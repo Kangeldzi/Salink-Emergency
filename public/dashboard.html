@@ -17,6 +17,19 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
     <style>
+        /* ============================================================
+         * SALINK DASHBOARD v4.3 — DUAL MODE EMERGENCY ALERT
+         * ============================================================
+         * NEW in v4.3:
+         * ✅ Tombol "Ambil Lokasi Saya" (GPS + Reverse Geocoding Nominatim)
+         * ✅ Dual Mode Emergency Alert:
+         *    - STANDBY (tab hidden / idle>30s) → FULL SCREEN ALARM
+         *    - AKTIF (tab visible) → FLOATING + BUTTON GRID BERBUNYI
+         * ✅ Full screen alarm dengan swipe 4 arah dismiss
+         * ✅ Audio loop tanpa batas (auto-pause saat tab hidden)
+         * ✅ Auto-activate alarm via FCM background handler
+         * ============================================================ */
+
         :root {
             --bg-primary: #0d1117; --bg-secondary: #161b22; --bg-card: rgba(22, 27, 34, 0.92);
             --bg-input: rgba(22, 27, 34, 0.6); --text-primary: #e6edf3; --text-secondary: #8b949e;
@@ -49,6 +62,7 @@
         ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
         ::-webkit-scrollbar-thumb { background: var(--accent-blue); border-radius: 3px; }
 
+        /* ============ ANIMATIONS ============ */
         @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes modalIn { from { transform: scale(0.8) translateY(30px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
         @keyframes notifPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.3); } }
@@ -75,12 +89,47 @@
         @keyframes emergencyZoom { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
         @keyframes syncPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
 
+        /* ✅ v4.3: FULL SCREEN ALARM ANIMATIONS */
+        @keyframes fullScreenAlarmFlash {
+            0%, 100% { background-color: #0d1117; }
+            50% { background-color: #4a0000; }
+        }
+        @keyframes fullScreenAlarmPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 60px rgba(248,81,73,0.6); }
+            50% { transform: scale(1.08); box-shadow: 0 0 120px rgba(248,81,73,1); }
+        }
+        @keyframes fullScreenAlarmZoom {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
+        @keyframes fullScreenAlarmSwipeHint {
+            0%, 100% { opacity: 0.5; transform: translateY(0); }
+            50% { opacity: 1; transform: translateY(-12px); }
+        }
+        @keyframes fullScreenAlarmShakeX {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+        @keyframes swipeDirectionPulse {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
+        }
+        @keyframes alarmRingIcon {
+            0%, 100% { transform: scale(1) rotate(-15deg); }
+            25% { transform: scale(1.1) rotate(15deg); }
+            50% { transform: scale(1.15) rotate(-15deg); }
+            75% { transform: scale(1.1) rotate(15deg); }
+        }
+
+        /* ============ THEME TOGGLE ============ */
         .theme-toggle { position: relative; width: 44px; height: 24px; background: var(--toggle-bg); border-radius: 30px; cursor: pointer; transition: all 0.3s ease; border: 1px solid var(--border-color); flex-shrink: 0; }
         .theme-toggle.active { background: rgba(88, 166, 255, 0.3); }
         .theme-toggle .toggle-thumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--toggle-thumb); transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(88, 166, 255, 0.3); display: flex; align-items: center; justify-content: center; font-size: 0.55rem; }
         .theme-toggle.active .toggle-thumb { left: 22px; }
         .theme-toggle .toggle-thumb i { color: #fff; }
 
+        /* ============ APP BAR ============ */
         .app-bar { position: fixed; top: 0; width: 100%; height: var(--header-height); background: var(--header-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: flex; justify-content: space-between; align-items: center; padding: 0 12px; z-index: 1000; box-shadow: 0 2px 20px var(--shadow-color); border-bottom: 1px solid var(--border-color); transition: background 0.3s ease; }
         .app-title { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--text-primary); font-size: 1rem; cursor: pointer; }
         .app-title .siren-icon-header { font-size: 1.5rem; display: inline-block; animation: spin 1.5s linear infinite, blink 1s ease-in-out infinite; line-height: 1; transform-origin: center; }
@@ -96,11 +145,12 @@
         .search-btn:hover { border-color: var(--accent-blue); }
         .search-btn i { font-size: 1rem; }
 
-        /* ✅ v4.0: Sync indicator */
+        /* ============ SYNC INDICATOR ============ */
         .sync-indicator { position: fixed; top: calc(var(--header-height) + 6px); right: 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 3px 10px; font-size: 0.55rem; color: var(--text-muted); z-index: 999; display: none; align-items: center; gap: 4px; animation: syncPulse 1s ease-in-out infinite; }
         .sync-indicator.active { display: flex; }
         .sync-indicator i { color: var(--accent-blue); font-size: 0.6rem; }
 
+        /* ============ SIDEBAR ============ */
         .sidebar-overlay-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1099; display: none; opacity: 0; transition: opacity 0.3s ease; }
         .sidebar-overlay-bg.active { display: block; opacity: 1; }
         .sidebar { position: fixed; top: var(--header-height); left: 0; width: 290px; max-height: calc(100vh - var(--header-height)); background: var(--bg-secondary); padding: 0; z-index: 1100; overflow-y: auto; box-shadow: 15px 0 30px var(--shadow-color); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; transform: translateX(-100%); transition: transform 0.3s ease; border-radius: 0 0 12px 0; }
@@ -124,11 +174,13 @@
         .nav-logout .nav-link { color: var(--accent-red); }
         .nav-logout .nav-link i { color: var(--accent-red); }
 
+        /* ============ MAIN CONTENT ============ */
         .main-content { padding: calc(var(--header-height) + 14px) 14px calc(var(--footer-height) + 14px); max-width: 600px; margin: 0 auto; width: 100%; min-height: 100vh; }
         .page-title { font-size: 1.3rem; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 600; color: var(--text-primary); }
         .page-title .title-left { display: flex; align-items: center; gap: 10px; }
         .page-title .title-left i { color: var(--accent-blue); }
 
+        /* ============ STATS CARDS ============ */
         .stats-grid-horizontal { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
         .stat-card-horizontal { background: var(--bg-card); backdrop-filter: blur(5px); border-radius: 12px; padding: 10px 14px; border: 1px solid var(--border-color); box-shadow: 0 4px 15px var(--shadow-light); transition: all 0.4s; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
         .stat-card-horizontal:hover { transform: translateY(-3px) scale(1.02); border-color: var(--accent-blue); }
@@ -138,6 +190,7 @@
         .stat-card-horizontal .stat-icon { font-size: 1.2rem; color: var(--accent-blue); opacity: 0.4; }
         @media (max-width: 480px) { .stats-grid-horizontal { grid-template-columns: repeat(2, 1fr); gap: 8px; } .stat-card-horizontal .stat-number { font-size: 1rem; } }
 
+        /* ============ HOLOGRAM ============ */
         .hologram-display { width: 100%; min-height: 240px; max-height: 500px; margin: 0 auto 16px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; position: relative; overflow-y: auto; overflow-x: hidden; box-shadow: 0 0 30px rgba(88,166,255,0.08); backdrop-filter: blur(12px); scroll-behavior: smooth; }
         .hologram-display::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(rgba(88,166,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(88,166,255,0.03) 1px, transparent 1px); background-size: 100% 2px, 2px 100%; animation: hologramScan 10s linear infinite; pointer-events: none; z-index: 1; }
         .hologram-header-title { position: sticky; top: 0; z-index: 5; background: var(--bg-card); backdrop-filter: blur(12px); padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; font-weight: 600; color: var(--text-primary); font-family: 'Poppins', sans-serif; }
@@ -181,411 +234,7 @@
         .hologram-empty .empty-title { font-size: 0.9rem; font-weight: 500; color: var(--text-primary); }
         .hologram-empty .empty-desc { font-size: 0.7rem; color: var(--text-muted); max-width: 280px; }
 
-        .emergency-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-bottom: 20px; }
-        .emergency-btn { aspect-ratio: 1/1; border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-decoration: none; color: var(--text-primary); font-weight: 500; position: relative; overflow: visible; border: 1px solid var(--border-color); cursor: pointer; padding: 0; background: transparent; transition: all 0.4s; }
-        .emergency-btn:hover { transform: translateY(-5px); border-color: var(--accent-blue); }
-        .emergency-btn:active { transform: scale(0.95); }
-        .btn-content { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 18px; background: var(--bg-card); backdrop-filter: blur(5px); box-shadow: 0 4px 15px var(--shadow-light); transition: all 0.4s; border: 1px solid transparent; overflow: hidden; }
-        .emergency-btn:hover .btn-content { box-shadow: 0 8px 25px var(--shadow-color); border-color: var(--accent-blue); }
-        .btn-glow { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 18px; z-index: 1; opacity: 0.3; filter: blur(20px); transition: all 0.4s; }
-        .emergency-btn:hover .btn-glow { opacity: 0.6; filter: blur(25px); }
-        .emergency-btn span { font-size: 0.7rem; font-weight: 500; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); }
-        .emergency-btn .play-status { font-size: 0.5rem; margin-top: 3px; opacity: 0.7; }
-        .btn-fire .btn-content { color: var(--accent-red); }
-        .btn-fire .btn-glow { background: var(--accent-red); }
-        .btn-medical .btn-content { color: #4fc3f7; }
-        .btn-medical .btn-glow { background: #4fc3f7; }
-        .btn-security .btn-content { color: var(--accent-gold); }
-        .btn-security .btn-glow { background: var(--accent-gold); }
-        .btn-disaster .btn-content { color: var(--accent-purple); }
-        .btn-disaster .btn-glow { background: var(--accent-purple); }
-        .emergency-btn .notif-badge { position: absolute; top: -10px !important; right: -10px !important; z-index: 9999 !important; background: var(--accent-red); color: #fff; font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 50%; min-width: 26px; height: 26px; display: none; align-items: center; justify-content: center; box-shadow: 0 0 25px rgba(248, 81, 73, 0.9); animation: badgePulse 0.8s ease-in-out infinite; border: 2px solid rgba(255, 255, 255, 0.3); pointer-events: none; }
-        .emergency-btn .notif-badge.show { display: flex !important; }
-        .emergency-btn.has-notification { border-color: var(--accent-red) !important; animation: emergencyPulse 0.8s ease-in-out infinite, emergencyFloat 2s ease-in-out infinite !important; box-shadow: 0 0 30px rgba(248, 81, 73, 0.4) !important; }
-        .emergency-btn.has-notification .btn-content { animation: emergencyRing 0.5s ease-in-out infinite !important; }
-        .emergency-btn.has-notification .play-status { color: var(--accent-red) !important; font-weight: 700 !important; animation: notifPulse 1s ease-in-out infinite; }
-        .emergency-btn.playing { border-color: var(--accent-green) !important; box-shadow: 0 0 30px rgba(37, 211, 102, 0.5) !important; }
-        .emergency-btn.playing .play-status { color: var(--accent-green) !important; font-weight: 700 !important; }
-        .emergency-btn.new-emergency { animation: emergencyButtonShake 0.6s ease-in-out infinite, emergencyZoom 1s ease-in-out infinite, emergencyFloat 1.5s ease-in-out infinite !important; border-color: var(--accent-red) !important; box-shadow: 0 0 40px rgba(248, 81, 73, 0.6) !important; }
-        @media (max-width: 480px) { .emergency-btn .notif-badge { font-size: 0.5rem; padding: 2px 6px; min-width: 22px; height: 22px; top: -8px; right: -8px; } }
-
-        .quick-access-section { margin-top: 20px; background: var(--bg-card); backdrop-filter: blur(10px); border-radius: 12px; padding: 16px; border: 1px solid var(--border-color); box-shadow: 0 4px 15px var(--shadow-light); }
-        .quick-access-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-        .quick-access-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
-        .quick-access-title i { color: var(--accent-blue); }
-        .quick-access-hint { font-size: 0.55rem; color: var(--text-muted); background: var(--bg-input); padding: 3px 10px; border-radius: 10px; }
-        .quick-access-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-        .quick-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 12px 6px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; text-decoration: none; color: var(--text-primary); transition: all 0.3s; cursor: pointer; position: relative; min-height: 80px; }
-        .quick-card:hover { border-color: var(--accent-blue); transform: translateY(-3px); box-shadow: 0 6px 18px rgba(88,166,255,0.15); }
-        .quick-card:active { transform: scale(0.95); }
-        .quick-card .quick-icon { font-size: 1.6rem; line-height: 1; }
-        .quick-card .quick-label { font-size: 0.6rem; font-weight: 600; text-align: center; line-height: 1.2; }
-        .quick-card .quick-badge { position: absolute; top: 4px; right: 4px; background: var(--accent-red); color: #fff; font-size: 0.5rem; font-weight: 700; padding: 1px 5px; border-radius: 8px; min-width: 16px; text-align: center; }
-        .quick-card.emergency-card { border-color: rgba(248,81,73,0.3); }
-        .quick-card.emergency-card:hover { border-color: var(--accent-red); box-shadow: 0 6px 18px rgba(248,81,73,0.2); }
-
-        .post-section { margin-top: 16px; background: var(--bg-card); backdrop-filter: blur(10px); border-radius: 12px; padding: 16px; border: 1px solid var(--border-color); box-shadow: 0 4px 15px var(--shadow-light); }
-        .post-header { display: flex; align-items: center; margin-bottom: 12px; }
-        .post-profile-pic { width: 34px; height: 34px; border-radius: 50%; background: var(--accent-blue-gradient); display: flex; align-items: center; justify-content: center; margin-right: 10px; overflow: hidden; flex-shrink: 0; border: 2px solid var(--accent-blue); cursor: pointer; }
-        .post-profile-pic img { width: 100%; height: 100%; object-fit: cover; }
-        .post-profile-pic i { color: #fff; font-size: 0.85rem; }
-        .post-user-info h4 { font-size: 0.85rem; color: var(--text-primary); }
-        .post-user-info small { font-size: 0.55rem; color: var(--text-muted); }
-        .post-type-dropdown-wrapper { margin-bottom: 12px; }
-        .post-type-dropdown-wrapper label { display: block; font-size: 0.65rem; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; }
-        #postTypeSelect { width: 100%; padding: 10px 12px; background: var(--bg-input); border: 2px solid var(--border-color); border-radius: 10px; color: var(--text-primary); font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.3s; }
-        #postTypeSelect:focus { outline: none; border-color: var(--accent-blue); }
-        .post-input { width: 100%; background: var(--bg-input); border: 1px solid var(--input-border); border-radius: 8px; padding: 10px; color: var(--text-primary); resize: none; min-height: 55px; font-size: 0.75rem; }
-        .post-input:focus { outline: none; border-color: var(--accent-blue); }
-        .post-special-fields { display: none; flex-direction: column; gap: 8px; margin-top: 6px; padding: 10px 12px; background: var(--bg-input); border-radius: 8px; border: 1px solid var(--border-color); }
-        .post-special-fields.active { display: flex; }
-        .post-special-fields .field-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .post-special-fields .field-label { font-size: 0.6rem; color: var(--text-muted); min-width: 100px; }
-        .post-special-fields .field-input { flex: 1; background: var(--bg-input); border: 1px solid var(--input-border); border-radius: 6px; padding: 6px 10px; color: var(--text-primary); font-size: 0.7rem; min-width: 150px; }
-        .post-special-fields .field-input:focus { outline: none; border-color: var(--accent-blue); }
-        .post-special-fields .map-hint { font-size: 0.55rem; color: var(--text-muted); margin-top: 2px; }
-        .post-actions-bottom { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; }
-        .media-upload-btn { background: none; border: none; color: var(--accent-blue); cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 0.7rem; }
-        .file-input { display: none; }
-        .post-submit-btn { background: var(--accent-blue-gradient); color: #fff; border: none; padding: 6px 18px; border-radius: 18px; cursor: pointer; font-weight: 600; font-size: 0.75rem; }
-        .post-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .post-submit-btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(88,166,255,0.3); }
-        .media-preview { margin-top: 8px; position: relative; display: none; }
-        .media-preview img, .media-preview video { max-width: 100%; max-height: 120px; border-radius: 8px; }
-        .remove-media { position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.7); width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; cursor: pointer; font-size: 0.7rem; }
-
-        .post-feed { margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
-        .post { background: var(--bg-input); border-radius: 10px; padding: 14px; border: 1px solid var(--border-color); }
-        .post-text { font-size: 0.75rem; line-height: 1.5; color: var(--text-primary); }
-        .post-media img, .post-media video { max-width: 100%; max-height: 220px; border-radius: 8px; margin-top: 8px; }
-        .post-actions { display: flex; gap: 12px; padding: 6px 0; border-top: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); margin-bottom: 8px; flex-wrap: wrap; margin-top: 8px; }
-        .post-action { display: flex; align-items: center; gap: 4px; cursor: pointer; color: var(--text-muted); font-size: 0.65rem; transition: all 0.3s; padding: 3px 6px; border-radius: 6px; }
-        .post-action:hover { color: var(--accent-blue); background: var(--bg-input); }
-        .post-action.liked { color: var(--accent-red); }
-        .post-action.liked i { color: var(--accent-red); }
-        .post-action.delete { color: var(--accent-red); margin-left: auto; }
-        .post-menu-toggle { position: absolute; top: 8px; right: 8px; background: var(--bg-input); border: none; color: var(--text-muted); cursor: pointer; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; z-index: 5; }
-        .post-menu-dropdown { position: absolute; top: 32px; right: 8px; background: var(--modal-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 4px 0; min-width: 140px; z-index: 10; display: none; box-shadow: 0 10px 30px var(--shadow-color); }
-        .post-menu-dropdown.active { display: block; }
-        .post-menu-dropdown .menu-item { padding: 8px 14px; color: var(--text-primary); font-size: 0.7rem; cursor: pointer; display: flex; align-items: center; gap: 8px; border: none; background: transparent; width: 100%; text-align: left; }
-        .post-menu-dropdown .menu-item:hover { background: var(--bg-input); color: var(--accent-blue); }
-        .comments-section { max-height: 200px; overflow-y: auto; margin-bottom: 8px; }
-        .comment { display: flex; flex-direction: column; margin-bottom: 8px; padding: 6px 8px; background: var(--bg-input); border-radius: 8px; }
-        .comment-main { display: flex; align-items: flex-start; gap: 8px; }
-        .comment-profile-pic { width: 26px; height: 26px; border-radius: 50%; overflow: hidden; flex-shrink: 0; border: 1px solid var(--accent-blue); display: flex; align-items: center; justify-content: center; background: var(--accent-blue-gradient); cursor: pointer; }
-        .comment-profile-pic img { width: 100%; height: 100%; object-fit: cover; }
-        .comment-user { font-weight: 600; font-size: 0.65rem; color: var(--accent-blue); cursor: pointer; }
-        .comment-text { font-size: 0.7rem; color: var(--text-primary); margin: 2px 0; }
-        .comment-time { font-size: 0.5rem; color: var(--text-muted); }
-        .add-comment { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
-        .comment-input { flex: 1; background: var(--bg-input); border: 1px solid var(--input-border); border-radius: 18px; padding: 6px 12px; color: var(--text-primary); font-size: 0.65rem; }
-        .send-comment { background: var(--accent-blue-gradient); border: none; width: 28px; height: 28px; border-radius: 50%; color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; }
-
-        .posts-stats-card { margin-top: 16px; background: var(--bg-card); backdrop-filter: blur(10px); border-radius: 12px; padding: 16px; border: 1px solid var(--border-color); box-shadow: 0 4px 15px var(--shadow-light); }
-        .posts-stats-card .stats-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        .posts-stats-card .stats-title { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
-        .posts-stats-card .stats-count { font-size: 0.7rem; color: var(--text-muted); background: var(--bg-input); padding: 2px 10px; border-radius: 12px; }
-        .post-list-item { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 8px; background: var(--bg-input); margin-bottom: 6px; border: 1px solid var(--border-color); cursor: pointer; transition: all 0.3s; }
-        .post-list-item:hover { border-color: var(--accent-blue); transform: translateX(3px); }
-        .post-list-item .item-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.8rem; background: var(--bg-card); border: 1px solid var(--border-color); }
-        .post-list-item .item-content { flex: 1; min-width: 0; }
-        .post-list-item .item-title { font-size: 0.75rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .post-list-item .item-sub { font-size: 0.55rem; color: var(--text-muted); }
-        .post-list-item .item-time { font-size: 0.5rem; color: var(--text-muted); }
-        .post-list-item .item-delete { background: rgba(248,81,73,0.1); color: var(--accent-red); border: 1px solid rgba(248,81,73,0.2); width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 0.65rem; transition: all 0.3s; flex-shrink: 0; }
-        .post-list-item .item-delete:hover { background: var(--accent-red); color: #fff; }
-
-        .post-card-full { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; transition: all 0.3s; animation: fadeIn 0.4s ease; }
-        .post-card-full:hover { border-color: var(--accent-blue); transform: translateX(3px); }
-        .post-card-full.fire { border-left: 3px solid var(--accent-red); }
-        .post-card-full.medical { border-left: 3px solid #4fc3f7; }
-        .post-card-full.crime { border-left: 3px solid var(--accent-gold); }
-        .post-card-full.disaster { border-left: 3px solid var(--accent-purple); }
-        .post-card-full .pcf-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-        .post-card-full .pcf-icon { font-size: 1.5rem; }
-        .post-card-full .pcf-type { font-size: 0.7rem; font-weight: 700; padding: 2px 10px; border-radius: 10px; }
-        .post-card-full .pcf-type.fire { color: var(--accent-red); background: rgba(248,81,73,0.15); border: 1px solid rgba(248,81,73,0.2); animation: alarmPulse 1s ease-in-out infinite; }
-        .post-card-full .pcf-type.medical { color: #4fc3f7; background: rgba(79,195,247,0.15); border: 1px solid rgba(79,195,247,0.2); }
-        .post-card-full .pcf-type.crime { color: var(--accent-gold); background: rgba(240,208,128,0.15); border: 1px solid rgba(240,208,128,0.2); }
-        .post-card-full .pcf-type.disaster { color: var(--accent-purple); background: rgba(199,146,234,0.15); border: 1px solid rgba(199,146,234,0.2); }
-        .post-card-full .pcf-time { font-size: 0.55rem; color: var(--text-muted); margin-left: auto; }
-        .post-card-full .pcf-sender { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 6px; }
-        .post-card-full .pcf-sender strong { color: var(--accent-blue); cursor: pointer; }
-        .post-card-full .pcf-text { font-size: 0.75rem; color: var(--text-primary); line-height: 1.5; margin-bottom: 8px; padding: 8px 10px; background: rgba(88,166,255,0.05); border-radius: 8px; }
-        .post-card-full .pcf-location { font-size: 0.7rem; color: var(--text-secondary); display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px; }
-        .post-card-full .pcf-location i { color: var(--accent-blue); font-size: 0.75rem; margin-top: 2px; }
-        .post-card-full .pcf-coords { font-size: 0.6rem; font-family: 'Courier New', monospace; color: var(--accent-blue); padding: 3px 10px; background: rgba(88,166,255,0.08); border-radius: 6px; display: inline-block; margin-bottom: 8px; }
-        .post-card-full .pcf-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
-        .post-card-full .pcf-actions .btn-map-item { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 8px; font-size: 0.6rem; font-weight: 600; text-decoration: none; cursor: pointer; border: none; background: var(--accent-blue-gradient); color: #fff; }
-        .post-card-full .pcf-actions .btn-map-item:hover { transform: translateY(-2px); }
-        .post-card-full .pcf-actions .btn-delete-perm { background: rgba(248,81,73,0.1); color: var(--accent-red); border: 1px solid rgba(248,81,73,0.3); }
-        .post-card-full .pcf-expiry { font-size: 0.55rem; color: var(--accent-gold); display: flex; align-items: center; gap: 4px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border-color); }
-        .post-card-full.expired { opacity: 0.85; }
-        .post-card-full.expired .pcf-expiry { color: var(--text-muted); }
-        .post-card-full.expired .pcf-type { animation: none !important; }
-
-        .statistics-section { margin-top: 20px; background: var(--bg-card); backdrop-filter: blur(10px); border-radius: 12px; padding: 18px; border: 1px solid var(--border-color); box-shadow: 0 4px 15px var(--shadow-light); }
-        .statistics-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 6px; }
-        .statistics-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); }
-        .chart-nav { display: flex; gap: 4px; flex-wrap: wrap; }
-        .chart-nav-btn { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 4px 10px; color: var(--text-muted); font-size: 0.6rem; cursor: pointer; }
-        .chart-nav-btn:hover { border-color: var(--accent-blue); color: var(--text-primary); }
-        .chart-nav-btn.active { background: var(--accent-blue-gradient); color: #fff; border-color: var(--accent-blue); }
-        .chart-container { margin-top: 10px; display: none; min-height: 200px; }
-        .chart-container.active { display: block; animation: fadeIn 0.4s ease; }
-        .chart-container canvas { max-height: 280px; max-width: 100%; }
-        .chart-container .chart-wrapper { position: relative; width: 100%; max-width: 400px; margin: 0 auto; }
-        .chart-period-info { text-align: center; margin-top: 10px; font-size: 0.6rem; color: var(--text-muted); border-top: 1px solid var(--border-color); padding-top: 8px; }
-        .heatmap-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 10px 0; max-width: 400px; margin: 0 auto; }
-        .heatmap-cell { aspect-ratio: 1; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 0.5rem; color: var(--text-primary); font-weight: 600; cursor: pointer; border: 1px solid var(--border-color); min-height: 30px; }
-        .heatmap-cell.high { background: rgba(248,81,73,0.7); }
-        .heatmap-cell.medium { background: rgba(240,208,128,0.6); }
-        .heatmap-cell.low { background: rgba(63,185,80,0.4); }
-        .heatmap-cell.none { background: var(--bg-input); opacity: 0.3; }
-        .heatmap-legend { display: flex; justify-content: center; gap: 12px; font-size: 0.5rem; color: var(--text-muted); margin-top: 6px; flex-wrap: wrap; }
-        .emergency-map-container { width: 100%; margin: 10px 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); background: var(--bg-input); }
-        .emergency-map-container iframe { display: block; width: 100%; height: 300px; border: none; }
-
-        .social-links { display: flex; justify-content: center; gap: 16px; padding: 14px 0 10px; flex-wrap: wrap; background: var(--bg-card); border-radius: 12px; margin-top: 12px; border: 1px solid var(--border-color); box-shadow: 0 4px 15px var(--shadow-light); }
-        .social-link { display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 50%; background: var(--bg-input); border: 2px solid var(--border-color); color: var(--text-primary); text-decoration: none; font-size: 1.4rem; transition: all 0.4s; position: relative; animation: socialFloat 3s ease-in-out infinite; }
-        .social-link:nth-child(1) { animation-delay: 0s; }
-        .social-link:nth-child(2) { animation-delay: 0.4s; }
-        .social-link:nth-child(3) { animation-delay: 0.8s; }
-        .social-link:nth-child(4) { animation-delay: 1.2s; }
-        .social-link.facebook { color: var(--facebook); border-color: rgba(24,119,242,0.2); }
-        .social-link.facebook:hover { color: #fff; border-color: var(--facebook); background: var(--facebook); transform: scale(1.2) translateY(-6px); }
-        .social-link.tiktok { color: var(--tiktok); border-color: rgba(255,0,80,0.2); }
-        .social-link.tiktok:hover { color: #fff; border-color: var(--tiktok); background: var(--tiktok); transform: scale(1.2) translateY(-6px); }
-        .social-link.youtube { color: var(--youtube); border-color: rgba(255,0,0,0.2); }
-        .social-link.youtube:hover { color: #fff; border-color: var(--youtube); background: var(--youtube); transform: scale(1.2) translateY(-6px); }
-        .social-link.portfolio { color: var(--portfolio); border-color: rgba(139,92,246,0.2); }
-        .social-link.portfolio:hover { color: #fff; border-color: var(--portfolio); background: var(--portfolio); transform: scale(1.2) translateY(-6px); }
-        .social-link .social-tooltip { position: absolute; bottom: calc(100% + 14px); left: 50%; transform: translateX(-50%) scale(0.8); background: var(--modal-bg); color: var(--text-primary); padding: 6px 16px; border-radius: 10px; font-size: 0.7rem; font-weight: 600; white-space: nowrap; opacity: 0; pointer-events: none; transition: all 0.35s; border: 1px solid var(--border-color); z-index: 999; }
-        .social-link:hover .social-tooltip { opacity: 1; transform: translateX(-50%) scale(1); }
-
-        .footer-links { display: flex; justify-content: center; gap: 12px; padding: 12px 0 6px; flex-wrap: wrap; background: var(--bg-card); border-radius: 12px; margin-top: 8px; border: 1px solid var(--border-color); }
-        .footer-link { color: var(--text-muted); text-decoration: none; font-size: 0.6rem; font-weight: 500; padding: 4px 12px; border-radius: 6px; border: 1px solid transparent; transition: all 0.3s; position: relative; }
-        .footer-link:hover { color: var(--accent-blue); border-color: var(--accent-blue); background: rgba(88,166,255,0.05); transform: translateY(-2px); }
-        .footer-link.contact { color: var(--whatsapp); }
-        .footer-link.contact:hover { color: #fff; border-color: var(--whatsapp); background: var(--whatsapp); }
-        .footer-divider { color: var(--border-color); font-size: 0.6rem; display: flex; align-items: center; }
-
-        .preview-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(15px); z-index: 1500; display: none; align-items: center; justify-content: center; padding: 20px; }
-        .preview-overlay.active { display: flex; animation: fadeIn 0.4s ease; }
-        .preview-overlay-content { background: var(--modal-bg); border-radius: 20px; max-width: 420px; width: 100%; padding: 30px 24px; border: 1px solid var(--border-color); box-shadow: 0 30px 60px var(--shadow-color); animation: modalIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275); text-align: center; margin: 0 10px; }
-        .preview-overlay-content .overlay-icon { width: 70px; height: 70px; margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--accent-blue-gradient); box-shadow: 0 0 30px rgba(88,166,255,0.3); }
-        .preview-overlay-content .overlay-icon i { font-size: 2rem; color: #fff; }
-        .preview-overlay-content h2 { font-size: 1.2rem; margin-bottom: 8px; color: var(--text-primary); font-weight: 700; }
-        .preview-overlay-content p { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6; }
-        .preview-overlay-content .overlay-buttons { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
-        .preview-overlay-content .overlay-buttons button { padding: 10px 24px; border-radius: 10px; border: none; font-size: 0.8rem; font-weight: 600; cursor: pointer; flex: 1; max-width: 180px; font-family: inherit; }
-        .preview-overlay-content .overlay-buttons .btn-login { background: var(--accent-blue-gradient); color: #fff; }
-        .preview-overlay-content .overlay-buttons .btn-cancel { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-color); }
-
-        .preview-badge { position: fixed; top: var(--header-height); left: 0; right: 0; background: var(--bg-card); backdrop-filter: blur(10px); padding: 6px 16px; text-align: center; z-index: 999; border-bottom: 1px solid var(--border-color); font-size: 0.7rem; color: var(--text-secondary); display: none; }
-        .preview-badge .login-link { color: var(--accent-blue); font-weight: 600; cursor: pointer; text-decoration: underline; }
-        .preview-badge.active { display: block; }
-
-        .emergency-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.98); z-index: 99999; display: none; align-items: center; justify-content: center; flex-direction: column; padding: 30px 20px; touch-action: none; overflow: hidden; }
-        .emergency-overlay.active { display: flex; animation: flash 1.5s ease-in-out infinite; }
-        .emergency-overlay .emergency-icon { font-size: 5.5rem; margin-bottom: 16px; animation: emergencyOverlayIcon 1s ease-in-out infinite; }
-        .emergency-overlay .emergency-icon.fire { color: var(--accent-red); }
-        .emergency-overlay .emergency-icon.medical { color: #4fc3f7; }
-        .emergency-overlay .emergency-icon.crime { color: var(--accent-gold); }
-        .emergency-overlay .emergency-icon.disaster { color: var(--accent-purple); }
-        .emergency-overlay .emergency-title { font-size: 2.2rem; font-weight: 700; text-align: center; text-shadow: 0 0 40px currentColor; margin-bottom: 8px; animation: emergencyOverlayPulse 1.5s ease-in-out infinite; font-family: 'Poppins', sans-serif; }
-        .emergency-overlay .emergency-title.fire { color: var(--accent-red); }
-        .emergency-overlay .emergency-title.medical { color: #4fc3f7; }
-        .emergency-overlay .emergency-title.crime { color: var(--accent-gold); }
-        .emergency-overlay .emergency-title.disaster { color: var(--accent-purple); }
-        .emergency-overlay .emergency-subtitle { font-size: 1rem; color: var(--text-secondary); text-align: center; margin-bottom: 12px; }
-        .emergency-overlay .emergency-sender { font-size: 0.9rem; color: var(--accent-blue); text-align: center; margin-bottom: 4px; }
-        .emergency-overlay .emergency-sender strong { color: #fff; font-weight: 700; }
-        .emergency-overlay .emergency-location,
-        .emergency-overlay .emergency-address,
-        .emergency-overlay .emergency-coords,
-        .emergency-overlay .emergency-time { font-size: 0.75rem; color: var(--text-muted); text-align: center; margin-bottom: 4px; }
-        .emergency-overlay .emergency-actions { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; justify-content: center; }
-        .emergency-overlay .emergency-actions button { padding: 12px 24px; border-radius: 12px; border: none; font-size: 0.85rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: all 0.3s; font-family: inherit; -webkit-tap-highlight-color: transparent; min-width: 140px; justify-content: center; }
-        .emergency-overlay .emergency-actions .btn-view { background: var(--accent-blue-gradient); color: #fff; }
-        .emergency-overlay .emergency-actions .btn-view:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(88,166,255,0.4); }
-        .emergency-overlay .emergency-actions .btn-dismiss { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-color); }
-        .emergency-overlay .emergency-actions .btn-dismiss:hover { border-color: var(--accent-blue); }
-        .emergency-overlay .emergency-swipe { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); color: var(--text-muted); font-size: 0.7rem; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 16px 28px; background: rgba(255, 255, 255, 0.05); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.08); pointer-events: none; min-width: 220px; }
-        .emergency-overlay .emergency-swipe i { font-size: 2rem; animation: swipeArrow 1.5s ease-in-out infinite; }
-        .emergency-overlay .emergency-badge { position: absolute; top: 20px; right: 20px; font-size: 0.55rem; padding: 4px 14px; border-radius: 20px; background: rgba(248, 81, 73, 0.2); color: var(--accent-red); border: 1px solid rgba(248, 81, 73, 0.2); animation: alarmPulse 1s ease-in-out infinite; font-weight: 700; }
-        .emergency-overlay .countdown { position: absolute; top: 20px; left: 20px; font-size: 0.6rem; padding: 4px 14px; border-radius: 20px; background: rgba(240, 208, 128, 0.15); color: var(--accent-gold); border: 1px solid rgba(240, 208, 128, 0.2); font-weight: 700; }
-        .emergency-overlay .audio-indicator { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 6px; font-size: 0.65rem; color: var(--accent-red); font-weight: 700; animation: pulse-dot 1s ease-in-out infinite; }
-        .emergency-overlay .audio-indicator i { font-size: 1rem; }
-
-        .floating-notification { position: fixed; top: calc(var(--header-height) + 8px); left: 10px; right: 10px; max-width: 500px; margin: 0 auto; background: var(--bg-card); backdrop-filter: blur(15px); border: 1px solid var(--accent-blue); border-radius: 12px; padding: 12px 14px; z-index: 9998; display: none; box-shadow: 0 10px 40px var(--shadow-color); animation: floatingNotifIn 0.5s ease forwards; cursor: pointer; }
-        .floating-notification.active { display: flex; align-items: center; gap: 12px; }
-        .floating-notification.hide { animation: floatingNotifOut 0.5s ease forwards; }
-        .floating-notification.emergency-notif { border-color: var(--accent-red); animation: floatingNotifIn 0.5s ease forwards, emergencyZoom 1.5s ease-in-out infinite; box-shadow: 0 0 30px rgba(248,81,73,0.5); }
-        .floating-notification .notif-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1rem; }
-        .floating-notification .notif-icon.emergency { background: rgba(248, 81, 73, 0.2); color: var(--accent-red); animation: alarmPulse 0.5s ease-in-out infinite; }
-        .floating-notification .notif-icon.install { background: rgba(88, 166, 255, 0.2); color: var(--accent-blue); }
-        .floating-notification .notif-icon.regular { background: rgba(88, 166, 255, 0.15); color: var(--accent-blue); }
-        .floating-notification .notif-content { flex: 1; min-width: 0; }
-        .floating-notification .notif-content .notif-title { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); }
-        .floating-notification .notif-content .notif-message { font-size: 0.65rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .floating-notification .notif-content .notif-subtitle { font-size: 0.55rem; color: var(--text-muted); }
-        .floating-notification .notif-action { padding: 4px 16px; border-radius: 5px; border: 1px solid var(--accent-blue); background: rgba(88, 166, 255, 0.15); color: var(--accent-blue); font-size: 0.7rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
-        .floating-notification .notif-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; padding: 4px; }
-
-        .bottom-nav { position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; height: var(--footer-height, 65px) !important; min-height: 65px !important; max-height: 65px !important; background: var(--footer-bg) !important; backdrop-filter: blur(15px) !important; border-top: 1px solid var(--border-color) !important; z-index: 1000 !important; display: flex !important; flex-direction: row !important; justify-content: space-around !important; align-items: center !important; padding: 0 4px !important; box-shadow: 0 -5px 20px var(--shadow-color) !important; }
-        .nav-item-bottom { display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 4px; padding: 4px 8px; border-radius: 10px; cursor: pointer; text-decoration: none; color: var(--text-muted); border: none; background: transparent; position: relative !important; min-width: 50px; font-size: 11px; flex: 1 !important; height: 100% !important; max-height: 65px !important; }
-        .nav-item-bottom .nav-icon { font-size: 1.6rem; line-height: 1.2; display: block; }
-        .nav-item-bottom .nav-label { font-size: 0.65rem; font-weight: 500; white-space: nowrap; }
-        .nav-item-bottom.active .nav-icon { transform: scale(1.2); filter: drop-shadow(0 0 8px rgba(88,166,255,0.5)); }
-        .nav-item-bottom.active .nav-label { color: var(--accent-blue); font-weight: 600; }
-        .nav-item-bottom .badge { position: absolute; top: 0px !important; right: 0px !important; background: var(--accent-red); color: white; font-size: 0.55rem; border-radius: 50%; min-width: 18px; height: 18px; display: none; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 0 10px rgba(248,81,73,0.5); padding: 0 4px; animation: notifPulse 1s ease-in-out infinite; z-index: 10 !important; }
-        .nav-item-bottom .badge.show { display: flex !important; }
-        @media (max-width: 480px) { .bottom-nav { height: 58px !important; min-height: 58px !important; max-height: 58px !important; } .nav-item-bottom .nav-icon { font-size: 1.4rem !important; } .nav-item-bottom .nav-label { font-size: 0.55rem !important; } }
-        .main-content { padding-bottom: calc(var(--footer-height) + 16px) !important; }
-
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(15px); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 20px; }
-        .modal-overlay.active { display: flex; animation: fadeIn 0.3s ease; }
-        .modal-content { background: var(--modal-bg); border-radius: 20px; max-width: 500px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 20px 18px; border: 1px solid var(--border-color); box-shadow: 0 30px 60px var(--shadow-color); animation: modalIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275); }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
-        .modal-title { font-size: 1rem; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
-        .modal-title .badge-count { background: var(--bg-input); color: var(--text-primary); padding: 2px 10px; border-radius: 12px; font-size: 0.7rem; }
-        .modal-close { background: var(--bg-input); border: none; color: var(--text-primary); width: 30px; height: 30px; border-radius: 50%; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-color); }
-        .modal-close:hover { background: var(--bg-card); transform: rotate(90deg); }
-        .modal-body { color: var(--text-primary); font-size: 0.75rem; }
-        .modal-footer { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border-color); display: flex; justify-content: center; gap: 10px; }
-        .modal-footer .btn-close-modal { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 5px; padding: 8px 30px; font-size: 0.75rem; cursor: pointer; font-weight: 500; font-family: inherit; }
-
-        .invite-user-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 6px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; }
-        .invite-user-item:hover { border-color: var(--accent-blue); transform: translateX(3px); }
-        .invite-user-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--accent-blue-gradient); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 1rem; flex-shrink: 0; overflow: hidden; border: 2px solid var(--accent-blue); }
-        .invite-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .invite-user-info { flex: 1; min-width: 0; }
-        .invite-user-name { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); }
-        .invite-user-sub { font-size: 0.6rem; color: var(--text-muted); }
-        .invite-user-btn { padding: 6px 14px; border-radius: 8px; border: none; background: var(--accent-blue-gradient); color: #fff; font-size: 0.65rem; font-weight: 600; cursor: pointer; flex-shrink: 0; font-family: inherit; }
-        .invite-user-btn.sent { background: var(--bg-card); color: var(--accent-green); border: 1px solid var(--accent-green); }
-        .invite-user-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .notif-item { display: flex; gap: 10px; padding: 10px 12px; margin-bottom: 6px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; cursor: pointer; position: relative; }
-        .notif-item:hover { border-color: var(--accent-blue); transform: translateX(3px); }
-        .notif-item.unread { background: rgba(88,166,255,0.08); border-left: 3px solid var(--accent-blue); }
-        .notif-item.unread::after { content: ''; position: absolute; top: 10px; right: 10px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent-red); animation: notifPulse 1s ease-in-out infinite; }
-        .notif-item.emergency { border-left: 3px solid var(--accent-red); }
-        .notif-item-icon { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1rem; }
-        .notif-item-icon.emergency { background: rgba(248,81,73,0.2); color: var(--accent-red); }
-        .notif-item-icon.regular { background: rgba(88,166,255,0.15); color: var(--accent-blue); }
-        .notif-item-content { flex: 1; min-width: 0; }
-        .notif-item-title { font-size: 0.75rem; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; }
-        .notif-item-message { font-size: 0.65rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 3px; }
-        .notif-item-time { font-size: 0.55rem; color: var(--text-muted); }
-        .notif-item-actions { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
-        .notif-item-actions button { padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-muted); font-size: 0.55rem; cursor: pointer; font-family: inherit; }
-        .notif-item-actions button:hover { border-color: var(--accent-blue); color: var(--accent-blue); }
-        .notif-filter-btn.active { background: var(--accent-blue-gradient) !important; color: #fff !important; border-color: var(--accent-blue) !important; }
-
-        .toast-container { position: fixed; bottom: calc(var(--footer-height) + 20px); left: 50%; transform: translateX(-50%); z-index: 3000; max-width: 400px; width: 90%; }
-        .toast { background: var(--modal-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 16px; box-shadow: 0 10px 30px var(--shadow-color); display: flex; align-items: center; gap: 12px; animation: toastIn 0.4s ease; margin-bottom: 8px; }
-        .toast.hide { animation: toastOut 0.4s ease forwards; }
-        .toast .toast-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: rgba(88,166,255,0.15); color: var(--accent-blue); }
-        .toast .toast-content { flex: 1; }
-        .toast .toast-title { font-size: 0.75rem; font-weight: 600; color: var(--text-primary); }
-        .toast .toast-message { font-size: 0.7rem; color: var(--text-secondary); }
-        .toast .toast-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; padding: 4px; }
-        .shake-element { animation: shake 0.3s ease; }
-
-        .search-modal-content { max-width: 600px; max-height: 90vh; }
-        .search-input-wrapper { position: relative; margin-bottom: 12px; }
-        .search-input-wrapper i.search-icon { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--accent-blue); font-size: 1rem; pointer-events: none; }
-        .search-input-wrapper .clear-search-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-muted); width: 28px; height: 28px; border-radius: 50%; cursor: pointer; display: none; align-items: center; justify-content: center; font-size: 0.7rem; }
-        .search-input-wrapper .clear-search-btn.visible { display: flex; }
-        #searchInput { width: 100%; padding: 12px 42px 12px 42px; background: var(--bg-input); border: 2px solid var(--border-color); border-radius: 12px; color: var(--text-primary); font-size: 0.85rem; font-weight: 500; }
-        #searchInput:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(88,166,255,0.1); }
-
-        .search-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
-        .search-tab { flex: 1; min-width: 90px; padding: 8px 10px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-muted); font-size: 0.65rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; font-family: inherit; }
-        .search-tab:hover { border-color: var(--accent-blue); color: var(--text-primary); }
-        .search-tab.active { background: var(--accent-blue-gradient); color: #fff; border-color: var(--accent-blue); }
-
-        .search-section-title { font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin: 14px 0 8px; display: flex; align-items: center; justify-content: space-between; }
-        .search-section-title .count-pill { background: var(--bg-input); color: var(--accent-blue); padding: 2px 10px; border-radius: 10px; font-size: 0.6rem; font-weight: 700; }
-
-        .search-result-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 6px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; cursor: pointer; }
-        .search-result-item:hover { border-color: var(--accent-blue); transform: translateX(3px); background: var(--bg-card); }
-        .search-result-item .result-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--accent-blue-gradient); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 1rem; flex-shrink: 0; overflow: hidden; border: 2px solid var(--accent-blue); position: relative; }
-        .search-result-item .result-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .search-result-item .result-avatar .online-dot { position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--accent-green); border: 2px solid var(--bg-card); }
-        .search-result-item .result-avatar .offline-dot { position: absolute; bottom: 0; right: 0; width: 10px; height: 10px; border-radius: 50%; background: var(--text-muted); border: 2px solid var(--bg-card); }
-        .search-result-item .result-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1.1rem; background: var(--bg-card); border: 2px solid var(--border-color); }
-        .search-result-item .result-icon.fire { border-color: var(--accent-red); color: var(--accent-red); background: rgba(248,81,73,0.1); }
-        .search-result-item .result-icon.medical { border-color: #4fc3f7; color: #4fc3f7; background: rgba(79,195,247,0.1); }
-        .search-result-item .result-icon.crime { border-color: var(--accent-gold); color: var(--accent-gold); background: rgba(240,208,128,0.1); }
-        .search-result-item .result-icon.disaster { border-color: var(--accent-purple); color: var(--accent-purple); background: rgba(199,146,234,0.1); }
-        .search-result-item .result-icon.post { border-color: var(--accent-blue); color: var(--accent-blue); background: rgba(88,166,255,0.1); }
-        .search-result-item .result-info { flex: 1; min-width: 0; }
-        .search-result-item .result-title { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .search-result-item .result-sub { font-size: 0.6rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .search-result-item .result-time { font-size: 0.55rem; color: var(--text-muted); flex-shrink: 0; margin-left: 6px; }
-        .search-result-item .result-arrow { color: var(--text-muted); font-size: 0.75rem; flex-shrink: 0; }
-        .search-result-item mark { background: rgba(240,208,128,0.3); color: var(--text-primary); padding: 0 2px; border-radius: 3px; font-weight: 700; }
-
-        .search-empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
-        .search-empty-state .empty-big-icon { font-size: 3rem; opacity: 0.3; margin-bottom: 12px; }
-        .search-empty-state h4 { font-size: 0.9rem; color: var(--text-primary); margin-bottom: 6px; font-weight: 600; }
-        .search-empty-state p { font-size: 0.75rem; line-height: 1.5; max-width: 300px; margin: 0 auto; }
-
-        .recent-search-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 4px; cursor: pointer; }
-        .recent-search-item:hover { border-color: var(--accent-blue); }
-        .recent-search-item .recent-icon { color: var(--text-muted); font-size: 0.75rem; flex-shrink: 0; }
-        .recent-search-item .recent-text { flex: 1; font-size: 0.75rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .recent-search-item .recent-remove { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; }
-
-        .trending-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; margin-bottom: 6px; cursor: pointer; }
-        .trending-item:hover { border-color: var(--accent-gold); transform: translateX(3px); }
-        .trending-item .trending-rank { width: 28px; height: 28px; border-radius: 50%; background: var(--accent-blue-gradient); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; flex-shrink: 0; }
-        .trending-item .trending-rank.gold { background: linear-gradient(135deg, #f0d080, #d4a017); }
-        .trending-item .trending-info { flex: 1; min-width: 0; }
-        .trending-item .trending-title { font-size: 0.75rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .trending-item .trending-sub { font-size: 0.6rem; color: var(--text-muted); }
-
-        .search-filter-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
-        .search-filter-chip { padding: 5px 12px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 999px; color: var(--text-muted); font-size: 0.6rem; font-weight: 600; cursor: pointer; font-family: inherit; }
-        .search-filter-chip.active { background: rgba(88,166,255,0.15); border-color: var(--accent-blue); color: var(--accent-blue); }
-
-        .keyboard-hint { font-size: 0.55rem; color: var(--text-muted); text-align: center; margin-top: 8px; }
-        .keyboard-hint kbd { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 4px; padding: 1px 5px; font-size: 0.55rem; color: var(--text-secondary); }
-
-        /* ✅ v4.0: Delete confirmation modal */
-        .delete-confirm-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(20px); z-index: 999999; display: none; align-items: center; justify-content: center; padding: 20px; }
-        .delete-confirm-modal.active { display: flex; animation: fadeIn 0.3s ease; }
-        .delete-confirm-content { background: var(--modal-bg); border-radius: 20px; max-width: 380px; width: 100%; padding: 24px 20px; border: 1px solid var(--accent-red); box-shadow: 0 30px 60px rgba(248,81,73,0.3); text-align: center; }
-        .delete-confirm-icon { width: 60px; height: 60px; margin: 0 auto 14px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(248,81,73,0.15); color: var(--accent-red); font-size: 1.8rem; }
-        .delete-confirm-title { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
-        .delete-confirm-msg { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 6px; line-height: 1.5; }
-        .delete-confirm-warning { font-size: 0.7rem; color: var(--accent-red); background: rgba(248,81,73,0.08); padding: 8px 12px; border-radius: 10px; margin: 10px 0; border: 1px solid rgba(248,81,73,0.2); font-weight: 600; }
-        .delete-confirm-actions { display: flex; gap: 10px; margin-top: 16px; }
-        .delete-confirm-actions button { flex: 1; padding: 12px; border-radius: 12px; border: none; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: inherit; transition: all 0.3s; }
-        .delete-confirm-cancel { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-color) !important; }
-        .delete-confirm-delete { background: var(--accent-red); color: #fff; }
-        .delete-confirm-delete:active { transform: scale(0.95); }
-
-        @media (max-width: 480px) {
-            .emergency-overlay .emergency-icon { font-size: 4rem; }
-            .emergency-overlay .emergency-title { font-size: 1.6rem; }
-            .emergency-overlay .emergency-swipe { bottom: 30px; padding: 12px 20px; min-width: 160px; }
-            .emergency-overlay .emergency-actions { margin-top: 16px; }
-            .emergency-overlay .emergency-actions button { padding: 10px 20px; font-size: 0.8rem; min-width: 120px; }
-            .search-tab { min-width: 70px; font-size: 0.6rem; padding: 7px 6px; }
-        }
-
-        .gauge-modern-wrapper { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 20px 10px; background: var(--bg-input); border-radius: 16px; border: 1px solid var(--border-color); max-width: 420px; margin: 0 auto; }
-        .gauge-modern-title { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; font-weight: 600; color: var(--text-primary); }
-        .gauge-modern-svg-wrap { width: 100%; max-width: 340px; aspect-ratio: 320/200; }
-        .gauge-modern-svg { width: 100%; height: 100%; display: block; }
-        .gauge-modern-stats { display: flex; justify-content: center; gap: 20px; font-size: 0.65rem; color: var(--text-secondary); flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--border-color); width: 100%; }
-        .gauge-modern-stats span { display: flex; align-items: center; gap: 6px; }
-        .gauge-modern-stats strong { color: var(--text-primary); font-weight: 700; font-size: 0.75rem; }
-        .gauge-modern-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-    </style>
+            </style>
 </head>
 <body>
 
@@ -608,6 +257,50 @@
         </div>
     </div>
 
+    <!-- ============================================================ -->
+    <!-- v4.3: FULL SCREEN ALARM (Mode STANDBY)                        -->
+    <!-- ============================================================ -->
+    <div class="full-screen-alarm" id="fullScreenAlarm">
+        <div class="alarm-badge" id="alarmBadge">🚨 LIVE EMERGENCY</div>
+        <div class="alarm-audio-indicator" id="alarmAudioIndicator">
+            <i class="fas fa-volume-up"></i>
+            <span>ALARM AKTIF — Tap & Swipe untuk mematikan</span>
+        </div>
+
+        <div class="alarm-icon-wrapper" id="alarmIconWrapper">
+            <div class="alarm-icon" id="alarmIcon">🔥</div>
+        </div>
+
+        <div class="alarm-title" id="alarmTitle">KEBAKARAN</div>
+        <div class="alarm-subtitle" id="alarmSubtitle">⚠️ Darurat! Segera ambil tindakan</div>
+
+        <div class="alarm-info">
+            <div class="alarm-info-item"><i class="fas fa-user"></i><span>Dilaporkan oleh: <strong id="alarmSender">-</strong></span></div>
+            <div class="alarm-info-item"><i class="fas fa-map-marker-alt"></i><span id="alarmLocation">-</span></div>
+            <div class="alarm-info-item" id="alarmAddressRow" style="display:none;"><i class="fas fa-map-pin"></i><span id="alarmAddress">-</span></div>
+            <div class="alarm-info-item" id="alarmCoordsRow" style="display:none;"><i class="fas fa-crosshairs"></i><span id="alarmCoords">-</span></div>
+            <div class="alarm-info-item"><i class="fas fa-clock"></i><span id="alarmTime">-</span></div>
+        </div>
+
+        <div class="alarm-instruction">Alarm berbunyi terus menerus.<br>Swipe ke arah manapun untuk mematikan.</div>
+
+        <div class="swipe-indicator">
+            <span class="swipe-text">Swipe untuk mematikan</span>
+            <div class="swipe-arrows">
+                <i class="fas fa-chevron-up"></i>
+                <i class="fas fa-chevron-down"></i>
+                <i class="fas fa-chevron-left"></i>
+                <i class="fas fa-chevron-right"></i>
+                <i class="fas fa-bell center-icon"></i>
+            </div>
+        </div>
+
+        <div class="swipe-feedback" id="swipeFeedback"></div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- FLOATING NOTIFICATION (Mode AKTIF)                            -->
+    <!-- ============================================================ -->
     <div class="floating-notification" id="floatingNotification">
         <div class="notif-icon" id="floatingIcon"><i class="fas fa-bell"></i></div>
         <div class="notif-content">
@@ -619,6 +312,9 @@
         <button class="notif-close" id="floatingClose"><i class="fas fa-times"></i></button>
     </div>
 
+    <!-- ============================================================ -->
+    <!-- EMERGENCY OVERLAY (Legacy - untuk backward compatibility)   -->
+    <!-- ============================================================ -->
     <div class="emergency-overlay" id="emergencyOverlay">
         <div class="countdown" id="emergencyCountdown">60s</div>
         <div class="emergency-badge" id="emergencyBadge">🚨 LIVE EMERGENCY</div>
@@ -641,6 +337,9 @@
         </div>
     </div>
 
+    <!-- ============================================================ -->
+    <!-- PREVIEW OVERLAY                                               -->
+    <!-- ============================================================ -->
     <div class="preview-overlay" id="previewOverlay">
         <div class="preview-overlay-content">
             <div class="overlay-icon"><i class="fas fa-lock"></i></div>
@@ -659,6 +358,9 @@
         <span class="login-link" id="badgeLoginLink">Masuk untuk berinteraksi</span>
     </div>
 
+    <!-- ============================================================ -->
+    <!-- APP BAR                                                       -->
+    <!-- ============================================================ -->
     <header class="app-bar">
         <div class="app-title" id="appTitle">
             <span class="siren-icon-header">🚨</span>
@@ -675,6 +377,9 @@
         </div>
     </header>
 
+    <!-- ============================================================ -->
+    <!-- SIDEBAR                                                       -->
+    <!-- ============================================================ -->
     <div class="sidebar-overlay-bg" id="sidebarOverlay"></div>
     <div class="sidebar" id="sidebar">
         <button class="sidebar-close" id="sidebarClose"><i class="fas fa-times"></i></button>
@@ -689,7 +394,7 @@
             <li class="nav-item"><a href="kontak-darurat.html" class="nav-link"><i class="fas fa-phone-alt"></i><span>Kontak Darurat</span></a></li>
             <li class="nav-item"><a href="laporan-darurat.html" class="nav-link" data-action="login"><i class="fas fa-exclamation-circle"></i><span>Laporan Darurat</span></a></li>
             <li class="nav-item"><a href="lokasi-bantuan.html" class="nav-link"><i class="fas fa-hospital"></i><span>Lokasi Bantuan</span></a></li>
-            <li class="nav-item"><a href="alert-sekitar.html" class="nav-link"><i class="fas fa-bell"></i><span>Alert Sekitar</span></a></li>
+            <li class="nav-item"><a href="alert-sekar.html" class="nav-link"><i class="fas fa-bell"></i><span>Alert Sekitar</span></a></li>
             <div class="nav-section-title">📊 STATISTIK & INFO</div>
             <li class="nav-item"><a href="statistik.html" class="nav-link"><i class="fas fa-chart-pie"></i><span>Statistik Emergency</span></a></li>
             <li class="nav-item"><a href="statistik-emergency.html" class="nav-link"><i class="fas fa-satellite-dish"></i><span>Command Center</span></a></li>
@@ -707,6 +412,9 @@
         </ul>
     </div>
 
+    <!-- ============================================================ -->
+    <!-- MAIN CONTENT                                                  -->
+    <!-- ============================================================ -->
     <main class="main-content">
         <div class="page-title">
             <div class="title-left"><i class="fas fa-bell"></i><span>Emergency Alert</span></div>
@@ -738,6 +446,7 @@
             </div>
         </div>
 
+        <!-- EMERGENCY GRID 2x2 -->
         <div class="emergency-grid">
             <button class="emergency-btn btn-fire" id="fireBtn" data-type="fire" data-action="login">
                 <div class="btn-glow"></div>
@@ -777,6 +486,7 @@
             </button>
         </div>
 
+        <!-- QUICK ACCESS -->
         <div class="quick-access-section">
             <div class="quick-access-header">
                 <div class="quick-access-title"><i class="fas fa-th-large"></i><span>🗂️ Menu Akses Cepat</span></div>
@@ -786,7 +496,7 @@
                 <a href="kontak-darurat.html" class="quick-card"><span class="quick-icon">📞</span><span class="quick-label">Kontak Darurat</span></a>
                 <a href="laporan-darurat.html" class="quick-card emergency-card" data-action="login"><span class="quick-icon">📝</span><span class="quick-label">Laporan Darurat</span></a>
                 <a href="lokasi-bantuan.html" class="quick-card"><span class="quick-icon">🏥</span><span class="quick-label">Lokasi Bantuan</span></a>
-                <a href="alert-sekitar.html" class="quick-card"><span class="quick-icon">🔔</span><span class="quick-label">Alert Sekitar</span><span class="quick-badge" id="alertBadge">0</span></a>
+                <a href="alert-sekar.html" class="quick-card"><span class="quick-icon">🔔</span><span class="quick-label">Alert Sekitar</span><span class="quick-badge" id="alertBadge">0</span></a>
                 <a href="statistik.html" class="quick-card"><span class="quick-icon">📊</span><span class="quick-label">Statistik</span></a>
                 <a href="statistik-emergency.html" class="quick-card"><span class="quick-icon">🛰️</span><span class="quick-label">Command Center</span></a>
                 <a href="laporan-saya.html" class="quick-card" data-action="login"><span class="quick-icon">📋</span><span class="quick-label">Laporan Saya</span></a>
@@ -794,6 +504,9 @@
             </div>
         </div>
 
+        <!-- ============================================================ -->
+        <!-- POST SECTION — v4.3: Tombol "Ambil Lokasi Saya"               -->
+        <!-- ============================================================ -->
         <div class="post-section" id="postSection" style="margin-top:16px;">
             <div class="post-header">
                 <div class="post-profile-pic" id="postProfilePic" data-action="profile"><i class="fas fa-user"></i></div>
@@ -824,14 +537,23 @@
                     <span class="field-label">👤 Dilaporkan Oleh:</span>
                     <input type="text" class="field-input" id="postReportedBy" placeholder="Nama pelapor" disabled>
                 </div>
+
+                <!-- ✅ v4.3: GPS BUTTON menggantikan "Upload Link Google Maps" -->
                 <div class="field-row" style="flex-direction:column;align-items:stretch;">
-                    <span class="field-label">📍 Upload Link Google Maps:</span>
-                    <input type="url" class="field-input" id="postMapLink" placeholder="https://maps.app.goo.gl/..." readonly>
-                    <div class="map-hint"><i class="fas fa-info-circle"></i> Tempel link Google Maps lokasi kejadian</div>
-                </div>
-                <div class="field-row" style="flex-direction:column;align-items:stretch;">
-                    <span class="field-label">📍 Alamat & Koordinat:</span>
-                    <input type="text" class="field-input" id="postLocationAddress" placeholder="Alamat akan muncul otomatis..." readonly style="font-size:0.65rem;">
+                    <span class="field-label">📍 Lokasi Kejadian:</span>
+                    <button type="button" class="gps-location-btn" id="gpsLocationBtn" data-action="login">
+                        <i class="fas fa-location-arrow"></i>
+                        <span id="gpsLocationBtnText">📍 Ambil Lokasi Saya</span>
+                    </button>
+                    <div class="gps-location-result" id="gpsLocationResult">
+                        <div class="gps-address" id="gpsAddress">📍 Alamat</div>
+                        <div class="gps-coords" id="gpsCoords">-6.2000, 106.8166</div>
+                        <a href="#" class="gps-maps-link" id="gpsMapsLink" target="_blank" rel="noopener">
+                            <i class="fas fa-external-link-alt"></i> Buka di Google Maps
+                        </a>
+                    </div>
+                    <div class="gps-location-error" id="gpsError"></div>
+                    <div class="map-hint" style="margin-top:6px;"><i class="fas fa-info-circle"></i> Tombol ini akan mengambil lokasi GPS Anda saat ini</div>
                 </div>
             </div>
             <div class="media-preview" id="mediaPreview">
@@ -863,6 +585,7 @@
             <div id="postsList"></div>
         </div>
 
+        <!-- STATISTICS SECTION -->
         <div class="statistics-section">
             <div class="statistics-header">
                 <h2 class="statistics-title">📊 Laporan Statistik</h2>
@@ -923,6 +646,7 @@
             <div class="chart-period-info"><span id="chartPeriodInfo">📊 Data: Berdasarkan Filter Wilayah</span></div>
         </div>
 
+        <!-- SOCIAL LINKS -->
         <div class="social-links">
             <a href="https://www.facebook.com/share/1PDaouKpjF/" target="_blank" rel="noopener noreferrer" class="social-link facebook" title="Facebook"><i class="fab fa-facebook-f"></i><span class="social-tooltip">Facebook</span></a>
             <a href="https://www.tiktok.com/@teslasmart.online?_r=1&_t=ZS-99ZK3v6aGnA" target="_blank" rel="noopener noreferrer" class="social-link tiktok" title="TikTok"><i class="fab fa-tiktok"></i><span class="social-tooltip">TikTok</span></a>
@@ -930,6 +654,7 @@
             <a href="https://bio-data-pi-three.vercel.app/" target="_blank" rel="noopener noreferrer" class="social-link portfolio" title="Portofolio"><i class="fas fa-briefcase"></i><span class="social-tooltip">Portofolio</span></a>
         </div>
 
+        <!-- FOOTER LINKS -->
         <div class="footer-links">
             <a href="tentang-kami.html" class="footer-link"><i class="fas fa-info-circle"></i> Tentang Kami</a>
             <span class="footer-divider">|</span>
@@ -943,11 +668,12 @@
         <div style="background:var(--bg-card);padding:14px 16px;text-align:center;border-top:1px solid var(--border-color);margin-top:16px;border-radius:12px;">
             <div style="max-width:600px;margin:0 auto;color:var(--text-muted);font-size:9px;">
                 <p style="font-weight:500;color:var(--accent-blue);font-size:10px;margin-bottom:6px;">SALINK - Sistem Peringatan Darurat Masyarakat</p>
-                <p style="margin-top:8px;font-size:9px;color:var(--text-muted);">&copy; 2026 SALINK v4.0. Semua hak dilindungi.</p>
+                <p style="margin-top:8px;font-size:9px;color:var(--text-muted);">&copy; 2026 SALINK v4.3. Semua hak dilindungi.</p>
             </div>
         </div>
     </main>
 
+    <!-- BOTTOM NAV -->
     <nav class="bottom-nav" id="sl-bottom-nav">
         <a href="dashboard.html" class="nav-item-bottom active" data-workspace="home"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></a>
         <a href="toko.html" class="nav-item-bottom" data-workspace="toko"><span class="nav-icon">🛒</span><span class="nav-label">Toko</span></a>
@@ -956,6 +682,7 @@
         <a href="profil.html" class="nav-item-bottom" data-workspace="profile" data-action="profile"><span class="nav-icon">👤</span><span class="nav-label">Profil</span></a>
     </nav>
 
+    <!-- MODAL INVITE -->
     <div class="modal-overlay" id="inviteModal">
         <div class="modal-content" style="max-width:520px;">
             <div class="modal-header">
@@ -973,6 +700,7 @@
         </div>
     </div>
 
+    <!-- MODAL NOTIF -->
     <div class="modal-overlay" id="notifModal">
         <div class="modal-content" style="max-width:520px;">
             <div class="modal-header">
@@ -996,6 +724,7 @@
         </div>
     </div>
 
+    <!-- MODAL SEARCH -->
     <div class="modal-overlay" id="searchModal">
         <div class="modal-content search-modal-content">
             <div class="modal-header">
@@ -1033,18 +762,16 @@
 
     <div class="toast-container" id="toastContainer"></div>
 
+    <!-- Script akan masuk di PART 3 & PART 4 -->
+</body>
+</html>
+
     <script>
-    
-  /* ====================================================================
- * SALINK DASHBOARD v4.2 — AUDIO SYSTEM FIXED
+/* ====================================================================
+ * SALINK DASHBOARD v4.3 — DUAL MODE EMERGENCY ALERT
  * ====================================================================
- * PERUBAHAN v4.2:
- * ✅ Preload semua audio (fire, medical, crime, disaster, regular)
- * ✅ AudioContext unlock untuk Chrome mobile
- * ✅ Cached audio (0ms delay saat emergency)
- * ✅ Volume 1.0 konsisten (ikut device)
- * ✅ Fallback on error + retry sekali
- * ✅ Play regular sound di SEMUA event notifikasi
+ * PART 3: Constants, Audio System, Dual-Mode Detection,
+ *         Full Screen Alarm, Swipe Dismiss, GPS Location
  * ==================================================================== */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
@@ -1053,21 +780,21 @@ const DASHBOARD_URL = 'dashboard.html';
 const PROFILE_URL = 'profil.html';
 const DETAIL_URL = 'detail-emergency.html';
 const EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
-const EMERGENCY_AUDIO_MAX_MS = 60000;
-const EMERGENCY_AUTO_DISMISS_MS = 60000;
-const EMERGENCY_VIBRATE_INTERVAL_MS = 3000;
+const EMERGENCY_AUTO_DISMISS_MS = 5 * 60 * 1000; // 5 menit max (fallback)
+const EMERGENCY_VIBRATE_INTERVAL_MS = 2000;
 const EMERGENCY_POLL_INTERVAL = 15000;
 const AUTO_REFRESH = 60000;
 const EMERGENCY_CLEANUP_INTERVAL = 60000;
 const IDLE_THRESHOLD_MS = 30000;
 const SWIPE_MIN_DISTANCE = 50;
 const EMERGENCY_BTN_AUDIO_MAX_MS = 120000;
+const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
 
 const EMERGENCY_LABELS = { 'fire': '🔥 Kebakaran', 'medical': '🚑 Medis & Kematian', 'crime': '🚓 Kriminal', 'disaster': '🌪️ Bencana Alam' };
 const EMERGENCY_ICONS = { 'fire': '🔥', 'medical': '🚑', 'crime': '🚓', 'disaster': '🌪️' };
 const EMERGENCY_CSS_CLASS = { 'fire': 'fire', 'medical': 'medical', 'crime': 'crime', 'disaster': 'disaster' };
 
-// ✅ v4.2: Audio URLs
+// ✅ v4.3: Audio URLs (Vercel public/Music/)
 const EMERGENCY_AUDIO = {
     'fire':     '/Music/Kebakaran.mp3',
     'medical':  '/Music/kematian.mp3',
@@ -1084,19 +811,19 @@ const POST_TYPE_MAP = {
     'disaster': { isSpecial: true, specialType: 'disaster' }
 };
 
+// ====================================================================
 // STATE
+// ====================================================================
 let currentUser = null, isPreviewMode = true, currentTheme = 'dark';
 let posts = [], notifications = [], statistics = null, chartInstances = {};
 let emergencyOverlayTimeout = null, floatingNotificationTimeout = null;
 let userLat = null, userLng = null, allUsers = [];
-let currentPostType = 'biasa', isSwiping = false;
-let touchStartX = 0, touchStartY = 0, touchEndX = 0, touchEndY = 0;
+let currentPostType = 'biasa';
 let deferredPrompt = null, activeEmergencyBtn = null, activeEmergencyAudio = null;
 let notifFilter = 'all';
 let readNotifs = {};
 let dismissedEmergencies = {};
 let activeOverlayEmergency = null;
-let emergencyCountdownTimer = null;
 let emergencyVibrateInterval = null;
 let emergencyAudioLoop = null;
 let emergencyPollTimer = null;
@@ -1112,68 +839,59 @@ let searchEmergencyFilter = 'all';
 let searchDebounceTimer = null;
 let recentSearches = JSON.parse(localStorage.getItem('salink_recent_searches') || '[]');
 const MAX_RECENT_SEARCHES = 8;
+let currentGpsData = null; // { lat, lng, address, mapsURL }
 
-// ✅ v4.2: Audio cache
+// ✅ v4.3: State untuk full screen alarm
+let fullScreenAlarmActive = false;
+let fullScreenAlarmEmergency = null;
+let fullScreenAlarmSwipe = { active: false, startX: 0, startY: 0 };
+let fullScreenAlarmVibrateTimer = null;
+let fullScreenAlarmTimeout = null;
+
+// ✅ v4.3: Audio cache
 const audioCache = {};
-
-// ✅ v4.2: AudioContext untuk unlock di Chrome mobile
 let _audioContext = null;
 let _audioUnlocked = false;
 
+// ====================================================================
+// AUDIO SYSTEM
+// ====================================================================
 function unlockAudio() {
     if (_audioUnlocked) return;
-    console.log('🔓 [Audio] Attempting unlock...');
-    
     try {
         _audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        
-        // Buat buffer dummy untuk unlock
         const buffer = _audioContext.createBuffer(1, 1, 22050);
         const source = _audioContext.createBufferSource();
         source.buffer = buffer;
         source.connect(_audioContext.destination);
         source.start(0);
-        
-        // Resume context jika suspended
         if (_audioContext.state === 'suspended') {
-            _audioContext.resume().then(() => {
-                console.log('🔓 [Audio] Context resumed');
-            });
+            _audioContext.resume().catch(() => {});
         }
-        
         _audioUnlocked = true;
-        console.log('🔓 [Audio] Unlocked! State:', _audioContext.state);
+        console.log('🔓 [Audio] Unlocked');
     } catch(e) {
         console.warn('⚠️ [Audio] Unlock failed:', e.message);
     }
 }
 
-// Pasang listener untuk unlock pada interaksi pertama
+// Pasang listener unlock di interaksi pertama
 ['click', 'touchstart', 'keydown'].forEach(evt => {
     document.addEventListener(evt, unlockAudio, { once: true, passive: true });
 });
 
-// ✅ v4.2: Preload semua audio (cache)
 function preloadAllAudio() {
-    console.log('🔊 [Audio] Preloading semua audio...');
-    
-    // Preload emergency audio
+    console.log('🔊 [Audio] Preloading...');
     Object.keys(EMERGENCY_AUDIO).forEach(type => {
-        const url = EMERGENCY_AUDIO[type];
         try {
             const audio = new Audio();
             audio.preload = 'auto';
-            audio.src = url;
+            audio.src = EMERGENCY_AUDIO[type];
             audio.volume = 1.0;
             audio.load();
             audioCache[type] = audio;
-            console.log('✅ [Audio] Preloaded:', type);
-        } catch(e) {
-            console.warn('⚠️ [Audio] Gagal preload ' + type + ':', e.message);
-        }
+        } catch(e) { console.warn('⚠️ Preload ' + type + ':', e.message); }
     });
-    
-    // Preload regular sound
     try {
         const regAudio = new Audio();
         regAudio.preload = 'auto';
@@ -1181,19 +899,11 @@ function preloadAllAudio() {
         regAudio.volume = 1.0;
         regAudio.load();
         audioCache['regular'] = regAudio;
-        console.log('✅ [Audio] Preloaded: regular');
-    } catch(e) {
-        console.warn('⚠️ [Audio] Gagal preload regular:', e.message);
-    }
-    
-    console.log('✅ [Audio] Semua audio siap');
+    } catch(e) { console.warn('⚠️ Preload regular:', e.message); }
+    console.log('✅ [Audio] Preloaded');
 }
 
-// ====================================================================
-// ✅ v4.2: AUDIO PLAYERS (dengan fallback)
-// ====================================================================
-
-// Play regular notification sound
+// Play regular notification (biasa)
 function playRegularSound() {
     try {
         unlockAudio();
@@ -1201,78 +911,47 @@ function playRegularSound() {
         if (cached) {
             cached.currentTime = 0;
             cached.volume = 1.0;
-            const playPromise = cached.play();
-            if (playPromise !== undefined) {
-                playPromise.catch(err => {
-                    console.warn('⚠️ [Audio] Regular play failed, fallback:', err.message);
-                    try {
-                        const fallback = new Audio(REGULAR_SOUND_URL);
-                        fallback.volume = 1.0;
-                        fallback.play().catch(() => {});
-                    } catch(e) {}
-                });
-            }
+            const p = cached.play();
+            if (p !== undefined) p.catch(() => {
+                try { new Audio(REGULAR_SOUND_URL).play().catch(() => {}); } catch(e) {}
+            });
         } else {
-            const fallback = new Audio(REGULAR_SOUND_URL);
-            fallback.volume = 1.0;
-            fallback.play().catch(() => {});
+            new Audio(REGULAR_SOUND_URL).play().catch(() => {});
         }
-    } catch(e) {
-        console.warn('⚠️ [Audio] playRegularSound error:', e.message);
-    }
+    } catch(e) { console.warn('playRegularSound:', e.message); }
 }
 
-// Play emergency loop (dengan cached audio)
+// ✅ v4.3: Emergency loop TANPA BATAS (auto-pause saat tab hidden)
 function playEmergencyLoop(type) {
     try {
         unlockAudio();
         const url = EMERGENCY_AUDIO[type];
-        if (!url) { console.warn('⚠️ [Audio] No URL for type:', type); return null; }
-        
-        // Stop previous
+        if (!url) return null;
         stopEmergencyLoop();
-        
         const cached = audioCache[type];
-        if (cached) {
-            cached.currentTime = 0;
-            cached.volume = 1.0;
-            cached.loop = true;
-            emergencyAudioLoop = cached;
-            const playPromise = cached.play();
-            if (playPromise !== undefined) {
-                playPromise.then(() => {
-                    console.log('🔊 [Audio] Emergency loop playing:', type);
-                }).catch(err => {
-                    console.warn('⚠️ [Audio] Cached play failed, fallback:', err.message);
-                    // Fallback: buat baru
-                    try {
-                        const audio = new Audio(url);
-                        audio.volume = 1.0;
-                        audio.loop = true;
-                        emergencyAudioLoop = audio;
-                        audio.play().catch(e => console.warn('❌ [Audio] Fallback failed:', e.message));
-                    } catch(e) {}
-                });
-            }
-            // Auto-stop setelah MAX_MS
-            setTimeout(() => {
-                if (emergencyAudioLoop === cached) stopEmergencyLoop();
-            }, EMERGENCY_AUDIO_MAX_MS);
-            return cached;
-        } else {
-            // Tidak ada cache, buat baru
-            const audio = new Audio(url);
-            audio.volume = 1.0;
-            audio.loop = true;
-            emergencyAudioLoop = audio;
-            audio.play().catch(err => console.warn('❌ [Audio] Play failed:', err.message));
-            setTimeout(() => {
-                if (emergencyAudioLoop === audio) stopEmergencyLoop();
-            }, EMERGENCY_AUDIO_MAX_MS);
-            return audio;
+        const audio = cached || new Audio(url);
+        audio.currentTime = 0;
+        audio.volume = 1.0;
+        audio.loop = true;
+        emergencyAudioLoop = audio;
+        const p = audio.play();
+        if (p !== undefined) {
+            p.then(() => console.log('🔊 Emergency loop playing:', type))
+             .catch(err => {
+                console.warn('⚠️ Emergency play failed:', err.message);
+                // Fallback: coba sekali lagi
+                try {
+                    const fb = new Audio(url);
+                    fb.volume = 1.0;
+                    fb.loop = true;
+                    emergencyAudioLoop = fb;
+                    fb.play().catch(() => {});
+                } catch(e) {}
+             });
         }
+        return audio;
     } catch(e) {
-        console.warn('⚠️ [Audio] playEmergencyLoop error:', e.message);
+        console.warn('playEmergencyLoop:', e.message);
         return null;
     }
 }
@@ -1288,7 +967,22 @@ function stopEmergencyLoop() {
     }
 }
 
-// Button loop (untuk tombol emergency grid)
+// Pause/resume emergency loop saat tab visible/hidden (hemat baterai)
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+        // Pause saat tab hidden
+        if (emergencyAudioLoop && !emergencyAudioLoop.paused) {
+            try { emergencyAudioLoop.pause(); } catch(e) {}
+        }
+    } else {
+        // Resume saat tab visible kembali
+        if (emergencyAudioLoop && emergencyAudioLoop.paused && (activeOverlayEmergency || fullScreenAlarmEmergency)) {
+            try { emergencyAudioLoop.play().catch(() => {}); } catch(e) {}
+        }
+    }
+});
+
+// Button loop (untuk tombol grid 2x2 di mode AKTIF)
 function startButtonLoop(type) {
     stopButtonLoop();
     const url = EMERGENCY_AUDIO[type];
@@ -1296,28 +990,16 @@ function startButtonLoop(type) {
     try {
         unlockAudio();
         const cached = audioCache[type];
-        if (cached) {
-            cached.currentTime = 0;
-            cached.volume = 1.0;
-            cached.loop = true;
-            buttonLoopAudio = cached;
-            buttonLoopType = type;
-            cached.play().catch(() => {});
-        } else {
-            buttonLoopAudio = new Audio(url);
-            buttonLoopAudio.volume = 1.0;
-            buttonLoopAudio.loop = true;
-            buttonLoopType = type;
-            buttonLoopAudio.play().catch(() => {});
-        }
-        
-        // Vibrate
+        const audio = cached || new Audio(url);
+        audio.currentTime = 0;
+        audio.volume = 1.0;
+        audio.loop = true;
+        buttonLoopAudio = audio;
+        buttonLoopType = type;
+        audio.play().catch(() => {});
         buttonLoopVibrateTimer = setInterval(() => {
-            if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 500]);
-        }, 3000);
-        
-        // Auto-stop
-        buttonLoopTimer = setTimeout(() => { stopButtonLoop(); }, EMERGENCY_BTN_AUDIO_MAX_MS);
+            if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500, 200]);
+        }, 2000);
     } catch(e) {}
 }
 
@@ -1337,14 +1019,871 @@ function stopButtonLoop() {
 }
 
 // ====================================================================
+// ✅ v4.3: DUAL MODE DETECTION
+// ====================================================================
+function isStandbyMode() {
+    // STANDBY jika:
+    // 1. Tab hidden (user pindah app / lock HP), ATAU
+    // 2. Idle > 30 detik (user tidak interaksi)
+    if (document.hidden) return true;
+    if (isIdleStandby) return true;
+    return false;
+}
+
+function resetIdleTimer() {
+    isIdleStandby = false;
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { isIdleStandby = true; }, IDLE_THRESHOLD_MS);
+}
+
+function setupIdleDetection() {
+    ['mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'visibilitychange'].forEach(evt => {
+        document.addEventListener(evt, () => {
+            if (document.visibilityState === 'visible') resetIdleTimer();
+        }, { passive: true });
+    });
+    resetIdleTimer();
+}
+
+// ====================================================================
+// ✅ v4.3: FULL SCREEN ALARM (STANDBY MODE)
+// ====================================================================
+function showFullScreenAlarm(em) {
+    const alarm = document.getElementById('fullScreenAlarm');
+    if (!alarm) return;
+    if (isDismissed(em.id)) return;
+    if (fullScreenAlarmActive) return;
+
+    const type = em.type || 'fire';
+    const icon = EMERGENCY_ICONS[type] || '🚨';
+    const label = EMERGENCY_LABELS[type] || 'DARURAT';
+    const cssClass = EMERGENCY_CSS_CLASS[type] || 'fire';
+
+    // Isi data
+    document.getElementById('alarmIcon').textContent = icon;
+    document.getElementById('alarmTitle').textContent = label.replace(/^[^\s]+\s/, '');
+    document.getElementById('alarmSender').textContent = em.sender || 'User';
+    document.getElementById('alarmLocation').textContent = em.location || '-';
+    document.getElementById('alarmTime').textContent = formatDate(em.timestamp);
+
+    const addrRow = document.getElementById('alarmAddressRow');
+    const addrEl = document.getElementById('alarmAddress');
+    if (em.address && em.address !== em.location) {
+        addrRow.style.display = 'flex';
+        addrEl.textContent = em.address;
+    } else {
+        addrRow.style.display = 'none';
+    }
+
+    const coordsRow = document.getElementById('alarmCoordsRow');
+    const coordsEl = document.getElementById('alarmCoords');
+    if (em.coords) {
+        coordsRow.style.display = 'flex';
+        coordsEl.textContent = em.coords;
+    } else {
+        coordsRow.style.display = 'none';
+    }
+
+    // Set class untuk warna sesuai tipe
+    alarm.className = 'full-screen-alarm active ' + cssClass;
+
+    // Simpan state
+    fullScreenAlarmActive = true;
+    fullScreenAlarmEmergency = em;
+    activeOverlayEmergency = em;
+    alarm.dataset.emergencyId = em.id || '';
+
+    // Kunci scroll body
+    document.body.style.overflow = 'hidden';
+
+    // Bunyikan audio loop TANPA BATAS
+    playEmergencyLoop(type);
+
+    // Vibrate intens & berulang
+    if (navigator.vibrate) {
+        navigator.vibrate([500, 200, 500, 200, 500, 200]);
+        fullScreenAlarmVibrateTimer = setInterval(() => {
+            if (fullScreenAlarmActive) {
+                navigator.vibrate([500, 200, 500, 200, 500, 200]);
+            }
+        }, EMERGENCY_VIBRATE_INTERVAL_MS);
+    }
+
+    // Setup swipe-to-dismiss
+    setupFullScreenAlarmSwipe();
+
+    // Tandai read
+    if (em.id) { readNotifs[em.id] = true; saveReadNotifs(); }
+
+    console.log('🚨 [FullScreen Alarm] ACTIVE:', type, em.id);
+}
+
+function dismissFullScreenAlarm(userAction) {
+    const alarm = document.getElementById('fullScreenAlarm');
+    if (!alarm) return;
+    const emergencyId = alarm.dataset.emergencyId;
+    if (emergencyId) dismissEmergency(emergencyId);
+    alarm.classList.remove('active', 'fire', 'medical', 'crime', 'disaster');
+    alarm.dataset.emergencyId = '';
+    document.body.style.overflow = '';
+    clearInterval(fullScreenAlarmVibrateTimer);
+    fullScreenAlarmVibrateTimer = null;
+    stopEmergencyLoop();
+    hideFloatingNotification();
+    fullScreenAlarmActive = false;
+    fullScreenAlarmEmergency = null;
+    activeOverlayEmergency = null;
+    if (navigator.vibrate) navigator.vibrate(0);
+    if (userAction) {
+        showToast('✅ Alarm Dimatikan', 'Anda telah mengonfirmasi notifikasi darurat', 'fa-check-circle', 'success');
+    }
+    console.log('✅ [FullScreen Alarm] Dismissed');
+}
+
+function setupFullScreenAlarmSwipe() {
+    const alarm = document.getElementById('fullScreenAlarm');
+    if (!alarm || alarm._swipeSetup) return;
+    alarm._swipeSetup = true;
+
+    const feedback = document.getElementById('swipeFeedback');
+    let startX = 0, startY = 0, moving = false;
+
+    const showFeedback = (dir) => {
+        if (!feedback) return;
+        const icons = { up: '⬆️', down: '⬇️', left: '⬅️', right: '➡️' };
+        feedback.textContent = icons[dir] || '✅';
+        feedback.classList.add('active');
+        setTimeout(() => feedback.classList.remove('active'), 300);
+    };
+
+    // Touch events
+    alarm.addEventListener('touchstart', (e) => {
+        if (!fullScreenAlarmActive) return;
+        const t = e.touches[0];
+        startX = t.clientX;
+        startY = t.clientY;
+        moving = true;
+    }, { passive: true });
+
+    alarm.addEventListener('touchmove', (e) => {
+        if (!moving || !fullScreenAlarmActive) return;
+        // Prevent scroll
+        e.preventDefault();
+    }, { passive: false });
+
+    alarm.addEventListener('touchend', (e) => {
+        if (!moving || !fullScreenAlarmActive) return;
+        moving = false;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - startX;
+        const dy = t.clientY - startY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < SWIPE_MIN_DISTANCE) return;
+
+        // Tentukan arah dominan
+        let dir = 'up';
+        if (Math.abs(dx) > Math.abs(dy)) {
+            dir = dx > 0 ? 'right' : 'left';
+        } else {
+            dir = dy > 0 ? 'down' : 'up';
+        }
+
+        showFeedback(dir);
+        if (navigator.vibrate) navigator.vibrate(100);
+
+        // Dismiss setelah feedback visual
+        setTimeout(() => dismissFullScreenAlarm(true), 150);
+    }, { passive: true });
+
+    // Mouse events (untuk desktop testing)
+    let md = false, mx = 0, my = 0;
+    alarm.addEventListener('mousedown', (e) => {
+        if (!fullScreenAlarmActive) return;
+        md = true; mx = e.clientX; my = e.clientY;
+    });
+    alarm.addEventListener('mouseup', (e) => {
+        if (!md || !fullScreenAlarmActive) return;
+        md = false;
+        const dx = e.clientX - mx, dy = e.clientY - my;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance < SWIPE_MIN_DISTANCE) return;
+        let dir = 'up';
+        if (Math.abs(dx) > Math.abs(dy)) dir = dx > 0 ? 'right' : 'left';
+        else dir = dy > 0 ? 'down' : 'up';
+        showFeedback(dir);
+        setTimeout(() => dismissFullScreenAlarm(true), 150);
+    });
+
+    // Tap pada icon wrapper juga dismiss (bonus: accessiblity)
+    document.getElementById('alarmIconWrapper')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (fullScreenAlarmActive) dismissFullScreenAlarm(true);
+    });
+}
+
+// ====================================================================
+// ✅ v4.3: FLOATING EMERGENCY (AKTIF MODE)
+// ====================================================================
+function showFloatingEmergency(em) {
+    const type = em.type || 'fire';
+    const icon = EMERGENCY_ICONS[type] || '🚨';
+    const label = EMERGENCY_LABELS[type] || 'DARURAT';
+
+    // 1. Tampilkan floating notification
+    showFloatingNotification('emergency',
+        `${icon} ${label}`,
+        `${em.sender || 'User'} melaporkan darurat`,
+        `📍 ${em.location || 'Lokasi tidak diketahui'}`,
+        'Lihat',
+        () => {
+            // Scroll ke hologram
+            document.getElementById('hologramDisplay')?.scrollIntoView({ behavior: 'smooth' });
+            // Buka detail
+            if (em.id) {
+                setTimeout(() => {
+                    window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(em.id);
+                }, 500);
+            }
+        }
+    );
+
+    // 2. Aktifkan animasi tombol grid 2x2
+    animateEmergencyButton(type);
+
+    // 3. Bunyikan audio loop tombol grid (TANPA BATAS sampai di-tap)
+    startButtonLoop(type);
+
+    // 4. Vibrate
+    if (navigator.vibrate) {
+        navigator.vibrate([500, 200, 500, 200, 1000]);
+    }
+
+    // 5. Toast kecil
+    showToast(`🚨 ${label}`, `${em.sender} melaporkan darurat!`, 'fa-exclamation-triangle');
+}
+
+function dismissFloatingEmergency() {
+    stopButtonLoop();
+    stopEmergencyButtonAnimation();
+    hideFloatingNotification();
+    if (navigator.vibrate) navigator.vibrate(0);
+}
+
+// ====================================================================
+// TRIGGER EMERGENCY (pilih mode otomatis)
+// ====================================================================
+function triggerEmergencyFromNotification(notif) {
+    if (isDismissed(notif.id)) return;
+
+    // Konversi ke format emergency
+    const em = {
+        id: notif.id,
+        type: notif.type,
+        sender: notif.sender || 'User',
+        senderUsername: notif.senderUsername || '',
+        location: notif.message || 'Lokasi tidak diketahui',
+        address: notif.message || '',
+        text: notif.message || '',
+        mapsURL: '', coords: '',
+        timestamp: notif.timestamp,
+        expiresAt: notif.timestamp + EMERGENCY_DURATION
+    };
+
+    // Simpan ke storage
+    let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+    if (!ems.find(e => e.id === em.id)) {
+        ems.unshift(em);
+        try { localStorage.setItem('salink_emergencies', JSON.stringify(ems)); } catch(e) {}
+        renderHologram();
+    }
+
+    updateEmergencyBadges();
+    updateNotifBadge();
+
+    // ✅ v4.3: PILIH MODE berdasarkan isStandbyMode()
+    if (isStandbyMode()) {
+        console.log('🔴 [Emergency] STANDBY mode → FULL SCREEN ALARM');
+        showFullScreenAlarm(em);
+    } else {
+        console.log('🟢 [Emergency] AKTIF mode → FLOATING + BUTTON GRID');
+        showFloatingEmergency(em);
+    }
+}
+
+// ====================================================================
+// ✅ v4.3: TOMBOL "AMBIL LOKASI SAYA" (GPS + Nominatim)
+// ====================================================================
+async function ambilLokasiSaya() {
+    const btn = document.getElementById('gpsLocationBtn');
+    const btnText = document.getElementById('gpsLocationBtnText');
+    const resultBox = document.getElementById('gpsLocationResult');
+    const errorBox = document.getElementById('gpsError');
+    const addrEl = document.getElementById('gpsAddress');
+    const coordsEl = document.getElementById('gpsCoords');
+    const mapsLink = document.getElementById('gpsMapsLink');
+
+    if (!navigator.geolocation) {
+        errorBox.textContent = '❌ Browser Anda tidak mendukung GPS.';
+        errorBox.classList.add('active');
+        return;
+    }
+
+    // Set loading state
+    btn.classList.add('loading');
+    btnText.innerHTML = '<span class="gps-location-loading"></span> Mengambil lokasi...';
+    resultBox.classList.remove('active');
+    errorBox.classList.remove('active');
+
+    try {
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0
+            });
+        });
+
+        const lat = position.coords.latitude.toFixed(6);
+        const lng = position.coords.longitude.toFixed(6);
+        const accuracy = Math.round(position.coords.accuracy || 0);
+        const mapsURL = `https://www.google.com/maps?q=${lat},${lng}`;
+
+        console.log('📍 GPS OK:', lat, lng, '±', accuracy, 'm');
+
+        // Tampilkan koordinat dulu
+        coordsEl.textContent = `${lat}, ${lng} (±${accuracy}m)`;
+        addrEl.textContent = '🔄 Mengambil alamat...';
+        resultBox.classList.add('active');
+        mapsLink.href = mapsURL;
+
+        // Simpan data
+        currentGpsData = {
+            lat: parseFloat(lat),
+            lng: parseFloat(lng),
+            accuracy: accuracy,
+            address: `${lat}, ${lng}`,
+            mapsURL: mapsURL
+        };
+
+        // Reverse geocoding via Nominatim
+        try {
+            const nominatimUrl = `${NOMINATIM_URL}?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=id`;
+            const response = await fetch(nominatimUrl, {
+                method: 'GET',
+                headers: { 'User-Agent': 'SALINK-Emergency-App/4.3' }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data && data.display_name) {
+                    const address = data.display_name;
+                    addrEl.textContent = '📍 ' + address;
+                    currentGpsData.address = address;
+                    console.log('📍 Reverse geocoding OK:', address);
+                } else {
+                    addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
+                }
+            } else {
+                addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
+            }
+        } catch(e) {
+            console.warn('⚠️ Nominatim error:', e.message);
+            addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
+        }
+
+        // Update tombol
+        btn.classList.remove('loading');
+        btnText.textContent = '✅ Lokasi Ditemukan — Tap untuk Ambil Ulang';
+        btn.style.background = 'linear-gradient(135deg, #3fb950, #2ea44f)';
+
+        showToast('📍 Lokasi Ditemukan', `Akurasi ±${accuracy}m`, 'fa-location-arrow', 'success');
+
+    } catch(error) {
+        console.error('❌ GPS error:', error);
+        btn.classList.remove('loading');
+        btnText.textContent = '📍 Ambil Lokasi Saya';
+        btn.style.background = '';
+
+        let errMsg = 'Gagal mengambil lokasi. ';
+        switch(error.code) {
+            case 1: errMsg += 'Izin lokasi ditolak. Aktifkan di Settings browser.'; break;
+            case 2: errMsg += 'Lokasi tidak tersedia.'; break;
+            case 3: errMsg += 'Timeout. Coba lagi.'; break;
+            default: errMsg += error.message || 'Coba lagi.';
+        }
+        errorBox.textContent = '❌ ' + errMsg;
+        errorBox.classList.add('active');
+        showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle', 'error');
+    }
+}
+
+// ====================================================================
+// STORAGE HELPERS
+// ====================================================================
+function loadReadNotifs() {
+    try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); } catch(e) { readNotifs = {}; }
+}
+function saveReadNotifs() {
+    try { localStorage.setItem('salink_read_notifs', JSON.stringify(readNotifs)); } catch(e) {}
+}
+function loadDismissed() {
+    try { dismissedEmergencies = JSON.parse(localStorage.getItem('salink_dismissed_emergencies') || '{}'); } catch(e) { dismissedEmergencies = {}; }
+    const now = Date.now();
+    let cleaned = false;
+    Object.keys(dismissedEmergencies).forEach(id => {
+        if (now - dismissedEmergencies[id] > EMERGENCY_DURATION) {
+            delete dismissedEmergencies[id]; cleaned = true;
+        }
+    });
+    if (cleaned) saveDismissed();
+}
+function saveDismissed() {
+    try { localStorage.setItem('salink_dismissed_emergencies', JSON.stringify(dismissedEmergencies)); } catch(e) {}
+}
+function isDismissed(emergencyId) { return dismissedEmergencies[emergencyId] !== undefined; }
+function dismissEmergency(emergencyId) {
+    if (!emergencyId) return;
+    dismissedEmergencies[emergencyId] = Date.now();
+    saveDismissed();
+}
+
+function getAllEmergencies() {
+    try { return JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) { return []; }
+}
+function getActiveEmergencies() {
+    const all = getAllEmergencies();
+    return all.filter(e => {
+        const exp = e.expiresAt || (new Date(e.timestamp).getTime() + EMERGENCY_DURATION);
+        return exp > Date.now();
+    });
+}
+
+// ====================================================================
+// ADAPTERS
+// ====================================================================
+function adaptEmergency(em) {
+    const ts = em.timestamp ? new Date(em.timestamp).getTime() : Date.now();
+    const coords = (em.latitude && em.longitude) ? `${em.latitude}, ${em.longitude}` : '';
+    return {
+        id: em.id, type: em.type,
+        sender: em.sender || em.senderUsername || 'Sistem',
+        senderUsername: em.senderUsername || em.sender || 'sistem',
+        location: em.location || em.address || 'Lokasi tidak diketahui',
+        address: em.address || em.description || '',
+        text: em.description || em.title || '',
+        mapsURL: em.mapsURL || '', mapEmbedURL: em.mapEmbedURL || '',
+        coords: coords, latitude: em.latitude || '', longitude: em.longitude || '',
+        timestamp: ts, expiresAt: ts + EMERGENCY_DURATION,
+        province: em.province || '', city: em.city || '', district: em.district || '', village: em.village || '',
+        status: em.status || 'active',
+        mediaType: em.mediaType || '', mediaData: em.mediaData || '', imagesArray: em.imagesArray || []
+    };
+}
+function adaptPost(p) {
+    const ts = p.timestamp ? new Date(p.timestamp).getTime() : Date.now();
+    return {
+        id: p.id, userId: p.userId, userFullName: p.userFullName,
+        userGender: p.userGender || 'male', userProfilePic: p.userProfilePic || '',
+        text: p.text || '', mediaType: p.mediaType || '', mediaData: p.mediaData || '',
+        timestamp: ts, likes: p.likes || '[]', comments: p.comments || '[]',
+        viewerCount: parseInt(p.viewerCount || 0, 10) || 0,
+        isSpecial: p.isSpecial === 'TRUE' || p.isSpecial === true || p.isSpecial === 'true',
+        specialType: p.specialType || '',
+        specialLocation: p.specialLocation || '', specialAddress: p.specialAddress || '',
+        latitude: p.latitude || '', longitude: p.longitude || '', mapsURL: p.mapsURL || '',
+        postType: p.postType || 'biasa',
+        country: p.country || '', province: p.province || '', city: p.city || '',
+        district: p.district || '', village: p.village || '', address: p.address || ''
+    };
+}
+function adaptUser(u) {
+    const lastActive = u.lastActive ? new Date(u.lastActive).getTime() : 0;
+    return { ...u, isOnline: lastActive > (Date.now() - 5 * 60 * 1000) };
+}
+function adaptNotification(n) {
+    return {
+        id: n.id || 'notif-' + Date.now(), type: n.type || 'info',
+        title: n.title || 'Notifikasi', message: n.message || n.text || '',
+        sender: n.sender || 'Sistem', senderUsername: n.senderUsername || '',
+        link: n.link || '', postId: n.postId || '',
+        timestamp: n.timestamp ? new Date(n.timestamp).getTime() : Date.now(),
+        read: n.read === 'TRUE' || n.read === true || n.read === 'true',
+        soundKey: n.soundKey || ''
+    };
+}
+
+// ====================================================================
+// HELPERS
+// ====================================================================
+function formatDate(ts) {
+    const d = new Date(ts);
+    const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+    const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+    return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} • ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function getTimeAgo(ts) {
+    const diff = Date.now() - ts;
+    const sec = Math.floor(diff/1000), min = Math.floor(sec/60), hr = Math.floor(min/60), day = Math.floor(hr/24);
+    if (sec < 60) return 'Baru saja';
+    if (min < 60) return `${min}m lalu`;
+    if (hr < 24) return `${hr}j lalu`;
+    if (day < 7) return `${day}h lalu`;
+    return new Date(ts).toLocaleDateString('id-ID');
+}
+function getRemainingTime(expiresAt) {
+    const r = expiresAt - Date.now();
+    if (r <= 0) return 'Kadaluarsa';
+    const h = Math.floor(r/3600000), m = Math.floor((r%3600000)/60000);
+    return `${h}j ${m}m tersisa`;
+}
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+function escapeAttr(str) {
+    if (!str) return '';
+    return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ====================================================================
+// BADGES & NOTIFICATIONS UI
+// ====================================================================
+function updateEmergencyBadges() {
+    const counts = getActiveEmergencyCountByType();
+    const map = { 'fire': 'fireBadge', 'medical': 'medicalBadge', 'crime': 'crimeBadge', 'disaster': 'disasterBadge' };
+    const btnMap = { 'fire': 'fireBtn', 'medical': 'medicalBtn', 'crime': 'securityBtn', 'disaster': 'disasterBtn' };
+    Object.keys(map).forEach(type => {
+        const badge = document.getElementById(map[type]);
+        const btn = document.getElementById(btnMap[type]);
+        const count = counts[type] || 0;
+        if (badge) { badge.textContent = count; badge.classList.toggle('show', count > 0); }
+        if (btn) {
+            btn.classList.toggle('has-notification', count > 0);
+            const st = btn.querySelector('.play-status');
+            if (st && !btn.classList.contains('playing') && !btn.classList.contains('new-emergency')) {
+                st.textContent = count > 0 ? `🔔 ${count} Notifikasi` : '▶ Tap untuk Alarm';
+            }
+        }
+    });
+    const total = counts.fire + counts.medical + counts.crime + counts.disaster;
+    const hc = document.getElementById('hologramCount');
+    if (hc) { hc.textContent = total; hc.classList.toggle('zero', total === 0); }
+    const ab = document.getElementById('alertBadge');
+    if (ab) { ab.textContent = total; ab.style.display = total > 0 ? 'block' : 'none'; }
+}
+function updateNotifBadge(count) {
+    const allNotifs = getAllNotifications();
+    const unread = (typeof count === 'number') ? count : allNotifs.filter(n => !n.read).length;
+    const badge = document.getElementById('notifBadge');
+    if (badge) { badge.textContent = unread > 99 ? '99+' : unread; badge.classList.toggle('show', unread > 0); }
+    const modalBadge = document.getElementById('notifModalBadge');
+    if (modalBadge) modalBadge.textContent = unread;
+}
+function updateInviteBadge() {
+    const badge = document.getElementById('inviteBadge');
+    if (badge) {
+        const pending = Object.keys(sentInvites).length;
+        badge.textContent = pending;
+        badge.classList.toggle('show', pending > 0);
+    }
+}
+
+function getActiveEmergencyCountByType() {
+    const c = { fire: 0, medical: 0, crime: 0, disaster: 0 };
+    getActiveEmergencies().forEach(e => { if (c.hasOwnProperty(e.type)) c[e.type]++; });
+    return c;
+}
+
+// TOAST
+function showToast(title, message, icon = 'fa-info-circle', type = 'info') {
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML = `
+        <div class="toast-icon"><i class="fas ${icon}"></i></div>
+        <div class="toast-content">
+            <div class="toast-title">${escapeHTML(title)}</div>
+            <div class="toast-message">${escapeHTML(message)}</div>
+        </div>
+        <button class="toast-close"><i class="fas fa-times"></i></button>
+    `;
+    toast.querySelector('.toast-close').onclick = () => { toast.classList.remove('active'); setTimeout(() => toast.remove(), 400); };
+    container.appendChild(toast);
+    setTimeout(() => { toast.classList.remove('active'); setTimeout(() => toast.remove(), 400); }, 5000);
+}
+
+// FLOATING NOTIFICATION
+function showFloatingNotification(type, title, message, subtitle, actionText, actionCallback) {
+    const notif = document.getElementById('floatingNotification');
+    const icon = document.getElementById('floatingIcon');
+    if (!notif) return;
+    clearTimeout(floatingNotificationTimeout);
+    icon.className = 'notif-icon ' + type;
+    if (type === 'emergency') icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+    else if (type === 'install') icon.innerHTML = '<i class="fas fa-download"></i>';
+    else icon.innerHTML = '<i class="fas fa-bell"></i>';
+    document.getElementById('floatingTitle').textContent = title;
+    document.getElementById('floatingMessage').textContent = message;
+    document.getElementById('floatingSubtitle').textContent = subtitle || new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+    const actionBtn = document.getElementById('floatingAction');
+    if (actionText && actionCallback) {
+        actionBtn.style.display = 'block';
+        actionBtn.textContent = actionText;
+        actionBtn.onclick = (e) => { e.stopPropagation(); actionCallback(); };
+    } else actionBtn.style.display = 'none';
+    document.getElementById('floatingClose').onclick = (e) => { e.stopPropagation(); hideFloatingNotification(); };
+    if (type === 'emergency') notif.classList.add('emergency-notif');
+    else notif.classList.remove('emergency-notif');
+    notif.onclick = () => { if (actionCallback) actionCallback(); };
+    notif.classList.add('active');
+    floatingNotificationTimeout = setTimeout(() => hideFloatingNotification(), 10000);
+}
+function hideFloatingNotification() {
+    const notif = document.getElementById('floatingNotification');
+    if (notif) {
+        notif.classList.remove('active');
+        notif.classList.add('hide');
+        setTimeout(() => notif.classList.remove('hide'), 500);
+    }
+    clearTimeout(floatingNotificationTimeout);
+}
+
+// ====================================================================
+// EMERGENCY BUTTON ANIMATION
+// ====================================================================
+function animateEmergencyButton(type) {
+    const btnMap = { 'fire': 'fireBtn', 'medical': 'medicalBtn', 'crime': 'securityBtn', 'disaster': 'disasterBtn' };
+    const btn = document.getElementById(btnMap[type]);
+    if (!btn) return;
+    btn.classList.add('new-emergency', 'has-notification');
+    const st = btn.querySelector('.play-status');
+    if (st) st.textContent = '🔔 Ada Darurat! Tap untuk matikan';
+}
+function stopEmergencyButtonAnimation() {
+    document.querySelectorAll('.emergency-btn').forEach(btn => {
+        btn.classList.remove('new-emergency', 'playing');
+    });
+    updateEmergencyBadges();
+}
+
+// ====================================================================
+// STORAGE EMERGENCY
+// ====================================================================
+function saveEmergencyToStorage(data) {
+    let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+    data.savedAt = Date.now();
+    data.expiresAt = data.expiresAt || (Date.now() + EMERGENCY_DURATION);
+    data.id = data.id || 'emergency-' + Date.now();
+    ems.unshift(data);
+    localStorage.setItem('salink_emergencies', JSON.stringify(ems));
+}
+
+// ====================================================================
+// POLLING
+// ====================================================================
+function startEmergencyPolling() {
+    if (emergencyPollTimer) clearInterval(emergencyPollTimer);
+    emergencyPollTimer = setInterval(async () => {
+        // Skip polling saat full screen alarm aktif
+        if (fullScreenAlarmActive) return;
+        try {
+            const notifs = await apiGetNotifications();
+            if (notifs && notifs.length > 0) {
+                notifications = notifs;
+                const newEmergency = detectNewEmergencyNotifications(notifications);
+                if (newEmergency) triggerEmergencyFromNotification(newEmergency);
+                updateNotifBadge();
+            }
+        } catch(e) {}
+    }, EMERGENCY_POLL_INTERVAL);
+}
+
+function detectNewEmergencyNotifications(notifs) {
+    if (!notifs || notifs.length === 0) return null;
+    const lastCheck = parseInt(localStorage.getItem('salink_last_emergency_check') || '0');
+    const now = Date.now();
+    const newEmergencyNotifs = notifs.filter(n => {
+        const isEmergencyType = ['fire', 'medical', 'crime', 'disaster'].includes(n.type);
+        if (!isEmergencyType) return false;
+        if (readNotifs[n.id]) return false;
+        if (isDismissed(n.id)) return false;
+        return (n.timestamp || 0) > lastCheck;
+    });
+    if (newEmergencyNotifs.length === 0) {
+        localStorage.setItem('salink_last_emergency_check', String(now));
+        return null;
+    }
+    newEmergencyNotifs.sort((a, b) => b.timestamp - a.timestamp);
+    const latest = newEmergencyNotifs[0];
+    if (currentUser && latest.senderUsername === currentUser.username) {
+        readNotifs[latest.id] = true;
+        saveReadNotifs();
+        localStorage.setItem('salink_last_emergency_check', String(now));
+        return null;
+    }
+    localStorage.setItem('salink_last_emergency_check', String(now));
+    return latest;
+}
+
+function startEmergencyCleanup() {
+    setInterval(() => {
+        renderHologram();
+        updateEmergencyBadges();
+    }, EMERGENCY_CLEANUP_INTERVAL);
+}
+
+// Placeholder — akan di-override di Part 4
+let sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}');
+
+// Placeholder — akan di-override di Part 4
+function renderHologram() {}
+function getAllNotifications() { return []; }
+function apiGetNotifications() { return Promise.resolve([]); }
+    </script>
+
+    
+// ====================================================================
+// PART 4: API CALLS (REAL IMPLEMENTATION)
+// ====================================================================
+async function apiCall(action, data = {}) {
+    try {
+        if (action.startsWith('get_')) {
+            const params = new URLSearchParams({ action, ...data, timestamp: Date.now() });
+            const response = await fetch(API_URL + '?' + params.toString(), {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+                cache: 'no-store'
+            });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return await response.json();
+        } else {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action, data, timestamp: Date.now() })
+            });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return await response.json();
+        }
+    } catch (error) {
+        return { status: 'error', message: error.message };
+    }
+}
+
+async function apiGetPosts() {
+    const r = await apiCall('get_posts');
+    return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptPost) : [];
+}
+async function apiGetEmergencies() {
+    const r = await apiCall('get_emergencies');
+    return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptEmergency) : [];
+}
+async function apiGetNotifications() {
+    const r = await apiCall('get_notifications');
+    return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptNotification) : [];
+}
+async function apiGetStatistics() {
+    const r = await apiCall('get_statistics');
+    return r.status === 'success' ? r.data : null;
+}
+async function apiGetUsers() {
+    const r = await apiCall('get_users');
+    return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptUser) : [];
+}
+
+async function apiSavePost(postData) {
+    const payload = {
+        id: postData.id,
+        userId: postData.userId,
+        userFullName: postData.userFullName,
+        userGender: postData.userGender || 'male',
+        userProfilePic: postData.userProfilePic || '',
+        text: postData.text || '',
+        mediaType: postData.mediaType || '',
+        mediaData: postData.mediaData || '',
+        timestamp: new Date(postData.timestamp).toISOString(),
+        likes: '[]',
+        comments: '[]',
+        isSpecial: postData.isSpecial ? 'TRUE' : 'FALSE',
+        specialType: postData.specialType || '',
+        specialLocation: postData.specialLocation || '',
+        specialAddress: postData.specialAddress || '',
+        postType: postData.postType || 'biasa',
+        country: postData.country || '',
+        province: postData.province || '',
+        city: postData.city || '',
+        district: postData.district || '',
+        village: postData.village || '',
+        address: postData.address || '',
+        latitude: postData.latitude || '',
+        longitude: postData.longitude || '',
+        mapsURL: postData.mapsURL || ''
+    };
+    const r = await apiCall('save_post', payload);
+    return r.status === 'success';
+}
+
+async function apiSaveEmergency(emergencyData) {
+    const payload = {
+        id: 'emergency-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10),
+        type: emergencyData.type,
+        title: emergencyData.title || EMERGENCY_LABELS[emergencyData.type],
+        sender: emergencyData.sender,
+        senderUsername: emergencyData.senderUsername,
+        senderPhone: emergencyData.senderPhone || '',
+        location: emergencyData.location,
+        address: emergencyData.address || '',
+        latitude: emergencyData.latitude || '',
+        longitude: emergencyData.longitude || '',
+        mapsURL: emergencyData.mapsURL || '',
+        mapEmbedURL: emergencyData.mapEmbedURL ||
+            (emergencyData.latitude && emergencyData.longitude
+                ? `https://www.google.com/maps?q=${emergencyData.latitude},${emergencyData.longitude}&output=embed`
+                : ''),
+        timestamp: new Date().toISOString(),
+        status: emergencyData.status || 'active',
+        resolvedAt: '',
+        province: emergencyData.province || '',
+        city: emergencyData.city || '',
+        district: emergencyData.district || '',
+        village: emergencyData.village || '',
+        description: emergencyData.description || '',
+        nearbyContacts: '[]'
+    };
+    const r = await apiCall('save_emergency', payload);
+    return r.status === 'success';
+}
+
+async function incrementViewerCount(postId) {
+    if (!postId) return;
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ action: 'increment_viewer', data: { postId: postId } })
+        });
+        const result = await response.json();
+        if (result && result.status === 'success') {
+            const post = posts.find(p => p.id === postId);
+            if (post) {
+                post.viewerCount = result.viewerCount;
+                try { localStorage.setItem('salink_posts', JSON.stringify(posts)); } catch(e) {}
+                broadcastSync('stats_update', { postId });
+            }
+        }
+    } catch (error) {}
+}
+
+// ====================================================================
 // CROSS-TAB SYNC
 // ====================================================================
 let syncChannel = null;
 try {
     syncChannel = new BroadcastChannel('salink_sync');
-    syncChannel.onmessage = (event) => {
-        handleSyncMessage(event.data);
-    };
+    syncChannel.onmessage = (event) => handleSyncMessage(event.data);
 } catch(e) { console.warn('BroadcastChannel not supported'); }
 
 function handleSyncMessage(data) {
@@ -1462,6 +2001,9 @@ async function confirmDeleteNow() {
     hideSyncIndicator();
 }
 
+// ====================================================================
+// STATS CALCULATION
+// ====================================================================
 function calculateRealStatistics() {
     const allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
     const allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
@@ -1481,577 +2023,26 @@ function calculateRealStatistics() {
     return { totalPosts: allPosts.length, totalEmergencies: allEms.length, activeEmergencies: activeEms.length, totalLikes, totalViewers, byType };
 }
 
-function resetIdleTimer() {
-    isIdleStandby = false;
-    if (idleTimer) clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => { isIdleStandby = true; }, IDLE_THRESHOLD_MS);
-}
-function setupIdleDetection() {
-    ['mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'visibilitychange'].forEach(evt => {
-        document.addEventListener(evt, () => {
-            if (document.visibilityState === 'visible') resetIdleTimer();
-        }, { passive: true });
-    });
-    resetIdleTimer();
-}
-
-// STORAGE HELPERS
-function loadReadNotifs() {
-    try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); } catch(e) { readNotifs = {}; }
-}
-function saveReadNotifs() {
-    try { localStorage.setItem('salink_read_notifs', JSON.stringify(readNotifs)); } catch(e) {}
-}
-function loadDismissed() {
-    try { dismissedEmergencies = JSON.parse(localStorage.getItem('salink_dismissed_emergencies') || '{}'); } catch(e) { dismissedEmergencies = {}; }
-    const now = Date.now();
-    let cleaned = false;
-    Object.keys(dismissedEmergencies).forEach(id => {
-        if (now - dismissedEmergencies[id] > EMERGENCY_DURATION) {
-            delete dismissedEmergencies[id]; cleaned = true;
-        }
-    });
-    if (cleaned) saveDismissed();
-}
-function saveDismissed() {
-    try { localStorage.setItem('salink_dismissed_emergencies', JSON.stringify(dismissedEmergencies)); } catch(e) {}
-}
-function isDismissed(emergencyId) { return dismissedEmergencies[emergencyId] !== undefined; }
-function dismissEmergency(emergencyId) {
-    if (!emergencyId) return;
-    dismissedEmergencies[emergencyId] = Date.now();
-    saveDismissed();
-}
-
-function getAllEmergencies() {
-    try { return JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) { return []; }
-}
-function getActiveEmergencies() {
-    const all = getAllEmergencies();
-    return all.filter(e => {
-        const exp = e.expiresAt || (new Date(e.timestamp).getTime() + EMERGENCY_DURATION);
-        return exp > Date.now();
-    });
-}
-
-function adaptEmergency(em) {
-    const ts = em.timestamp ? new Date(em.timestamp).getTime() : Date.now();
-    const coords = (em.latitude && em.longitude) ? `${em.latitude}, ${em.longitude}` : '';
-    return {
-        id: em.id, type: em.type,
-        sender: em.sender || em.senderUsername || 'Sistem',
-        senderUsername: em.senderUsername || em.sender || 'sistem',
-        location: em.location || em.address || 'Lokasi tidak diketahui',
-        address: em.address || em.description || '',
-        text: em.description || em.title || '',
-        mapsURL: em.mapsURL || '', mapEmbedURL: em.mapEmbedURL || '',
-        coords: coords, latitude: em.latitude || '', longitude: em.longitude || '',
-        timestamp: ts, expiresAt: ts + EMERGENCY_DURATION,
-        province: em.province || '', city: em.city || '', district: em.district || '', village: em.village || '',
-        status: em.status || 'active',
-        mediaType: em.mediaType || '', mediaData: em.mediaData || '', imagesArray: em.imagesArray || []
-    };
-}
-function adaptPost(p) {
-    const ts = p.timestamp ? new Date(p.timestamp).getTime() : Date.now();
-    return {
-        id: p.id, userId: p.userId, userFullName: p.userFullName,
-        userGender: p.userGender || 'male', userProfilePic: p.userProfilePic || '',
-        text: p.text || '', mediaType: p.mediaType || '', mediaData: p.mediaData || '',
-        timestamp: ts, likes: p.likes || '[]', comments: p.comments || '[]',
-        viewerCount: parseInt(p.viewerCount || 0, 10) || 0,
-        isSpecial: p.isSpecial === 'TRUE' || p.isSpecial === true || p.isSpecial === 'true',
-        specialType: p.specialType || '',
-        specialLocation: p.specialLocation || '', specialAddress: p.specialAddress || '',
-        latitude: p.latitude || '', longitude: p.longitude || '', mapsURL: p.mapsURL || '',
-        postType: p.postType || 'biasa',
-        country: p.country || '', province: p.province || '', city: p.city || '',
-        district: p.district || '', village: p.village || '', address: p.address || ''
-    };
-}
-function adaptUser(u) {
-    const lastActive = u.lastActive ? new Date(u.lastActive).getTime() : 0;
-    return { ...u, isOnline: lastActive > (Date.now() - 5 * 60 * 1000) };
-}
-function adaptNotification(n) {
-    return {
-        id: n.id || 'notif-' + Date.now(), type: n.type || 'info',
-        title: n.title || 'Notifikasi', message: n.message || n.text || '',
-        sender: n.sender || 'Sistem', senderUsername: n.senderUsername || '',
-        link: n.link || '', postId: n.postId || '',
-        timestamp: n.timestamp ? new Date(n.timestamp).getTime() : Date.now(),
-        read: n.read === 'TRUE' || n.read === true || n.read === 'true',
-        soundKey: n.soundKey || ''
-    };
-}
-
-// PWA
-function setupPWA() {
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
-        });
+function updateStatsCards() {
+    const realStats = calculateRealStatistics();
+    let teamsDisplay = 0;
+    if (allUsers.length > 0) {
+        const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+        const teamsOnline = allUsers.filter(u => u.isOnline === true || (u.lastActive && new Date(u.lastActive).getTime() > fiveMinAgo)).length;
+        teamsDisplay = teamsOnline > 0 ? teamsOnline : allUsers.length;
     }
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        setTimeout(() => {
-            if (deferredPrompt && !localStorage.getItem('salink_installed')) {
-                showFloatingNotification('install', '📱 Install SALINK', 'Akses lebih cepat & offline', 'Tap untuk install aplikasi', 'Install', () => showInstallPrompt());
-            }
-        }, 10000);
-    });
-    window.addEventListener('appinstalled', () => {
-        localStorage.setItem('salink_installed', 'true');
-        deferredPrompt = null;
-        showToast('🎉 Selamat!', 'Aplikasi SALINK berhasil diinstall!', 'fa-rocket');
-    });
-}
-function showInstallPrompt() {
-    if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(r => {
-            if (r.outcome === 'accepted') {
-                localStorage.setItem('salink_installed', 'true');
-                showToast('✅ Berhasil', 'Aplikasi SALINK diinstall!', 'fa-check-circle');
-            }
-            deferredPrompt = null;
-        });
-    } else {
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-        showToast('📱 Install', isIOS ? 'Bagikan → Tambahkan ke Layar Utama' : 'Menu browser → Install Aplikasi', 'fa-mobile-alt');
-    }
-}
-
-async function apiCall(action, data = {}) {
-    try {
-        if (action.startsWith('get_')) {
-            const params = new URLSearchParams({ action, ...data, timestamp: Date.now() });
-            const response = await fetch(API_URL + '?' + params.toString(), { method: 'GET', headers: { 'Accept': 'application/json' }, cache: 'no-store' });
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            return await response.json();
-        } else {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action, data, timestamp: Date.now() })
-            });
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            return await response.json();
-        }
-    } catch (error) {
-        return { status: 'error', message: error.message };
-    }
-}
-async function apiGetPosts() { const r = await apiCall('get_posts'); return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptPost) : []; }
-async function apiGetEmergencies() { const r = await apiCall('get_emergencies'); return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptEmergency) : []; }
-async function apiGetNotifications() { const r = await apiCall('get_notifications'); return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptNotification) : []; }
-async function apiGetStatistics() { const r = await apiCall('get_statistics'); return r.status === 'success' ? r.data : null; }
-async function apiGetUsers() { const r = await apiCall('get_users'); return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptUser) : []; }
-
-async function apiSavePost(postData) {
-    const payload = {
-        id: postData.id, userId: postData.userId, userFullName: postData.userFullName,
-        userGender: postData.userGender || 'male', userProfilePic: postData.userProfilePic || '',
-        text: postData.text || '', mediaType: postData.mediaType || '', mediaData: postData.mediaData || '',
-        timestamp: new Date(postData.timestamp).toISOString(),
-        likes: '[]', comments: '[]',
-        isSpecial: postData.isSpecial ? 'TRUE' : 'FALSE',
-        specialType: postData.specialType || '',
-        specialLocation: postData.specialLocation || '', specialAddress: postData.specialAddress || '',
-        postType: postData.postType || 'biasa',
-        country: postData.country || '', province: postData.province || '', city: postData.city || '',
-        district: postData.district || '', village: postData.village || '', address: postData.address || '',
-        latitude: postData.latitude || '', longitude: postData.longitude || '', mapsURL: postData.mapsURL || ''
-    };
-    const r = await apiCall('save_post', payload);
-    return r.status === 'success';
-}
-async function apiSaveEmergency(emergencyData) {
-    const payload = {
-        id: 'emergency-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10),
-        type: emergencyData.type, title: emergencyData.title || EMERGENCY_LABELS[emergencyData.type],
-        sender: emergencyData.sender, senderUsername: emergencyData.senderUsername,
-        senderPhone: emergencyData.senderPhone || '',
-        location: emergencyData.location, address: emergencyData.address || '',
-        latitude: emergencyData.latitude || '', longitude: emergencyData.longitude || '',
-        mapsURL: emergencyData.mapsURL || '',
-        mapEmbedURL: emergencyData.mapEmbedURL || (emergencyData.latitude && emergencyData.longitude ? `https://www.google.com/maps?q=${emergencyData.latitude},${emergencyData.longitude}&output=embed` : ''),
-        timestamp: new Date().toISOString(), status: emergencyData.status || 'active', resolvedAt: '',
-        province: emergencyData.province || '', city: emergencyData.city || '', district: emergencyData.district || '', village: emergencyData.village || '',
-        description: emergencyData.description || '', nearbyContacts: '[]'
-    };
-    const r = await apiCall('save_emergency', payload);
-    return r.status === 'success';
-}
-async function incrementViewerCount(postId) {
-    if (!postId) return;
-    try {
-        const response = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'increment_viewer', data: { postId: postId } })
-        });
-        const result = await response.json();
-        if (result && result.status === 'success') {
-            const post = posts.find(p => p.id === postId);
-            if (post) {
-                post.viewerCount = result.viewerCount;
-                try { localStorage.setItem('salink_posts', JSON.stringify(posts)); } catch(e) {}
-                broadcastSync('stats_update', { postId });
-            }
-        }
-    } catch (error) {}
-}
-
-// HELPERS
-function formatDate(ts) {
-    const d = new Date(ts);
-    const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
-    const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-    return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} • ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-}
-function getTimeAgo(ts) {
-    const diff = Date.now() - ts;
-    const sec = Math.floor(diff/1000), min = Math.floor(sec/60), hr = Math.floor(min/60), day = Math.floor(hr/24);
-    if (sec < 60) return 'Baru saja';
-    if (min < 60) return `${min}m lalu`;
-    if (hr < 24) return `${hr}j lalu`;
-    if (day < 7) return `${day}h lalu`;
-    return new Date(ts).toLocaleDateString('id-ID');
-}
-function getRemainingTime(expiresAt) {
-    const r = expiresAt - Date.now();
-    if (r <= 0) return 'Kadaluarsa';
-    const h = Math.floor(r/3600000), m = Math.floor((r%3600000)/60000);
-    return `${h}j ${m}m tersisa`;
-}
-function escapeHTML(str) {
-    if (!str) return '';
-    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-}
-function escapeAttr(str) {
-    if (!str) return '';
-    return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-function saveEmergencyToStorage(data) {
-    let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-    data.savedAt = Date.now();
-    data.expiresAt = data.expiresAt || (Date.now() + EMERGENCY_DURATION);
-    data.id = data.id || 'emergency-' + Date.now();
-    ems.unshift(data);
-    localStorage.setItem('salink_emergencies', JSON.stringify(ems));
-}
-function getActiveEmergencyCountByType() {
-    const c = { fire: 0, medical: 0, crime: 0, disaster: 0 };
-    getActiveEmergencies().forEach(e => { if (c.hasOwnProperty(e.type)) c[e.type]++; });
-    return c;
+    const responseRate = realStats.totalEmergencies > 0
+        ? Math.round(((realStats.totalEmergencies - realStats.activeEmergencies) / realStats.totalEmergencies) * 100)
+        : 0;
+    const sa = document.getElementById('statActive'); if (sa) sa.textContent = realStats.activeEmergencies;
+    const sc = document.getElementById('statCompleted'); if (sc) sc.textContent = realStats.totalEmergencies - realStats.activeEmergencies;
+    const st = document.getElementById('statTeams'); if (st) st.textContent = teamsDisplay;
+    const sr = document.getElementById('statResponse'); if (sr) sr.textContent = responseRate + '%';
 }
 
 // ====================================================================
-// EMERGENCY OVERLAY
+// RENDER HOLOGRAM (REAL)
 // ====================================================================
-function showEmergencyOverlay(em) {
-    const overlay = document.getElementById('emergencyOverlay');
-    if (!overlay || overlay.classList.contains('active')) return;
-    if (isDismissed(em.id)) return;
-    const type = em.type || 'fire';
-    const icon = EMERGENCY_ICONS[type] || '🚨';
-    const label = EMERGENCY_LABELS[type] || 'DARURAT';
-    const cssClass = EMERGENCY_CSS_CLASS[type] || 'fire';
-    document.getElementById('emergencyIcon').textContent = icon;
-    document.getElementById('emergencyIcon').className = `emergency-icon ${cssClass}`;
-    document.getElementById('emergencyTitle').textContent = label.replace(/^[^\s]+\s/, '');
-    document.getElementById('emergencyTitle').className = `emergency-title ${cssClass}`;
-    document.getElementById('emergencySender').innerHTML = `📤 Dilaporkan oleh: <strong>${escapeHTML(em.sender || 'User')}</strong>`;
-    document.getElementById('emergencyLocation').textContent = `📍 ${em.location || '-'}`;
-    document.getElementById('emergencyAddress').textContent = em.address ? `📌 ${em.address}` : '';
-    document.getElementById('emergencyCoords').textContent = em.coords ? `📏 ${em.coords}` : '';
-    document.getElementById('emergencyTime').textContent = `🕐 ${formatDate(em.timestamp)}`;
-    document.getElementById('emergencyBadge').textContent = `🚨 ${label}`;
-    document.getElementById('emergencyViewBtn').onclick = () => { window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(em.id); };
-    document.getElementById('emergencyDismissBtn').onclick = () => dismissEmergencyOverlay(true);
-    overlay.classList.add('active');
-    document.body.style.overflow = 'hidden';
-    activeOverlayEmergency = em;
-    overlay.dataset.emergencyId = em.id || '';
-    
-    // ✅ v4.2: Play emergency loop
-    playEmergencyLoop(type);
-    
-    if (navigator.vibrate) {
-        navigator.vibrate([300, 100, 300, 100, 300, 100, 500]);
-        emergencyVibrateInterval = setInterval(() => {
-            if (activeOverlayEmergency) navigator.vibrate([300, 100, 300, 100, 300, 100, 500]);
-        }, EMERGENCY_VIBRATE_INTERVAL_MS);
-    }
-    let remaining = Math.floor(EMERGENCY_AUTO_DISMISS_MS / 1000);
-    const countdownEl = document.getElementById('emergencyCountdown');
-    countdownEl.textContent = remaining + 's';
-    clearInterval(emergencyCountdownTimer);
-    emergencyCountdownTimer = setInterval(() => {
-        remaining--;
-        countdownEl.textContent = remaining + 's';
-        if (remaining <= 0) { clearInterval(emergencyCountdownTimer); dismissEmergencyOverlay(false); }
-    }, 1000);
-    clearTimeout(emergencyOverlayTimeout);
-    emergencyOverlayTimeout = setTimeout(() => dismissEmergencyOverlay(false), EMERGENCY_AUTO_DISMISS_MS);
-    setupEmergencySwipe();
-    if (em.id) { readNotifs[em.id] = true; saveReadNotifs(); }
-}
-function dismissEmergencyOverlay(userAction) {
-    const overlay = document.getElementById('emergencyOverlay');
-    if (overlay) {
-        const emergencyId = overlay.dataset.emergencyId;
-        if (emergencyId) dismissEmergency(emergencyId);
-        overlay.classList.remove('active');
-        overlay.dataset.emergencyId = '';
-    }
-    document.body.style.overflow = '';
-    clearTimeout(emergencyOverlayTimeout);
-    clearInterval(emergencyCountdownTimer);
-    clearInterval(emergencyVibrateInterval);
-    stopEmergencyLoop();
-    hideFloatingNotification();
-    activeOverlayEmergency = null;
-    if (userAction) showToast('✅ Alarm Dimatikan', 'Anda telah mengonfirmasi notifikasi darurat', 'fa-check-circle', 'success');
-}
-function setupEmergencySwipe() {
-    const overlay = document.getElementById('emergencyOverlay');
-    if (!overlay || overlay._swipeSetup) return;
-    overlay._swipeSetup = true;
-    let startX = 0, startY = 0, endX = 0, endY = 0, isSwiping = false;
-    overlay.addEventListener('touchstart', (e) => {
-        const t = e.touches[0];
-        startX = t.clientX; startY = t.clientY; endX = startX; endY = startY; isSwiping = true;
-    }, { passive: true });
-    overlay.addEventListener('touchmove', (e) => {
-        if (!isSwiping) return;
-        const t = e.touches[0];
-        endX = t.clientX; endY = t.clientY;
-    }, { passive: true });
-    overlay.addEventListener('touchend', () => {
-        if (!isSwiping) return;
-        isSwiping = false;
-        const dx = endX - startX, dy = endY - startY;
-        const distance = Math.sqrt(dx*dx + dy*dy);
-        if (distance > SWIPE_MIN_DISTANCE) {
-            if (navigator.vibrate) navigator.vibrate(100);
-            dismissEmergencyOverlay(true);
-        }
-    }, { passive: true });
-    let md = false, mx = 0, my = 0;
-    overlay.addEventListener('mousedown', (e) => { md = true; mx = e.clientX; my = e.clientY; });
-    overlay.addEventListener('mouseup', (e) => {
-        if (!md) return;
-        md = false;
-        const dx = e.clientX - mx, dy = e.clientY - my;
-        const distance = Math.sqrt(dx*dx + dy*dy);
-        if (distance > SWIPE_MIN_DISTANCE) dismissEmergencyOverlay(true);
-    });
-}
-
-// DETECT NEW EMERGENCY
-function detectNewEmergencyNotifications(notifs) {
-    if (!notifs || notifs.length === 0) return null;
-    const lastCheck = parseInt(localStorage.getItem('salink_last_emergency_check') || '0');
-    const now = Date.now();
-    const newEmergencyNotifs = notifs.filter(n => {
-        const isEmergencyType = ['fire', 'medical', 'crime', 'disaster'].includes(n.type);
-        if (!isEmergencyType) return false;
-        if (readNotifs[n.id]) return false;
-        if (isDismissed(n.id)) return false;
-        return (n.timestamp || 0) > lastCheck;
-    });
-    if (newEmergencyNotifs.length === 0) {
-        localStorage.setItem('salink_last_emergency_check', String(now));
-        return null;
-    }
-    newEmergencyNotifs.sort((a, b) => b.timestamp - a.timestamp);
-    const latest = newEmergencyNotifs[0];
-    if (currentUser && latest.senderUsername === currentUser.username) {
-        readNotifs[latest.id] = true;
-        saveReadNotifs();
-        localStorage.setItem('salink_last_emergency_check', String(now));
-        return null;
-    }
-    localStorage.setItem('salink_last_emergency_check', String(now));
-    return latest;
-}
-function triggerEmergencyFromNotification(notif) {
-    if (isDismissed(notif.id)) return;
-    const em = {
-        id: notif.id, type: notif.type,
-        sender: notif.sender || 'User',
-        senderUsername: notif.senderUsername || '',
-        location: notif.message || 'Lokasi tidak diketahui',
-        address: notif.message || '', text: notif.message || '',
-        mapsURL: '', coords: '',
-        timestamp: notif.timestamp,
-        expiresAt: notif.timestamp + EMERGENCY_DURATION
-    };
-    let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-    const exists = ems.find(e => e.id === em.id);
-    if (!exists) {
-        ems.unshift(em);
-        try { localStorage.setItem('salink_emergencies', JSON.stringify(ems)); } catch(e) {}
-        renderHologram();
-    }
-    updateEmergencyBadges();
-    updateNotifBadge();
-    animateEmergencyButton(notif.type);
-    const isStandby = document.hidden || isIdleStandby;
-    if (isStandby) {
-        showEmergencyOverlay(em);
-    } else {
-        showFloatingNotification('emergency',
-            `${EMERGENCY_ICONS[notif.type]} ${EMERGENCY_LABELS[notif.type]}`,
-            `${notif.sender || 'User'} melaporkan darurat`,
-            `📍 ${notif.message || 'Lokasi tidak diketahui'}`,
-            'Lihat',
-            () => {
-                document.getElementById('hologramDisplay')?.scrollIntoView({ behavior: 'smooth' });
-                hideFloatingNotification();
-            }
-        );
-    }
-}
-
-function startEmergencyPolling() {
-    if (emergencyPollTimer) clearInterval(emergencyPollTimer);
-    emergencyPollTimer = setInterval(async () => {
-        if (document.getElementById('emergencyOverlay')?.classList.contains('active')) return;
-        try {
-            const notifs = await apiGetNotifications();
-            if (notifs && notifs.length > 0) {
-                notifications = notifs;
-                const newEmergency = detectNewEmergencyNotifications(notifications);
-                if (newEmergency) triggerEmergencyFromNotification(newEmergency);
-                updateNotifBadge();
-            }
-        } catch(e) {}
-    }, EMERGENCY_POLL_INTERVAL);
-}
-function startEmergencyCleanup() {
-    setInterval(() => {
-        renderHologram();
-        updateEmergencyBadges();
-    }, EMERGENCY_CLEANUP_INTERVAL);
-}
-
-function animateEmergencyButton(type) {
-    const btnMap = { 'fire': 'fireBtn', 'medical': 'medicalBtn', 'crime': 'securityBtn', 'disaster': 'disasterBtn' };
-    const btn = document.getElementById(btnMap[type]);
-    if (!btn) return;
-    btn.classList.add('new-emergency', 'has-notification');
-    startButtonLoop(type);
-    const st = btn.querySelector('.play-status');
-    if (st) st.textContent = '🔔 Ada Darurat! Tap untuk matikan';
-}
-function stopEmergencyButtonAnimation() {
-    document.querySelectorAll('.emergency-btn').forEach(btn => btn.classList.remove('new-emergency'));
-    stopButtonLoop();
-}
-
-// FLOATING NOTIFICATION
-function showFloatingNotification(type, title, message, subtitle, actionText, actionCallback) {
-    const notif = document.getElementById('floatingNotification');
-    const icon = document.getElementById('floatingIcon');
-    if (!notif) return;
-    clearTimeout(floatingNotificationTimeout);
-    icon.className = 'notif-icon ' + type;
-    if (type === 'emergency') icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
-    else if (type === 'install') icon.innerHTML = '<i class="fas fa-download"></i>';
-    else icon.innerHTML = '<i class="fas fa-bell"></i>';
-    document.getElementById('floatingTitle').textContent = title;
-    document.getElementById('floatingMessage').textContent = message;
-    document.getElementById('floatingSubtitle').textContent = subtitle || new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
-    const actionBtn = document.getElementById('floatingAction');
-    if (actionText && actionCallback) {
-        actionBtn.style.display = 'block';
-        actionBtn.textContent = actionText;
-        actionBtn.onclick = (e) => { e.stopPropagation(); actionCallback(); };
-    } else actionBtn.style.display = 'none';
-    document.getElementById('floatingClose').onclick = (e) => { e.stopPropagation(); hideFloatingNotification(); };
-    if (type === 'emergency') notif.classList.add('emergency-notif');
-    else notif.classList.remove('emergency-notif');
-    notif.onclick = () => { if (actionCallback) actionCallback(); };
-    notif.classList.add('active');
-    floatingNotificationTimeout = setTimeout(() => hideFloatingNotification(), 10000);
-}
-function hideFloatingNotification() {
-    const notif = document.getElementById('floatingNotification');
-    if (notif) {
-        notif.classList.remove('active');
-        notif.classList.add('hide');
-        setTimeout(() => notif.classList.remove('hide'), 500);
-    }
-    clearTimeout(floatingNotificationTimeout);
-}
-
-// TOAST
-function showToast(title, message, icon = 'fa-info-circle', type = 'info') {
-    document.querySelectorAll('.toast').forEach(t => t.remove());
-    const container = document.getElementById('toastContainer');
-    if (!container) return;
-    const toast = document.createElement('div');
-    toast.className = 'toast' + (type === 'error' ? ' toast-error' : type === 'success' ? ' toast-success' : '');
-    toast.innerHTML = `
-        <div class="toast-icon"><i class="fas ${icon}"></i></div>
-        <div class="toast-content">
-            <div class="toast-title">${escapeHTML(title)}</div>
-            <div class="toast-message">${escapeHTML(message)}</div>
-        </div>
-        <button class="toast-close"><i class="fas fa-times"></i></button>
-    `;
-    toast.querySelector('.toast-close').onclick = () => { toast.classList.remove('active'); setTimeout(() => toast.remove(), 400); };
-    container.appendChild(toast);
-    setTimeout(() => { toast.classList.remove('active'); setTimeout(() => toast.remove(), 400); }, 5000);
-}
-
-// BADGES
-function updateEmergencyBadges() {
-    const counts = getActiveEmergencyCountByType();
-    const map = { 'fire': 'fireBadge', 'medical': 'medicalBadge', 'crime': 'crimeBadge', 'disaster': 'disasterBadge' };
-    const btnMap = { 'fire': 'fireBtn', 'medical': 'medicalBtn', 'crime': 'securityBtn', 'disaster': 'disasterBtn' };
-    Object.keys(map).forEach(type => {
-        const badge = document.getElementById(map[type]);
-        const btn = document.getElementById(btnMap[type]);
-        const count = counts[type] || 0;
-        if (badge) { badge.textContent = count; badge.classList.toggle('show', count > 0); }
-        if (btn) {
-            btn.classList.toggle('has-notification', count > 0);
-            const st = btn.querySelector('.play-status');
-            if (st && !btn.classList.contains('playing') && !btn.classList.contains('new-emergency')) {
-                st.textContent = count > 0 ? `🔔 ${count} Notifikasi` : '▶ Tap untuk Alarm';
-            }
-        }
-    });
-    const total = counts.fire + counts.medical + counts.crime + counts.disaster;
-    const hc = document.getElementById('hologramCount');
-    if (hc) { hc.textContent = total; hc.classList.toggle('zero', total === 0); }
-    const ab = document.getElementById('alertBadge');
-    if (ab) { ab.textContent = total; ab.style.display = total > 0 ? 'block' : 'none'; }
-}
-function updateNotifBadge(count) {
-    const allNotifs = getAllNotifications();
-    const unread = (typeof count === 'number') ? count : allNotifs.filter(n => !n.read).length;
-    const badge = document.getElementById('notifBadge');
-    if (badge) { badge.textContent = unread > 99 ? '99+' : unread; badge.classList.toggle('show', unread > 0); }
-    const modalBadge = document.getElementById('notifModalBadge');
-    if (modalBadge) modalBadge.textContent = unread;
-}
-function updateInviteBadge() {
-    const badge = document.getElementById('inviteBadge');
-    if (badge) {
-        const pending = Object.keys(sentInvites).length;
-        badge.textContent = pending;
-        badge.classList.toggle('show', pending > 0);
-    }
-}
-
-// HOLOGRAM
 function renderHologram() {
     const list = document.getElementById('hologramList');
     if (!list) return;
@@ -2109,7 +2100,9 @@ function openEmergencyDetail(id) {
     window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(id);
 }
 
-// POSTS
+// ====================================================================
+// POSTS CRUD
+// ====================================================================
 function renderPosts() {
     const feed = document.getElementById('postFeed');
     if (!feed) return;
@@ -2371,7 +2364,9 @@ function sharePost(postId) {
     else navigator.clipboard.writeText(text + '\n' + url).then(() => showToast('📋', 'Link disalin', 'fa-copy'));
 }
 
+// ====================================================================
 // CREATE POST
+// ====================================================================
 async function createPost(text, mediaFile, isSpecial, specialData) {
     if (isPreviewMode) { showPreviewOverlay(); return; }
     if (!currentUser) { redirectToLogin(); return; }
@@ -2426,8 +2421,6 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
         broadcastSync('new_post', { id: postId });
         document.getElementById('postInput').value = '';
         document.getElementById('postSpecialText').value = '';
-        document.getElementById('postMapLink').value = '';
-        document.getElementById('postLocationAddress').value = '';
         document.getElementById('mediaUpload').value = '';
         document.getElementById('mediaPreview').style.display = 'none';
         document.getElementById('postSubmit').disabled = true;
@@ -2436,6 +2429,16 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
         currentPostType = 'biasa';
         document.getElementById('postSpecialFields')?.classList.remove('active');
         document.getElementById('postBiasaForm').style.display = 'block';
+        // Reset GPS
+        currentGpsData = null;
+        const gpsResult = document.getElementById('gpsLocationResult');
+        if (gpsResult) gpsResult.classList.remove('active');
+        const gpsBtn = document.getElementById('gpsLocationBtn');
+        if (gpsBtn) {
+            gpsBtn.style.background = '';
+            const txt = document.getElementById('gpsLocationBtnText');
+            if (txt) txt.textContent = '📍 Ambil Lokasi Saya';
+        }
     };
     if (mediaFile) {
         const reader = new FileReader();
@@ -2447,6 +2450,7 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
         reader.readAsDataURL(mediaFile);
     } else finish();
 }
+
 function triggerLocalEmergencyVisual(type, sender, location, text) {
     const em = {
         id: 'emergency-' + Date.now(),
@@ -2454,7 +2458,7 @@ function triggerLocalEmergencyVisual(type, sender, location, text) {
         senderUsername: currentUser?.username || 'user',
         location: location || 'Lokasi tidak diketahui',
         address: location || '', text: text || '',
-        mapsURL: '', coords: '',
+        mapsURL: currentGpsData?.mapsURL || '', coords: currentGpsData ? `${currentGpsData.lat}, ${currentGpsData.lng}` : '',
         timestamp: Date.now(),
         expiresAt: Date.now() + EMERGENCY_DURATION
     };
@@ -2462,21 +2466,12 @@ function triggerLocalEmergencyVisual(type, sender, location, text) {
     renderHologram();
     updateEmergencyBadges();
     updateNotifBadge();
-    triggerEmergencyVisual(em);
     readNotifs[em.id] = true;
     saveReadNotifs();
     dismissEmergency(em.id);
-}
-function triggerEmergencyVisual(em) {
-    const type = em.type;
-    const btnMap = { 'fire': 'fireBtn', 'medical': 'medicalBtn', 'crime': 'securityBtn', 'disaster': 'disasterBtn' };
-    const btn = document.getElementById(btnMap[type]);
-    if (btn) {
-        btn.classList.add('has-notification');
-        const counts = getActiveEmergencyCountByType();
-        const st = btn.querySelector('.play-status');
-        if (st) st.textContent = `🔔 ${counts[type]} Notifikasi`;
-    }
+
+    // Trigger floating (mode aktif) saja
+    // Pengirim tidak perlu full screen alarm untuk postingan sendiri
     showFloatingNotification('emergency',
         `${EMERGENCY_ICONS[type]} ${EMERGENCY_LABELS[type]}`,
         `${em.sender} melaporkan darurat di ${em.location}`,
@@ -2486,137 +2481,12 @@ function triggerEmergencyVisual(em) {
     );
     if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 1000]);
     showToast(`🚨 ${EMERGENCY_LABELS[type]}`, `${em.sender} melaporkan darurat!`, 'fa-exclamation-triangle');
+    playRegularSound();
 }
 
-// POST INPUT
-function setupPostInput() {
-    const select = document.getElementById('postTypeSelect');
-    const specialFields = document.getElementById('postSpecialFields');
-    const biasaForm = document.getElementById('postBiasaForm');
-    const input = document.getElementById('postInput');
-    const specialText = document.getElementById('postSpecialText');
-    const submitBtn = document.getElementById('postSubmit');
-    const mediaUpload = document.getElementById('mediaUpload');
-    const mapLink = document.getElementById('postMapLink');
-    const locAddr = document.getElementById('postLocationAddress');
-    const reportedBy = document.getElementById('postReportedBy');
-    if (reportedBy && currentUser) reportedBy.value = currentUser.fullName || '';
-    if (select) {
-        select.addEventListener('change', function() {
-            if (isPreviewMode) { showPreviewOverlay(); this.value = 'biasa'; return; }
-            const val = this.value;
-            const mapping = POST_TYPE_MAP[val] || POST_TYPE_MAP['biasa'];
-            currentPostType = val;
-            if (mapping.isSpecial) {
-                specialFields.classList.add('active');
-                biasaForm.style.display = 'none';
-                if (reportedBy && currentUser) reportedBy.value = currentUser.fullName || '';
-            } else {
-                specialFields.classList.remove('active');
-                biasaForm.style.display = 'block';
-            }
-            validatePost();
-        });
-    }
-    if (mapLink) {
-        mapLink.addEventListener('input', function() {
-            const url = this.value.trim();
-            if (url) {
-                let lat = null, lng = null, addr = '';
-                const cm = url.match(/@([-0-9.]+),([-0-9.]+)/);
-                if (cm) { lat = cm[1]; lng = cm[2]; }
-                const pm = url.match(/place\/([^/@]+)/);
-                if (pm) addr = decodeURIComponent(pm[1].replace(/\+/g, ' '));
-                if (lat && lng) {
-                    locAddr.value = `📍 ${lat}, ${lng}${addr ? ' • ' + addr : ''}`;
-                    locAddr.dataset.lat = lat; locAddr.dataset.lng = lng;
-                    locAddr.dataset.address = addr || url;
-                } else if (addr) {
-                    locAddr.value = `📍 ${addr}`;
-                    locAddr.dataset.lat = ''; locAddr.dataset.lng = '';
-                    locAddr.dataset.address = addr;
-                } else {
-                    locAddr.value = '📍 Link Google Maps terdeteksi';
-                    locAddr.dataset.lat = ''; locAddr.dataset.lng = '';
-                    locAddr.dataset.address = url;
-                }
-            } else {
-                locAddr.value = '';
-                locAddr.dataset.lat = ''; locAddr.dataset.lng = ''; locAddr.dataset.address = '';
-            }
-            validatePost();
-        });
-    }
-    if (input) input.addEventListener('input', validatePost);
-    if (specialText) specialText.addEventListener('input', validatePost);
-    if (mediaUpload) {
-        mediaUpload.addEventListener('change', function() {
-            if (isPreviewMode) { showPreviewOverlay(); this.value = ''; return; }
-            if (this.files && this.files[0]) {
-                const f = this.files[0];
-                const isVideo = f.type.startsWith('video/');
-                const isImage = f.type.startsWith('image/');
-                let maxSize = isVideo ? 500 * 1024 : (isImage ? 200 * 1024 : 0);
-                if (!maxSize) { showToast('⚠️ Format tidak didukung', 'Hanya foto/video', 'fa-exclamation-triangle'); this.value = ''; validatePost(); return; }
-                if (f.size > maxSize) { showToast('⚠️ File terlalu besar', `Max ${(maxSize/1024).toFixed(0)}KB`, 'fa-exclamation-triangle'); this.value = ''; validatePost(); return; }
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const p = document.getElementById('mediaPreview');
-                    if (isImage) p.innerHTML = `<span class="remove-media" id="removeMedia">&times;</span><img src="${e.target.result}" style="max-width:100%;max-height:150px;border-radius:8px;">`;
-                    else p.innerHTML = `<span class="remove-media" id="removeMedia">&times;</span><video controls style="max-width:100%;max-height:150px;border-radius:8px;"><source src="${e.target.result}"></video>`;
-                    p.style.display = 'block';
-                    document.getElementById('removeMedia').onclick = () => { p.style.display = 'none'; document.getElementById('mediaUpload').value = ''; validatePost(); };
-                    validatePost();
-                };
-                reader.readAsDataURL(f);
-            } else validatePost();
-        });
-    }
-    if (submitBtn) {
-        const newBtn = submitBtn.cloneNode(true);
-        submitBtn.parentNode.replaceChild(newBtn, submitBtn);
-        newBtn.addEventListener('click', async function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (isPreviewMode) { showPreviewOverlay(); return; }
-            if (!currentUser) { redirectToLogin(); return; }
-            const val = document.getElementById('postTypeSelect')?.value || 'biasa';
-            const mapping = POST_TYPE_MAP[val] || POST_TYPE_MAP['biasa'];
-            const isSpecial = mapping.isSpecial;
-            const specialType = mapping.specialType;
-            const text = isSpecial ? (document.getElementById('postSpecialText')?.value || '').trim() : (document.getElementById('postInput')?.value || '').trim();
-            const file = document.getElementById('mediaUpload')?.files[0];
-            if (!text && !file) { showToast('⚠️ Perhatian', 'Isi teks atau upload media', 'fa-exclamation-triangle'); return; }
-            let specialData = null;
-            if (isSpecial) {
-                const ml = (document.getElementById('postMapLink')?.value || '').trim();
-                const addr = document.getElementById('postLocationAddress')?.value || '';
-                const lat = document.getElementById('postLocationAddress')?.dataset?.lat || '';
-                const lng = document.getElementById('postLocationAddress')?.dataset?.lng || '';
-                if (!ml) { showToast('⚠️ Perhatian', 'Link Google Maps wajib untuk postingan khusus', 'fa-exclamation-triangle'); return; }
-                specialData = { type: specialType, location: addr || 'Lokasi tidak diketahui', address: addr, latitude: lat, longitude: lng, mapsURL: ml, coords: (lat && lng) ? `${lat}, ${lng}` : '' };
-            }
-            await createPost(text, file, isSpecial, specialData);
-        });
-    }
-    validatePost();
-}
-function validatePost() {
-    const val = document.getElementById('postTypeSelect')?.value || 'biasa';
-    const mapping = POST_TYPE_MAP[val] || POST_TYPE_MAP['biasa'];
-    const isSpecial = mapping.isSpecial;
-    const text = isSpecial ? (document.getElementById('postSpecialText')?.value || '').trim() : (document.getElementById('postInput')?.value || '').trim();
-    const mediaInput = document.getElementById('mediaUpload');
-    const hasFile = mediaInput && mediaInput.files && mediaInput.files.length > 0;
-    const btn = document.getElementById('postSubmit');
-    if (!btn) return;
-    if (isPreviewMode) { btn.disabled = true; return; }
-    if (isSpecial) {
-        const hasMap = (document.getElementById('postMapLink')?.value || '').trim() !== '';
-        btn.disabled = !((text || hasFile) && hasMap);
-    } else btn.disabled = !(text || hasFile);
-}
-
+// ====================================================================
 // NOTIF MODAL
+// ====================================================================
 function getAllNotifications() {
     const list = [];
     getActiveEmergencies().forEach(em => {
@@ -2729,8 +2599,9 @@ function goToLocation(location) {
     window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`, '_blank');
 }
 
+// ====================================================================
 // INVITE MODAL
-let sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}');
+// ====================================================================
 function openInviteModal() {
     if (isPreviewMode) { showPreviewOverlay(); return; }
     openModal('inviteModal');
@@ -2806,7 +2677,9 @@ async function sendInvite(username, btnEl) {
     }
 }
 
+// ====================================================================
 // CHARTS
+// ====================================================================
 function getChartColors() {
     const isDark = currentTheme === 'dark';
     return { text: isDark ? '#e6edf3' : '#1a1a2e', grid: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)', fire: '#f85149', medical: '#4fc3f7', security: '#f0d080', disaster: '#c792ea' };
@@ -2971,45 +2844,31 @@ function updateMap() {
     }
 }
 
-// EMERGENCY BUTTON
+// ====================================================================
+// EMERGENCY BUTTON CLICK HANDLER
+// ====================================================================
 function handleEmergencyClick(e) {
     e.preventDefault(); e.stopPropagation();
     const btn = e.currentTarget;
     const type = btn.dataset.type;
     if (isPreviewMode) { showPreviewOverlay(); return; }
     if (!currentUser) { redirectToLogin(); return; }
-    // Unlock audio pada tap pertama
     unlockAudio();
+
+    // Jika ada button loop aktif → tap = matikan
     if (buttonLoopAudio) {
-        stopButtonLoop(); stopEmergencyButtonAnimation();
-        const counts = getActiveEmergencyCountByType();
-        const st = btn.querySelector('.play-status');
-        if (st) st.textContent = counts[type] > 0 ? `🔔 ${counts[type]} Notifikasi` : '▶ Tap untuk Alarm';
-        if (navigator.vibrate) navigator.vibrate(50);
-        showToast('✅ Alarm Dimatikan', 'Suara alarm dihentikan', 'fa-check-circle');
+        dismissFloatingEmergency();
+        showToast('✅ Alarm Dimatikan', 'Notifikasi darurat dimatikan', 'fa-check-circle');
         return;
     }
-    const overlay = document.getElementById('emergencyOverlay');
-    if (overlay && overlay.classList.contains('active')) { dismissEmergencyOverlay(true); return; }
-    if (activeEmergencyBtn === btn && activeEmergencyAudio) {
-        activeEmergencyAudio.pause(); activeEmergencyAudio.currentTime = 0;
-        activeEmergencyAudio = null; activeEmergencyBtn = null;
-        btn.classList.remove('playing');
-        const st = btn.querySelector('.play-status');
-        if (st) { const counts = getActiveEmergencyCountByType(); st.textContent = counts[type] > 0 ? `🔔 ${counts[type]} Notifikasi` : '▶ Tap untuk Alarm'; }
+
+    // Jika full screen alarm aktif → tap icon wrapper yang dismiss
+    if (fullScreenAlarmActive) {
+        dismissFullScreenAlarm(true);
         return;
     }
-    if (activeEmergencyBtn && activeEmergencyAudio) {
-        activeEmergencyAudio.pause(); activeEmergencyAudio.currentTime = 0;
-        activeEmergencyAudio = null;
-        const prevBtn = activeEmergencyBtn;
-        prevBtn.classList.remove('playing');
-        const prevType = prevBtn.dataset.type;
-        const prevSt = prevBtn.querySelector('.play-status');
-        const counts = getActiveEmergencyCountByType();
-        if (prevSt) prevSt.textContent = counts[prevType] > 0 ? `🔔 ${counts[prevType]} Notifikasi` : '▶ Tap untuk Alarm';
-        activeEmergencyBtn = null;
-    }
+
+    // Manual play alarm (biasa)
     const url = EMERGENCY_AUDIO[type];
     if (!url) return;
     stopEmergencyLoop();
@@ -3041,7 +2900,9 @@ function setupChartNavigation() {
     });
 }
 
+// ====================================================================
 // USER & PREVIEW
+// ====================================================================
 function loadUser() {
     const s = localStorage.getItem('salink_user');
     if (s) {
@@ -3103,16 +2964,18 @@ function redirectToLogin() { window.location.href = LOGIN_URL + '?redirect=' + e
 function applyPreviewMode() {
     if (isPreviewMode) {
         document.getElementById('previewBadge')?.classList.add('active');
-        ['postInput','postSpecialText','postMapLink','postLocationAddress'].forEach(id => { const el = document.getElementById(id); if (el) el.readOnly = true; });
+        ['postInput','postSpecialText'].forEach(id => { const el = document.getElementById(id); if (el) el.readOnly = true; });
         const mu = document.getElementById('mediaUpload'); if (mu) mu.disabled = true;
         const ps = document.getElementById('postSubmit'); if (ps) ps.disabled = true;
         const pts = document.getElementById('postTypeSelect'); if (pts) pts.disabled = true;
+        const gps = document.getElementById('gpsLocationBtn'); if (gps) gps.disabled = true;
         document.querySelectorAll('.emergency-btn').forEach(b => b.style.opacity = '0.7');
     } else {
         document.getElementById('previewBadge')?.classList.remove('active');
-        ['postInput','postSpecialText','postMapLink','postLocationAddress'].forEach(id => { const el = document.getElementById(id); if (el) el.readOnly = false; });
+        ['postInput','postSpecialText'].forEach(id => { const el = document.getElementById(id); if (el) el.readOnly = false; });
         const mu = document.getElementById('mediaUpload'); if (mu) mu.disabled = false;
         const pts = document.getElementById('postTypeSelect'); if (pts) pts.disabled = false;
+        const gps = document.getElementById('gpsLocationBtn'); if (gps) gps.disabled = false;
         document.querySelectorAll('.emergency-btn').forEach(b => b.style.opacity = '1');
         validatePost();
     }
@@ -3142,6 +3005,9 @@ function setupLoginGuard() {
     }, true);
 }
 
+// ====================================================================
+// LOAD DATA
+// ====================================================================
 async function loadData() {
     const results = await Promise.allSettled([
         apiGetPosts(), apiGetEmergencies(), apiGetNotifications(), apiGetStatistics(), apiGetUsers()
@@ -3175,23 +3041,10 @@ async function loadData() {
     renderPosts(); renderHologram(); updateEmergencyBadges(); updateNotifBadge();
     updateInviteBadge(); updateAllCharts(); updateStatsCards();
 }
-function updateStatsCards() {
-    const realStats = calculateRealStatistics();
-    let teamsDisplay = 0;
-    if (allUsers.length > 0) {
-        const fiveMinAgo = Date.now() - 5 * 60 * 1000;
-        const teamsOnline = allUsers.filter(u => u.isOnline === true || (u.lastActive && new Date(u.lastActive).getTime() > fiveMinAgo)).length;
-        teamsDisplay = teamsOnline > 0 ? teamsOnline : allUsers.length;
-    }
-    const responseRate = realStats.totalEmergencies > 0 
-        ? Math.round(((realStats.totalEmergencies - realStats.activeEmergencies) / realStats.totalEmergencies) * 100) 
-        : 0;
-    const sa = document.getElementById('statActive'); if (sa) sa.textContent = realStats.activeEmergencies;
-    const sc = document.getElementById('statCompleted'); if (sc) sc.textContent = realStats.totalEmergencies - realStats.activeEmergencies;
-    const st = document.getElementById('statTeams'); if (st) st.textContent = teamsDisplay;
-    const sr = document.getElementById('statResponse'); if (sr) sr.textContent = responseRate + '%';
-}
 
+// ====================================================================
+// THEME
+// ====================================================================
 function loadTheme() {
     const t = localStorage.getItem('salink_theme');
     if (t === 'light') {
@@ -3222,6 +3075,9 @@ function toggleTheme() {
     updateAllCharts();
 }
 
+// ====================================================================
+// SIDEBAR & MODAL
+// ====================================================================
 function openSidebar() { document.getElementById('sidebar')?.classList.add('active'); document.getElementById('sidebarOverlay')?.classList.add('active'); }
 function closeSidebar() { document.getElementById('sidebar')?.classList.remove('active'); document.getElementById('sidebarOverlay')?.classList.remove('active'); }
 function openProfileUser(username) {
@@ -3232,6 +3088,9 @@ function openProfileUser(username) {
 function openModal(id) { document.getElementById(id)?.classList.add('active'); document.body.style.overflow = 'hidden'; }
 function closeModal(id) { document.getElementById(id)?.classList.remove('active'); document.body.style.overflow = ''; }
 
+// ====================================================================
+// SEARCH
+// ====================================================================
 function openSearchModal() {
     if (isPreviewMode) { showPreviewOverlay(); return; }
     openModal('searchModal');
@@ -3463,6 +3322,9 @@ function setupSearchInput() {
     input.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeSearchModal(); });
 }
 
+// ====================================================================
+// URL PARAMS
+// ====================================================================
 function checkURLParams() {
     const params = new URLSearchParams(window.location.search);
     const userParam = params.get('user');
@@ -3485,18 +3347,30 @@ function checkURLParams() {
     }
 }
 
+// ====================================================================
+// VISIBILITY DETECTION (untuk dual mode)
+// ====================================================================
 function setupVisibilityDetection() {
     document.addEventListener('visibilitychange', () => {
-        const isNowActive = !document.hidden;
-        if (!isNowActive) {
-            isIdleStandby = true;
+        if (!document.hidden) {
+            // Tab kembali visible — cek emergency yang belum di-dismiss
+            resetIdleTimer();
             const ems = getActiveEmergencies();
             const undismissed = ems.find(e => !isDismissed(e.id) && !readNotifs[e.id]);
-            if (undismissed && !activeOverlayEmergency) showEmergencyOverlay(undismissed);
-        } else { resetIdleTimer(); }
+            if (undismissed && !fullScreenAlarmActive) {
+                // Tampilkan full screen alarm saat user kembali
+                setTimeout(() => showFullScreenAlarm(undismissed), 500);
+            }
+        } else {
+            // Tab hidden — set standby
+            isIdleStandby = true;
+        }
     });
 }
 
+// ====================================================================
+// BOTTOM NAV
+// ====================================================================
 function initBottomNav() {
     document.querySelectorAll('.nav-item-bottom').forEach(item => {
         item.addEventListener('click', function(e) {
@@ -3514,19 +3388,127 @@ function initBottomNav() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 SALINK Dashboard v4.2 — Audio System Fixed');
-    console.log('⚡ Polling: 15s');
-    console.log('🔊 Preload: ALL emergency audio + regular');
+// ====================================================================
+// POST TYPE HANDLING
+// ====================================================================
+function setupPostInput() {
+    const select = document.getElementById('postTypeSelect');
+    const specialFields = document.getElementById('postSpecialFields');
+    const biasaForm = document.getElementById('postBiasaForm');
+    const input = document.getElementById('postInput');
+    const specialText = document.getElementById('postSpecialText');
+    const submitBtn = document.getElementById('postSubmit');
+    const mediaUpload = document.getElementById('mediaUpload');
+    const reportedBy = document.getElementById('postReportedBy');
+    if (reportedBy && currentUser) reportedBy.value = currentUser.fullName || '';
 
-    // ✅ v4.2: Preload semua audio
+    if (select) {
+        select.addEventListener('change', function() {
+            if (isPreviewMode) { showPreviewOverlay(); this.value = 'biasa'; return; }
+            const val = this.value;
+            const mapping = POST_TYPE_MAP[val] || POST_TYPE_MAP['biasa'];
+            currentPostType = val;
+            if (mapping.isSpecial) {
+                specialFields.classList.add('active');
+                biasaForm.style.display = 'none';
+                if (reportedBy && currentUser) reportedBy.value = currentUser.fullName || '';
+            } else {
+                specialFields.classList.remove('active');
+                biasaForm.style.display = 'block';
+            }
+            validatePost();
+        });
+    }
+    if (input) input.addEventListener('input', validatePost);
+    if (specialText) specialText.addEventListener('input', validatePost);
+    if (mediaUpload) {
+        mediaUpload.addEventListener('change', function() {
+            if (isPreviewMode) { showPreviewOverlay(); this.value = ''; return; }
+            if (this.files && this.files[0]) {
+                const f = this.files[0];
+                const isVideo = f.type.startsWith('video/');
+                const isImage = f.type.startsWith('image/');
+                let maxSize = isVideo ? 500 * 1024 : (isImage ? 200 * 1024 : 0);
+                if (!maxSize) { showToast('⚠️ Format tidak didukung', 'Hanya foto/video', 'fa-exclamation-triangle'); this.value = ''; validatePost(); return; }
+                if (f.size > maxSize) { showToast('⚠️ File terlalu besar', `Max ${(maxSize/1024).toFixed(0)}KB`, 'fa-exclamation-triangle'); this.value = ''; validatePost(); return; }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const p = document.getElementById('mediaPreview');
+                    if (isImage) p.innerHTML = `<span class="remove-media" id="removeMedia">&times;</span><img src="${e.target.result}" style="max-width:100%;max-height:150px;border-radius:8px;">`;
+                    else p.innerHTML = `<span class="remove-media" id="removeMedia">&times;</span><video controls style="max-width:100%;max-height:150px;border-radius:8px;"><source src="${e.target.result}"></video>`;
+                    p.style.display = 'block';
+                    document.getElementById('removeMedia').onclick = () => { p.style.display = 'none'; document.getElementById('mediaUpload').value = ''; validatePost(); };
+                    validatePost();
+                };
+                reader.readAsDataURL(f);
+            } else validatePost();
+        });
+    }
+    if (submitBtn) {
+        const newBtn = submitBtn.cloneNode(true);
+        submitBtn.parentNode.replaceChild(newBtn, submitBtn);
+        newBtn.addEventListener('click', async function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (isPreviewMode) { showPreviewOverlay(); return; }
+            if (!currentUser) { redirectToLogin(); return; }
+            const val = document.getElementById('postTypeSelect')?.value || 'biasa';
+            const mapping = POST_TYPE_MAP[val] || POST_TYPE_MAP['biasa'];
+            const isSpecial = mapping.isSpecial;
+            const specialType = mapping.specialType;
+            const text = isSpecial ? (document.getElementById('postSpecialText')?.value || '').trim() : (document.getElementById('postInput')?.value || '').trim();
+            const file = document.getElementById('mediaUpload')?.files[0];
+            if (!text && !file) { showToast('⚠️ Perhatian', 'Isi teks atau upload media', 'fa-exclamation-triangle'); return; }
+            let specialData = null;
+            if (isSpecial) {
+                if (!currentGpsData) {
+                    showToast('⚠️ Perhatian', 'Tekan "Ambil Lokasi Saya" dulu', 'fa-exclamation-triangle');
+                    return;
+                }
+                specialData = {
+                    type: specialType,
+                    location: currentGpsData.address || `Koordinat: ${currentGpsData.lat}, ${currentGpsData.lng}`,
+                    address: currentGpsData.address,
+                    latitude: currentGpsData.lat,
+                    longitude: currentGpsData.lng,
+                    mapsURL: currentGpsData.mapsURL,
+                    coords: `${currentGpsData.lat}, ${currentGpsData.lng}`
+                };
+            }
+            await createPost(text, file, isSpecial, specialData);
+        });
+    }
+    validatePost();
+}
+function validatePost() {
+    const val = document.getElementById('postTypeSelect')?.value || 'biasa';
+    const mapping = POST_TYPE_MAP[val] || POST_TYPE_MAP['biasa'];
+    const isSpecial = mapping.isSpecial;
+    const text = isSpecial ? (document.getElementById('postSpecialText')?.value || '').trim() : (document.getElementById('postInput')?.value || '').trim();
+    const mediaInput = document.getElementById('mediaUpload');
+    const hasFile = mediaInput && mediaInput.files && mediaInput.files.length > 0;
+    const btn = document.getElementById('postSubmit');
+    if (!btn) return;
+    if (isPreviewMode) { btn.disabled = true; return; }
+    if (isSpecial) {
+        btn.disabled = !((text || hasFile) && currentGpsData);
+    } else btn.disabled = !(text || hasFile);
+}
+
+// ====================================================================
+// ✅ v4.3: INIT — DOMContentLoaded
+// ====================================================================
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 SALINK Dashboard v4.3 — DUAL MODE EMERGENCY');
+    console.log('📡 STANDBY mode: full screen alarm + swipe dismiss');
+    console.log('🟢 AKTIF mode: floating + button grid berbunyi');
+    console.log('📍 GPS: Ambil Lokasi Saya (Nominatim reverse geocoding)');
+
     preloadAllAudio();
-    // Paksa unlock audio pada setiap interaction
-    ['click', 'touchstart', 'keydown', 'scroll'].forEach(evt => {
-    document.addEventListener(evt, () => {
-        if (!_audioUnlocked) unlockAudio();
-    }, { passive: true });
-});
+
+    // Setup idle detection
+    setupIdleDetection();
+    setupVisibilityDetection();
+
     setupPWA();
     checkURLParams();
     loadTheme();
@@ -3536,13 +3518,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     applyPreviewMode();
     updateUserUI();
     setupLoginGuard();
-    setupIdleDetection();
 
     lastNotifCheck = parseInt(localStorage.getItem('salink_last_emergency_check') || '0');
     const savedLat = localStorage.getItem('salink_user_lat');
     const savedLng = localStorage.getItem('salink_user_lng');
     if (savedLat && savedLng) { userLat = parseFloat(savedLat); userLng = parseFloat(savedLng); }
 
+    // Event listeners
     document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
     document.getElementById('overlayLoginBtn')?.addEventListener('click', redirectToLogin);
     document.getElementById('overlayCancelBtn')?.addEventListener('click', hidePreviewOverlay);
@@ -3573,17 +3555,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         b.addEventListener('click', handleEmergencyClick);
     });
 
+    // ✅ v4.3: GPS button
+    document.getElementById('gpsLocationBtn')?.addEventListener('click', ambilLokasiSaya);
+
     setupChartNavigation();
     initBottomNav();
     setupPostInput();
-    setupVisibilityDetection();
     setupSearchInput();
 
     document.addEventListener('keydown', function(e) {
         if (e.key === '/' && !e.target.matches('input, textarea, select')) { e.preventDefault(); openSearchModal(); }
-        if (e.key === 'Escape') { if (document.getElementById('searchModal')?.classList.contains('active')) closeSearchModal(); }
+        if (e.key === 'Escape') {
+            if (document.getElementById('searchModal')?.classList.contains('active')) closeSearchModal();
+            if (fullScreenAlarmActive) dismissFullScreenAlarm(true);
+        }
     });
 
+    // Storage event
     window.addEventListener('storage', function(e) {
         if (e.key === 'salink_sync_trigger') {
             try { const data = JSON.parse(e.newValue); if (data && data.type) handleSyncMessage(data); } catch(err) {}
@@ -3611,9 +3599,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (document.getElementById('notifModal')?.classList.contains('active')) renderNotifList();
     }, 15000);
 
-    console.log('✅ SALINK Dashboard v4.2 Ready! — Audio Fixed');
+    console.log('✅ SALINK Dashboard v4.3 Ready!');
 });
 
+// ====================================================================
+// EXPOSE GLOBAL FUNCTIONS
+// ====================================================================
 window.openProfileUser = openProfileUser;
 window.requestDelete = requestDelete;
 window.confirmDeleteNow = confirmDeleteNow;
@@ -3648,8 +3639,47 @@ window.goToUser = goToUser;
 window.goToPost = goToPost;
 window.goToEmergency = goToEmergency;
 window.openEmergencyDetail = openEmergencyDetail;
+window.ambilLokasiSaya = ambilLokasiSaya;
 
-console.log('✅ SALINK Dashboard v4.1 Loaded');
+// PWA setup (jika belum ada)
+function setupPWA() {
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
+        });
+    }
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        setTimeout(() => {
+            if (deferredPrompt && !localStorage.getItem('salink_installed')) {
+                showFloatingNotification('install', '📱 Install SALINK', 'Akses lebih cepat & offline', 'Tap untuk install aplikasi', 'Install', () => showInstallPrompt());
+            }
+        }, 10000);
+    });
+    window.addEventListener('appinstalled', () => {
+        localStorage.setItem('salink_installed', 'true');
+        deferredPrompt = null;
+        showToast('🎉 Selamat!', 'Aplikasi SALINK berhasil diinstall!', 'fa-rocket');
+    });
+}
+function showInstallPrompt() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(r => {
+            if (r.outcome === 'accepted') {
+                localStorage.setItem('salink_installed', 'true');
+                showToast('✅ Berhasil', 'Aplikasi SALINK diinstall!', 'fa-check-circle');
+            }
+            deferredPrompt = null;
+        });
+    } else {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        showToast('📱 Install', isIOS ? 'Bagikan → Tambahkan ke Layar Utama' : 'Menu browser → Install Aplikasi', 'fa-mobile-alt');
+    }
+}
+
+console.log('✅ SALINK Dashboard v4.3 Script Loaded — DUAL MODE ALERT');
     </script>
 
     <!-- ============================================================ -->
@@ -3662,7 +3692,6 @@ console.log('✅ SALINK Dashboard v4.1 Loaded');
       'use strict';
 
       window.addEventListener('load', async function() {
-        // Cek login via key SALINK
         const isLoggedIn = localStorage.getItem('salink_logged_in');
         const userData = localStorage.getItem('salink_user');
 
