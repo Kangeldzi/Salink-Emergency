@@ -1069,12 +1069,12 @@ const EMERGENCY_CSS_CLASS = { 'fire': 'fire', 'medical': 'medical', 'crime': 'cr
 
 // ✅ v4.2: Audio URLs
 const EMERGENCY_AUDIO = {
-    'fire':     'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/Kebakaran.mp3',
-    'medical':  'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/kematian.mp3',
-    'crime':    'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/pencurian.mp3',
-    'disaster': 'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/bencana_tsunami.mp3'
+    'fire':     '/Music/Kebakaran.mp3',
+    'medical':  '/Music/kematian.mp3',
+    'crime':    '/Music/pencurian.mp3',
+    'disaster': '/Music/bencana_tsunami.mp3'
 };
-const REGULAR_SOUND_URL = 'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/smsblackber_4a537f155087133.mp3';
+const REGULAR_SOUND_URL = '/Music/smsblackber_4a537f155087133.mp3';
 
 const POST_TYPE_MAP = {
     'biasa': { isSpecial: false, specialType: null },
@@ -1122,15 +1122,27 @@ let _audioUnlocked = false;
 
 function unlockAudio() {
     if (_audioUnlocked) return;
+    console.log('🔓 [Audio] Attempting unlock...');
+    
     try {
         _audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // Buat buffer dummy untuk unlock
         const buffer = _audioContext.createBuffer(1, 1, 22050);
         const source = _audioContext.createBufferSource();
         source.buffer = buffer;
         source.connect(_audioContext.destination);
         source.start(0);
+        
+        // Resume context jika suspended
+        if (_audioContext.state === 'suspended') {
+            _audioContext.resume().then(() => {
+                console.log('🔓 [Audio] Context resumed');
+            });
+        }
+        
         _audioUnlocked = true;
-        console.log('🔓 [Audio] Context unlocked');
+        console.log('🔓 [Audio] Unlocked! State:', _audioContext.state);
     } catch(e) {
         console.warn('⚠️ [Audio] Unlock failed:', e.message);
     }
@@ -3509,7 +3521,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // ✅ v4.2: Preload semua audio
     preloadAllAudio();
-
+    // Paksa unlock audio pada setiap interaction
+    ['click', 'touchstart', 'keydown', 'scroll'].forEach(evt => {
+    document.addEventListener(evt, () => {
+        if (!_audioUnlocked) unlockAudio();
+    }, { passive: true });
+});
     setupPWA();
     checkURLParams();
     loadTheme();
