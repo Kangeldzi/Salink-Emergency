@@ -1034,15 +1034,17 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <script>
-/* ====================================================================
- * SALINK DASHBOARD v4.0 — FINAL with CENTRAL SYNC
+    
+  /* ====================================================================
+ * SALINK DASHBOARD v4.2 — AUDIO SYSTEM FIXED
  * ====================================================================
- * PERUBAHAN UTAMA v4.0:
- * ✅ Central Delete Function — hapus di 1 halaman → sync ke semua
- * ✅ Cross-Tab Sync — BroadcastChannel + storage event
- * ✅ Statistik Real-time — hybrid (API + fallback)
- * ✅ Konfirmasi 2× untuk hapus
- * ✅ Semua fitur v3.2/v3.1 dipertahankan
+ * PERUBAHAN v4.2:
+ * ✅ Preload semua audio (fire, medical, crime, disaster, regular)
+ * ✅ AudioContext unlock untuk Chrome mobile
+ * ✅ Cached audio (0ms delay saat emergency)
+ * ✅ Volume 1.0 konsisten (ikut device)
+ * ✅ Fallback on error + retry sekali
+ * ✅ Play regular sound di SEMUA event notifikasi
  * ==================================================================== */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
@@ -1064,6 +1066,8 @@ const EMERGENCY_BTN_AUDIO_MAX_MS = 120000;
 const EMERGENCY_LABELS = { 'fire': '🔥 Kebakaran', 'medical': '🚑 Medis & Kematian', 'crime': '🚓 Kriminal', 'disaster': '🌪️ Bencana Alam' };
 const EMERGENCY_ICONS = { 'fire': '🔥', 'medical': '🚑', 'crime': '🚓', 'disaster': '🌪️' };
 const EMERGENCY_CSS_CLASS = { 'fire': 'fire', 'medical': 'medical', 'crime': 'crime', 'disaster': 'disaster' };
+
+// ✅ v4.2: Audio URLs
 const EMERGENCY_AUDIO = {
     'fire':     'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/Kebakaran.mp3',
     'medical':  'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/kematian.mp3',
@@ -1071,6 +1075,7 @@ const EMERGENCY_AUDIO = {
     'disaster': 'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/bencana_tsunami.mp3'
 };
 const REGULAR_SOUND_URL = 'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/smsblackber_4a537f155087133.mp3';
+
 const POST_TYPE_MAP = {
     'biasa': { isSpecial: false, specialType: null },
     'fire': { isSpecial: true, specialType: 'fire' },
@@ -1108,17 +1113,228 @@ let searchDebounceTimer = null;
 let recentSearches = JSON.parse(localStorage.getItem('salink_recent_searches') || '[]');
 const MAX_RECENT_SEARCHES = 8;
 
-// ✅ v4.0: Cross-Tab BroadcastChannel
+// ✅ v4.2: Audio cache
+const audioCache = {};
+
+// ✅ v4.2: AudioContext untuk unlock di Chrome mobile
+let _audioContext = null;
+let _audioUnlocked = false;
+
+function unlockAudio() {
+    if (_audioUnlocked) return;
+    try {
+        _audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const buffer = _audioContext.createBuffer(1, 1, 22050);
+        const source = _audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(_audioContext.destination);
+        source.start(0);
+        _audioUnlocked = true;
+        console.log('🔓 [Audio] Context unlocked');
+    } catch(e) {
+        console.warn('⚠️ [Audio] Unlock failed:', e.message);
+    }
+}
+
+// Pasang listener untuk unlock pada interaksi pertama
+['click', 'touchstart', 'keydown'].forEach(evt => {
+    document.addEventListener(evt, unlockAudio, { once: true, passive: true });
+});
+
+// ✅ v4.2: Preload semua audio (cache)
+function preloadAllAudio() {
+    console.log('🔊 [Audio] Preloading semua audio...');
+    
+    // Preload emergency audio
+    Object.keys(EMERGENCY_AUDIO).forEach(type => {
+        const url = EMERGENCY_AUDIO[type];
+        try {
+            const audio = new Audio();
+            audio.preload = 'auto';
+            audio.src = url;
+            audio.volume = 1.0;
+            audio.load();
+            audioCache[type] = audio;
+            console.log('✅ [Audio] Preloaded:', type);
+        } catch(e) {
+            console.warn('⚠️ [Audio] Gagal preload ' + type + ':', e.message);
+        }
+    });
+    
+    // Preload regular sound
+    try {
+        const regAudio = new Audio();
+        regAudio.preload = 'auto';
+        regAudio.src = REGULAR_SOUND_URL;
+        regAudio.volume = 1.0;
+        regAudio.load();
+        audioCache['regular'] = regAudio;
+        console.log('✅ [Audio] Preloaded: regular');
+    } catch(e) {
+        console.warn('⚠️ [Audio] Gagal preload regular:', e.message);
+    }
+    
+    console.log('✅ [Audio] Semua audio siap');
+}
+
+// ====================================================================
+// ✅ v4.2: AUDIO PLAYERS (dengan fallback)
+// ====================================================================
+
+// Play regular notification sound
+function playRegularSound() {
+    try {
+        unlockAudio();
+        const cached = audioCache['regular'];
+        if (cached) {
+            cached.currentTime = 0;
+            cached.volume = 1.0;
+            const playPromise = cached.play();
+            if (playPromise !== undefined) {
+                playPromise.catch(err => {
+                    console.warn('⚠️ [Audio] Regular play failed, fallback:', err.message);
+                    try {
+                        const fallback = new Audio(REGULAR_SOUND_URL);
+                        fallback.volume = 1.0;
+                        fallback.play().catch(() => {});
+                    } catch(e) {}
+                });
+            }
+        } else {
+            const fallback = new Audio(REGULAR_SOUND_URL);
+            fallback.volume = 1.0;
+            fallback.play().catch(() => {});
+        }
+    } catch(e) {
+        console.warn('⚠️ [Audio] playRegularSound error:', e.message);
+    }
+}
+
+// Play emergency loop (dengan cached audio)
+function playEmergencyLoop(type) {
+    try {
+        unlockAudio();
+        const url = EMERGENCY_AUDIO[type];
+        if (!url) { console.warn('⚠️ [Audio] No URL for type:', type); return null; }
+        
+        // Stop previous
+        stopEmergencyLoop();
+        
+        const cached = audioCache[type];
+        if (cached) {
+            cached.currentTime = 0;
+            cached.volume = 1.0;
+            cached.loop = true;
+            emergencyAudioLoop = cached;
+            const playPromise = cached.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    console.log('🔊 [Audio] Emergency loop playing:', type);
+                }).catch(err => {
+                    console.warn('⚠️ [Audio] Cached play failed, fallback:', err.message);
+                    // Fallback: buat baru
+                    try {
+                        const audio = new Audio(url);
+                        audio.volume = 1.0;
+                        audio.loop = true;
+                        emergencyAudioLoop = audio;
+                        audio.play().catch(e => console.warn('❌ [Audio] Fallback failed:', e.message));
+                    } catch(e) {}
+                });
+            }
+            // Auto-stop setelah MAX_MS
+            setTimeout(() => {
+                if (emergencyAudioLoop === cached) stopEmergencyLoop();
+            }, EMERGENCY_AUDIO_MAX_MS);
+            return cached;
+        } else {
+            // Tidak ada cache, buat baru
+            const audio = new Audio(url);
+            audio.volume = 1.0;
+            audio.loop = true;
+            emergencyAudioLoop = audio;
+            audio.play().catch(err => console.warn('❌ [Audio] Play failed:', err.message));
+            setTimeout(() => {
+                if (emergencyAudioLoop === audio) stopEmergencyLoop();
+            }, EMERGENCY_AUDIO_MAX_MS);
+            return audio;
+        }
+    } catch(e) {
+        console.warn('⚠️ [Audio] playEmergencyLoop error:', e.message);
+        return null;
+    }
+}
+
+function stopEmergencyLoop() {
+    if (emergencyAudioLoop) {
+        try {
+            emergencyAudioLoop.pause();
+            emergencyAudioLoop.currentTime = 0;
+            emergencyAudioLoop.loop = false;
+        } catch(e) {}
+        emergencyAudioLoop = null;
+    }
+}
+
+// Button loop (untuk tombol emergency grid)
+function startButtonLoop(type) {
+    stopButtonLoop();
+    const url = EMERGENCY_AUDIO[type];
+    if (!url) return;
+    try {
+        unlockAudio();
+        const cached = audioCache[type];
+        if (cached) {
+            cached.currentTime = 0;
+            cached.volume = 1.0;
+            cached.loop = true;
+            buttonLoopAudio = cached;
+            buttonLoopType = type;
+            cached.play().catch(() => {});
+        } else {
+            buttonLoopAudio = new Audio(url);
+            buttonLoopAudio.volume = 1.0;
+            buttonLoopAudio.loop = true;
+            buttonLoopType = type;
+            buttonLoopAudio.play().catch(() => {});
+        }
+        
+        // Vibrate
+        buttonLoopVibrateTimer = setInterval(() => {
+            if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 500]);
+        }, 3000);
+        
+        // Auto-stop
+        buttonLoopTimer = setTimeout(() => { stopButtonLoop(); }, EMERGENCY_BTN_AUDIO_MAX_MS);
+    } catch(e) {}
+}
+
+function stopButtonLoop() {
+    if (buttonLoopAudio) {
+        try {
+            buttonLoopAudio.pause();
+            buttonLoopAudio.currentTime = 0;
+            buttonLoopAudio.loop = false;
+        } catch(e) {}
+        buttonLoopAudio = null;
+    }
+    if (buttonLoopTimer) { clearTimeout(buttonLoopTimer); buttonLoopTimer = null; }
+    if (buttonLoopVibrateTimer) { clearInterval(buttonLoopVibrateTimer); buttonLoopVibrateTimer = null; }
+    buttonLoopType = null;
+    if (navigator.vibrate) navigator.vibrate(0);
+}
+
+// ====================================================================
+// CROSS-TAB SYNC
+// ====================================================================
 let syncChannel = null;
 try {
     syncChannel = new BroadcastChannel('salink_sync');
     syncChannel.onmessage = (event) => {
-        console.log('📡 Sync message received:', event.data);
         handleSyncMessage(event.data);
     };
 } catch(e) { console.warn('BroadcastChannel not supported'); }
 
-// ✅ v4.0: Handle sync message
 function handleSyncMessage(data) {
     if (!data || !data.type) return;
     showSyncIndicator();
@@ -1126,19 +1342,8 @@ function handleSyncMessage(data) {
         case 'delete_post':
         case 'delete_emergency':
         case 'delete_all':
-            // Reload data dari localStorage
-            posts = loadPostsFromStorage();
-            renderPosts();
-            renderHologram();
-            updateEmergencyBadges();
-            updateNotifBadge();
-            updateAllCharts();
-            updateStatsCards();
-            console.log('✅ Sync complete:', data.type);
-            break;
         case 'new_post':
         case 'new_emergency':
-            // Reload data
             posts = loadPostsFromStorage();
             renderPosts();
             renderHologram();
@@ -1153,13 +1358,9 @@ function handleSyncMessage(data) {
     }
     hideSyncIndicator();
 }
-
 function showSyncIndicator() {
     const el = document.getElementById('syncIndicator');
-    if (el) {
-        el.classList.add('active');
-        setTimeout(() => el.classList.remove('active'), 2000);
-    }
+    if (el) { el.classList.add('active'); setTimeout(() => el.classList.remove('active'), 2000); }
 }
 function hideSyncIndicator() {
     const el = document.getElementById('syncIndicator');
@@ -1169,14 +1370,12 @@ function broadcastSync(type, data = {}) {
     if (syncChannel) {
         try { syncChannel.postMessage({ type, data, timestamp: Date.now() }); } catch(e) {}
     }
-    // Fallback: write to localStorage to trigger 'storage' event
     try {
         localStorage.setItem('salink_sync_trigger', JSON.stringify({ type, data, timestamp: Date.now() }));
         setTimeout(() => localStorage.removeItem('salink_sync_trigger'), 100);
     } catch(e) {}
 }
 
-// ✅ v4.0: Load posts from localStorage
 function loadPostsFromStorage() {
     try {
         const raw = localStorage.getItem('salink_posts');
@@ -1189,15 +1388,12 @@ function loadPostsFromStorage() {
 }
 
 // ====================================================================
-// ✅ v4.0: CENTRAL DELETE FUNCTION
+// CENTRAL DELETE
 // ====================================================================
 let pendingDelete = null;
-
 function requestDelete(type, id, description) {
-    // type: 'post' | 'emergency' | 'all_posts' | 'all_emergencies'
     if (!confirm('⚠️ KONFIRMASI PERTAMA\n\nAnda akan menghapus ' + description + '.\n\nLanjutkan?')) return;
     pendingDelete = { type, id, description };
-    // Tampilkan modal konfirmasi ke-2
     const modal = document.getElementById('deleteConfirmModal');
     const msgEl = document.getElementById('deleteConfirmMsg');
     if (msgEl) {
@@ -1216,44 +1412,29 @@ async function confirmDeleteNow() {
     const modal = document.getElementById('deleteConfirmModal');
     if (modal) modal.classList.remove('active');
     pendingDelete = null;
-
     showSyncIndicator();
     try {
-        // ✅ 1. Hapus dari localStorage
         if (type === 'post' || type === 'emergency') {
-            // Hapus dari posts
             let allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
             allPosts = allPosts.filter(p => p.id !== id);
             localStorage.setItem('salink_posts', JSON.stringify(allPosts));
-            // Hapus dari emergencies
             let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
             ems = ems.filter(e => e.id !== id);
             localStorage.setItem('salink_emergencies', JSON.stringify(ems));
-            // Hapus dari readNotifs
             if (readNotifs[id]) { delete readNotifs[id]; saveReadNotifs(); }
         } else if (type === 'all_posts') {
             localStorage.setItem('salink_posts', JSON.stringify([]));
         } else if (type === 'all_emergencies') {
             localStorage.setItem('salink_emergencies', JSON.stringify([]));
         }
-
-        // ✅ 2. Hapus di Google Sheets via API
         try {
             await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({
-                    action: 'delete_content',
-                    data: { type, id, userId: currentUser?.username || '' },
-                    timestamp: Date.now()
-                })
+                body: JSON.stringify({ action: 'delete_content', data: { type, id, userId: currentUser?.username || '' }, timestamp: Date.now() })
             });
-        } catch(e) { console.warn('⚠️ API delete failed (offline mode OK):', e); }
-
-        // ✅ 3. Broadcast ke semua tab
+        } catch(e) {}
         broadcastSync(type === 'post' ? 'delete_post' : 'delete_emergency', { id });
-
-        // ✅ 4. Update UI di halaman ini
         posts = loadPostsFromStorage();
         renderPosts();
         renderHologram();
@@ -1261,21 +1442,18 @@ async function confirmDeleteNow() {
         updateNotifBadge();
         updateAllCharts();
         updateStatsCards();
-
         showToast('✅ Dihapus', 'Data berhasil dihapus dari semua halaman', 'fa-check-circle', 'success');
+        playRegularSound();
     } catch(e) {
-        console.error('❌ Delete error:', e);
         showToast('⚠️ Gagal', 'Tidak dapat menghapus data', 'fa-exclamation-triangle', 'error');
     }
     hideSyncIndicator();
 }
 
-// ✅ v4.0: STATISTIK REAL-TIME (Hybrid)
 function calculateRealStatistics() {
     const allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
     const allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
     const activeEms = allEms.filter(e => (e.expiresAt || (new Date(e.timestamp).getTime() + EMERGENCY_DURATION)) > Date.now());
-    
     let totalLikes = 0, totalViewers = 0;
     allPosts.forEach(p => {
         try {
@@ -1284,33 +1462,17 @@ function calculateRealStatistics() {
         } catch(e) {}
         totalViewers += parseInt(p.viewerCount || 0, 10) || 0;
     });
-
     const byType = { fire: 0, medical: 0, crime: 0, disaster: 0 };
     allPosts.forEach(p => {
-        if (p.isSpecial && p.specialType && byType.hasOwnProperty(p.specialType)) {
-            byType[p.specialType]++;
-        }
+        if (p.isSpecial && p.specialType && byType.hasOwnProperty(p.specialType)) byType[p.specialType]++;
     });
-
-    return {
-        totalPosts: allPosts.length,
-        totalEmergencies: allEms.length,
-        activeEmergencies: activeEms.length,
-        totalLikes: totalLikes,
-        totalViewers: totalViewers,
-        byType: byType
-    };
+    return { totalPosts: allPosts.length, totalEmergencies: allEms.length, activeEmergencies: activeEms.length, totalLikes, totalViewers, byType };
 }
 
-// ====================================================================
-// IDLE TIMER
-// ====================================================================
 function resetIdleTimer() {
     isIdleStandby = false;
     if (idleTimer) clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => {
-        isIdleStandby = true;
-    }, IDLE_THRESHOLD_MS);
+    idleTimer = setTimeout(() => { isIdleStandby = true; }, IDLE_THRESHOLD_MS);
 }
 function setupIdleDetection() {
     ['mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'visibilitychange'].forEach(evt => {
@@ -1334,8 +1496,7 @@ function loadDismissed() {
     let cleaned = false;
     Object.keys(dismissedEmergencies).forEach(id => {
         if (now - dismissedEmergencies[id] > EMERGENCY_DURATION) {
-            delete dismissedEmergencies[id];
-            cleaned = true;
+            delete dismissedEmergencies[id]; cleaned = true;
         }
     });
     if (cleaned) saveDismissed();
@@ -1343,16 +1504,13 @@ function loadDismissed() {
 function saveDismissed() {
     try { localStorage.setItem('salink_dismissed_emergencies', JSON.stringify(dismissedEmergencies)); } catch(e) {}
 }
-function isDismissed(emergencyId) {
-    return dismissedEmergencies[emergencyId] !== undefined;
-}
+function isDismissed(emergencyId) { return dismissedEmergencies[emergencyId] !== undefined; }
 function dismissEmergency(emergencyId) {
     if (!emergencyId) return;
     dismissedEmergencies[emergencyId] = Date.now();
     saveDismissed();
 }
 
-// SPLIT FUNCTION
 function getAllEmergencies() {
     try { return JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) { return []; }
 }
@@ -1364,7 +1522,6 @@ function getActiveEmergencies() {
     });
 }
 
-// ADAPTERS
 function adaptEmergency(em) {
     const ts = em.timestamp ? new Date(em.timestamp).getTime() : Date.now();
     const coords = (em.latitude && em.longitude) ? `${em.latitude}, ${em.longitude}` : '';
@@ -1420,9 +1577,7 @@ function adaptNotification(n) {
 function setupPWA() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js', { scope: './' })
-                .then(() => console.log('✅ PWA: SW registered'))
-                .catch(err => console.warn('⚠️ PWA: SW gagal:', err.message));
+            navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
         });
     }
     window.addEventListener('beforeinstallprompt', (e) => {
@@ -1456,7 +1611,6 @@ function showInstallPrompt() {
     }
 }
 
-// API CALL
 async function apiCall(action, data = {}) {
     try {
         if (action.startsWith('get_')) {
@@ -1474,7 +1628,6 @@ async function apiCall(action, data = {}) {
             return await response.json();
         }
     } catch (error) {
-        console.error('❌ API Error:', error);
         return { status: 'error', message: error.message };
     }
 }
@@ -1483,6 +1636,7 @@ async function apiGetEmergencies() { const r = await apiCall('get_emergencies');
 async function apiGetNotifications() { const r = await apiCall('get_notifications'); return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptNotification) : []; }
 async function apiGetStatistics() { const r = await apiCall('get_statistics'); return r.status === 'success' ? r.data : null; }
 async function apiGetUsers() { const r = await apiCall('get_users'); return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptUser) : []; }
+
 async function apiSavePost(postData) {
     const payload = {
         id: postData.id, userId: postData.userId, userFullName: postData.userFullName,
@@ -1506,6 +1660,7 @@ async function apiSaveEmergency(emergencyData) {
         id: 'emergency-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10),
         type: emergencyData.type, title: emergencyData.title || EMERGENCY_LABELS[emergencyData.type],
         sender: emergencyData.sender, senderUsername: emergencyData.senderUsername,
+        senderPhone: emergencyData.senderPhone || '',
         location: emergencyData.location, address: emergencyData.address || '',
         latitude: emergencyData.latitude || '', longitude: emergencyData.longitude || '',
         mapsURL: emergencyData.mapsURL || '',
@@ -1568,7 +1723,6 @@ function escapeAttr(str) {
     return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// EMERGENCY STORAGE
 function saveEmergencyToStorage(data) {
     let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
     data.savedAt = Date.now();
@@ -1583,58 +1737,9 @@ function getActiveEmergencyCountByType() {
     return c;
 }
 
-// AUDIO
-function playRegularSound() {
-    try { new Audio(REGULAR_SOUND_URL).play().catch(() => {}); } catch(e) {}
-}
-function playEmergencyLoop(type) {
-    try {
-        const url = EMERGENCY_AUDIO[type];
-        if (!url) return null;
-        stopEmergencyLoop();
-        const audio = new Audio(url);
-        audio.volume = 1.0;
-        audio.loop = true;
-        emergencyAudioLoop = audio;
-        audio.play().catch(err => {});
-        setTimeout(() => { if (emergencyAudioLoop === audio) stopEmergencyLoop(); }, EMERGENCY_AUDIO_MAX_MS);
-        return audio;
-    } catch(e) { return null; }
-}
-function stopEmergencyLoop() {
-    if (emergencyAudioLoop) {
-        try { emergencyAudioLoop.pause(); emergencyAudioLoop.currentTime = 0; } catch(e) {}
-        emergencyAudioLoop = null;
-    }
-}
-function startButtonLoop(type) {
-    stopButtonLoop();
-    const url = EMERGENCY_AUDIO[type];
-    if (!url) return;
-    try {
-        buttonLoopAudio = new Audio(url);
-        buttonLoopAudio.volume = 1.0;
-        buttonLoopAudio.loop = true;
-        buttonLoopType = type;
-        buttonLoopAudio.play().catch(err => {});
-        buttonLoopVibrateTimer = setInterval(() => {
-            if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 500]);
-        }, 3000);
-        buttonLoopTimer = setTimeout(() => { stopButtonLoop(); }, EMERGENCY_BTN_AUDIO_MAX_MS);
-    } catch(e) {}
-}
-function stopButtonLoop() {
-    if (buttonLoopAudio) {
-        try { buttonLoopAudio.pause(); buttonLoopAudio.currentTime = 0; } catch(e) {}
-        buttonLoopAudio = null;
-    }
-    if (buttonLoopTimer) { clearTimeout(buttonLoopTimer); buttonLoopTimer = null; }
-    if (buttonLoopVibrateTimer) { clearInterval(buttonLoopVibrateTimer); buttonLoopVibrateTimer = null; }
-    buttonLoopType = null;
-    if (navigator.vibrate) navigator.vibrate(0);
-}
-
+// ====================================================================
 // EMERGENCY OVERLAY
+// ====================================================================
 function showEmergencyOverlay(em) {
     const overlay = document.getElementById('emergencyOverlay');
     if (!overlay || overlay.classList.contains('active')) return;
@@ -1653,15 +1758,16 @@ function showEmergencyOverlay(em) {
     document.getElementById('emergencyCoords').textContent = em.coords ? `📏 ${em.coords}` : '';
     document.getElementById('emergencyTime').textContent = `🕐 ${formatDate(em.timestamp)}`;
     document.getElementById('emergencyBadge').textContent = `🚨 ${label}`;
-    document.getElementById('emergencyViewBtn').onclick = () => {
-        window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(em.id);
-    };
+    document.getElementById('emergencyViewBtn').onclick = () => { window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(em.id); };
     document.getElementById('emergencyDismissBtn').onclick = () => dismissEmergencyOverlay(true);
     overlay.classList.add('active');
     document.body.style.overflow = 'hidden';
     activeOverlayEmergency = em;
     overlay.dataset.emergencyId = em.id || '';
+    
+    // ✅ v4.2: Play emergency loop
     playEmergencyLoop(type);
+    
     if (navigator.vibrate) {
         navigator.vibrate([300, 100, 300, 100, 300, 100, 500]);
         emergencyVibrateInterval = setInterval(() => {
@@ -1800,7 +1906,6 @@ function triggerEmergencyFromNotification(notif) {
     }
 }
 
-// POLLING
 function startEmergencyPolling() {
     if (emergencyPollTimer) clearInterval(emergencyPollTimer);
     emergencyPollTimer = setInterval(async () => {
@@ -1823,7 +1928,6 @@ function startEmergencyCleanup() {
     }, EMERGENCY_CLEANUP_INTERVAL);
 }
 
-// ANIMATE EMERGENCY BUTTON
 function animateEmergencyButton(type) {
     const btnMap = { 'fire': 'fireBtn', 'medical': 'medicalBtn', 'crime': 'securityBtn', 'disaster': 'disasterBtn' };
     const btn = document.getElementById(btnMap[type]);
@@ -2077,7 +2181,6 @@ function renderPosts() {
     renderPostsStats();
 }
 
-// ✅ v4.0: Render Stats dengan tombol hapus
 function renderPostsStats() {
     const container = document.getElementById('postsList');
     if (!container) return;
@@ -2180,6 +2283,7 @@ function attachPostListeners() {
                 renderPosts();
                 broadcastSync('new_post', { id: p.id });
                 showToast('✅', 'Postingan diedit', 'fa-edit');
+                playRegularSound();
             }
         };
     });
@@ -2244,6 +2348,7 @@ function deleteComment(postId, commentId) {
     localStorage.setItem('salink_posts', JSON.stringify(posts));
     renderPosts();
     broadcastSync('new_post', { id: postId });
+    playRegularSound();
 }
 function sharePost(postId) {
     const p = posts.find(x => x.id === postId);
@@ -2293,6 +2398,7 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
             const emPayload = {
                 type: specialData.type, title: EMERGENCY_LABELS[specialData.type],
                 sender: currentUser.fullName, senderUsername: currentUser.username,
+                senderPhone: currentUser.phone || '',
                 location: specialData.location, address: specialData.address,
                 latitude: specialData.latitude, longitude: specialData.longitude,
                 mapsURL: specialData.mapsURL, description: text, status: 'active',
@@ -2582,6 +2688,7 @@ function setupNotifFilters() {
             renderNotifList();
             updateNotifBadge(0);
             showToast('✅', 'Semua notifikasi ditandai dibaca', 'fa-check-double');
+            playRegularSound();
         };
     }
 }
@@ -2738,44 +2845,31 @@ function initAllCharts() {
     const values = [data.fire, data.medical, data.crime, data.disaster];
     const bgColors = [colors.fire, colors.medical, colors.security, colors.disaster];
     const pieCtx = document.getElementById('pieChart');
-    if (pieCtx && !chartInstances.pie) {
-        chartInstances.pie = new Chart(pieCtx, { type: 'pie', data: { labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#fff', borderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } } });
-    }
+    if (pieCtx && !chartInstances.pie) chartInstances.pie = new Chart(pieCtx, { type: 'pie', data: { labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#fff', borderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } } });
     const barCtx = document.getElementById('barChart');
-    if (barCtx && !chartInstances.bar) {
-        chartInstances.bar = new Chart(barCtx, { type: 'bar', data: { labels, datasets: [{ label: 'Jumlah Kejadian', data: values, backgroundColor: bgColors, borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } } });
-    }
+    if (barCtx && !chartInstances.bar) chartInstances.bar = new Chart(barCtx, { type: 'bar', data: { labels, datasets: [{ label: 'Jumlah Kejadian', data: values, backgroundColor: bgColors, borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } } });
     const weekly = getWeeklyChartData();
     const lineCtx = document.getElementById('lineChart');
-    if (lineCtx && !chartInstances.line) {
-        chartInstances.line = new Chart(lineCtx, { type: 'line', data: { labels: weekly.labels, datasets: [
-            { label: '🔥 Kebakaran', data: weekly.fire, borderColor: colors.fire, backgroundColor: colors.fire + '20', tension: 0.4 },
-            { label: '🚑 Medis', data: weekly.medical, borderColor: colors.medical, backgroundColor: colors.medical + '20', tension: 0.4 },
-            { label: '🚓 Kriminal', data: weekly.crime, borderColor: colors.security, backgroundColor: colors.security + '20', tension: 0.4 },
-            { label: '🌪️ Bencana', data: weekly.disaster, borderColor: colors.disaster, backgroundColor: colors.disaster + '20', tension: 0.4 }
-        ] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } } });
-    }
+    if (lineCtx && !chartInstances.line) chartInstances.line = new Chart(lineCtx, { type: 'line', data: { labels: weekly.labels, datasets: [
+        { label: '🔥 Kebakaran', data: weekly.fire, borderColor: colors.fire, backgroundColor: colors.fire + '20', tension: 0.4 },
+        { label: '🚑 Medis', data: weekly.medical, borderColor: colors.medical, backgroundColor: colors.medical + '20', tension: 0.4 },
+        { label: '🚓 Kriminal', data: weekly.crime, borderColor: colors.security, backgroundColor: colors.security + '20', tension: 0.4 },
+        { label: '🌪️ Bencana', data: weekly.disaster, borderColor: colors.disaster, backgroundColor: colors.disaster + '20', tension: 0.4 }
+    ] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } } });
     const areaCtx = document.getElementById('areaChart');
-    if (areaCtx && !chartInstances.area) {
-        chartInstances.area = new Chart(areaCtx, { type: 'line', data: { labels: weekly.labels, datasets: [
-            { label: '🔥 Kebakaran', data: weekly.fire, borderColor: colors.fire, backgroundColor: colors.fire + '40', tension: 0.4, fill: true },
-            { label: '🚑 Medis', data: weekly.medical, borderColor: colors.medical, backgroundColor: colors.medical + '40', tension: 0.4, fill: true },
-            { label: '🚓 Kriminal', data: weekly.crime, borderColor: colors.security, backgroundColor: colors.security + '40', tension: 0.4, fill: true },
-            { label: '🌪️ Bencana', data: weekly.disaster, borderColor: colors.disaster, backgroundColor: colors.disaster + '40', tension: 0.4, fill: true }
-        ] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, stacked: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } } });
-    }
+    if (areaCtx && !chartInstances.area) chartInstances.area = new Chart(areaCtx, { type: 'line', data: { labels: weekly.labels, datasets: [
+        { label: '🔥 Kebakaran', data: weekly.fire, borderColor: colors.fire, backgroundColor: colors.fire + '40', tension: 0.4, fill: true },
+        { label: '🚑 Medis', data: weekly.medical, borderColor: colors.medical, backgroundColor: colors.medical + '40', tension: 0.4, fill: true },
+        { label: '🚓 Kriminal', data: weekly.crime, borderColor: colors.security, backgroundColor: colors.security + '40', tension: 0.4, fill: true },
+        { label: '🌪️ Bencana', data: weekly.disaster, borderColor: colors.disaster, backgroundColor: colors.disaster + '40', tension: 0.4, fill: true }
+    ] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, stacked: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } } });
     const doughnutCtx = document.getElementById('doughnutChart');
-    if (doughnutCtx && !chartInstances.doughnut) {
-        chartInstances.doughnut = new Chart(doughnutCtx, { type: 'doughnut', data: { labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#fff', borderWidth: 3, hoverOffset: 10 }] }, options: { responsive: true, maintainAspectRatio: true, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } } });
-    }
+    if (doughnutCtx && !chartInstances.doughnut) chartInstances.doughnut = new Chart(doughnutCtx, { type: 'doughnut', data: { labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#fff', borderWidth: 3, hoverOffset: 10 }] }, options: { responsive: true, maintainAspectRatio: true, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } } });
 }
 function switchChart(type) {
     document.querySelectorAll('.chart-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.chart === type));
     const map = { pie: 'pieChartContainer', bar: 'barChartContainer', line: 'lineChartContainer', area: 'areaChartContainer', doughnut: 'doughnutChartContainer', gauge: 'gaugeChartContainer', heatmap: 'heatmapChartContainer', map: 'mapChartContainer' };
-    Object.keys(map).forEach(k => {
-        const el = document.getElementById(map[k]);
-        if (el) el.classList.toggle('active', k === type);
-    });
+    Object.keys(map).forEach(k => { const el = document.getElementById(map[k]); if (el) el.classList.toggle('active', k === type); });
     setTimeout(() => {
         const chart = chartInstances[type];
         if (chart) chart.resize();
@@ -2791,37 +2885,20 @@ function updateAllCharts() {
     if (chartInstances.pie) { chartInstances.pie.data.datasets[0].data = values; chartInstances.pie.update(); }
     if (chartInstances.bar) { chartInstances.bar.data.datasets[0].data = values; chartInstances.bar.update(); }
     if (chartInstances.doughnut) { chartInstances.doughnut.data.datasets[0].data = values; chartInstances.doughnut.update(); }
-    updateLineAreaCharts();
-    updateGaugeChart();
-    updateHeatmap();
+    updateLineAreaCharts(); updateGaugeChart(); updateHeatmap();
 }
 function updateLineAreaCharts() {
     const weekly = getWeeklyChartData();
-    if (chartInstances.line) {
-        chartInstances.line.data.labels = weekly.labels;
-        chartInstances.line.data.datasets[0].data = weekly.fire;
-        chartInstances.line.data.datasets[1].data = weekly.medical;
-        chartInstances.line.data.datasets[2].data = weekly.crime;
-        chartInstances.line.data.datasets[3].data = weekly.disaster;
-        chartInstances.line.update();
-    }
-    if (chartInstances.area) {
-        chartInstances.area.data.labels = weekly.labels;
-        chartInstances.area.data.datasets[0].data = weekly.fire;
-        chartInstances.area.data.datasets[1].data = weekly.medical;
-        chartInstances.area.data.datasets[2].data = weekly.crime;
-        chartInstances.area.data.datasets[3].data = weekly.disaster;
-        chartInstances.area.update();
-    }
+    if (chartInstances.line) { chartInstances.line.data.labels = weekly.labels; chartInstances.line.data.datasets[0].data = weekly.fire; chartInstances.line.data.datasets[1].data = weekly.medical; chartInstances.line.data.datasets[2].data = weekly.crime; chartInstances.line.data.datasets[3].data = weekly.disaster; chartInstances.line.update(); }
+    if (chartInstances.area) { chartInstances.area.data.labels = weekly.labels; chartInstances.area.data.datasets[0].data = weekly.fire; chartInstances.area.data.datasets[1].data = weekly.medical; chartInstances.area.data.datasets[2].data = weekly.crime; chartInstances.area.data.datasets[3].data = weekly.disaster; chartInstances.area.update(); }
 }
 let gaugeTicksDrawn = false;
 function updateGaugeChart() {
-    let rate = 0;
     const realStats = calculateRealStatistics();
     const total = realStats.totalEmergencies;
     const active = realStats.activeEmergencies;
     const resolved = total - active;
-    rate = total > 0 ? Math.round((resolved / total) * 100) : 0;
+    let rate = total > 0 ? Math.round((resolved / total) * 100) : 0;
     rate = Math.max(0, Math.min(100, rate));
     const ticksGroup = document.getElementById('gaugeModernTicks');
     if (ticksGroup && !gaugeTicksDrawn) {
@@ -2832,28 +2909,19 @@ function updateGaugeChart() {
             const isMajor = i % 2 === 0;
             const r1 = isMajor ? 95 : 100;
             const r2 = 108;
-            const x1 = 160 + r1 * Math.cos(rad);
-            const y1 = 180 + r1 * Math.sin(rad);
-            const x2 = 160 + r2 * Math.cos(rad);
-            const y2 = 180 + r2 * Math.sin(rad);
+            const x1 = 160 + r1 * Math.cos(rad); const y1 = 180 + r1 * Math.sin(rad);
+            const x2 = 160 + r2 * Math.cos(rad); const y2 = 180 + r2 * Math.sin(rad);
             ticksHTML += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="rgba(230,237,243,${isMajor ? 0.9 : 0.4})" stroke-width="${isMajor ? 3 : 1.5}" stroke-linecap="round"/>`;
             if (i % 2 === 0) {
                 const rLabel = 78;
-                const xL = 160 + rLabel * Math.cos(rad);
-                const yL = 180 + rLabel * Math.sin(rad);
+                const xL = 160 + rLabel * Math.cos(rad); const yL = 180 + rLabel * Math.sin(rad);
                 ticksHTML += `<text x="${xL.toFixed(1)}" y="${(yL + 4).toFixed(1)}" text-anchor="middle" fill="var(--text-secondary)" font-size="11" font-weight="600" font-family="Inter, sans-serif">${i * 10}</text>`;
             }
         }
-        ticksGroup.innerHTML = ticksHTML;
-        gaugeTicksDrawn = true;
+        ticksGroup.innerHTML = ticksHTML; gaugeTicksDrawn = true;
     }
     const arc = document.getElementById('gaugeModernArc');
-    if (arc) {
-        const totalArcLength = Math.PI * 120;
-        const progressLength = (rate / 100) * totalArcLength;
-        arc.setAttribute('stroke-dasharray', `${progressLength} ${totalArcLength}`);
-        arc.setAttribute('stroke-dashoffset', '0');
-    }
+    if (arc) { const totalArcLength = Math.PI * 120; const progressLength = (rate / 100) * totalArcLength; arc.setAttribute('stroke-dasharray', `${progressLength} ${totalArcLength}`); arc.setAttribute('stroke-dashoffset', '0'); }
     const needle = document.getElementById('gaugeModernNeedle');
     if (needle) needle.style.transform = `rotate(${-90 + (rate * 1.8)}deg)`;
     const valueEl = document.getElementById('gaugeModernValue');
@@ -2874,12 +2942,7 @@ function updateHeatmap() {
         const cell = document.createElement('div');
         const val = totals[i];
         let level = 'none';
-        if (val > 0) {
-            const ratio = val / maxTotal;
-            if (ratio > 0.7) level = 'high';
-            else if (ratio > 0.3) level = 'medium';
-            else level = 'low';
-        }
+        if (val > 0) { const ratio = val / maxTotal; if (ratio > 0.7) level = 'high'; else if (ratio > 0.3) level = 'medium'; else level = 'low'; }
         cell.className = `heatmap-cell ${level}`;
         cell.textContent = val > 0 ? val : '·';
         cell.title = `${label}: ${val} kejadian`;
@@ -2892,10 +2955,7 @@ function updateMap() {
     else if (f) {
         const ems = getActiveEmergencies();
         const withCoords = ems.find(e => e.coords && e.coords.includes(','));
-        if (withCoords) {
-            const [lat, lng] = withCoords.coords.split(',').map(s => s.trim());
-            f.src = `https://www.google.com/maps?q=${lat},${lng}&output=embed`;
-        }
+        if (withCoords) { const [lat, lng] = withCoords.coords.split(',').map(s => s.trim()); f.src = `https://www.google.com/maps?q=${lat},${lng}&output=embed`; }
     }
 }
 
@@ -2906,9 +2966,10 @@ function handleEmergencyClick(e) {
     const type = btn.dataset.type;
     if (isPreviewMode) { showPreviewOverlay(); return; }
     if (!currentUser) { redirectToLogin(); return; }
+    // Unlock audio pada tap pertama
+    unlockAudio();
     if (buttonLoopAudio) {
-        stopButtonLoop();
-        stopEmergencyButtonAnimation();
+        stopButtonLoop(); stopEmergencyButtonAnimation();
         const counts = getActiveEmergencyCountByType();
         const st = btn.querySelector('.play-status');
         if (st) st.textContent = counts[type] > 0 ? `🔔 ${counts[type]} Notifikasi` : '▶ Tap untuk Alarm';
@@ -2940,9 +3001,11 @@ function handleEmergencyClick(e) {
     const url = EMERGENCY_AUDIO[type];
     if (!url) return;
     stopEmergencyLoop();
-    const audio = new Audio(url);
+    const cached = audioCache[type];
+    const audio = cached || new Audio(url);
     audio.volume = 1.0;
     audio.loop = false;
+    audio.currentTime = 0;
     activeEmergencyAudio = audio;
     activeEmergencyBtn = btn;
     audio.play().then(() => {
@@ -3028,20 +3091,14 @@ function redirectToLogin() { window.location.href = LOGIN_URL + '?redirect=' + e
 function applyPreviewMode() {
     if (isPreviewMode) {
         document.getElementById('previewBadge')?.classList.add('active');
-        const pi = document.getElementById('postInput'); if (pi) pi.readOnly = true;
-        const pst = document.getElementById('postSpecialText'); if (pst) pst.readOnly = true;
-        const pml = document.getElementById('postMapLink'); if (pml) pml.readOnly = true;
-        const pla = document.getElementById('postLocationAddress'); if (pla) pla.readOnly = true;
+        ['postInput','postSpecialText','postMapLink','postLocationAddress'].forEach(id => { const el = document.getElementById(id); if (el) el.readOnly = true; });
         const mu = document.getElementById('mediaUpload'); if (mu) mu.disabled = true;
         const ps = document.getElementById('postSubmit'); if (ps) ps.disabled = true;
         const pts = document.getElementById('postTypeSelect'); if (pts) pts.disabled = true;
         document.querySelectorAll('.emergency-btn').forEach(b => b.style.opacity = '0.7');
     } else {
         document.getElementById('previewBadge')?.classList.remove('active');
-        const pi = document.getElementById('postInput'); if (pi) pi.readOnly = false;
-        const pst = document.getElementById('postSpecialText'); if (pst) pst.readOnly = false;
-        const pml = document.getElementById('postMapLink'); if (pml) pml.readOnly = false;
-        const pla = document.getElementById('postLocationAddress'); if (pla) pla.readOnly = false;
+        ['postInput','postSpecialText','postMapLink','postLocationAddress'].forEach(id => { const el = document.getElementById(id); if (el) el.readOnly = false; });
         const mu = document.getElementById('mediaUpload'); if (mu) mu.disabled = false;
         const pts = document.getElementById('postTypeSelect'); if (pts) pts.disabled = false;
         document.querySelectorAll('.emergency-btn').forEach(b => b.style.opacity = '1');
@@ -3073,32 +3130,22 @@ function setupLoginGuard() {
     }, true);
 }
 
-// LOAD DATA
 async function loadData() {
     const results = await Promise.allSettled([
         apiGetPosts(), apiGetEmergencies(), apiGetNotifications(), apiGetStatistics(), apiGetUsers()
     ]);
     let localPosts = [];
     let apiPosts = [];
-    try {
-        const raw = localStorage.getItem('salink_posts');
-        if (raw) { const parsed = JSON.parse(raw); if (Array.isArray(parsed)) localPosts = parsed; }
-    } catch(e) { localPosts = []; }
+    try { const raw = localStorage.getItem('salink_posts'); if (raw) { const parsed = JSON.parse(raw); if (Array.isArray(parsed)) localPosts = parsed; } } catch(e) { localPosts = []; }
     if (results[0].status === 'fulfilled' && results[0].value) apiPosts = results[0].value;
     const postMap = new Map();
     apiPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
     localPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
     posts = Array.from(postMap.values())
-        .filter(p => {
-            if (!p || !p.id || !p.userId || !p.userFullName) return false;
-            const hasText = p.text && p.text.trim() !== '';
-            const hasMedia = p.mediaData && p.mediaData !== '';
-            return hasText || hasMedia;
-        })
+        .filter(p => { if (!p || !p.id || !p.userId || !p.userFullName) return false; const hasText = p.text && p.text.trim() !== ''; const hasMedia = p.mediaData && p.mediaData !== ''; return hasText || hasMedia; })
         .sort((a, b) => b.timestamp - a.timestamp);
     localStorage.setItem('salink_posts', JSON.stringify(posts));
-    let localEms = [];
-    try { localEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) { localEms = []; }
+    let localEms = []; try { localEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) { localEms = []; }
     let apiEms = [];
     if (results[1].status === 'fulfilled' && results[1].value) apiEms = results[1].value;
     const emMap = new Map();
@@ -3113,13 +3160,8 @@ async function loadData() {
     if (results[3].status === 'fulfilled' && results[3].value) statistics = results[3].value;
     else statistics = null;
     if (results[4].status === 'fulfilled' && results[4].value) allUsers = results[4].value;
-    renderPosts();
-    renderHologram();
-    updateEmergencyBadges();
-    updateNotifBadge();
-    updateInviteBadge();
-    updateAllCharts();
-    updateStatsCards();
+    renderPosts(); renderHologram(); updateEmergencyBadges(); updateNotifBadge();
+    updateInviteBadge(); updateAllCharts(); updateStatsCards();
 }
 function updateStatsCards() {
     const realStats = calculateRealStatistics();
@@ -3138,7 +3180,6 @@ function updateStatsCards() {
     const sr = document.getElementById('statResponse'); if (sr) sr.textContent = responseRate + '%';
 }
 
-// THEME
 function loadTheme() {
     const t = localStorage.getItem('salink_theme');
     if (t === 'light') {
@@ -3169,7 +3210,6 @@ function toggleTheme() {
     updateAllCharts();
 }
 
-// SIDEBAR & MODAL
 function openSidebar() { document.getElementById('sidebar')?.classList.add('active'); document.getElementById('sidebarOverlay')?.classList.add('active'); }
 function closeSidebar() { document.getElementById('sidebar')?.classList.remove('active'); document.getElementById('sidebarOverlay')?.classList.remove('active'); }
 function openProfileUser(username) {
@@ -3180,7 +3220,6 @@ function openProfileUser(username) {
 function openModal(id) { document.getElementById(id)?.classList.add('active'); document.body.style.overflow = 'hidden'; }
 function closeModal(id) { document.getElementById(id)?.classList.remove('active'); document.body.style.overflow = ''; }
 
-// SEARCH
 function openSearchModal() {
     if (isPreviewMode) { showPreviewOverlay(); return; }
     openModal('searchModal');
@@ -3213,9 +3252,7 @@ function renderSearchDefaultView() {
     let html = '';
     if (recentSearches.length > 0) {
         html += `<div class="search-section-title"><span>🕐 Pencarian Terakhir</span><button onclick="clearRecentSearches()" style="background:none;border:none;color:var(--accent-red);font-size:0.6rem;cursor:pointer;"><i class="fas fa-trash"></i> Hapus</button></div>`;
-        html += recentSearches.slice(0, 5).map(q => `
-            <div class="recent-search-item" onclick="applySearchQuery('${escapeAttr(q)}')"><i class="fas fa-history recent-icon"></i><span class="recent-text">${escapeHTML(q)}</span><button class="recent-remove" onclick="event.stopPropagation();removeRecentSearch('${escapeAttr(q)}')"><i class="fas fa-times"></i></button></div>
-        `).join('');
+        html += recentSearches.slice(0, 5).map(q => `<div class="recent-search-item" onclick="applySearchQuery('${escapeAttr(q)}')"><i class="fas fa-history recent-icon"></i><span class="recent-text">${escapeHTML(q)}</span><button class="recent-remove" onclick="event.stopPropagation();removeRecentSearch('${escapeAttr(q)}')"><i class="fas fa-times"></i></button></div>`).join('');
     }
     const trending = getTrendingPosts();
     if (trending.length > 0) {
@@ -3317,19 +3354,14 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 }
 function performSearch(query) {
     const q = query.trim().toLowerCase();
-    if (!q) {
-        document.getElementById('searchActiveResults').style.display = 'none';
-        document.getElementById('searchDefaultView').style.display = 'block';
-        return;
-    }
+    if (!q) { document.getElementById('searchActiveResults').style.display = 'none'; document.getElementById('searchDefaultView').style.display = 'block'; return; }
     document.getElementById('searchDefaultView').style.display = 'none';
     document.getElementById('searchActiveResults').style.display = 'block';
     document.getElementById('clearSearchBtn')?.classList.add('visible');
     const users = searchUsers(q);
     const matchedPosts = searchPosts(q);
     const matchedEm = searchEmergencies(q);
-    let html = '';
-    let totalCount = 0;
+    let html = ''; let totalCount = 0;
     const showUsers = (searchTab === 'all' || searchTab === 'users');
     const showPosts = (searchTab === 'all' || searchTab === 'posts');
     const showEm = (searchTab === 'all' || searchTab === 'emergency');
@@ -3419,7 +3451,6 @@ function setupSearchInput() {
     input.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeSearchModal(); });
 }
 
-// URL PARAMS
 function checkURLParams() {
     const params = new URLSearchParams(window.location.search);
     const userParam = params.get('user');
@@ -3442,7 +3473,6 @@ function checkURLParams() {
     }
 }
 
-// VISIBILITY
 function setupVisibilityDetection() {
     document.addEventListener('visibilitychange', () => {
         const isNowActive = !document.hidden;
@@ -3455,7 +3485,6 @@ function setupVisibilityDetection() {
     });
 }
 
-// BOTTOM NAV
 function initBottomNav() {
     document.querySelectorAll('.nav-item-bottom').forEach(item => {
         item.addEventListener('click', function(e) {
@@ -3473,10 +3502,13 @@ function initBottomNav() {
     });
 }
 
-// INIT
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 SALINK Dashboard v4.0 Initializing...');
-    console.log('✅ NEW v4.0: Central Sync, Cross-Tab BroadcastChannel, Hybrid Statistics');
+    console.log('🚀 SALINK Dashboard v4.2 — Audio System Fixed');
+    console.log('⚡ Polling: 15s');
+    console.log('🔊 Preload: ALL emergency audio + regular');
+
+    // ✅ v4.2: Preload semua audio
+    preloadAllAudio();
 
     setupPWA();
     checkURLParams();
@@ -3535,25 +3567,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (e.key === 'Escape') { if (document.getElementById('searchModal')?.classList.contains('active')) closeSearchModal(); }
     });
 
-    // ✅ v4.0: Storage event listener (cross-tab fallback)
     window.addEventListener('storage', function(e) {
         if (e.key === 'salink_sync_trigger') {
-            try {
-                const data = JSON.parse(e.newValue);
-                if (data && data.type) handleSyncMessage(data);
-            } catch(err) {}
+            try { const data = JSON.parse(e.newValue); if (data && data.type) handleSyncMessage(data); } catch(err) {}
         }
         if (e.key === 'salink_user') { loadUser(); updateUserUI(); }
         if (e.key === 'salink_theme') loadTheme();
         if (e.key === 'salink_posts' || e.key === 'salink_emergencies') {
-            // Reload data & render
             posts = loadPostsFromStorage();
-            renderPosts();
-            renderHologram();
-            updateEmergencyBadges();
-            updateNotifBadge();
-            updateAllCharts();
-            updateStatsCards();
+            renderPosts(); renderHologram(); updateEmergencyBadges();
+            updateNotifBadge(); updateAllCharts(); updateStatsCards();
         }
     });
 
@@ -3571,18 +3594,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (document.getElementById('notifModal')?.classList.contains('active')) renderNotifList();
     }, 15000);
 
-    console.log('✅ SALINK Dashboard v4.0 Ready!');
+    console.log('✅ SALINK Dashboard v4.2 Ready! — Audio Fixed');
 });
 
-// EXPOSE GLOBAL
 window.openProfileUser = openProfileUser;
-window.deleteEmergencyById = (id) => requestDelete('emergency', id, 'Emergency');
 window.requestDelete = requestDelete;
 window.confirmDeleteNow = confirmDeleteNow;
 window.closeDeleteConfirm = closeDeleteConfirm;
 window.toggleLike = toggleLike;
 window.deleteComment = deleteComment;
-window.deletePost = (id) => requestDelete('post', id, 'Postingan');
 window.sharePost = sharePost;
 window.closeModal = closeModal;
 window.openModal = openModal;
@@ -3682,7 +3702,5 @@ console.log('✅ SALINK Dashboard v4.1 Loaded');
     </script>
     <!-- ============================================================ -->
 
-</body>
-</html>
 </body>
 </html>
