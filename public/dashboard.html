@@ -96,6 +96,7 @@
         .search-btn:hover { border-color: var(--accent-blue); }
         .search-btn i { font-size: 1rem; }
 
+        /* ✅ v4.0: Sync indicator */
         .sync-indicator { position: fixed; top: calc(var(--header-height) + 6px); right: 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 3px 10px; font-size: 0.55rem; color: var(--text-muted); z-index: 999; display: none; align-items: center; gap: 4px; animation: syncPulse 1s ease-in-out infinite; }
         .sync-indicator.active { display: flex; }
         .sync-indicator i { color: var(--accent-blue); font-size: 0.6rem; }
@@ -553,6 +554,7 @@
         .keyboard-hint { font-size: 0.55rem; color: var(--text-muted); text-align: center; margin-top: 8px; }
         .keyboard-hint kbd { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 4px; padding: 1px 5px; font-size: 0.55rem; color: var(--text-secondary); }
 
+        /* ✅ v4.0: Delete confirmation modal */
         .delete-confirm-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(20px); z-index: 999999; display: none; align-items: center; justify-content: center; padding: 20px; }
         .delete-confirm-modal.active { display: flex; animation: fadeIn 0.3s ease; }
         .delete-confirm-content { background: var(--modal-bg); border-radius: 20px; max-width: 380px; width: 100%; padding: 24px 20px; border: 1px solid var(--accent-red); box-shadow: 0 30px 60px rgba(248,81,73,0.3); text-align: center; }
@@ -587,8 +589,10 @@
 </head>
 <body>
 
+    <!-- SYNC INDICATOR -->
     <div class="sync-indicator" id="syncIndicator"><i class="fas fa-sync-alt fa-spin"></i> Sync...</div>
 
+    <!-- DELETE CONFIRM MODAL -->
     <div class="delete-confirm-modal" id="deleteConfirmModal">
         <div class="delete-confirm-content">
             <div class="delete-confirm-icon"><i class="fas fa-trash-alt"></i></div>
@@ -939,7 +943,7 @@
         <div style="background:var(--bg-card);padding:14px 16px;text-align:center;border-top:1px solid var(--border-color);margin-top:16px;border-radius:12px;">
             <div style="max-width:600px;margin:0 auto;color:var(--text-muted);font-size:9px;">
                 <p style="font-weight:500;color:var(--accent-blue);font-size:10px;margin-bottom:6px;">SALINK - Sistem Peringatan Darurat Masyarakat</p>
-                <p style="margin-top:8px;font-size:9px;color:var(--text-muted);">&copy; 2026 SALINK v4.1. Semua hak dilindungi.</p>
+                <p style="margin-top:8px;font-size:9px;color:var(--text-muted);">&copy; 2026 SALINK v4.0. Semua hak dilindungi.</p>
             </div>
         </div>
     </main>
@@ -1031,18 +1035,14 @@
 
     <script>
 /* ====================================================================
- * SALINK DASHBOARD v4.1 — INSTANT DELIVERY
+ * SALINK DASHBOARD v4.0 — FINAL with CENTRAL SYNC
  * ====================================================================
- * FIX CEPAT v4.1:
- * ✅ Polling 3 detik (dari 15 detik) → 5× lebih cepat
- * ✅ Priority fetch + keepalive
- * ✅ Preload + cache audio (0ms delay)
- * ✅ Wake Lock API
- * ✅ Visibility API instant resume
- * ✅ BroadcastChannel sync < 1 detik
- * ✅ Central delete (2× konfirmasi)
- * ✅ Auto-retry exponential backoff
- * ✅ Statistik real-time (Hybrid)
+ * PERUBAHAN UTAMA v4.0:
+ * ✅ Central Delete Function — hapus di 1 halaman → sync ke semua
+ * ✅ Cross-Tab Sync — BroadcastChannel + storage event
+ * ✅ Statistik Real-time — hybrid (API + fallback)
+ * ✅ Konfirmasi 2× untuk hapus
+ * ✅ Semua fitur v3.2/v3.1 dipertahankan
  * ==================================================================== */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
@@ -1054,14 +1054,12 @@ const EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
 const EMERGENCY_AUDIO_MAX_MS = 60000;
 const EMERGENCY_AUTO_DISMISS_MS = 60000;
 const EMERGENCY_VIBRATE_INTERVAL_MS = 3000;
-const EMERGENCY_POLL_INTERVAL = 3000;
+const EMERGENCY_POLL_INTERVAL = 15000;
 const AUTO_REFRESH = 60000;
 const EMERGENCY_CLEANUP_INTERVAL = 60000;
 const IDLE_THRESHOLD_MS = 30000;
 const SWIPE_MIN_DISTANCE = 50;
 const EMERGENCY_BTN_AUDIO_MAX_MS = 120000;
-const MAX_FETCH_RETRY = 2;
-const FETCH_TIMEOUT = 5000;
 
 const EMERGENCY_LABELS = { 'fire': '🔥 Kebakaran', 'medical': '🚑 Medis & Kematian', 'crime': '🚓 Kriminal', 'disaster': '🌪️ Bencana Alam' };
 const EMERGENCY_ICONS = { 'fire': '🔥', 'medical': '🚑', 'crime': '🚓', 'disaster': '🌪️' };
@@ -1081,6 +1079,7 @@ const POST_TYPE_MAP = {
     'disaster': { isSpecial: true, specialType: 'disaster' }
 };
 
+// STATE
 let currentUser = null, isPreviewMode = true, currentTheme = 'dark';
 let posts = [], notifications = [], statistics = null, chartInstances = {};
 let emergencyOverlayTimeout = null, floatingNotificationTimeout = null;
@@ -1108,156 +1107,53 @@ let searchEmergencyFilter = 'all';
 let searchDebounceTimer = null;
 let recentSearches = JSON.parse(localStorage.getItem('salink_recent_searches') || '[]');
 const MAX_RECENT_SEARCHES = 8;
-const audioCache = {};
-let wakeLockSentinel = null;
-let sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}');
 
+// ✅ v4.0: Cross-Tab BroadcastChannel
 let syncChannel = null;
 try {
     syncChannel = new BroadcastChannel('salink_sync');
     syncChannel.onmessage = (event) => {
-        console.log('📡 [INSTANT] Sync:', event.data);
+        console.log('📡 Sync message received:', event.data);
         handleSyncMessage(event.data);
     };
-    console.log('✅ BroadcastChannel ready');
 } catch(e) { console.warn('BroadcastChannel not supported'); }
 
-// ✅ v4.1: Preload semua audio
-function preloadAllAudio() {
-    console.log('🔊 Preloading emergency audio...');
-    Object.keys(EMERGENCY_AUDIO).forEach(type => {
-        const url = EMERGENCY_AUDIO[type];
-        try {
-            const audio = new Audio();
-            audio.preload = 'auto';
-            audio.src = url;
-            audio.volume = 1.0;
-            audio.load();
-            audioCache[type] = audio;
-        } catch(e) {}
-    });
-    try {
-        const regAudio = new Audio();
-        regAudio.preload = 'auto';
-        regAudio.src = REGULAR_SOUND_URL;
-        regAudio.load();
-        audioCache['regular'] = regAudio;
-    } catch(e) {}
-    console.log('✅ All audio preloaded');
-}
-
-// ✅ v4.1: Wake Lock API
-async function requestWakeLock() {
-    if (!('wakeLock' in navigator)) return;
-    try {
-        if (wakeLockSentinel) return;
-        wakeLockSentinel = await navigator.wakeLock.request('screen');
-        console.log('🔒 Wake Lock active');
-        wakeLockSentinel.addEventListener('release', () => {
-            wakeLockSentinel = null;
-        });
-    } catch(e) {}
-}
-function releaseWakeLock() {
-    if (wakeLockSentinel) {
-        try { wakeLockSentinel.release(); } catch(e) {}
-        wakeLockSentinel = null;
-    }
-}
-
-// ✅ v4.1: Smart Fetch
-async function smartFetch(url, options = {}, retries = MAX_FETCH_RETRY) {
-    for (let attempt = 0; attempt <= retries; attempt++) {
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-            const response = await fetch(url, {
-                ...options,
-                signal: controller.signal,
-                keepalive: true,
-                cache: 'no-store'
-            });
-            clearTimeout(timeoutId);
-            return response;
-        } catch(error) {
-            if (attempt < retries) {
-                await new Promise(r => setTimeout(r, 300 * Math.pow(2, attempt)));
-            } else {
-                throw error;
-            }
-        }
-    }
-}
-
-// ✅ v4.1: Instant polling
-async function instantPollNotifications() {
-    try {
-        const url = API_URL + '?action=get_notifications&_t=' + Date.now();
-        const response = await smartFetch(url, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' }
-        });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        const result = await response.json();
-        if (result.status === 'success' && Array.isArray(result.data)) {
-            const notifs = result.data.map(adaptNotification);
-            notifications = notifs;
-            const newEmergency = detectNewEmergencyNotifications(notifs);
-            if (newEmergency) {
-                console.log('⚡ [INSTANT] Emergency detected in <3s:', newEmergency.type);
-                triggerEmergencyFromNotification(newEmergency);
-            }
-            updateNotifBadge();
-            if (document.getElementById('notifModal')?.classList.contains('active')) {
-                renderNotifList();
-            }
-        }
-    } catch(e) {}
-}
-
-function startEmergencyPolling() {
-    if (emergencyPollTimer) clearInterval(emergencyPollTimer);
-    instantPollNotifications();
-    emergencyPollTimer = setInterval(() => {
-        if (document.getElementById('emergencyOverlay')?.classList.contains('active')) return;
-        if (document.hidden && !isIdleStandby) return;
-        instantPollNotifications();
-    }, EMERGENCY_POLL_INTERVAL);
-    console.log('⚡ Emergency polling: 3s INSTANT MODE');
-}
-
-// ✅ v4.1: Visibility + Wake Lock
-function setupInstantVisibility() {
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) {
-            resetIdleTimer();
-            requestWakeLock();
-            instantPollNotifications();
+// ✅ v4.0: Handle sync message
+function handleSyncMessage(data) {
+    if (!data || !data.type) return;
+    showSyncIndicator();
+    switch(data.type) {
+        case 'delete_post':
+        case 'delete_emergency':
+        case 'delete_all':
+            // Reload data dari localStorage
             posts = loadPostsFromStorage();
             renderPosts();
             renderHologram();
             updateEmergencyBadges();
             updateNotifBadge();
-        } else {
-            isIdleStandby = true;
-            releaseWakeLock();
-        }
-    });
-    requestWakeLock();
-}
-
-function handleSyncMessage(data) {
-    if (!data || !data.type) return;
-    showSyncIndicator();
-    posts = loadPostsFromStorage();
-    renderPosts();
-    renderHologram();
-    updateEmergencyBadges();
-    updateNotifBadge();
-    updateAllCharts();
-    updateStatsCards();
+            updateAllCharts();
+            updateStatsCards();
+            console.log('✅ Sync complete:', data.type);
+            break;
+        case 'new_post':
+        case 'new_emergency':
+            // Reload data
+            posts = loadPostsFromStorage();
+            renderPosts();
+            renderHologram();
+            updateEmergencyBadges();
+            updateNotifBadge();
+            updateAllCharts();
+            updateStatsCards();
+            break;
+        case 'stats_update':
+            updateStatsCards();
+            break;
+    }
     hideSyncIndicator();
 }
+
 function showSyncIndicator() {
     const el = document.getElementById('syncIndicator');
     if (el) {
@@ -1273,12 +1169,14 @@ function broadcastSync(type, data = {}) {
     if (syncChannel) {
         try { syncChannel.postMessage({ type, data, timestamp: Date.now() }); } catch(e) {}
     }
+    // Fallback: write to localStorage to trigger 'storage' event
     try {
         localStorage.setItem('salink_sync_trigger', JSON.stringify({ type, data, timestamp: Date.now() }));
         setTimeout(() => localStorage.removeItem('salink_sync_trigger'), 100);
     } catch(e) {}
 }
 
+// ✅ v4.0: Load posts from localStorage
 function loadPostsFromStorage() {
     try {
         const raw = localStorage.getItem('salink_posts');
@@ -1290,11 +1188,16 @@ function loadPostsFromStorage() {
     return [];
 }
 
-// CENTRAL DELETE
+// ====================================================================
+// ✅ v4.0: CENTRAL DELETE FUNCTION
+// ====================================================================
 let pendingDelete = null;
+
 function requestDelete(type, id, description) {
+    // type: 'post' | 'emergency' | 'all_posts' | 'all_emergencies'
     if (!confirm('⚠️ KONFIRMASI PERTAMA\n\nAnda akan menghapus ' + description + '.\n\nLanjutkan?')) return;
     pendingDelete = { type, id, description };
+    // Tampilkan modal konfirmasi ke-2
     const modal = document.getElementById('deleteConfirmModal');
     const msgEl = document.getElementById('deleteConfirmMsg');
     if (msgEl) {
@@ -1313,29 +1216,44 @@ async function confirmDeleteNow() {
     const modal = document.getElementById('deleteConfirmModal');
     if (modal) modal.classList.remove('active');
     pendingDelete = null;
+
     showSyncIndicator();
     try {
+        // ✅ 1. Hapus dari localStorage
         if (type === 'post' || type === 'emergency') {
+            // Hapus dari posts
             let allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
             allPosts = allPosts.filter(p => p.id !== id);
             localStorage.setItem('salink_posts', JSON.stringify(allPosts));
+            // Hapus dari emergencies
             let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
             ems = ems.filter(e => e.id !== id);
             localStorage.setItem('salink_emergencies', JSON.stringify(ems));
+            // Hapus dari readNotifs
             if (readNotifs[id]) { delete readNotifs[id]; saveReadNotifs(); }
         } else if (type === 'all_posts') {
             localStorage.setItem('salink_posts', JSON.stringify([]));
         } else if (type === 'all_emergencies') {
             localStorage.setItem('salink_emergencies', JSON.stringify([]));
         }
+
+        // ✅ 2. Hapus di Google Sheets via API
         try {
-            await smartFetch(API_URL, {
+            await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'delete_content', data: { type, id, userId: currentUser?.username || '' }, timestamp: Date.now() })
-            }, 0);
-        } catch(e) {}
+                body: JSON.stringify({
+                    action: 'delete_content',
+                    data: { type, id, userId: currentUser?.username || '' },
+                    timestamp: Date.now()
+                })
+            });
+        } catch(e) { console.warn('⚠️ API delete failed (offline mode OK):', e); }
+
+        // ✅ 3. Broadcast ke semua tab
         broadcastSync(type === 'post' ? 'delete_post' : 'delete_emergency', { id });
+
+        // ✅ 4. Update UI di halaman ini
         posts = loadPostsFromStorage();
         renderPosts();
         renderHologram();
@@ -1343,17 +1261,21 @@ async function confirmDeleteNow() {
         updateNotifBadge();
         updateAllCharts();
         updateStatsCards();
+
         showToast('✅ Dihapus', 'Data berhasil dihapus dari semua halaman', 'fa-check-circle', 'success');
     } catch(e) {
+        console.error('❌ Delete error:', e);
         showToast('⚠️ Gagal', 'Tidak dapat menghapus data', 'fa-exclamation-triangle', 'error');
     }
     hideSyncIndicator();
 }
 
+// ✅ v4.0: STATISTIK REAL-TIME (Hybrid)
 function calculateRealStatistics() {
     const allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
     const allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
     const activeEms = allEms.filter(e => (e.expiresAt || (new Date(e.timestamp).getTime() + EMERGENCY_DURATION)) > Date.now());
+    
     let totalLikes = 0, totalViewers = 0;
     allPosts.forEach(p => {
         try {
@@ -1362,17 +1284,33 @@ function calculateRealStatistics() {
         } catch(e) {}
         totalViewers += parseInt(p.viewerCount || 0, 10) || 0;
     });
+
     const byType = { fire: 0, medical: 0, crime: 0, disaster: 0 };
     allPosts.forEach(p => {
-        if (p.isSpecial && p.specialType && byType.hasOwnProperty(p.specialType)) byType[p.specialType]++;
+        if (p.isSpecial && p.specialType && byType.hasOwnProperty(p.specialType)) {
+            byType[p.specialType]++;
+        }
     });
-    return { totalPosts: allPosts.length, totalEmergencies: allEms.length, activeEmergencies: activeEms.length, totalLikes, totalViewers, byType };
+
+    return {
+        totalPosts: allPosts.length,
+        totalEmergencies: allEms.length,
+        activeEmergencies: activeEms.length,
+        totalLikes: totalLikes,
+        totalViewers: totalViewers,
+        byType: byType
+    };
 }
 
+// ====================================================================
+// IDLE TIMER
+// ====================================================================
 function resetIdleTimer() {
     isIdleStandby = false;
     if (idleTimer) clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => { isIdleStandby = true; }, IDLE_THRESHOLD_MS);
+    idleTimer = setTimeout(() => {
+        isIdleStandby = true;
+    }, IDLE_THRESHOLD_MS);
 }
 function setupIdleDetection() {
     ['mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'visibilitychange'].forEach(evt => {
@@ -1383,6 +1321,7 @@ function setupIdleDetection() {
     resetIdleTimer();
 }
 
+// STORAGE HELPERS
 function loadReadNotifs() {
     try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); } catch(e) { readNotifs = {}; }
 }
@@ -1395,7 +1334,8 @@ function loadDismissed() {
     let cleaned = false;
     Object.keys(dismissedEmergencies).forEach(id => {
         if (now - dismissedEmergencies[id] > EMERGENCY_DURATION) {
-            delete dismissedEmergencies[id]; cleaned = true;
+            delete dismissedEmergencies[id];
+            cleaned = true;
         }
     });
     if (cleaned) saveDismissed();
@@ -1403,13 +1343,16 @@ function loadDismissed() {
 function saveDismissed() {
     try { localStorage.setItem('salink_dismissed_emergencies', JSON.stringify(dismissedEmergencies)); } catch(e) {}
 }
-function isDismissed(emergencyId) { return dismissedEmergencies[emergencyId] !== undefined; }
+function isDismissed(emergencyId) {
+    return dismissedEmergencies[emergencyId] !== undefined;
+}
 function dismissEmergency(emergencyId) {
     if (!emergencyId) return;
     dismissedEmergencies[emergencyId] = Date.now();
     saveDismissed();
 }
 
+// SPLIT FUNCTION
 function getAllEmergencies() {
     try { return JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) { return []; }
 }
@@ -1421,6 +1364,7 @@ function getActiveEmergencies() {
     });
 }
 
+// ADAPTERS
 function adaptEmergency(em) {
     const ts = em.timestamp ? new Date(em.timestamp).getTime() : Date.now();
     const coords = (em.latitude && em.longitude) ? `${em.latitude}, ${em.longitude}` : '';
@@ -1432,7 +1376,7 @@ function adaptEmergency(em) {
         address: em.address || em.description || '',
         text: em.description || em.title || '',
         mapsURL: em.mapsURL || '', mapEmbedURL: em.mapEmbedURL || '',
-        coords, latitude: em.latitude || '', longitude: em.longitude || '',
+        coords: coords, latitude: em.latitude || '', longitude: em.longitude || '',
         timestamp: ts, expiresAt: ts + EMERGENCY_DURATION,
         province: em.province || '', city: em.city || '', district: em.district || '', village: em.village || '',
         status: em.status || 'active',
@@ -1472,10 +1416,13 @@ function adaptNotification(n) {
     };
 }
 
+// PWA
 function setupPWA() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
+            navigator.serviceWorker.register('./sw.js', { scope: './' })
+                .then(() => console.log('✅ PWA: SW registered'))
+                .catch(err => console.warn('⚠️ PWA: SW gagal:', err.message));
         });
     }
     window.addEventListener('beforeinstallprompt', (e) => {
@@ -1509,17 +1456,16 @@ function showInstallPrompt() {
     }
 }
 
+// API CALL
 async function apiCall(action, data = {}) {
     try {
         if (action.startsWith('get_')) {
             const params = new URLSearchParams({ action, ...data, timestamp: Date.now() });
-            const response = await smartFetch(API_URL + '?' + params.toString(), {
-                method: 'GET', headers: { 'Accept': 'application/json' }
-            });
+            const response = await fetch(API_URL + '?' + params.toString(), { method: 'GET', headers: { 'Accept': 'application/json' }, cache: 'no-store' });
             if (!response.ok) throw new Error('HTTP ' + response.status);
             return await response.json();
         } else {
-            const response = await smartFetch(API_URL, {
+            const response = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({ action, data, timestamp: Date.now() })
@@ -1528,6 +1474,7 @@ async function apiCall(action, data = {}) {
             return await response.json();
         }
     } catch (error) {
+        console.error('❌ API Error:', error);
         return { status: 'error', message: error.message };
     }
 }
@@ -1573,11 +1520,11 @@ async function apiSaveEmergency(emergencyData) {
 async function incrementViewerCount(postId) {
     if (!postId) return;
     try {
-        const response = await smartFetch(API_URL, {
+        const response = await fetch(API_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-            body: JSON.stringify({ action: 'increment_viewer', data: { postId } })
-        }, 0);
+            body: JSON.stringify({ action: 'increment_viewer', data: { postId: postId } })
+        });
         const result = await response.json();
         if (result && result.status === 'success') {
             const post = posts.find(p => p.id === postId);
@@ -1590,6 +1537,7 @@ async function incrementViewerCount(postId) {
     } catch (error) {}
 }
 
+// HELPERS
 function formatDate(ts) {
     const d = new Date(ts);
     const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
@@ -1620,6 +1568,7 @@ function escapeAttr(str) {
     return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// EMERGENCY STORAGE
 function saveEmergencyToStorage(data) {
     let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
     data.savedAt = Date.now();
@@ -1634,44 +1583,27 @@ function getActiveEmergencyCountByType() {
     return c;
 }
 
+// AUDIO
 function playRegularSound() {
-    try {
-        const cached = audioCache['regular'];
-        if (cached) {
-            cached.currentTime = 0;
-            cached.play().catch(() => { new Audio(REGULAR_SOUND_URL).play().catch(() => {}); });
-        } else {
-            new Audio(REGULAR_SOUND_URL).play().catch(() => {});
-        }
-    } catch(e) {}
+    try { new Audio(REGULAR_SOUND_URL).play().catch(() => {}); } catch(e) {}
 }
 function playEmergencyLoop(type) {
     try {
-        const cached = audioCache[type];
-        if (!cached) {
-            const url = EMERGENCY_AUDIO[type];
-            if (!url) return null;
-            stopEmergencyLoop();
-            const audio = new Audio(url);
-            audio.volume = 1.0;
-            audio.loop = true;
-            emergencyAudioLoop = audio;
-            audio.play().catch(err => {});
-            setTimeout(() => { if (emergencyAudioLoop === audio) stopEmergencyLoop(); }, EMERGENCY_AUDIO_MAX_MS);
-            return audio;
-        }
+        const url = EMERGENCY_AUDIO[type];
+        if (!url) return null;
         stopEmergencyLoop();
-        cached.currentTime = 0;
-        cached.loop = true;
-        emergencyAudioLoop = cached;
-        cached.play().catch(err => {});
-        setTimeout(() => { if (emergencyAudioLoop === cached) stopEmergencyLoop(); }, EMERGENCY_AUDIO_MAX_MS);
-        return cached;
+        const audio = new Audio(url);
+        audio.volume = 1.0;
+        audio.loop = true;
+        emergencyAudioLoop = audio;
+        audio.play().catch(err => {});
+        setTimeout(() => { if (emergencyAudioLoop === audio) stopEmergencyLoop(); }, EMERGENCY_AUDIO_MAX_MS);
+        return audio;
     } catch(e) { return null; }
 }
 function stopEmergencyLoop() {
     if (emergencyAudioLoop) {
-        try { emergencyAudioLoop.pause(); emergencyAudioLoop.currentTime = 0; emergencyAudioLoop.loop = false; } catch(e) {}
+        try { emergencyAudioLoop.pause(); emergencyAudioLoop.currentTime = 0; } catch(e) {}
         emergencyAudioLoop = null;
     }
 }
@@ -1702,6 +1634,7 @@ function stopButtonLoop() {
     if (navigator.vibrate) navigator.vibrate(0);
 }
 
+// EMERGENCY OVERLAY
 function showEmergencyOverlay(em) {
     const overlay = document.getElementById('emergencyOverlay');
     if (!overlay || overlay.classList.contains('active')) return;
@@ -1720,7 +1653,9 @@ function showEmergencyOverlay(em) {
     document.getElementById('emergencyCoords').textContent = em.coords ? `📏 ${em.coords}` : '';
     document.getElementById('emergencyTime').textContent = `🕐 ${formatDate(em.timestamp)}`;
     document.getElementById('emergencyBadge').textContent = `🚨 ${label}`;
-    document.getElementById('emergencyViewBtn').onclick = () => { window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(em.id); };
+    document.getElementById('emergencyViewBtn').onclick = () => {
+        window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(em.id);
+    };
     document.getElementById('emergencyDismissBtn').onclick = () => dismissEmergencyOverlay(true);
     overlay.classList.add('active');
     document.body.style.overflow = 'hidden';
@@ -1799,6 +1734,7 @@ function setupEmergencySwipe() {
     });
 }
 
+// DETECT NEW EMERGENCY
 function detectNewEmergencyNotifications(notifs) {
     if (!notifs || notifs.length === 0) return null;
     const lastCheck = parseInt(localStorage.getItem('salink_last_emergency_check') || '0');
@@ -1864,6 +1800,22 @@ function triggerEmergencyFromNotification(notif) {
     }
 }
 
+// POLLING
+function startEmergencyPolling() {
+    if (emergencyPollTimer) clearInterval(emergencyPollTimer);
+    emergencyPollTimer = setInterval(async () => {
+        if (document.getElementById('emergencyOverlay')?.classList.contains('active')) return;
+        try {
+            const notifs = await apiGetNotifications();
+            if (notifs && notifs.length > 0) {
+                notifications = notifs;
+                const newEmergency = detectNewEmergencyNotifications(notifications);
+                if (newEmergency) triggerEmergencyFromNotification(newEmergency);
+                updateNotifBadge();
+            }
+        } catch(e) {}
+    }, EMERGENCY_POLL_INTERVAL);
+}
 function startEmergencyCleanup() {
     setInterval(() => {
         renderHologram();
@@ -1871,6 +1823,7 @@ function startEmergencyCleanup() {
     }, EMERGENCY_CLEANUP_INTERVAL);
 }
 
+// ANIMATE EMERGENCY BUTTON
 function animateEmergencyButton(type) {
     const btnMap = { 'fire': 'fireBtn', 'medical': 'medicalBtn', 'crime': 'securityBtn', 'disaster': 'disasterBtn' };
     const btn = document.getElementById(btnMap[type]);
@@ -1885,6 +1838,7 @@ function stopEmergencyButtonAnimation() {
     stopButtonLoop();
 }
 
+// FLOATING NOTIFICATION
 function showFloatingNotification(type, title, message, subtitle, actionText, actionCallback) {
     const notif = document.getElementById('floatingNotification');
     const icon = document.getElementById('floatingIcon');
@@ -1920,6 +1874,7 @@ function hideFloatingNotification() {
     clearTimeout(floatingNotificationTimeout);
 }
 
+// TOAST
 function showToast(title, message, icon = 'fa-info-circle', type = 'info') {
     document.querySelectorAll('.toast').forEach(t => t.remove());
     const container = document.getElementById('toastContainer');
@@ -1939,6 +1894,7 @@ function showToast(title, message, icon = 'fa-info-circle', type = 'info') {
     setTimeout(() => { toast.classList.remove('active'); setTimeout(() => toast.remove(), 400); }, 5000);
 }
 
+// BADGES
 function updateEmergencyBadges() {
     const counts = getActiveEmergencyCountByType();
     const map = { 'fire': 'fireBadge', 'medical': 'medicalBadge', 'crime': 'crimeBadge', 'disaster': 'disasterBadge' };
@@ -1979,6 +1935,7 @@ function updateInviteBadge() {
     }
 }
 
+// HOLOGRAM
 function renderHologram() {
     const list = document.getElementById('hologramList');
     if (!list) return;
@@ -2036,6 +1993,7 @@ function openEmergencyDetail(id) {
     window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(id);
 }
 
+// POSTS
 function renderPosts() {
     const feed = document.getElementById('postFeed');
     if (!feed) return;
@@ -2119,6 +2077,7 @@ function renderPosts() {
     renderPostsStats();
 }
 
+// ✅ v4.0: Render Stats dengan tombol hapus
 function renderPostsStats() {
     const container = document.getElementById('postsList');
     if (!container) return;
@@ -2295,6 +2254,7 @@ function sharePost(postId) {
     else navigator.clipboard.writeText(text + '\n' + url).then(() => showToast('📋', 'Link disalin', 'fa-copy'));
 }
 
+// CREATE POST
 async function createPost(text, mediaFile, isSpecial, specialData) {
     if (isPreviewMode) { showPreviewOverlay(); return; }
     if (!currentUser) { redirectToLogin(); return; }
@@ -2410,6 +2370,7 @@ function triggerEmergencyVisual(em) {
     showToast(`🚨 ${EMERGENCY_LABELS[type]}`, `${em.sender} melaporkan darurat!`, 'fa-exclamation-triangle');
 }
 
+// POST INPUT
 function setupPostInput() {
     const select = document.getElementById('postTypeSelect');
     const specialFields = document.getElementById('postSpecialFields');
@@ -2537,6 +2498,7 @@ function validatePost() {
     } else btn.disabled = !(text || hasFile);
 }
 
+// NOTIF MODAL
 function getAllNotifications() {
     const list = [];
     getActiveEmergencies().forEach(em => {
@@ -2648,6 +2610,8 @@ function goToLocation(location) {
     window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`, '_blank');
 }
 
+// INVITE MODAL
+let sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}');
 function openInviteModal() {
     if (isPreviewMode) { showPreviewOverlay(); return; }
     openModal('inviteModal');
@@ -2723,6 +2687,7 @@ async function sendInvite(username, btnEl) {
     }
 }
 
+// CHARTS
 function getChartColors() {
     const isDark = currentTheme === 'dark';
     return { text: isDark ? '#e6edf3' : '#1a1a2e', grid: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)', fire: '#f85149', medical: '#4fc3f7', security: '#f0d080', disaster: '#c792ea' };
@@ -2773,31 +2738,44 @@ function initAllCharts() {
     const values = [data.fire, data.medical, data.crime, data.disaster];
     const bgColors = [colors.fire, colors.medical, colors.security, colors.disaster];
     const pieCtx = document.getElementById('pieChart');
-    if (pieCtx && !chartInstances.pie) chartInstances.pie = new Chart(pieCtx, { type: 'pie', data: { labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#fff', borderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } } });
+    if (pieCtx && !chartInstances.pie) {
+        chartInstances.pie = new Chart(pieCtx, { type: 'pie', data: { labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#fff', borderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } } });
+    }
     const barCtx = document.getElementById('barChart');
-    if (barCtx && !chartInstances.bar) chartInstances.bar = new Chart(barCtx, { type: 'bar', data: { labels, datasets: [{ label: 'Jumlah Kejadian', data: values, backgroundColor: bgColors, borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } } });
+    if (barCtx && !chartInstances.bar) {
+        chartInstances.bar = new Chart(barCtx, { type: 'bar', data: { labels, datasets: [{ label: 'Jumlah Kejadian', data: values, backgroundColor: bgColors, borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } } });
+    }
     const weekly = getWeeklyChartData();
     const lineCtx = document.getElementById('lineChart');
-    if (lineCtx && !chartInstances.line) chartInstances.line = new Chart(lineCtx, { type: 'line', data: { labels: weekly.labels, datasets: [
-        { label: '🔥 Kebakaran', data: weekly.fire, borderColor: colors.fire, backgroundColor: colors.fire + '20', tension: 0.4 },
-        { label: '🚑 Medis', data: weekly.medical, borderColor: colors.medical, backgroundColor: colors.medical + '20', tension: 0.4 },
-        { label: '🚓 Kriminal', data: weekly.crime, borderColor: colors.security, backgroundColor: colors.security + '20', tension: 0.4 },
-        { label: '🌪️ Bencana', data: weekly.disaster, borderColor: colors.disaster, backgroundColor: colors.disaster + '20', tension: 0.4 }
-    ] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } } });
+    if (lineCtx && !chartInstances.line) {
+        chartInstances.line = new Chart(lineCtx, { type: 'line', data: { labels: weekly.labels, datasets: [
+            { label: '🔥 Kebakaran', data: weekly.fire, borderColor: colors.fire, backgroundColor: colors.fire + '20', tension: 0.4 },
+            { label: '🚑 Medis', data: weekly.medical, borderColor: colors.medical, backgroundColor: colors.medical + '20', tension: 0.4 },
+            { label: '🚓 Kriminal', data: weekly.crime, borderColor: colors.security, backgroundColor: colors.security + '20', tension: 0.4 },
+            { label: '🌪️ Bencana', data: weekly.disaster, borderColor: colors.disaster, backgroundColor: colors.disaster + '20', tension: 0.4 }
+        ] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } } });
+    }
     const areaCtx = document.getElementById('areaChart');
-    if (areaCtx && !chartInstances.area) chartInstances.area = new Chart(areaCtx, { type: 'line', data: { labels: weekly.labels, datasets: [
-        { label: '🔥 Kebakaran', data: weekly.fire, borderColor: colors.fire, backgroundColor: colors.fire + '40', tension: 0.4, fill: true },
-        { label: '🚑 Medis', data: weekly.medical, borderColor: colors.medical, backgroundColor: colors.medical + '40', tension: 0.4, fill: true },
-        { label: '🚓 Kriminal', data: weekly.crime, borderColor: colors.security, backgroundColor: colors.security + '40', tension: 0.4, fill: true },
-        { label: '🌪️ Bencana', data: weekly.disaster, borderColor: colors.disaster, backgroundColor: colors.disaster + '40', tension: 0.4, fill: true }
-    ] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, stacked: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } } });
+    if (areaCtx && !chartInstances.area) {
+        chartInstances.area = new Chart(areaCtx, { type: 'line', data: { labels: weekly.labels, datasets: [
+            { label: '🔥 Kebakaran', data: weekly.fire, borderColor: colors.fire, backgroundColor: colors.fire + '40', tension: 0.4, fill: true },
+            { label: '🚑 Medis', data: weekly.medical, borderColor: colors.medical, backgroundColor: colors.medical + '40', tension: 0.4, fill: true },
+            { label: '🚓 Kriminal', data: weekly.crime, borderColor: colors.security, backgroundColor: colors.security + '40', tension: 0.4, fill: true },
+            { label: '🌪️ Bencana', data: weekly.disaster, borderColor: colors.disaster, backgroundColor: colors.disaster + '40', tension: 0.4, fill: true }
+        ] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, stacked: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } } });
+    }
     const doughnutCtx = document.getElementById('doughnutChart');
-    if (doughnutCtx && !chartInstances.doughnut) chartInstances.doughnut = new Chart(doughnutCtx, { type: 'doughnut', data: { labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#fff', borderWidth: 3, hoverOffset: 10 }] }, options: { responsive: true, maintainAspectRatio: true, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } } });
+    if (doughnutCtx && !chartInstances.doughnut) {
+        chartInstances.doughnut = new Chart(doughnutCtx, { type: 'doughnut', data: { labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#fff', borderWidth: 3, hoverOffset: 10 }] }, options: { responsive: true, maintainAspectRatio: true, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } } });
+    }
 }
 function switchChart(type) {
     document.querySelectorAll('.chart-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.chart === type));
     const map = { pie: 'pieChartContainer', bar: 'barChartContainer', line: 'lineChartContainer', area: 'areaChartContainer', doughnut: 'doughnutChartContainer', gauge: 'gaugeChartContainer', heatmap: 'heatmapChartContainer', map: 'mapChartContainer' };
-    Object.keys(map).forEach(k => { const el = document.getElementById(map[k]); if (el) el.classList.toggle('active', k === type); });
+    Object.keys(map).forEach(k => {
+        const el = document.getElementById(map[k]);
+        if (el) el.classList.toggle('active', k === type);
+    });
     setTimeout(() => {
         const chart = chartInstances[type];
         if (chart) chart.resize();
@@ -2813,20 +2791,37 @@ function updateAllCharts() {
     if (chartInstances.pie) { chartInstances.pie.data.datasets[0].data = values; chartInstances.pie.update(); }
     if (chartInstances.bar) { chartInstances.bar.data.datasets[0].data = values; chartInstances.bar.update(); }
     if (chartInstances.doughnut) { chartInstances.doughnut.data.datasets[0].data = values; chartInstances.doughnut.update(); }
-    updateLineAreaCharts(); updateGaugeChart(); updateHeatmap();
+    updateLineAreaCharts();
+    updateGaugeChart();
+    updateHeatmap();
 }
 function updateLineAreaCharts() {
     const weekly = getWeeklyChartData();
-    if (chartInstances.line) { chartInstances.line.data.labels = weekly.labels; chartInstances.line.data.datasets[0].data = weekly.fire; chartInstances.line.data.datasets[1].data = weekly.medical; chartInstances.line.data.datasets[2].data = weekly.crime; chartInstances.line.data.datasets[3].data = weekly.disaster; chartInstances.line.update(); }
-    if (chartInstances.area) { chartInstances.area.data.labels = weekly.labels; chartInstances.area.data.datasets[0].data = weekly.fire; chartInstances.area.data.datasets[1].data = weekly.medical; chartInstances.area.data.datasets[2].data = weekly.crime; chartInstances.area.data.datasets[3].data = weekly.disaster; chartInstances.area.update(); }
+    if (chartInstances.line) {
+        chartInstances.line.data.labels = weekly.labels;
+        chartInstances.line.data.datasets[0].data = weekly.fire;
+        chartInstances.line.data.datasets[1].data = weekly.medical;
+        chartInstances.line.data.datasets[2].data = weekly.crime;
+        chartInstances.line.data.datasets[3].data = weekly.disaster;
+        chartInstances.line.update();
+    }
+    if (chartInstances.area) {
+        chartInstances.area.data.labels = weekly.labels;
+        chartInstances.area.data.datasets[0].data = weekly.fire;
+        chartInstances.area.data.datasets[1].data = weekly.medical;
+        chartInstances.area.data.datasets[2].data = weekly.crime;
+        chartInstances.area.data.datasets[3].data = weekly.disaster;
+        chartInstances.area.update();
+    }
 }
 let gaugeTicksDrawn = false;
 function updateGaugeChart() {
+    let rate = 0;
     const realStats = calculateRealStatistics();
     const total = realStats.totalEmergencies;
     const active = realStats.activeEmergencies;
     const resolved = total - active;
-    let rate = total > 0 ? Math.round((resolved / total) * 100) : 0;
+    rate = total > 0 ? Math.round((resolved / total) * 100) : 0;
     rate = Math.max(0, Math.min(100, rate));
     const ticksGroup = document.getElementById('gaugeModernTicks');
     if (ticksGroup && !gaugeTicksDrawn) {
@@ -2837,19 +2832,28 @@ function updateGaugeChart() {
             const isMajor = i % 2 === 0;
             const r1 = isMajor ? 95 : 100;
             const r2 = 108;
-            const x1 = 160 + r1 * Math.cos(rad); const y1 = 180 + r1 * Math.sin(rad);
-            const x2 = 160 + r2 * Math.cos(rad); const y2 = 180 + r2 * Math.sin(rad);
+            const x1 = 160 + r1 * Math.cos(rad);
+            const y1 = 180 + r1 * Math.sin(rad);
+            const x2 = 160 + r2 * Math.cos(rad);
+            const y2 = 180 + r2 * Math.sin(rad);
             ticksHTML += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="rgba(230,237,243,${isMajor ? 0.9 : 0.4})" stroke-width="${isMajor ? 3 : 1.5}" stroke-linecap="round"/>`;
             if (i % 2 === 0) {
                 const rLabel = 78;
-                const xL = 160 + rLabel * Math.cos(rad); const yL = 180 + rLabel * Math.sin(rad);
+                const xL = 160 + rLabel * Math.cos(rad);
+                const yL = 180 + rLabel * Math.sin(rad);
                 ticksHTML += `<text x="${xL.toFixed(1)}" y="${(yL + 4).toFixed(1)}" text-anchor="middle" fill="var(--text-secondary)" font-size="11" font-weight="600" font-family="Inter, sans-serif">${i * 10}</text>`;
             }
         }
-        ticksGroup.innerHTML = ticksHTML; gaugeTicksDrawn = true;
+        ticksGroup.innerHTML = ticksHTML;
+        gaugeTicksDrawn = true;
     }
     const arc = document.getElementById('gaugeModernArc');
-    if (arc) { const totalArcLength = Math.PI * 120; const progressLength = (rate / 100) * totalArcLength; arc.setAttribute('stroke-dasharray', `${progressLength} ${totalArcLength}`); arc.setAttribute('stroke-dashoffset', '0'); }
+    if (arc) {
+        const totalArcLength = Math.PI * 120;
+        const progressLength = (rate / 100) * totalArcLength;
+        arc.setAttribute('stroke-dasharray', `${progressLength} ${totalArcLength}`);
+        arc.setAttribute('stroke-dashoffset', '0');
+    }
     const needle = document.getElementById('gaugeModernNeedle');
     if (needle) needle.style.transform = `rotate(${-90 + (rate * 1.8)}deg)`;
     const valueEl = document.getElementById('gaugeModernValue');
@@ -2870,7 +2874,12 @@ function updateHeatmap() {
         const cell = document.createElement('div');
         const val = totals[i];
         let level = 'none';
-        if (val > 0) { const ratio = val / maxTotal; if (ratio > 0.7) level = 'high'; else if (ratio > 0.3) level = 'medium'; else level = 'low'; }
+        if (val > 0) {
+            const ratio = val / maxTotal;
+            if (ratio > 0.7) level = 'high';
+            else if (ratio > 0.3) level = 'medium';
+            else level = 'low';
+        }
         cell.className = `heatmap-cell ${level}`;
         cell.textContent = val > 0 ? val : '·';
         cell.title = `${label}: ${val} kejadian`;
@@ -2883,10 +2892,14 @@ function updateMap() {
     else if (f) {
         const ems = getActiveEmergencies();
         const withCoords = ems.find(e => e.coords && e.coords.includes(','));
-        if (withCoords) { const [lat, lng] = withCoords.coords.split(',').map(s => s.trim()); f.src = `https://www.google.com/maps?q=${lat},${lng}&output=embed`; }
+        if (withCoords) {
+            const [lat, lng] = withCoords.coords.split(',').map(s => s.trim());
+            f.src = `https://www.google.com/maps?q=${lat},${lng}&output=embed`;
+        }
     }
 }
 
+// EMERGENCY BUTTON
 function handleEmergencyClick(e) {
     e.preventDefault(); e.stopPropagation();
     const btn = e.currentTarget;
@@ -2894,7 +2907,8 @@ function handleEmergencyClick(e) {
     if (isPreviewMode) { showPreviewOverlay(); return; }
     if (!currentUser) { redirectToLogin(); return; }
     if (buttonLoopAudio) {
-        stopButtonLoop(); stopEmergencyButtonAnimation();
+        stopButtonLoop();
+        stopEmergencyButtonAnimation();
         const counts = getActiveEmergencyCountByType();
         const st = btn.querySelector('.play-status');
         if (st) st.textContent = counts[type] > 0 ? `🔔 ${counts[type]} Notifikasi` : '▶ Tap untuk Alarm';
@@ -2927,8 +2941,10 @@ function handleEmergencyClick(e) {
     if (!url) return;
     stopEmergencyLoop();
     const audio = new Audio(url);
-    audio.volume = 1.0; audio.loop = false;
-    activeEmergencyAudio = audio; activeEmergencyBtn = btn;
+    audio.volume = 1.0;
+    audio.loop = false;
+    activeEmergencyAudio = audio;
+    activeEmergencyBtn = btn;
     audio.play().then(() => {
         btn.classList.add('playing');
         const st = btn.querySelector('.play-status');
@@ -2950,6 +2966,7 @@ function setupChartNavigation() {
     });
 }
 
+// USER & PREVIEW
 function loadUser() {
     const s = localStorage.getItem('salink_user');
     if (s) {
@@ -3011,14 +3028,20 @@ function redirectToLogin() { window.location.href = LOGIN_URL + '?redirect=' + e
 function applyPreviewMode() {
     if (isPreviewMode) {
         document.getElementById('previewBadge')?.classList.add('active');
-        ['postInput','postSpecialText','postMapLink','postLocationAddress'].forEach(id => { const el = document.getElementById(id); if (el) el.readOnly = true; });
+        const pi = document.getElementById('postInput'); if (pi) pi.readOnly = true;
+        const pst = document.getElementById('postSpecialText'); if (pst) pst.readOnly = true;
+        const pml = document.getElementById('postMapLink'); if (pml) pml.readOnly = true;
+        const pla = document.getElementById('postLocationAddress'); if (pla) pla.readOnly = true;
         const mu = document.getElementById('mediaUpload'); if (mu) mu.disabled = true;
         const ps = document.getElementById('postSubmit'); if (ps) ps.disabled = true;
         const pts = document.getElementById('postTypeSelect'); if (pts) pts.disabled = true;
         document.querySelectorAll('.emergency-btn').forEach(b => b.style.opacity = '0.7');
     } else {
         document.getElementById('previewBadge')?.classList.remove('active');
-        ['postInput','postSpecialText','postMapLink','postLocationAddress'].forEach(id => { const el = document.getElementById(id); if (el) el.readOnly = false; });
+        const pi = document.getElementById('postInput'); if (pi) pi.readOnly = false;
+        const pst = document.getElementById('postSpecialText'); if (pst) pst.readOnly = false;
+        const pml = document.getElementById('postMapLink'); if (pml) pml.readOnly = false;
+        const pla = document.getElementById('postLocationAddress'); if (pla) pla.readOnly = false;
         const mu = document.getElementById('mediaUpload'); if (mu) mu.disabled = false;
         const pts = document.getElementById('postTypeSelect'); if (pts) pts.disabled = false;
         document.querySelectorAll('.emergency-btn').forEach(b => b.style.opacity = '1');
@@ -3050,22 +3073,32 @@ function setupLoginGuard() {
     }, true);
 }
 
+// LOAD DATA
 async function loadData() {
     const results = await Promise.allSettled([
         apiGetPosts(), apiGetEmergencies(), apiGetNotifications(), apiGetStatistics(), apiGetUsers()
     ]);
     let localPosts = [];
     let apiPosts = [];
-    try { const raw = localStorage.getItem('salink_posts'); if (raw) { const parsed = JSON.parse(raw); if (Array.isArray(parsed)) localPosts = parsed; } } catch(e) { localPosts = []; }
+    try {
+        const raw = localStorage.getItem('salink_posts');
+        if (raw) { const parsed = JSON.parse(raw); if (Array.isArray(parsed)) localPosts = parsed; }
+    } catch(e) { localPosts = []; }
     if (results[0].status === 'fulfilled' && results[0].value) apiPosts = results[0].value;
     const postMap = new Map();
     apiPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
     localPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
     posts = Array.from(postMap.values())
-        .filter(p => { if (!p || !p.id || !p.userId || !p.userFullName) return false; const hasText = p.text && p.text.trim() !== ''; const hasMedia = p.mediaData && p.mediaData !== ''; return hasText || hasMedia; })
+        .filter(p => {
+            if (!p || !p.id || !p.userId || !p.userFullName) return false;
+            const hasText = p.text && p.text.trim() !== '';
+            const hasMedia = p.mediaData && p.mediaData !== '';
+            return hasText || hasMedia;
+        })
         .sort((a, b) => b.timestamp - a.timestamp);
     localStorage.setItem('salink_posts', JSON.stringify(posts));
-    let localEms = []; try { localEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) { localEms = []; }
+    let localEms = [];
+    try { localEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) { localEms = []; }
     let apiEms = [];
     if (results[1].status === 'fulfilled' && results[1].value) apiEms = results[1].value;
     const emMap = new Map();
@@ -3075,13 +3108,18 @@ async function loadData() {
     if (results[2].status === 'fulfilled' && results[2].value) {
         notifications = results[2].value;
         const newEmergency = detectNewEmergencyNotifications(notifications);
-        if (newEmergency) setTimeout(() => triggerEmergencyFromNotification(newEmergency), 500);
+        if (newEmergency) setTimeout(() => triggerEmergencyFromNotification(newEmergency), 1500);
     }
     if (results[3].status === 'fulfilled' && results[3].value) statistics = results[3].value;
     else statistics = null;
     if (results[4].status === 'fulfilled' && results[4].value) allUsers = results[4].value;
-    renderPosts(); renderHologram(); updateEmergencyBadges(); updateNotifBadge();
-    updateInviteBadge(); updateAllCharts(); updateStatsCards();
+    renderPosts();
+    renderHologram();
+    updateEmergencyBadges();
+    updateNotifBadge();
+    updateInviteBadge();
+    updateAllCharts();
+    updateStatsCards();
 }
 function updateStatsCards() {
     const realStats = calculateRealStatistics();
@@ -3100,6 +3138,7 @@ function updateStatsCards() {
     const sr = document.getElementById('statResponse'); if (sr) sr.textContent = responseRate + '%';
 }
 
+// THEME
 function loadTheme() {
     const t = localStorage.getItem('salink_theme');
     if (t === 'light') {
@@ -3130,6 +3169,7 @@ function toggleTheme() {
     updateAllCharts();
 }
 
+// SIDEBAR & MODAL
 function openSidebar() { document.getElementById('sidebar')?.classList.add('active'); document.getElementById('sidebarOverlay')?.classList.add('active'); }
 function closeSidebar() { document.getElementById('sidebar')?.classList.remove('active'); document.getElementById('sidebarOverlay')?.classList.remove('active'); }
 function openProfileUser(username) {
@@ -3140,6 +3180,7 @@ function openProfileUser(username) {
 function openModal(id) { document.getElementById(id)?.classList.add('active'); document.body.style.overflow = 'hidden'; }
 function closeModal(id) { document.getElementById(id)?.classList.remove('active'); document.body.style.overflow = ''; }
 
+// SEARCH
 function openSearchModal() {
     if (isPreviewMode) { showPreviewOverlay(); return; }
     openModal('searchModal');
@@ -3172,7 +3213,9 @@ function renderSearchDefaultView() {
     let html = '';
     if (recentSearches.length > 0) {
         html += `<div class="search-section-title"><span>🕐 Pencarian Terakhir</span><button onclick="clearRecentSearches()" style="background:none;border:none;color:var(--accent-red);font-size:0.6rem;cursor:pointer;"><i class="fas fa-trash"></i> Hapus</button></div>`;
-        html += recentSearches.slice(0, 5).map(q => `<div class="recent-search-item" onclick="applySearchQuery('${escapeAttr(q)}')"><i class="fas fa-history recent-icon"></i><span class="recent-text">${escapeHTML(q)}</span><button class="recent-remove" onclick="event.stopPropagation();removeRecentSearch('${escapeAttr(q)}')"><i class="fas fa-times"></i></button></div>`).join('');
+        html += recentSearches.slice(0, 5).map(q => `
+            <div class="recent-search-item" onclick="applySearchQuery('${escapeAttr(q)}')"><i class="fas fa-history recent-icon"></i><span class="recent-text">${escapeHTML(q)}</span><button class="recent-remove" onclick="event.stopPropagation();removeRecentSearch('${escapeAttr(q)}')"><i class="fas fa-times"></i></button></div>
+        `).join('');
     }
     const trending = getTrendingPosts();
     if (trending.length > 0) {
@@ -3274,14 +3317,19 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 }
 function performSearch(query) {
     const q = query.trim().toLowerCase();
-    if (!q) { document.getElementById('searchActiveResults').style.display = 'none'; document.getElementById('searchDefaultView').style.display = 'block'; return; }
+    if (!q) {
+        document.getElementById('searchActiveResults').style.display = 'none';
+        document.getElementById('searchDefaultView').style.display = 'block';
+        return;
+    }
     document.getElementById('searchDefaultView').style.display = 'none';
     document.getElementById('searchActiveResults').style.display = 'block';
     document.getElementById('clearSearchBtn')?.classList.add('visible');
     const users = searchUsers(q);
     const matchedPosts = searchPosts(q);
     const matchedEm = searchEmergencies(q);
-    let html = ''; let totalCount = 0;
+    let html = '';
+    let totalCount = 0;
     const showUsers = (searchTab === 'all' || searchTab === 'users');
     const showPosts = (searchTab === 'all' || searchTab === 'posts');
     const showEm = (searchTab === 'all' || searchTab === 'emergency');
@@ -3371,6 +3419,7 @@ function setupSearchInput() {
     input.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeSearchModal(); });
 }
 
+// URL PARAMS
 function checkURLParams() {
     const params = new URLSearchParams(window.location.search);
     const userParam = params.get('user');
@@ -3393,6 +3442,20 @@ function checkURLParams() {
     }
 }
 
+// VISIBILITY
+function setupVisibilityDetection() {
+    document.addEventListener('visibilitychange', () => {
+        const isNowActive = !document.hidden;
+        if (!isNowActive) {
+            isIdleStandby = true;
+            const ems = getActiveEmergencies();
+            const undismissed = ems.find(e => !isDismissed(e.id) && !readNotifs[e.id]);
+            if (undismissed && !activeOverlayEmergency) showEmergencyOverlay(undismissed);
+        } else { resetIdleTimer(); }
+    });
+}
+
+// BOTTOM NAV
 function initBottomNav() {
     document.querySelectorAll('.nav-item-bottom').forEach(item => {
         item.addEventListener('click', function(e) {
@@ -3410,12 +3473,10 @@ function initBottomNav() {
     });
 }
 
+// INIT
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 SALINK Dashboard v4.1 — INSTANT DELIVERY');
-    console.log('⚡ Polling: 3s INSTANT');
-    console.log('🔊 Preload: ALL emergency audio');
-
-    preloadAllAudio();
+    console.log('🚀 SALINK Dashboard v4.0 Initializing...');
+    console.log('✅ NEW v4.0: Central Sync, Cross-Tab BroadcastChannel, Hybrid Statistics');
 
     setupPWA();
     checkURLParams();
@@ -3427,7 +3488,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateUserUI();
     setupLoginGuard();
     setupIdleDetection();
-    setupInstantVisibility();
 
     lastNotifCheck = parseInt(localStorage.getItem('salink_last_emergency_check') || '0');
     const savedLat = localStorage.getItem('salink_user_lat');
@@ -3467,6 +3527,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     setupChartNavigation();
     initBottomNav();
     setupPostInput();
+    setupVisibilityDetection();
     setupSearchInput();
 
     document.addEventListener('keydown', function(e) {
@@ -3474,16 +3535,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (e.key === 'Escape') { if (document.getElementById('searchModal')?.classList.contains('active')) closeSearchModal(); }
     });
 
+    // ✅ v4.0: Storage event listener (cross-tab fallback)
     window.addEventListener('storage', function(e) {
         if (e.key === 'salink_sync_trigger') {
-            try { const data = JSON.parse(e.newValue); if (data && data.type) handleSyncMessage(data); } catch(err) {}
+            try {
+                const data = JSON.parse(e.newValue);
+                if (data && data.type) handleSyncMessage(data);
+            } catch(err) {}
         }
         if (e.key === 'salink_user') { loadUser(); updateUserUI(); }
         if (e.key === 'salink_theme') loadTheme();
         if (e.key === 'salink_posts' || e.key === 'salink_emergencies') {
+            // Reload data & render
             posts = loadPostsFromStorage();
-            renderPosts(); renderHologram(); updateEmergencyBadges();
-            updateNotifBadge(); updateAllCharts(); updateStatsCards();
+            renderPosts();
+            renderHologram();
+            updateEmergencyBadges();
+            updateNotifBadge();
+            updateAllCharts();
+            updateStatsCards();
         }
     });
 
@@ -3499,17 +3569,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     setInterval(() => {
         updateNotifBadge();
         if (document.getElementById('notifModal')?.classList.contains('active')) renderNotifList();
-    }, 5000);
+    }, 15000);
 
-    console.log('✅ SALINK Dashboard v4.1 Ready! — INSTANT MODE');
+    console.log('✅ SALINK Dashboard v4.0 Ready!');
 });
 
+// EXPOSE GLOBAL
 window.openProfileUser = openProfileUser;
+window.deleteEmergencyById = (id) => requestDelete('emergency', id, 'Emergency');
 window.requestDelete = requestDelete;
 window.confirmDeleteNow = confirmDeleteNow;
 window.closeDeleteConfirm = closeDeleteConfirm;
 window.toggleLike = toggleLike;
 window.deleteComment = deleteComment;
+window.deletePost = (id) => requestDelete('post', id, 'Postingan');
 window.sharePost = sharePost;
 window.closeModal = closeModal;
 window.openModal = openModal;
