@@ -1828,14 +1828,34 @@
                 console.log('📥 Register result:', result);
 
                 if (result.sukses) {
-                    Storage.setSession(result.pengguna || userData);
-                    showMessage('✅ ' + result.pesan + '<br><small>Mengalihkan ke dashboard...</small>', 'success');
+    Storage.setSession(result.pengguna || userData);
+    showMessage('✅ ' + result.pesan + '<br><small>Mengalihkan ke dashboard...</small>', 'success');
 
-                    var redirectUrl = getRedirectUrl();
-                    setTimeout(function() {
-                        window.location.href = redirectUrl;
-                    }, 1200);
-                } else {
+    // ✅ Init FCM setelah register
+    (async function() {
+        try {
+            if (typeof SalinkFCM !== 'undefined' && SalinkFCM.init) {
+                const initResult = await SalinkFCM.init();
+                if (initResult && initResult.ok) {
+                    const user = result.pengguna || userData;
+                    await SalinkFCM.saveToken({
+                        userId: user.id || user.username,
+                        username: user.username,
+                        email: user.email
+                    });
+                    console.log('✅ [FCM] Token tersimpan setelah register');
+                }
+            }
+        } catch (err) {
+            console.warn('⚠️ [FCM] Error:', err);
+        }
+    })();
+
+    var redirectUrl = getRedirectUrl();
+    setTimeout(function() {
+        window.location.href = redirectUrl;
+    }, 1200);
+} else {
                     showMessage('❌ ' + result.pesan, 'error');
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fas fa-user-plus"></i> Daftar Sekarang';
