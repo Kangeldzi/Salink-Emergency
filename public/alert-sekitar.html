@@ -16,6 +16,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
+    <!-- ✅ v4.0: SalinkEmergency.js — Dual mode emergency alert (standby + aktif) -->
+    <script src="/salink-emergency.js" defer></script>
+
     <style>
         :root {
             --bg-primary: #0d1117;
@@ -97,11 +100,7 @@
         @keyframes toastIn { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         @keyframes toastOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(30px); opacity: 0; } }
         @keyframes notifPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.3); } }
-        @keyframes emergencyIconPulse { 0%, 100% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.1) rotate(-5deg); } }
-        @keyframes emergencyOverlayPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.03); } }
-        @keyframes swipeArrow { 0%, 100% { transform: translateY(0); opacity: 0.5; } 50% { transform: translateY(-10px); opacity: 1; } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
-        @keyframes flash { 0%, 100% { background-color: rgba(0,0,0,0.98); } 50% { background-color: rgba(40,0,0,0.98); } }
 
         /* HEADER */
         .app-bar {
@@ -541,122 +540,10 @@
         .preview-badge .login-link { color: var(--accent-blue); font-weight: 600; cursor: pointer; text-decoration: underline; }
         .preview-badge.active { display: block; }
 
-        /* EMERGENCY OVERLAY v3.0 */
-        .emergency-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.98); z-index: 99999;
-            display: none; align-items: center; justify-content: center;
-            flex-direction: column; padding: 30px 20px; touch-action: none;
-            overflow: hidden;
-        }
-        .emergency-overlay.active { display: flex; animation: flash 1.5s ease-in-out infinite; }
-        .emergency-overlay .emergency-icon { font-size: 5.5rem; margin-bottom: 16px; animation: emergencyIconPulse 1s ease-in-out infinite; }
-        .emergency-overlay .emergency-icon.fire { color: var(--accent-red); }
-        .emergency-overlay .emergency-icon.medical { color: #4fc3f7; }
-        .emergency-overlay .emergency-icon.crime { color: var(--accent-gold); }
-        .emergency-overlay .emergency-icon.disaster { color: var(--accent-purple); }
-        .emergency-overlay .emergency-title {
-            font-size: 2.2rem; font-weight: 700; text-align: center;
-            text-shadow: 0 0 40px currentColor; margin-bottom: 8px;
-            animation: emergencyOverlayPulse 1.5s ease-in-out infinite;
-        }
-        .emergency-overlay .emergency-title.fire { color: var(--accent-red); }
-        .emergency-overlay .emergency-title.medical { color: #4fc3f7; }
-        .emergency-overlay .emergency-title.crime { color: var(--accent-gold); }
-        .emergency-overlay .emergency-title.disaster { color: var(--accent-purple); }
-        .emergency-overlay .emergency-subtitle,
-        .emergency-overlay .emergency-sender,
-        .emergency-overlay .emergency-location,
-        .emergency-overlay .emergency-address,
-        .emergency-overlay .emergency-coords,
-        .emergency-overlay .emergency-time {
-            font-size: 0.85rem; color: var(--text-secondary);
-            text-align: center; margin-bottom: 4px;
-        }
-        .emergency-overlay .emergency-sender strong { color: #fff; font-weight: 700; }
-        .emergency-overlay .emergency-actions {
-            display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; justify-content: center;
-        }
-        .emergency-overlay .emergency-actions button {
-            padding: 12px 24px; border-radius: 12px; border: none;
-            font-size: 0.85rem; font-weight: 700; cursor: pointer;
-            display: flex; align-items: center; gap: 8px; transition: all 0.3s;
-            font-family: inherit; -webkit-tap-highlight-color: transparent;
-            min-width: 140px; justify-content: center;
-        }
-        .emergency-overlay .emergency-actions .btn-view { background: var(--accent-blue-gradient); color: #fff; }
-        .emergency-overlay .emergency-actions .btn-view:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(88,166,255,0.4); }
-        .emergency-overlay .emergency-actions .btn-dismiss { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-color); }
-        .emergency-overlay .emergency-actions .btn-dismiss:hover { border-color: var(--accent-blue); }
-        .emergency-overlay .emergency-swipe {
-            position: absolute; bottom: 40px; left: 50%;
-            transform: translateX(-50%); color: var(--text-muted);
-            font-size: 0.7rem; display: flex; flex-direction: column;
-            align-items: center; gap: 12px; padding: 16px 28px;
-            background: rgba(255, 255, 255, 0.05); border-radius: 16px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            pointer-events: none; min-width: 220px;
-        }
-        .emergency-overlay .emergency-swipe i { font-size: 2rem; animation: swipeArrow 1.5s ease-in-out infinite; }
-        .emergency-overlay .emergency-badge {
-            position: absolute; top: 20px; right: 20px;
-            font-size: 0.55rem; padding: 4px 14px; border-radius: 20px;
-            background: rgba(248, 81, 73, 0.2); color: var(--accent-red);
-            border: 1px solid rgba(248, 81, 73, 0.2);
-            animation: alarmPulse 1s ease-in-out infinite; font-weight: 700;
-        }
-        .emergency-overlay .countdown {
-            position: absolute; top: 20px; left: 20px;
-            font-size: 0.6rem; padding: 4px 14px; border-radius: 20px;
-            background: rgba(240, 208, 128, 0.15); color: var(--accent-gold);
-            border: 1px solid rgba(240, 208, 128, 0.2); font-weight: 700;
-        }
-        .emergency-overlay .audio-indicator {
-            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-            display: flex; align-items: center; gap: 6px;
-            font-size: 0.65rem; color: var(--accent-red); font-weight: 700;
-            animation: notifPulse 1s ease-in-out infinite;
-        }
-
         .shake-element { animation: shake 0.3s ease; }
-
-        @media (max-width: 480px) {
-            .emergency-overlay .emergency-icon { font-size: 4rem; }
-            .emergency-overlay .emergency-title { font-size: 1.6rem; }
-            .emergency-overlay .emergency-swipe { bottom: 30px; padding: 12px 20px; min-width: 160px; }
-            .emergency-overlay .emergency-actions { margin-top: 16px; }
-            .emergency-overlay .emergency-actions button { padding: 10px 20px; font-size: 0.8rem; min-width: 120px; }
-        }
     </style>
 </head>
 <body>
-
-    <!-- EMERGENCY OVERLAY v3.0 -->
-    <div class="emergency-overlay" id="emergencyOverlay">
-        <div class="countdown" id="emergencyCountdown">60s</div>
-        <div class="emergency-badge" id="emergencyBadge">🚨 LIVE EMERGENCY</div>
-        <div class="audio-indicator" id="audioIndicator"><i class="fas fa-volume-up"></i> Alarm Aktif</div>
-        <div class="emergency-icon fire" id="emergencyIcon">🔥</div>
-        <div class="emergency-title fire" id="emergencyTitle">KEBAKARAN</div>
-        <div class="emergency-subtitle" id="emergencySubtitle">⚠️ Darurat! Segera ambil tindakan</div>
-        <div class="emergency-sender" id="emergencySender"></div>
-        <div class="emergency-location" id="emergencyLocation"></div>
-        <div class="emergency-address" id="emergencyAddress"></div>
-        <div class="emergency-coords" id="emergencyCoords"></div>
-        <div class="emergency-time" id="emergencyTime"></div>
-        <div class="emergency-actions">
-            <button class="btn-view" id="emergencyViewBtn" type="button">
-                <i class="fas fa-eye"></i> Lihat Detail
-            </button>
-            <button class="btn-dismiss" id="emergencyDismissBtn" type="button">
-                <i class="fas fa-check"></i> Saya Mengerti
-            </button>
-        </div>
-        <div class="emergency-swipe" id="emergencySwipe">
-            <i class="fas fa-chevron-up"></i>
-            <span>Geser atau klik untuk matikan alarm</span>
-        </div>
-    </div>
 
     <!-- PREVIEW OVERLAY -->
     <div class="preview-overlay" id="previewOverlay">
@@ -839,15 +726,14 @@
 
     <script>
 /* ====================================================================
- * SALINK ALERT SEKITAR v3.0 - FINAL REWRITE
- * Backend: code.gs V2.5.1
- *
- * FITUR BARU v3.0:
- * ✅ Dismiss tracker (salink_dismissed_emergencies)
- * ✅ Polling emergency 15 detik dengan dismiss check
- * ✅ Auto-cleanup dismissed > 24 jam
- * ✅ Emergency overlay + loop sound + vibrate (pertahankan)
- * ✅ Semua fitur lama (GPS, filter, summary, alert cards)
+ * SALINK ALERT SEKITAR v4.0 — REFACTORED
+ * ====================================================================
+ * PERUBAHAN v4.0:
+ * ✅ Emergency alert system di-handle oleh /salink-emergency.js
+ *    (dual mode: standby full-screen + aktif floating)
+ * ✅ Legacy emergency overlay + polling DIHAPUS (konflik)
+ * ✅ Fokus halaman ini: GPS, filter, summary, alert cards
+ * ✅ Fix typo alert-sekaritar.html → alert-sekitar.html
  * ==================================================================== */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
@@ -857,25 +743,11 @@ const PROFILE_URL = 'profil.html';
 const DETAIL_URL = 'detail-emergency.html';
 const RADIUS_KM = 5;
 const EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
-const EMERGENCY_AUDIO_MAX_MS = 60000;
-const EMERGENCY_AUTO_DISMISS_MS = 60000;
-const EMERGENCY_VIBRATE_INTERVAL_MS = 3000;
-const EMERGENCY_POLL_INTERVAL = 15000; // ✅ v3.0
-const AUTO_REFRESH = 60000;
-
 const EMERGENCY_LABELS = { 'fire': '🔥 Kebakaran', 'medical': '🚑 Medis & Kematian', 'crime': '🚓 Kriminal', 'disaster': '🌪️ Bencana Alam' };
 const EMERGENCY_ICONS = { 'fire': '🔥', 'medical': '🚑', 'crime': '🚓', 'disaster': '🌪️' };
 const EMERGENCY_CLASSES = { 'fire': 'fire', 'medical': 'medical', 'crime': 'security', 'disaster': 'disaster' };
-const EMERGENCY_AUDIO = {
-    'fire': 'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/Kebakaran.mp3',
-    'medical': 'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/kematian.mp3',
-    'crime': 'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/pencurian.mp3',
-    'disaster': 'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/bencana_tsunami.mp3'
-};
 
-// ====================================================================
 // STATE
-// ====================================================================
 let currentUser = null;
 let isPreviewMode = true;
 let currentTheme = 'dark';
@@ -886,56 +758,6 @@ let filteredEmergencies = [];
 let currentFilter = '';
 let isSidebarOpen = false;
 let isLoading = false;
-let deferredPrompt = null;
-
-let readNotifs = {};
-let dismissedEmergencies = {};
-
-// Emergency overlay state
-let activeOverlayEmergency = null;
-let emergencyCountdownTimer = null;
-let emergencyVibrateInterval = null;
-let emergencyAudioLoop = null;
-let emergencyOverlayTimeout = null;
-let emergencyPollTimer = null;
-let isSwiping = false;
-let touchStartX = 0, touchStartY = 0, touchEndX = 0, touchEndY = 0;
-let lastNotifCheck = 0;
-
-// ====================================================================
-// STORAGE HELPERS
-// ====================================================================
-function loadReadNotifs() {
-    try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); } catch(e) { readNotifs = {}; }
-}
-function saveReadNotifs() {
-    try { localStorage.setItem('salink_read_notifs', JSON.stringify(readNotifs)); } catch(e) {}
-}
-
-// ✅ v3.0: DISMISS TRACKER
-function loadDismissed() {
-    try { dismissedEmergencies = JSON.parse(localStorage.getItem('salink_dismissed_emergencies') || '{}'); } catch(e) { dismissedEmergencies = {}; }
-    const now = Date.now();
-    let cleaned = false;
-    Object.keys(dismissedEmergencies).forEach(id => {
-        if (now - dismissedEmergencies[id] > EMERGENCY_DURATION) {
-            delete dismissedEmergencies[id];
-            cleaned = true;
-        }
-    });
-    if (cleaned) saveDismissed();
-}
-function saveDismissed() {
-    try { localStorage.setItem('salink_dismissed_emergencies', JSON.stringify(dismissedEmergencies)); } catch(e) {}
-}
-function isDismissed(emergencyId) {
-    return dismissedEmergencies[emergencyId] !== undefined;
-}
-function dismissEmergency(emergencyId) {
-    if (!emergencyId) return;
-    dismissedEmergencies[emergencyId] = Date.now();
-    saveDismissed();
-}
 
 // ====================================================================
 // HELPERS
@@ -967,12 +789,6 @@ function getTimeAgo(timestamp) {
     if (hours < 24) return `${hours} jam lalu`;
     if (days < 7) return `${days} hari lalu`;
     return new Date(timestamp).toLocaleDateString('id-ID');
-}
-function formatDate(ts) {
-    const d = new Date(ts);
-    const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
-    const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-    return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} • ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
 
 // ====================================================================
@@ -1036,28 +852,6 @@ function toggleTheme() {
 }
 
 // ====================================================================
-// PWA
-// ====================================================================
-function setupPWA() {
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js', { scope: './' })
-                .then(() => console.log('✅ PWA: SW registered'))
-                .catch(err => console.warn('⚠️ PWA: SW gagal:', err.message));
-        });
-    }
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-    });
-    window.addEventListener('appinstalled', () => {
-        localStorage.setItem('salink_installed', 'true');
-        deferredPrompt = null;
-        showToast('🎉 Selamat!', 'Aplikasi SALINK berhasil diinstall!', 'fa-rocket');
-    });
-}
-
-// ====================================================================
 // PREVIEW MODE
 // ====================================================================
 function showPreviewOverlay() {
@@ -1070,7 +864,8 @@ function hidePreviewOverlay() {
     if (o) { o.classList.remove('active'); document.body.style.overflow = ''; }
 }
 function redirectToLogin() {
-    window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent('alert-sekaritar.html');
+    // ✅ v4.0: FIX TYPO — alert-sekitar.html
+    window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent('alert-sekitar.html');
 }
 function applyPreviewMode() {
     if (isPreviewMode) {
@@ -1230,7 +1025,7 @@ async function loadEmergencies() {
         let localEms = [];
         try {
             localEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-            localEms = localEms.filter(e => e.expiresAt > Date.now());
+            localEms = localEms.filter(e => (e.expiresAt || 0) > Date.now());
         } catch(e) {}
 
         const response = await fetch(API_URL + '?action=get_emergencies&timestamp=' + Date.now(), {
@@ -1239,7 +1034,6 @@ async function loadEmergencies() {
         const result = await response.json();
         const apiEms = (result.status === 'success' && Array.isArray(result.data)) ? result.data : [];
 
-        // Merge + dedup
         const emMap = new Map();
         apiEms.forEach(e => {
             if (e && e.id) {
@@ -1351,7 +1145,7 @@ function renderAlerts(alerts) {
                 📤 Dilaporkan oleh: 
                 <span class="sender-name" onclick="event.stopPropagation();openProfileUser('${escapeAttr(alert.senderUsername || sender)}')">${escapeHTML(sender)}</span>
             </div>
-            ${distance ? `<div class="alert-distance"><i class="fas fa-route"></i> Jarak: ${distance}</div>` : ''}
+            ${distance !== 'Tidak diketahui' ? `<div class="alert-distance"><i class="fas fa-route"></i> Jarak: ${distance}</div>` : ''}
             <div class="alert-status ${status === 'active' ? 'active' : 'resolved'}">
                 ${status === 'active' ? '🟢 AKTIF' : '✅ SELESAI'}
             </div>
@@ -1404,7 +1198,7 @@ function openProfileUser(username) {
 function handleLogout() {
     if (confirm('Apakah Anda yakin ingin keluar?')) {
         currentUser = null;
-        ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies','salink_last_emergency_check'].forEach(k => localStorage.removeItem(k));
+        ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies','salink_last_emergency_check','salink_last_emergency_check_alert'].forEach(k => localStorage.removeItem(k));
         updateUserUI();
         updateSidebar();
         showToast('👋 Logout Berhasil', 'Anda telah keluar dari akun', 'fa-sign-out-alt');
@@ -1413,292 +1207,15 @@ function handleLogout() {
 }
 
 // ====================================================================
-// AUDIO
-// ====================================================================
-function playEmergencyLoop(type) {
-    try {
-        const url = EMERGENCY_AUDIO[type];
-        if (!url) return null;
-        stopEmergencyLoop();
-        const audio = new Audio(url);
-        audio.volume = 1.0;
-        audio.loop = true;
-        emergencyAudioLoop = audio;
-        audio.play().then(() => console.log('🔊 Emergency loop playing:', type)).catch(err => console.warn('⚠️ Audio fail:', err));
-        setTimeout(() => { if (emergencyAudioLoop === audio) stopEmergencyLoop(); }, EMERGENCY_AUDIO_MAX_MS);
-        return audio;
-    } catch(e) { return null; }
-}
-function stopEmergencyLoop() {
-    if (emergencyAudioLoop) {
-        try { emergencyAudioLoop.pause(); emergencyAudioLoop.currentTime = 0; } catch(e) {}
-        emergencyAudioLoop = null;
-    }
-}
-
-// ====================================================================
-// EMERGENCY OVERLAY v3.0
-// ====================================================================
-function showEmergencyOverlay(em) {
-    const overlay = document.getElementById('emergencyOverlay');
-    if (!overlay || overlay.classList.contains('active')) return;
-    if (isDismissed(em.id)) {
-        console.log('⏭️ Skip overlay — already dismissed:', em.id);
-        return;
-    }
-
-    const type = em.type || 'fire';
-    const icon = EMERGENCY_ICONS[type] || '🚨';
-    const label = EMERGENCY_LABELS[type] || 'DARURAT';
-    const cssClass = EMERGENCY_CLASSES[type] || 'fire';
-
-    document.getElementById('emergencyIcon').textContent = icon;
-    document.getElementById('emergencyIcon').className = `emergency-icon ${cssClass}`;
-    document.getElementById('emergencyTitle').textContent = label.replace(/^[^\s]+\s/, '');
-    document.getElementById('emergencyTitle').className = `emergency-title ${cssClass}`;
-    document.getElementById('emergencySender').innerHTML = `📤 Dilaporkan oleh: <strong>${escapeHTML(em.sender || 'Sistem')}</strong>`;
-    document.getElementById('emergencyLocation').textContent = `📍 ${em.location || '-'}`;
-    document.getElementById('emergencyAddress').textContent = em.address ? `📌 ${em.address}` : '';
-    document.getElementById('emergencyCoords').textContent = em.coords ? `📏 ${em.coords}` : '';
-    document.getElementById('emergencyTime').textContent = `🕐 ${formatDate(em.timestamp || Date.now())}`;
-    document.getElementById('emergencyBadge').textContent = `🚨 ${label}`;
-
-    const viewBtn = document.getElementById('emergencyViewBtn');
-    viewBtn.onclick = () => { window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(em.id); };
-    const dismissBtn = document.getElementById('emergencyDismissBtn');
-    dismissBtn.onclick = () => dismissEmergencyOverlay(true);
-
-    overlay.classList.add('active');
-    document.body.style.overflow = 'hidden';
-    activeOverlayEmergency = em;
-    overlay.dataset.emergencyId = em.id || '';
-
-    playEmergencyLoop(type);
-
-    if (navigator.vibrate) {
-        navigator.vibrate([300, 100, 300, 100, 300, 100, 500]);
-        emergencyVibrateInterval = setInterval(() => {
-            if (activeOverlayEmergency) navigator.vibrate([300, 100, 300, 100, 300, 100, 500]);
-        }, EMERGENCY_VIBRATE_INTERVAL_MS);
-    }
-
-    let remaining = Math.floor(EMERGENCY_AUTO_DISMISS_MS / 1000);
-    const countdownEl = document.getElementById('emergencyCountdown');
-    countdownEl.textContent = remaining + 's';
-    clearInterval(emergencyCountdownTimer);
-    emergencyCountdownTimer = setInterval(() => {
-        remaining--;
-        countdownEl.textContent = remaining + 's';
-        if (remaining <= 0) {
-            clearInterval(emergencyCountdownTimer);
-            dismissEmergencyOverlay(false);
-        }
-    }, 1000);
-
-    clearTimeout(emergencyOverlayTimeout);
-    emergencyOverlayTimeout = setTimeout(() => dismissEmergencyOverlay(false), EMERGENCY_AUTO_DISMISS_MS);
-
-    setupEmergencySwipe();
-
-    if (em.id) {
-        readNotifs[em.id] = true;
-        saveReadNotifs();
-    }
-}
-function dismissEmergencyOverlay(userAction) {
-    const overlay = document.getElementById('emergencyOverlay');
-    if (overlay) {
-        const emergencyId = overlay.dataset.emergencyId;
-        if (emergencyId) {
-            dismissEmergency(emergencyId);
-            console.log('✅ Dismissed:', emergencyId);
-        }
-        overlay.classList.remove('active');
-        overlay.dataset.emergencyId = '';
-    }
-    document.body.style.overflow = '';
-    clearTimeout(emergencyOverlayTimeout);
-    clearInterval(emergencyCountdownTimer);
-    clearInterval(emergencyVibrateInterval);
-    stopEmergencyLoop();
-    activeOverlayEmergency = null;
-
-    if (userAction) {
-        showToast('✅ Alarm Dimatikan', 'Anda telah mengonfirmasi notifikasi darurat', 'fa-check-circle');
-    }
-}
-function setupEmergencySwipe() {
-    const overlay = document.getElementById('emergencyOverlay');
-    if (!overlay || overlay._swipeSetup) return;
-    overlay._swipeSetup = true;
-    overlay.addEventListener('touchstart', (e) => {
-        const t = e.touches[0];
-        touchStartX = t.clientX; touchStartY = t.clientY; isSwiping = false;
-    }, { passive: true });
-    overlay.addEventListener('touchmove', (e) => {
-        if (!touchStartX || !touchStartY) return;
-        const t = e.touches[0];
-        touchEndX = t.clientX; touchEndY = t.clientY;
-        if (Math.abs(touchEndX - touchStartX) > 10 || Math.abs(touchEndY - touchStartY) > 10) isSwiping = true;
-    }, { passive: true });
-    overlay.addEventListener('touchend', () => {
-        if (!isSwiping) return;
-        const dx = touchEndX - touchStartX, dy = touchEndY - touchStartY;
-        if (Math.sqrt(dx*dx + dy*dy) > 50) {
-            if (navigator.vibrate) navigator.vibrate(100);
-            dismissEmergencyOverlay(true);
-        }
-        touchStartX = 0; touchStartY = 0; touchEndX = 0; touchEndY = 0; isSwiping = false;
-    }, { passive: true });
-    let md = false, mx = 0, my = 0;
-    overlay.addEventListener('mousedown', (e) => { md = true; mx = e.clientX; my = e.clientY; });
-    overlay.addEventListener('mouseup', (e) => {
-        if (!md) return;
-        md = false;
-        const dx = e.clientX - mx, dy = e.clientY - my;
-        if (Math.sqrt(dx*dx + dy*dy) > 50) dismissEmergencyOverlay(true);
-    });
-}
-
-// ====================================================================
-// ✅ v3.0: DETECT NEW EMERGENCY (dengan dismiss check)
-// ====================================================================
-async function apiGetNotifications() {
-    try {
-        const response = await fetch(API_URL + '?action=get_notifications&timestamp=' + Date.now(), {
-            method: 'GET', headers: { 'Accept': 'application/json' }, cache: 'no-store'
-        });
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        const result = await response.json();
-        if (result.status === 'success' && Array.isArray(result.data)) {
-            return result.data.map(n => ({
-                id: n.id || 'notif-' + Date.now(),
-                type: n.type || 'info',
-                title: n.title || 'Notifikasi',
-                message: n.message || n.text || '',
-                sender: n.sender || 'Sistem',
-                senderUsername: n.senderUsername || '',
-                link: n.link || '', postId: n.postId || '',
-                timestamp: n.timestamp ? new Date(n.timestamp).getTime() : Date.now(),
-                read: n.read === 'TRUE' || n.read === true || n.read === 'true',
-                soundKey: n.soundKey || ''
-            }));
-        }
-        return [];
-    } catch (e) {
-        console.warn('⚠️ apiGetNotifications error:', e.message);
-        return [];
-    }
-}
-
-function detectNewEmergencyNotifications(notifs) {
-    if (!notifs || notifs.length === 0) return null;
-
-    const lastCheck = parseInt(localStorage.getItem('salink_last_emergency_check_alert') || '0');
-    const now = Date.now();
-
-    const newEmergencyNotifs = notifs.filter(n => {
-        const isEmergencyType = ['fire', 'medical', 'crime', 'disaster'].includes(n.type);
-        if (!isEmergencyType) return false;
-        if (readNotifs[n.id]) return false;
-        if (isDismissed(n.id)) return false;  // ✅ v3.0
-        const ts = n.timestamp || 0;
-        return ts > lastCheck;
-    });
-
-    if (newEmergencyNotifs.length === 0) {
-        localStorage.setItem('salink_last_emergency_check_alert', String(now));
-        return null;
-    }
-
-    newEmergencyNotifs.sort((a, b) => b.timestamp - a.timestamp);
-    const latest = newEmergencyNotifs[0];
-
-    if (currentUser && latest.senderUsername === currentUser.username) {
-        console.log('ℹ️ Skip own emergency notification');
-        readNotifs[latest.id] = true;
-        saveReadNotifs();
-        localStorage.setItem('salink_last_emergency_check_alert', String(now));
-        return null;
-    }
-
-    localStorage.setItem('salink_last_emergency_check_alert', String(now));
-    return latest;
-}
-
-function triggerEmergencyFromNotification(notif) {
-    console.log('🚨 Trigger emergency:', notif);
-    if (isDismissed(notif.id)) {
-        console.log('⏭️ Skip — already dismissed:', notif.id);
-        return;
-    }
-
-    const em = {
-        id: notif.id,
-        type: notif.type,
-        sender: notif.sender || 'User',
-        senderUsername: notif.senderUsername || '',
-        location: notif.message || 'Lokasi tidak diketahui',
-        address: notif.message || '',
-        text: notif.message || '',
-        mapsURL: '', coords: '',
-        timestamp: notif.timestamp,
-        expiresAt: notif.timestamp + EMERGENCY_DURATION
-    };
-
-    let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-    const exists = ems.find(e => e.id === em.id);
-    if (!exists) {
-        ems.unshift(em);
-        ems = ems.filter(e => e.expiresAt > Date.now());
-        try { localStorage.setItem('salink_emergencies', JSON.stringify(ems)); } catch(e) {}
-    }
-
-    showEmergencyOverlay(em);
-}
-
-// ====================================================================
-// ✅ v3.0: POLLING EMERGENCY (15 detik)
-// ====================================================================
-function startEmergencyPolling() {
-    if (emergencyPollTimer) clearInterval(emergencyPollTimer);
-    emergencyPollTimer = setInterval(async () => {
-        if (document.getElementById('emergencyOverlay')?.classList.contains('active')) return;
-        if (document.hidden) return;
-
-        try {
-            const notifs = await apiGetNotifications();
-            if (notifs && notifs.length > 0) {
-                const newEmergency = detectNewEmergencyNotifications(notifs);
-                if (newEmergency) {
-                    console.log('🚨 Polling: new emergency detected:', newEmergency.type);
-                    triggerEmergencyFromNotification(newEmergency);
-                }
-            }
-            // Refresh data emergency untuk alert list
-            if (userLat && userLng && !isLoading) loadEmergencies();
-        } catch(e) {
-            console.warn('⚠️ Polling error:', e.message);
-        }
-    }, EMERGENCY_POLL_INTERVAL);
-    console.log('✅ Emergency polling started (15s interval)');
-}
-
-// ====================================================================
 // INIT
 // ====================================================================
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 SALINK Alert Sekitar v3.0 Initializing...');
-    console.log('✅ Dismiss tracker + Polling 15s');
+    console.log('🚀 SALINK Alert Sekitar v4.0 Initializing...');
+    console.log('✅ SalinkEmergency.js handles dual mode alert');
 
-    setupPWA();
     loadTheme();
-    loadReadNotifs();
-    loadDismissed();
     loadCurrentUser();
     setupLoginGuard();
-
-    lastNotifCheck = parseInt(localStorage.getItem('salink_last_emergency_check_alert') || '0');
 
     // Load lokasi tersimpan
     const savedLat = localStorage.getItem('salink_user_lat');
@@ -1745,12 +1262,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.key === 'salink_emergencies' && userLat && userLng) loadEmergencies();
     });
 
-    // ✅ v3.0: Start polling emergency
-    startEmergencyPolling();
-
     if (isPreviewMode) setTimeout(() => showPreviewOverlay(), 1200);
 
-    console.log('✅ Alert Sekitar v3.0 Ready!');
+    console.log('✅ Alert Sekitar v4.0 Ready!');
     console.log('👤 Mode:', isPreviewMode ? 'PREVIEW' : 'FULL');
 });
 
@@ -1760,73 +1274,82 @@ window.getMyLocation = getMyLocation;
 window.refreshAlerts = refreshAlerts;
 window.setEmergencyFilter = setEmergencyFilter;
 window.openProfileUser = openProfileUser;
-</script>
+    </script>
 
-<!-- ============================================================ -->
-<!-- SALINK FCM INTEGRATION                                        -->
-<!-- ============================================================ -->
-<script src="/firebase-config.js"></script>
-<script src="/fcm-client.js"></script>
-<script>
-(function() {
-  'use strict';
+    <!-- ============================================================ -->
+    <!-- SALINK FCM INTEGRATION                                        -->
+    <!-- ============================================================ -->
+    <script src="/firebase-config.js"></script>
+    <script src="/fcm-client.js"></script>
+    <script>
+    (function() {
+      'use strict';
 
-  window.addEventListener('load', async function() {
-    const isLoggedIn = localStorage.getItem('salink_logged_in');
-    const userData = localStorage.getItem('salink_user');
+      window.addEventListener('load', async function() {
+        const isLoggedIn = localStorage.getItem('salink_logged_in');
+        const userData = localStorage.getItem('salink_user');
 
-    if (isLoggedIn !== 'true' || !userData) {
-      console.log('ℹ️ [FCM] User belum login — FCM tidak diinisialisasi');
-      return;
-    }
+        if (isLoggedIn !== 'true' || !userData) {
+          console.log('ℹ️ [FCM] User belum login — FCM tidak diinisialisasi');
+          return;
+        }
 
-    let user;
-    try {
-      user = JSON.parse(userData);
-    } catch (e) {
-      console.warn('⚠️ [FCM] Data salink_user tidak valid:', e.message);
-      return;
-    }
+        let user;
+        try {
+          user = JSON.parse(userData);
+        } catch (e) {
+          console.warn('⚠️ [FCM] Data salink_user tidak valid:', e.message);
+          return;
+        }
 
-    if (!user || !user.username) {
-      console.warn('⚠️ [FCM] salink_user tidak punya username');
-      return;
-    }
+        if (!user || !user.username) {
+          console.warn('⚠️ [FCM] salink_user tidak punya username');
+          return;
+        }
 
-    console.log('🚀 [FCM] Init untuk:', user.username, '(' + (user.fullName || '') + ')');
+        console.log('🚀 [FCM] Init untuk:', user.username, '(' + (user.fullName || '') + ')');
 
-    try {
-      if (typeof SalinkFCM === 'undefined') {
-        console.warn('⚠️ [FCM] SalinkFCM tidak tersedia — cek /fcm-client.js');
-        return;
-      }
+        try {
+          if (typeof SalinkFCM === 'undefined') {
+            console.warn('⚠️ [FCM] SalinkFCM tidak tersedia — cek /fcm-client.js');
+            return;
+          }
 
-      const initResult = await SalinkFCM.init();
-      if (!initResult.ok) {
-        console.warn('⚠️ [FCM] init gagal:', initResult.reason);
-        return;
-      }
+          const initResult = await SalinkFCM.init();
+          if (!initResult.ok) {
+            console.warn('⚠️ [FCM] init gagal:', initResult.reason);
+            return;
+          }
 
-      console.log('✅ [FCM] Siap. Token:', initResult.token.substring(0, 30) + '...');
+          console.log('✅ [FCM] Siap. Token:', initResult.token.substring(0, 30) + '...');
 
-      const saveResult = await SalinkFCM.saveToken({
-        userId: user.id,
-        username: user.username,
-        email: user.email
+          const saveResult = await SalinkFCM.saveToken({
+            userId: user.id,
+            username: user.username,
+            email: user.email
+          });
+
+          if (saveResult.ok) {
+            console.log('✅ [FCM] Token tersimpan di backend');
+          } else {
+            console.warn('⚠️ [FCM] Gagal simpan token:', saveResult);
+          }
+        } catch (err) {
+          console.error('❌ [FCM] error:', err);
+        }
       });
 
-      if (saveResult.ok) {
-        console.log('✅ [FCM] Token tersimpan di backend');
-      } else {
-        console.warn('⚠️ [FCM] Gagal simpan token:', saveResult);
-      }
-    } catch (err) {
-      console.error('❌ [FCM] error:', err);
-    }
-  });
-})();
-</script>
-<!-- ============================================================ -->
+      // Wait for SalinkEmergency to be ready
+      const checkEmergency = setInterval(() => {
+        if (typeof SalinkEmergency !== 'undefined') {
+          clearInterval(checkEmergency);
+          console.log('✅ [Emergency] SalinkEmergency ready — dual mode ACTIVE');
+        }
+      }, 100);
+      setTimeout(() => clearInterval(checkEmergency), 10000);
+    })();
+    </script>
+    <!-- ============================================================ -->
 
 </body>
 </html>
