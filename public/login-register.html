@@ -1914,5 +1914,96 @@
         console.log('📱 Universal compatibility mode');
         console.log('🔧 Foto auto-compressed to prevent 50K limit');
     </script>
+
+    <!-- ============================================================ -->
+    <!-- SALINK FCM + EMERGENCY ALERT INTEGRATION v4.3                 -->
+    <!-- ============================================================ -->
+    <script src="/firebase-config.js"></script>
+    <script src="/fcm-client.js"></script>
+    <script src="/salink-emergency.js"></script>
+    <script>
+    (function() {
+      'use strict';
+
+      // ==========================================================
+      // FCM INIT — hanya jalan kalau user sudah login
+      // ==========================================================
+      async function initFCMIfLoggedIn() {
+        const isLoggedIn = localStorage.getItem('salink_logged_in');
+        const userData = localStorage.getItem('salink_user');
+        if (isLoggedIn !== 'true' || !userData) {
+          console.log('ℹ️ [FCM] User belum login — skip');
+          return;
+        }
+
+        let user;
+        try { user = JSON.parse(userData); } catch(e) { return; }
+        if (!user || !user.username) return;
+
+        console.log('🚀 [FCM] Init untuk:', user.username);
+
+        try {
+          if (typeof SalinkFCM === 'undefined') {
+            console.warn('⚠️ [FCM] SalinkFCM tidak tersedia');
+            return;
+          }
+
+          const initResult = await SalinkFCM.init();
+          if (!initResult.ok) {
+            console.warn('⚠️ [FCM] init gagal:', initResult.reason);
+            return;
+          }
+
+          console.log('✅ [FCM] Siap. Token:', initResult.token.substring(0, 30) + '...');
+
+          const saveResult = await SalinkFCM.saveToken({
+            userId: user.id,
+            username: user.username,
+            email: user.email
+          });
+
+          if (saveResult.ok) {
+            console.log('✅ [FCM] Token tersimpan di backend');
+          } else {
+            console.warn('⚠️ [FCM] Gagal simpan token:', saveResult);
+          }
+        } catch (err) {
+          console.error('❌ [FCM] error:', err);
+        }
+      }
+
+      // ==========================================================
+      // EMERGENCY INIT — SalinkEmergency auto-init
+      // ==========================================================
+      function initEmergency() {
+        if (typeof SalinkEmergency === 'undefined') {
+          console.warn('⚠️ [Emergency] SalinkEmergency tidak tersedia');
+          return;
+        }
+        console.log('✅ [Emergency] SalinkEmergency ready — auto-init');
+      }
+
+      // ==========================================================
+      // RUN saat halaman sudah load
+      // ==========================================================
+      window.addEventListener('load', function() {
+        initFCMIfLoggedIn();
+        initEmergency();
+      });
+
+      // ==========================================================
+      // WATCH LOGIN — kalau user baru login via form,
+      // FCM langsung di-init setelah redirect
+      // ==========================================================
+      // Karena login-register.html redirect ke dashboard.html,
+      // FCM akan otomatis init di dashboard.html
+      // Disini cukup kirim log saja.
+
+      console.log('✅ [Integration] login-register.html loaded');
+
+    })();
+    </script>
+    <!-- ============================================================ -->
+
 </body>
 </html>
