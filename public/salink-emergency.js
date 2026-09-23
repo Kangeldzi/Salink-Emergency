@@ -1,0 +1,1174 @@
+/* ====================================================================
+ * SALINK EMERGENCY ALERT — UNIVERSAL CLIENT v4.3
+ * ====================================================================
+ * File ini di-include oleh 14 file HTML (kecuali dashboard.html).
+ *
+ * FITUR:
+ * ✅ Audio system (preload, play, loop tanpa batas, auto-pause)
+ * ✅ Dual mode detection (STANDBY vs AKTIF)
+ * ✅ Full screen alarm + swipe 4 arah
+ * ✅ Floating emergency + button grid berbunyi
+ * ✅ Emergency polling 15 detik
+ * ✅ Cross-tab sync (BroadcastChannel)
+ * ✅ Auto-init saat DOM ready
+ *
+ * CARA PAKAI:
+ *   <script src="/salink-emergency.js"></script>
+ *
+ * ATAU kalau butuh akses manual:
+ *   SalinkEmergency.init()
+ *   SalinkEmergency.showAlarm(emergencyObj)
+ *
+ * TIDAK AKAN KONFLIK dengan dashboard.html yang punya inline sendiri.
+ * ==================================================================== */
+
+(function() {
+    'use strict';
+
+    // ================================================================
+    // KONFIGURASI
+    // ================================================================
+    const CONFIG = {
+        API_URL: 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec',
+        POLL_INTERVAL: 15000,
+        IDLE_THRESHOLD_MS: 30000,
+        EMERGENCY_DURATION: 24 * 60 * 60 * 1000,
+        VIBRATE_INTERVAL_MS: 2000,
+        SWIPE_MIN_DISTANCE: 50,
+        AUDIO: {
+            'fire':     '/Music/Kebakaran.mp3',
+            'medical':  '/Music/kematian.mp3',
+            'crime':    '/Music/pencurian.mp3',
+            'disaster': '/Music/bencana_tsunami.mp3'
+        },
+        REGULAR_AUDIO: '/Music/smsblackber_4a537f155087133.mp3',
+        LABELS: { 'fire': '🔥 Kebakaran', 'medical': '🚑 Medis & Kematian', 'crime': '🚓 Kriminal', 'disaster': '🌪️ Bencana Alam' },
+        ICONS: { 'fire': '🔥', 'medical': '🚑', 'crime': '🚓', 'disaster': '🌪️' },
+        CSS_CLASS: { 'fire': 'fire', 'medical': 'medical', 'crime': 'crime', 'disaster': 'disaster' }
+    };
+
+    // ================================================================
+    // STATE
+    // ================================================================
+    const state = {
+        initialized: false,
+        currentUser: null,
+        readNotifs: {},
+        dismissedEmergencies: {},
+        emergencyPollTimer: null,
+        emergencyVibrateTimer: null,
+        emergencyAudioLoop: null,
+        buttonLoopAudio: null,
+        buttonLoopTimer: null,
+        buttonLoopVibrateTimer: null,
+        buttonLoopType: null,
+        idleTimer: null,
+        isIdleStandby: false,
+        fullScreenAlarmActive: false,
+        fullScreenAlarmEmergency: null,
+        fullScreenAlarmSwipe: { active: false, startX: 0, startY: 0 },
+        audioCache: {},
+        audioContext: null,
+        audioUnlocked: false,
+        lastNotifCheck: 0
+    };
+
+    // ================================================================
+    // UTILS
+    // ================================================================
+    function escapeHTML(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+    }
+    function escapeAttr(str) {
+        if (!str) return '';
+        return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+    function formatDate(ts) {
+        const d = new Date(ts);
+        const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+        const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+        return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} • ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+    function log(...args) {
+        // Uncomment kalau mau debug
+        // console.log('🚨 [SalinkEmergency]', ...args);
+    }
+    function logError(...args) {
+        console.error('❌ [SalinkEmergency]', ...args);
+    }
+
+    // ================================================================
+    // STORAGE
+    // ================================================================
+    function loadReadNotifs() {
+        try { state.readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); } catch(e) { state.readNotifs = {}; }
+    }
+    function saveReadNotifs() {
+        try { localStorage.setItem('salink_read_notifs', JSON.stringify(state.readNotifs)); } catch(e) {}
+    }
+    function loadDismissed() {
+        try { state.dismissedEmergencies = JSON.parse(localStorage.getItem('salink_dismissed_emergencies') || '{}'); } catch(e) { state.dismissedEmergencies = {}; }
+        const now = Date.now();
+        let cleaned = false;
+        Object.keys(state.dismissedEmergencies).forEach(id => {
+            if (now - state.dismissedEmergencies[id] > CONFIG.EMERGENCY_DURATION) {
+                delete state.dismissedEmergencies[id]; cleaned = true;
+            }
+        });
+        if (cleaned) saveDismissed();
+    }
+    function saveDismissed() {
+        try { localStorage.setItem('salink_dismissed_emergencies', JSON.stringify(state.dismissedEmergencies)); } catch(e) {}
+    }
+    function isDismissed(id) { return state.dismissedEmergencies[id] !== undefined; }
+    function dismissEmergency(id) {
+        if (!id) return;
+        state.dismissedEmergencies[id] = Date.now();
+        saveDismissed();
+    }
+    function getAllEmergencies() {
+        try { return JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) { return []; }
+    }
+    function getActiveEmergencies() {
+        const all = getAllEmergencies();
+        return all.filter(e => {
+            const exp = e.expiresAt || (new Date(e.timestamp).getTime() + CONFIG.EMERGENCY_DURATION);
+            return exp > Date.now();
+        });
+    }
+
+    // ================================================================
+    // AUDIO SYSTEM
+    // ================================================================
+    function unlockAudio() {
+        if (state.audioUnlocked) return;
+        try {
+            state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const buffer = state.audioContext.createBuffer(1, 1, 22050);
+            const source = state.audioContext.createBufferSource();
+            source.buffer = buffer;
+            source.connect(state.audioContext.destination);
+            source.start(0);
+            if (state.audioContext.state === 'suspended') {
+                state.audioContext.resume().catch(() => {});
+            }
+            state.audioUnlocked = true;
+            log('Audio unlocked');
+        } catch(e) { logError('Unlock failed:', e.message); }
+    }
+
+    ['click', 'touchstart', 'keydown'].forEach(evt => {
+        document.addEventListener(evt, unlockAudio, { once: true, passive: true });
+    });
+
+    function preloadAllAudio() {
+        log('Preloading audio...');
+        Object.keys(CONFIG.AUDIO).forEach(type => {
+            try {
+                const audio = new Audio();
+                audio.preload = 'auto';
+                audio.src = CONFIG.AUDIO[type];
+                audio.volume = 1.0;
+                audio.load();
+                state.audioCache[type] = audio;
+            } catch(e) { logError('Preload ' + type + ':', e.message); }
+        });
+        try {
+            const regAudio = new Audio();
+            regAudio.preload = 'auto';
+            regAudio.src = CONFIG.REGULAR_AUDIO;
+            regAudio.volume = 1.0;
+            regAudio.load();
+            state.audioCache['regular'] = regAudio;
+        } catch(e) { logError('Preload regular:', e.message); }
+        log('Audio preloaded');
+    }
+
+    function playRegularSound() {
+        try {
+            unlockAudio();
+            const cached = state.audioCache['regular'];
+            if (cached) {
+                cached.currentTime = 0;
+                cached.volume = 1.0;
+                const p = cached.play();
+                if (p !== undefined) p.catch(() => {
+                    try { new Audio(CONFIG.REGULAR_AUDIO).play().catch(() => {}); } catch(e) {}
+                });
+            } else {
+                new Audio(CONFIG.REGULAR_AUDIO).play().catch(() => {});
+            }
+        } catch(e) { logError('playRegularSound:', e.message); }
+    }
+
+    function playEmergencyLoop(type) {
+        try {
+            unlockAudio();
+            const url = CONFIG.AUDIO[type];
+            if (!url) return null;
+            stopEmergencyLoop();
+            const cached = state.audioCache[type];
+            const audio = cached || new Audio(url);
+            audio.currentTime = 0;
+            audio.volume = 1.0;
+            audio.loop = true;
+            state.emergencyAudioLoop = audio;
+            const p = audio.play();
+            if (p !== undefined) {
+                p.then(() => log('Emergency loop playing:', type))
+                 .catch(err => {
+                    logError('Emergency play failed:', err.message);
+                    try {
+                        const fb = new Audio(url);
+                        fb.volume = 1.0;
+                        fb.loop = true;
+                        state.emergencyAudioLoop = fb;
+                        fb.play().catch(() => {});
+                    } catch(e) {}
+                 });
+            }
+            return audio;
+        } catch(e) {
+            logError('playEmergencyLoop:', e.message);
+            return null;
+        }
+    }
+
+    function stopEmergencyLoop() {
+        if (state.emergencyAudioLoop) {
+            try {
+                state.emergencyAudioLoop.pause();
+                state.emergencyAudioLoop.currentTime = 0;
+                state.emergencyAudioLoop.loop = false;
+            } catch(e) {}
+            state.emergencyAudioLoop = null;
+        }
+    }
+
+    function startButtonLoop(type) {
+        stopButtonLoop();
+        const url = CONFIG.AUDIO[type];
+        if (!url) return;
+        try {
+            unlockAudio();
+            const cached = state.audioCache[type];
+            const audio = cached || new Audio(url);
+            audio.currentTime = 0;
+            audio.volume = 1.0;
+            audio.loop = true;
+            state.buttonLoopAudio = audio;
+            state.buttonLoopType = type;
+            audio.play().catch(() => {});
+            state.buttonLoopVibrateTimer = setInterval(() => {
+                if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500, 200]);
+            }, CONFIG.VIBRATE_INTERVAL_MS);
+        } catch(e) {}
+    }
+
+    function stopButtonLoop() {
+        if (state.buttonLoopAudio) {
+            try {
+                state.buttonLoopAudio.pause();
+                state.buttonLoopAudio.currentTime = 0;
+                state.buttonLoopAudio.loop = false;
+            } catch(e) {}
+            state.buttonLoopAudio = null;
+        }
+        if (state.buttonLoopTimer) { clearTimeout(state.buttonLoopTimer); state.buttonLoopTimer = null; }
+        if (state.buttonLoopVibrateTimer) { clearInterval(state.buttonLoopVibrateTimer); state.buttonLoopVibrateTimer = null; }
+        state.buttonLoopType = null;
+        if (navigator.vibrate) navigator.vibrate(0);
+    }
+
+    // Auto-pause saat tab hidden
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            if (state.emergencyAudioLoop && !state.emergencyAudioLoop.paused) {
+                try { state.emergencyAudioLoop.pause(); } catch(e) {}
+            }
+            if (state.buttonLoopAudio && !state.buttonLoopAudio.paused) {
+                try { state.buttonLoopAudio.pause(); } catch(e) {}
+            }
+        } else {
+            if (state.emergencyAudioLoop && state.emergencyAudioLoop.paused && state.fullScreenAlarmActive) {
+                try { state.emergencyAudioLoop.play().catch(() => {}); } catch(e) {}
+            }
+            if (state.buttonLoopAudio && state.buttonLoopAudio.paused && state.buttonLoopType) {
+                try { state.buttonLoopAudio.play().catch(() => {}); } catch(e) {}
+            }
+        }
+    });
+
+    // ================================================================
+    // DUAL MODE DETECTION
+    // ================================================================
+    function isStandbyMode() {
+        if (document.hidden) return true;
+        if (state.isIdleStandby) return true;
+        return false;
+    }
+
+    function resetIdleTimer() {
+        state.isIdleStandby = false;
+        if (state.idleTimer) clearTimeout(state.idleTimer);
+        state.idleTimer = setTimeout(() => { state.isIdleStandby = true; }, CONFIG.IDLE_THRESHOLD_MS);
+    }
+
+    function setupIdleDetection() {
+        ['mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'visibilitychange'].forEach(evt => {
+            document.addEventListener(evt, () => {
+                if (document.visibilityState === 'visible') resetIdleTimer();
+            }, { passive: true });
+        });
+        resetIdleTimer();
+    }
+
+    // ================================================================
+    // FULL SCREEN ALARM
+    // ================================================================
+    function ensureFullScreenAlarmDOM() {
+        if (document.getElementById('salinkFullScreenAlarm')) return;
+
+        const div = document.createElement('div');
+        div.id = 'salinkFullScreenAlarm';
+        div.className = 'salink-full-screen-alarm';
+        div.innerHTML = `
+            <div class="salink-alarm-badge">🚨 LIVE EMERGENCY</div>
+            <div class="salink-alarm-audio-indicator">
+                <i class="fas fa-volume-up"></i>
+                <span>ALARM AKTIF — Swipe untuk mematikan</span>
+            </div>
+            <div class="salink-alarm-icon-wrapper">
+                <div class="salink-alarm-icon" id="salinkAlarmIcon">🔥</div>
+            </div>
+            <div class="salink-alarm-title" id="salinkAlarmTitle">KEBAKARAN</div>
+            <div class="salink-alarm-subtitle" id="salinkAlarmSubtitle">⚠️ Darurat! Segera ambil tindakan</div>
+            <div class="salink-alarm-info">
+                <div class="salink-alarm-info-item"><i class="fas fa-user"></i><span>Dilaporkan oleh: <strong id="salinkAlarmSender">-</strong></span></div>
+                <div class="salink-alarm-info-item"><i class="fas fa-map-marker-alt"></i><span id="salinkAlarmLocation">-</span></div>
+                <div class="salink-alarm-info-item" id="salinkAlarmAddressRow" style="display:none;"><i class="fas fa-map-pin"></i><span id="salinkAlarmAddress">-</span></div>
+                <div class="salink-alarm-info-item" id="salinkAlarmCoordsRow" style="display:none;"><i class="fas fa-crosshairs"></i><span id="salinkAlarmCoords">-</span></div>
+                <div class="salink-alarm-info-item"><i class="fas fa-clock"></i><span id="salinkAlarmTime">-</span></div>
+            </div>
+            <div class="salink-alarm-instruction">Alarm berbunyi terus menerus.<br>Swipe ke arah manapun untuk mematikan.</div>
+            <div class="salink-swipe-indicator">
+                <span class="salink-swipe-text">Swipe untuk mematikan</span>
+                <div class="salink-swipe-arrows">
+                    <i class="fas fa-chevron-up"></i>
+                    <i class="fas fa-chevron-down"></i>
+                    <i class="fas fa-chevron-left"></i>
+                    <i class="fas fa-chevron-right"></i>
+                    <i class="fas fa-bell salink-center-icon"></i>
+                </div>
+            </div>
+            <div class="salink-swipe-feedback" id="salinkSwipeFeedback"></div>
+        `;
+        document.body.appendChild(div);
+    }
+
+    function showFullScreenAlarm(em) {
+        ensureFullScreenAlarmDOM();
+        const alarm = document.getElementById('salinkFullScreenAlarm');
+        if (!alarm) return;
+        if (isDismissed(em.id)) return;
+        if (state.fullScreenAlarmActive) return;
+
+        const type = em.type || 'fire';
+        const icon = CONFIG.ICONS[type] || '🚨';
+        const label = CONFIG.LABELS[type] || 'DARURAT';
+        const cssClass = CONFIG.CSS_CLASS[type] || 'fire';
+
+        document.getElementById('salinkAlarmIcon').textContent = icon;
+        document.getElementById('salinkAlarmTitle').textContent = label.replace(/^[^\s]+\s/, '');
+        document.getElementById('salinkAlarmSender').textContent = em.sender || 'User';
+        document.getElementById('salinkAlarmLocation').textContent = em.location || '-';
+        document.getElementById('salinkAlarmTime').textContent = formatDate(em.timestamp);
+
+        const addrRow = document.getElementById('salinkAlarmAddressRow');
+        const addrEl = document.getElementById('salinkAlarmAddress');
+        if (em.address && em.address !== em.location) {
+            addrRow.style.display = 'flex';
+            addrEl.textContent = em.address;
+        } else addrRow.style.display = 'none';
+
+        const coordsRow = document.getElementById('salinkAlarmCoordsRow');
+        const coordsEl = document.getElementById('salinkAlarmCoords');
+        if (em.coords) {
+            coordsRow.style.display = 'flex';
+            coordsEl.textContent = em.coords;
+        } else coordsRow.style.display = 'none';
+
+        alarm.className = 'salink-full-screen-alarm active ' + cssClass;
+        state.fullScreenAlarmActive = true;
+        state.fullScreenAlarmEmergency = em;
+        alarm.dataset.emergencyId = em.id || '';
+        document.body.style.overflow = 'hidden';
+
+        playEmergencyLoop(type);
+
+        if (navigator.vibrate) {
+            navigator.vibrate([500, 200, 500, 200, 500, 200]);
+            state.emergencyVibrateTimer = setInterval(() => {
+                if (state.fullScreenAlarmActive) {
+                    navigator.vibrate([500, 200, 500, 200, 500, 200]);
+                }
+            }, CONFIG.VIBRATE_INTERVAL_MS);
+        }
+
+        setupFullScreenAlarmSwipe();
+        if (em.id) { state.readNotifs[em.id] = true; saveReadNotifs(); }
+        log('Full screen alarm ACTIVE:', type);
+    }
+
+    function dismissFullScreenAlarm(userAction) {
+        const alarm = document.getElementById('salinkFullScreenAlarm');
+        if (!alarm) return;
+        const emergencyId = alarm.dataset.emergencyId;
+        if (emergencyId) dismissEmergency(emergencyId);
+        alarm.classList.remove('active', 'fire', 'medical', 'crime', 'disaster');
+        alarm.dataset.emergencyId = '';
+        document.body.style.overflow = '';
+        clearInterval(state.emergencyVibrateTimer);
+        state.emergencyVibrateTimer = null;
+        stopEmergencyLoop();
+        hideFloatingNotification();
+        state.fullScreenAlarmActive = false;
+        state.fullScreenAlarmEmergency = null;
+        if (navigator.vibrate) navigator.vibrate(0);
+        if (userAction) showToast('✅ Alarm Dimatikan', 'Anda telah mengonfirmasi notifikasi darurat', 'fa-check-circle', 'success');
+        log('Full screen alarm dismissed');
+    }
+
+    function setupFullScreenAlarmSwipe() {
+        const alarm = document.getElementById('salinkFullScreenAlarm');
+        if (!alarm || alarm._swipeSetup) return;
+        alarm._swipeSetup = true;
+
+        const feedback = document.getElementById('salinkSwipeFeedback');
+        let startX = 0, startY = 0, moving = false;
+
+        const showFeedback = (dir) => {
+            if (!feedback) return;
+            const icons = { up: '⬆️', down: '⬇️', left: '⬅️', right: '➡️' };
+            feedback.textContent = icons[dir] || '✅';
+            feedback.classList.add('active');
+            setTimeout(() => feedback.classList.remove('active'), 300);
+        };
+
+        alarm.addEventListener('touchstart', (e) => {
+            if (!state.fullScreenAlarmActive) return;
+            const t = e.touches[0];
+            startX = t.clientX; startY = t.clientY; moving = true;
+        }, { passive: true });
+
+        alarm.addEventListener('touchmove', (e) => {
+            if (!moving || !state.fullScreenAlarmActive) return;
+            e.preventDefault();
+        }, { passive: false });
+
+        alarm.addEventListener('touchend', (e) => {
+            if (!moving || !state.fullScreenAlarmActive) return;
+            moving = false;
+            const t = e.changedTouches[0];
+            const dx = t.clientX - startX;
+            const dy = t.clientY - startY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < CONFIG.SWIPE_MIN_DISTANCE) return;
+
+            let dir = 'up';
+            if (Math.abs(dx) > Math.abs(dy)) dir = dx > 0 ? 'right' : 'left';
+            else dir = dy > 0 ? 'down' : 'up';
+
+            showFeedback(dir);
+            if (navigator.vibrate) navigator.vibrate(100);
+            setTimeout(() => dismissFullScreenAlarm(true), 150);
+        }, { passive: true });
+
+        let md = false, mx = 0, my = 0;
+        alarm.addEventListener('mousedown', (e) => {
+            if (!state.fullScreenAlarmActive) return;
+            md = true; mx = e.clientX; my = e.clientY;
+        });
+        alarm.addEventListener('mouseup', (e) => {
+            if (!md || !state.fullScreenAlarmActive) return;
+            md = false;
+            const dx = e.clientX - mx, dy = e.clientY - my;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (distance < CONFIG.SWIPE_MIN_DISTANCE) return;
+            let dir = 'up';
+            if (Math.abs(dx) > Math.abs(dy)) dir = dx > 0 ? 'right' : 'left';
+            else dir = dy > 0 ? 'down' : 'up';
+            showFeedback(dir);
+            setTimeout(() => dismissFullScreenAlarm(true), 150);
+        });
+
+        // Tap pada icon wrapper juga dismiss
+        document.querySelector('#salinkFullScreenAlarm .salink-alarm-icon-wrapper')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (state.fullScreenAlarmActive) dismissFullScreenAlarm(true);
+        });
+    }
+
+    // ================================================================
+    // FLOATING EMERGENCY
+    // ================================================================
+    function ensureFloatingNotificationDOM() {
+        if (document.getElementById('salinkFloatingNotification')) return;
+
+        const div = document.createElement('div');
+        div.id = 'salinkFloatingNotification';
+        div.className = 'salink-floating-notification';
+        div.innerHTML = `
+            <div class="salink-notif-icon" id="salinkFloatingIcon"><i class="fas fa-bell"></i></div>
+            <div class="salink-notif-content">
+                <div class="salink-notif-title" id="salinkFloatingTitle">SALINK</div>
+                <div class="salink-notif-message" id="salinkFloatingMessage">Emergency Alert System</div>
+                <div class="salink-notif-subtitle" id="salinkFloatingSubtitle"></div>
+            </div>
+            <button class="salink-notif-action" id="salinkFloatingAction">Lihat</button>
+            <button class="salink-notif-close" id="salinkFloatingClose"><i class="fas fa-times"></i></button>
+        `;
+        document.body.appendChild(div);
+    }
+
+    function showFloatingEmergency(em) {
+        ensureFloatingNotificationDOM();
+        const type = em.type || 'fire';
+        const icon = CONFIG.ICONS[type] || '🚨';
+        const label = CONFIG.LABELS[type] || 'DARURAT';
+
+        showFloatingNotification('emergency',
+            `${icon} ${label}`,
+            `${em.sender || 'User'} melaporkan darurat`,
+            `📍 ${em.location || 'Lokasi tidak diketahui'}`,
+            'Lihat',
+            () => {
+                if (em.id) {
+                    window.location.href = 'detail-emergency.html?id=' + encodeURIComponent(em.id);
+                }
+            }
+        );
+
+        animateEmergencyButton(type);
+        startButtonLoop(type);
+
+        if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 1000]);
+        showToast(`🚨 ${label}`, `${em.sender} melaporkan darurat!`, 'fa-exclamation-triangle');
+    }
+
+    function dismissFloatingEmergency() {
+        stopButtonLoop();
+        stopEmergencyButtonAnimation();
+        hideFloatingNotification();
+        if (navigator.vibrate) navigator.vibrate(0);
+    }
+
+    function showFloatingNotification(type, title, message, subtitle, actionText, actionCallback) {
+        ensureFloatingNotificationDOM();
+        const notif = document.getElementById('salinkFloatingNotification');
+        const icon = document.getElementById('salinkFloatingIcon');
+        if (!notif) return;
+        icon.className = 'salink-notif-icon ' + type;
+        if (type === 'emergency') icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+        else if (type === 'install') icon.innerHTML = '<i class="fas fa-download"></i>';
+        else icon.innerHTML = '<i class="fas fa-bell"></i>';
+        document.getElementById('salinkFloatingTitle').textContent = title;
+        document.getElementById('salinkFloatingMessage').textContent = message;
+        document.getElementById('salinkFloatingSubtitle').textContent = subtitle || new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+        const actionBtn = document.getElementById('salinkFloatingAction');
+        if (actionText && actionCallback) {
+            actionBtn.style.display = 'block';
+            actionBtn.textContent = actionText;
+            actionBtn.onclick = (e) => { e.stopPropagation(); actionCallback(); };
+        } else actionBtn.style.display = 'none';
+        document.getElementById('salinkFloatingClose').onclick = (e) => { e.stopPropagation(); hideFloatingNotification(); };
+        if (type === 'emergency') notif.classList.add('emergency-notif');
+        else notif.classList.remove('emergency-notif');
+        notif.onclick = () => { if (actionCallback) actionCallback(); };
+        notif.classList.add('active');
+    }
+
+    function hideFloatingNotification() {
+        const notif = document.getElementById('salinkFloatingNotification');
+        if (notif) {
+            notif.classList.remove('active');
+            notif.classList.add('hide');
+            setTimeout(() => notif.classList.remove('hide'), 500);
+        }
+    }
+
+    // ================================================================
+    // BUTTON ANIMATION
+    // ================================================================
+    function animateEmergencyButton(type) {
+        const btnMap = { 'fire': 'fireBtn', 'medical': 'medicalBtn', 'crime': 'securityBtn', 'disaster': 'disasterBtn' };
+        const btn = document.getElementById(btnMap[type]);
+        if (!btn) return;
+        btn.classList.add('new-emergency', 'has-notification');
+        const st = btn.querySelector('.play-status');
+        if (st) st.textContent = '🔔 Ada Darurat! Tap untuk matikan';
+    }
+
+    function stopEmergencyButtonAnimation() {
+        document.querySelectorAll('.emergency-btn').forEach(btn => {
+            btn.classList.remove('new-emergency', 'playing');
+        });
+    }
+
+    // ================================================================
+    // TOAST
+    // ================================================================
+    function showToast(title, message, icon = 'fa-info-circle', type = 'info') {
+        let container = document.getElementById('toastContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toastContainer';
+            container.className = 'toast-container';
+            document.body.appendChild(container);
+        }
+        container.querySelectorAll('.toast').forEach(t => t.remove());
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerHTML = `
+            <div class="toast-icon"><i class="fas ${icon}"></i></div>
+            <div class="toast-content">
+                <div class="toast-title">${escapeHTML(title)}</div>
+                <div class="toast-message">${escapeHTML(message)}</div>
+            </div>
+            <button class="toast-close"><i class="fas fa-times"></i></button>
+        `;
+        toast.querySelector('.toast-close').onclick = () => { toast.classList.remove('active'); setTimeout(() => toast.remove(), 400); };
+        container.appendChild(toast);
+        setTimeout(() => { toast.classList.remove('active'); setTimeout(() => toast.remove(), 400); }, 5000);
+    }
+
+    // ================================================================
+    // API CALL
+    // ================================================================
+    async function apiCall(action, data = {}) {
+        try {
+            if (action.startsWith('get_')) {
+                const params = new URLSearchParams({ action, ...data, timestamp: Date.now() });
+                const response = await fetch(CONFIG.API_URL + '?' + params.toString(), {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-store'
+                });
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return await response.json();
+            } else {
+                const response = await fetch(CONFIG.API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action, data, timestamp: Date.now() })
+                });
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return await response.json();
+            }
+        } catch (error) {
+            return { status: 'error', message: error.message };
+        }
+    }
+
+    async function apiGetNotifications() {
+        const r = await apiCall('get_notifications');
+        return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptNotification) : [];
+    }
+
+    function adaptNotification(n) {
+        return {
+            id: n.id || 'notif-' + Date.now(), type: n.type || 'info',
+            title: n.title || 'Notifikasi', message: n.message || n.text || '',
+            sender: n.sender || 'Sistem', senderUsername: n.senderUsername || '',
+            link: n.link || '', postId: n.postId || '',
+            timestamp: n.timestamp ? new Date(n.timestamp).getTime() : Date.now(),
+            read: n.read === 'TRUE' || n.read === true || n.read === 'true',
+            soundKey: n.soundKey || ''
+        };
+    }
+
+    // ================================================================
+    // TRIGGER EMERGENCY (PILIH MODE)
+    // ================================================================
+    function triggerEmergencyFromNotification(notif) {
+        if (isDismissed(notif.id)) return;
+
+        const em = {
+            id: notif.id,
+            type: notif.type,
+            sender: notif.sender || 'User',
+            senderUsername: notif.senderUsername || '',
+            location: notif.message || 'Lokasi tidak diketahui',
+            address: notif.message || '',
+            text: notif.message || '',
+            mapsURL: '', coords: '',
+            timestamp: notif.timestamp,
+            expiresAt: notif.timestamp + CONFIG.EMERGENCY_DURATION
+        };
+
+        let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+        if (!ems.find(e => e.id === em.id)) {
+            ems.unshift(em);
+            try { localStorage.setItem('salink_emergencies', JSON.stringify(ems)); } catch(e) {}
+        }
+
+        if (isStandbyMode()) {
+            log('STANDBY → full screen alarm');
+            showFullScreenAlarm(em);
+        } else {
+            log('AKTIF → floating');
+            showFloatingEmergency(em);
+        }
+    }
+
+    function detectNewEmergencyNotifications(notifs) {
+        if (!notifs || notifs.length === 0) return null;
+        const lastCheck = parseInt(localStorage.getItem('salink_last_emergency_check') || '0');
+        const now = Date.now();
+        const newEmergencyNotifs = notifs.filter(n => {
+            const isEmergencyType = ['fire', 'medical', 'crime', 'disaster'].includes(n.type);
+            if (!isEmergencyType) return false;
+            if (state.readNotifs[n.id]) return false;
+            if (isDismissed(n.id)) return false;
+            return (n.timestamp || 0) > lastCheck;
+        });
+        if (newEmergencyNotifs.length === 0) {
+            localStorage.setItem('salink_last_emergency_check', String(now));
+            return null;
+        }
+        newEmergencyNotifs.sort((a, b) => b.timestamp - a.timestamp);
+        const latest = newEmergencyNotifs[0];
+        if (state.currentUser && latest.senderUsername === state.currentUser.username) {
+            state.readNotifs[latest.id] = true;
+            saveReadNotifs();
+            localStorage.setItem('salink_last_emergency_check', String(now));
+            return null;
+        }
+        localStorage.setItem('salink_last_emergency_check', String(now));
+        return latest;
+    }
+
+    // ================================================================
+    // POLLING
+    // ================================================================
+    function startEmergencyPolling() {
+        if (state.emergencyPollTimer) clearInterval(state.emergencyPollTimer);
+
+        // Cek langsung saat init
+        checkEmergencyNow();
+
+        state.emergencyPollTimer = setInterval(() => {
+            if (state.fullScreenAlarmActive) return;
+            checkEmergencyNow();
+        }, CONFIG.POLL_INTERVAL);
+    }
+
+    async function checkEmergencyNow() {
+        try {
+            const notifs = await apiGetNotifications();
+            if (notifs && notifs.length > 0) {
+                const newEmergency = detectNewEmergencyNotifications(notifs);
+                if (newEmergency) triggerEmergencyFromNotification(newEmergency);
+            }
+        } catch(e) {}
+    }
+
+    // ================================================================
+    // VISIBILITY DETECTION
+    // ================================================================
+    function setupVisibilityDetection() {
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                resetIdleTimer();
+                // Cek emergency yang belum di-dismiss saat tab kembali visible
+                const ems = getActiveEmergencies();
+                const undismissed = ems.find(e => !isDismissed(e.id) && !state.readNotifs[e.id]);
+                if (undismissed && !state.fullScreenAlarmActive) {
+                    setTimeout(() => showFullScreenAlarm(undismissed), 500);
+                }
+            } else {
+                state.isIdleStandby = true;
+            }
+        });
+    }
+
+    // ================================================================
+    // EMERGENCY BUTTON HANDLER (untuk halaman yang punya grid 2x2)
+    // ================================================================
+    function setupEmergencyButtons() {
+        document.querySelectorAll('.emergency-btn').forEach(btn => {
+            // Skip kalau sudah ada handler dari dashboard.html
+            if (btn._salinkEmergencySetup) return;
+            btn._salinkEmergencySetup = true;
+
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const type = btn.dataset.type;
+
+                // Cek preview mode
+                if (localStorage.getItem('salink_logged_in') !== 'true') {
+                    showToast('🔒 Login Diperlukan', 'Silakan login dulu untuk mengakses alarm', 'fa-lock');
+                    return;
+                }
+
+                // Kalau ada full screen alarm aktif → dismiss
+                if (state.fullScreenAlarmActive) {
+                    dismissFullScreenAlarm(true);
+                    return;
+                }
+
+                // Kalau ada button loop aktif → dismiss
+                if (state.buttonLoopAudio) {
+                    dismissFloatingEmergency();
+                    showToast('✅ Alarm Dimatikan', 'Notifikasi darurat dimatikan', 'fa-check-circle');
+                    return;
+                }
+
+                // Manual play alarm (1x)
+                const url = CONFIG.AUDIO[type];
+                if (!url) return;
+                unlockAudio();
+                const audio = state.audioCache[type] || new Audio(url);
+                audio.volume = 1.0;
+                audio.loop = false;
+                audio.currentTime = 0;
+                audio.play().then(() => {
+                    btn.classList.add('playing');
+                    const st = btn.querySelector('.play-status');
+                    if (st) st.textContent = '🔊 Alarm Berbunyi...';
+                    setTimeout(() => {
+                        audio.pause();
+                        audio.currentTime = 0;
+                        btn.classList.remove('playing');
+                        if (st) st.textContent = '▶ Tap untuk Alarm';
+                    }, 15000);
+                }).catch(() => {
+                    showToast('⚠️ Error', 'Tidak dapat memutar audio', 'fa-exclamation-triangle');
+                });
+            });
+        });
+    }
+
+    // ================================================================
+    // CSS INJECTION (untuk halaman yang belum punya style emergency)
+    // ================================================================
+    function injectStyles() {
+        if (document.getElementById('salink-emergency-styles')) return;
+        const style = document.createElement('style');
+        style.id = 'salink-emergency-styles';
+        style.textContent = `
+            /* Full Screen Alarm */
+            .salink-full-screen-alarm {
+                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                width: 100vw; height: 100vh; height: 100dvh;
+                background: #0d1117; z-index: 999999;
+                display: none; flex-direction: column; align-items: center; justify-content: center;
+                padding: 30px 20px; text-align: center;
+                user-select: none; -webkit-user-select: none;
+                touch-action: none; overflow: hidden;
+            }
+            .salink-full-screen-alarm.active { display: flex; animation: salinkFlash 1s ease-in-out infinite; }
+            .salink-full-screen-alarm.fire { --alarm-color: #f85149; }
+            .salink-full-screen-alarm.medical { --alarm-color: #4fc3f7; }
+            .salink-full-screen-alarm.crime { --alarm-color: #f0d080; }
+            .salink-full-screen-alarm.disaster { --alarm-color: #c792ea; }
+
+            @keyframes salinkFlash {
+                0%, 100% { background-color: #0d1117; }
+                50% { background-color: #4a0000; }
+            }
+            @keyframes salinkPulse {
+                0%, 100% { transform: scale(1); box-shadow: 0 0 60px var(--alarm-color, #f85149); }
+                50% { transform: scale(1.08); box-shadow: 0 0 120px var(--alarm-color, #f85149); }
+            }
+            @keyframes salinkZoom {
+                0%, 100% { transform: scale(1); }
+                50% { transform: scale(1.15); }
+            }
+            @keyframes salinkSwipeHint {
+                0%, 100% { opacity: 0.5; transform: translateY(0); }
+                50% { opacity: 1; transform: translateY(-12px); }
+            }
+            @keyframes salinkShakeX {
+                0%, 100% { transform: translateX(0); }
+                25% { transform: translateX(-8px); }
+                75% { transform: translateX(8px); }
+            }
+            @keyframes salinkDirPulse {
+                0%, 100% { opacity: 0.3; transform: scale(1); }
+                50% { opacity: 1; transform: scale(1.2); }
+            }
+            @keyframes salinkRingIcon {
+                0%, 100% { transform: scale(1) rotate(-15deg); }
+                25% { transform: scale(1.1) rotate(15deg); }
+                50% { transform: scale(1.15) rotate(-15deg); }
+                75% { transform: scale(1.1) rotate(15deg); }
+            }
+
+            .salink-full-screen-alarm .salink-alarm-badge {
+                position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
+                padding: 6px 20px; background: rgba(248,81,73,0.25);
+                border: 1px solid rgba(248,81,73,0.4); border-radius: 20px;
+                font-size: 0.7rem; font-weight: 700; color: #f85149;
+                text-transform: uppercase; letter-spacing: 2px;
+                animation: salinkPulse 1.2s ease-in-out infinite;
+            }
+            .salink-full-screen-alarm .salink-alarm-audio-indicator {
+                position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+                display: flex; align-items: center; gap: 8px;
+                font-size: 0.75rem; color: var(--alarm-color, #f85149);
+                font-weight: 700; animation: salinkPulse 0.8s ease-in-out infinite;
+            }
+            .salink-full-screen-alarm .salink-alarm-icon-wrapper {
+                width: 140px; height: 140px; border-radius: 50%;
+                display: flex; align-items: center; justify-content: center;
+                margin-bottom: 24px; background: rgba(255,255,255,0.05);
+                border: 3px solid var(--alarm-color, #f85149);
+                box-shadow: 0 0 60px var(--alarm-color, #f85149), inset 0 0 40px rgba(255,255,255,0.1);
+                animation: salinkPulse 1s ease-in-out infinite, salinkShakeX 0.6s ease-in-out infinite;
+                cursor: pointer;
+            }
+            .salink-full-screen-alarm .salink-alarm-icon {
+                font-size: 5rem; line-height: 1;
+                animation: salinkZoom 1s ease-in-out infinite;
+            }
+            .salink-full-screen-alarm .salink-alarm-title {
+                font-size: 2.4rem; font-weight: 800;
+                color: var(--alarm-color, #f85149);
+                text-shadow: 0 0 40px var(--alarm-color, #f85149), 0 0 80px var(--alarm-color, #f85149);
+                margin-bottom: 8px;
+                animation: salinkZoom 1.2s ease-in-out infinite;
+                font-family: 'Poppins', sans-serif;
+                letter-spacing: 2px; text-transform: uppercase;
+            }
+            .salink-full-screen-alarm .salink-alarm-subtitle {
+                font-size: 1rem; color: #8b949e; margin-bottom: 20px; font-weight: 500;
+            }
+            .salink-full-screen-alarm .salink-alarm-info {
+                display: flex; flex-direction: column; gap: 8px;
+                margin-bottom: 24px; max-width: 500px; width: 100%;
+            }
+            .salink-full-screen-alarm .salink-alarm-info-item {
+                display: flex; align-items: center; justify-content: center; gap: 8px;
+                font-size: 0.8rem; color: #8b949e;
+                padding: 8px 14px; background: rgba(255,255,255,0.03);
+                border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);
+            }
+            .salink-full-screen-alarm .salink-alarm-info-item strong { color: #e6edf3; font-weight: 700; }
+            .salink-full-screen-alarm .salink-alarm-info-item i { color: var(--alarm-color, #f85149); }
+            .salink-full-screen-alarm .salink-alarm-instruction {
+                position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%);
+                font-size: 0.65rem; color: #6e7681; text-align: center;
+                max-width: 300px; line-height: 1.5;
+            }
+            .salink-full-screen-alarm .salink-swipe-indicator {
+                position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+                display: flex; flex-direction: column; align-items: center; gap: 14px;
+                padding: 18px 32px; background: rgba(255,255,255,0.06);
+                border-radius: 20px; border: 1px solid rgba(255,255,255,0.1);
+                animation: salinkSwipeHint 1.5s ease-in-out infinite;
+                pointer-events: none;
+            }
+            .salink-full-screen-alarm .salink-swipe-text {
+                font-size: 0.75rem; color: #8b949e; font-weight: 600;
+                text-transform: uppercase; letter-spacing: 1px;
+            }
+            .salink-full-screen-alarm .salink-swipe-arrows {
+                position: relative; width: 80px; height: 80px;
+                display: flex; align-items: center; justify-content: center;
+            }
+            .salink-full-screen-alarm .salink-swipe-arrows i {
+                position: absolute; font-size: 1.6rem; color: #8b949e;
+                animation: salinkDirPulse 1.5s ease-in-out infinite;
+            }
+            .salink-full-screen-alarm .salink-swipe-arrows i:nth-child(1) { top: 0; left: 50%; transform: translateX(-50%); animation-delay: 0s; }
+            .salink-full-screen-alarm .salink-swipe-arrows i:nth-child(2) { bottom: 0; left: 50%; transform: translateX(-50%); animation-delay: 0.4s; }
+            .salink-full-screen-alarm .salink-swipe-arrows i:nth-child(3) { left: 0; top: 50%; transform: translateY(-50%); animation-delay: 0.8s; }
+            .salink-full-screen-alarm .salink-swipe-arrows i:nth-child(4) { right: 0; top: 50%; transform: translateY(-50%); animation-delay: 1.2s; }
+            .salink-full-screen-alarm .salink-swipe-arrows .salink-center-icon {
+                position: static; font-size: 1.8rem;
+                color: var(--alarm-color, #f85149);
+                animation: salinkRingIcon 1.5s ease-in-out infinite;
+            }
+            .salink-full-screen-alarm .salink-swipe-feedback {
+                position: absolute; top: 50%; left: 50%;
+                transform: translate(-50%, -50%);
+                font-size: 6rem; color: var(--alarm-color, #f85149);
+                opacity: 0; pointer-events: none;
+                transition: opacity 0.2s;
+                text-shadow: 0 0 40px var(--alarm-color, #f85149);
+            }
+            .salink-full-screen-alarm .salink-swipe-feedback.active {
+                opacity: 1; animation: salinkZoom 0.4s ease-in-out;
+            }
+
+            /* Floating Notification */
+            .salink-floating-notification {
+                position: fixed; top: 70px; left: 10px; right: 10px;
+                max-width: 500px; margin: 0 auto;
+                background: rgba(22, 27, 34, 0.98);
+                backdrop-filter: blur(15px);
+                border: 1px solid #58a6ff; border-radius: 12px;
+                padding: 12px 14px; z-index: 99998;
+                display: none; align-items: center; gap: 12px;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+                cursor: pointer;
+                animation: salinkSlideDown 0.5s ease;
+            }
+            .salink-floating-notification.active { display: flex; }
+            .salink-floating-notification.hide { animation: salinkSlideUp 0.5s ease forwards; }
+            .salink-floating-notification.emergency-notif {
+                border-color: #f85149;
+                box-shadow: 0 0 30px rgba(248,81,73,0.5);
+            }
+            @keyframes salinkSlideDown {
+                from { transform: translateY(-100px); opacity: 0; }
+                to { transform: translateY(0); opacity: 1; }
+            }
+            @keyframes salinkSlideUp {
+                from { transform: translateY(0); opacity: 1; }
+                to { transform: translateY(-100px); opacity: 0; }
+            }
+            .salink-floating-notification .salink-notif-icon {
+                width: 36px; height: 36px; border-radius: 50%;
+                display: flex; align-items: center; justify-content: center;
+                flex-shrink: 0; font-size: 1rem;
+                background: rgba(88,166,255,0.15); color: #58a6ff;
+            }
+            .salink-floating-notification .salink-notif-icon.emergency {
+                background: rgba(248,81,73,0.2); color: #f85149;
+                animation: salinkPulse 0.5s ease-in-out infinite;
+            }
+            .salink-floating-notification .salink-notif-content { flex: 1; min-width: 0; }
+            .salink-floating-notification .salink-notif-title {
+                font-size: 0.8rem; font-weight: 600; color: #e6edf3;
+            }
+            .salink-floating-notification .salink-notif-message {
+                font-size: 0.65rem; color: #8b949e;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            }
+            .salink-floating-notification .salink-notif-subtitle {
+                font-size: 0.55rem; color: #6e7681;
+            }
+            .salink-floating-notification .salink-notif-action {
+                padding: 4px 16px; border-radius: 5px;
+                border: 1px solid #58a6ff;
+                background: rgba(88,166,255,0.15); color: #58a6ff;
+                font-size: 0.7rem; font-weight: 600; cursor: pointer;
+                white-space: nowrap;
+            }
+            .salink-floating-notification .salink-notif-close {
+                background: none; border: none; color: #6e7681;
+                cursor: pointer; font-size: 0.8rem; padding: 4px;
+            }
+
+            /* Toast */
+            .toast-container {
+                position: fixed; bottom: 80px; left: 50%;
+                transform: translateX(-50%);
+                z-index: 3000; max-width: 400px; width: 90%;
+            }
+            .toast {
+                background: rgba(22, 27, 34, 0.98);
+                border: 1px solid #30363d; border-radius: 12px;
+                padding: 12px 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+                display: flex; align-items: center; gap: 12px;
+                margin-bottom: 8px;
+                animation: salinkSlideDown 0.4s ease;
+            }
+            .toast .toast-icon {
+                width: 32px; height: 32px; border-radius: 50%;
+                display: flex; align-items: center; justify-content: center;
+                flex-shrink: 0;
+                background: rgba(88,166,255,0.15); color: #58a6ff;
+            }
+            .toast .toast-content { flex: 1; }
+            .toast .toast-title { font-size: 0.75rem; font-weight: 600; color: #e6edf3; }
+            .toast .toast-message { font-size: 0.7rem; color: #8b949e; }
+            .toast .toast-close {
+                background: none; border: none; color: #6e7681;
+                cursor: pointer; font-size: 0.8rem; padding: 4px;
+            }
+            .toast.active { display: flex; }
+            .toast:not(.active) { display: none; }
+        `;
+        document.head.appendChild(style);
+    }
+
+    // ================================================================
+    // INIT
+    // ================================================================
+    function init() {
+        if (state.initialized) return;
+        state.initialized = true;
+
+        log('Initializing...');
+
+        // Load user
+        try {
+            const userData = localStorage.getItem('salink_user');
+            if (userData) state.currentUser = JSON.parse(userData);
+        } catch(e) {}
+
+        // Cek apakah user login
+        const isLoggedIn = localStorage.getItem('salink_logged_in') === 'true';
+        if (!isLoggedIn || !state.currentUser) {
+            log('User belum login, skip emergency polling');
+            return;
+        }
+
+        // Inject styles
+        injectStyles();
+
+        // Load read/dismissed
+        loadReadNotifs();
+        loadDismissed();
+
+        // Preload audio
+        preloadAllAudio();
+
+        // Setup detection
+        setupIdleDetection();
+        setupVisibilityDetection();
+
+        // Setup emergency buttons (kalau ada)
+        setupEmergencyButtons();
+
+        // Start polling
+        startEmergencyPolling();
+
+        // Cek lastNotifCheck
+        state.lastNotifCheck = parseInt(localStorage.getItem('salink_last_emergency_check') || '0');
+
+        log('✅ Initialized — polling every', CONFIG.POLL_INTERVAL / 1000, 's');
+    }
+
+    // Auto-init saat DOM ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        // DOM sudah ready
+        init();
+    }
+
+    // ================================================================
+    // EXPOSE PUBLIC API
+    // ================================================================
+    window.SalinkEmergency = {
+        init: init,
+        showAlarm: showFullScreenAlarm,
+        dismissAlarm: dismissFullScreenAlarm,
+        showFloating: showFloatingEmergency,
+        dismissFloating: dismissFloatingEmergency,
+        playRegular: playRegularSound,
+        playEmergency: playEmergencyLoop,
+        stopEmergency: stopEmergencyLoop,
+        isStandbyMode: isStandbyMode,
+        config: CONFIG,
+        state: state
+    };
+
+    log('Script loaded. Public API: window.SalinkEmergency');
+})();
