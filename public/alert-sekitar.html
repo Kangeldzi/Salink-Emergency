@@ -1761,5 +1761,72 @@ window.refreshAlerts = refreshAlerts;
 window.setEmergencyFilter = setEmergencyFilter;
 window.openProfileUser = openProfileUser;
 </script>
+
+<!-- ============================================================ -->
+<!-- SALINK FCM INTEGRATION                                        -->
+<!-- ============================================================ -->
+<script src="/firebase-config.js"></script>
+<script src="/fcm-client.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  window.addEventListener('load', async function() {
+    const isLoggedIn = localStorage.getItem('salink_logged_in');
+    const userData = localStorage.getItem('salink_user');
+
+    if (isLoggedIn !== 'true' || !userData) {
+      console.log('ℹ️ [FCM] User belum login — FCM tidak diinisialisasi');
+      return;
+    }
+
+    let user;
+    try {
+      user = JSON.parse(userData);
+    } catch (e) {
+      console.warn('⚠️ [FCM] Data salink_user tidak valid:', e.message);
+      return;
+    }
+
+    if (!user || !user.username) {
+      console.warn('⚠️ [FCM] salink_user tidak punya username');
+      return;
+    }
+
+    console.log('🚀 [FCM] Init untuk:', user.username, '(' + (user.fullName || '') + ')');
+
+    try {
+      if (typeof SalinkFCM === 'undefined') {
+        console.warn('⚠️ [FCM] SalinkFCM tidak tersedia — cek /fcm-client.js');
+        return;
+      }
+
+      const initResult = await SalinkFCM.init();
+      if (!initResult.ok) {
+        console.warn('⚠️ [FCM] init gagal:', initResult.reason);
+        return;
+      }
+
+      console.log('✅ [FCM] Siap. Token:', initResult.token.substring(0, 30) + '...');
+
+      const saveResult = await SalinkFCM.saveToken({
+        userId: user.id,
+        username: user.username,
+        email: user.email
+      });
+
+      if (saveResult.ok) {
+        console.log('✅ [FCM] Token tersimpan di backend');
+      } else {
+        console.warn('⚠️ [FCM] Gagal simpan token:', saveResult);
+      }
+    } catch (err) {
+      console.error('❌ [FCM] error:', err);
+    }
+  });
+})();
+</script>
+<!-- ============================================================ -->
+
 </body>
 </html>
