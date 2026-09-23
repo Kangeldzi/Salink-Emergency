@@ -53,7 +53,7 @@
 
       // 6. Ambil FCM token
       _currentToken = await _messaging.getToken({
-        vapidKey: BGwJ9E-bZh2QwdYIeaSyVoxSc9puUnu6mjsMeR2nr9FAUSKAaq0SIuIlBxdaUExuYTd63zriEZwOTjj6TPTlMa0,
+            vapidKey: SALINK_VAPID_KEY,
         serviceWorkerRegistration: registration
       });
 
