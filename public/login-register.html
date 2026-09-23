@@ -1692,20 +1692,49 @@
                 console.log('📥 Login result:', result);
 
                 if (result.sukses) {
-                    Storage.setSession(result.pengguna);
-                    
-                    if (document.getElementById('rememberMe').checked) {
-                        localStorage.setItem('salink_remember', 'true');
+    Storage.setSession(result.pengguna);
+    
+    if (document.getElementById('rememberMe').checked) {
+        localStorage.setItem('salink_remember', 'true');
+    }
+
+    var sourceLabel = result.source === 'local' ? ' (offline)' : '';
+    showMessage('✅ Login berhasil' + sourceLabel + '!<br><small>Menyiapkan notifikasi...</small>', 'success');
+
+    // ✅ FIX: Save FCM token langsung setelah login
+    (async function() {
+        try {
+            if (typeof SalinkFCM !== 'undefined' && SalinkFCM.init) {
+                console.log('🚀 [FCM] Init setelah login...');
+                const initResult = await SalinkFCM.init();
+                if (initResult && initResult.ok) {
+                    const user = result.pengguna;
+                    const saveResult = await SalinkFCM.saveToken({
+                        userId: user.id || user.username,
+                        username: user.username,
+                        email: user.email
+                    });
+                    if (saveResult && saveResult.ok) {
+                        console.log('✅ [FCM] Token tersimpan setelah login');
+                    } else {
+                        console.warn('⚠️ [FCM] Gagal save token:', saveResult);
                     }
-
-                    var sourceLabel = result.source === 'local' ? ' (offline)' : '';
-                    showMessage('✅ Login berhasil' + sourceLabel + '!<br><small>Mengalihkan...</small>', 'success');
-
-                    var redirectUrl = getRedirectUrl();
-                    setTimeout(function() {
-                        window.location.href = redirectUrl;
-                    }, 800);
                 } else {
+                    console.warn('⚠️ [FCM] Init gagal:', initResult && initResult.reason);
+                }
+            } else {
+                console.warn('⚠️ [FCM] SalinkFCM tidak tersedia');
+            }
+        } catch (err) {
+            console.warn('⚠️ [FCM] Error saat save token:', err);
+        }
+    })();
+
+    var redirectUrl = getRedirectUrl();
+    setTimeout(function() {
+        window.location.href = redirectUrl;
+    }, 1200);  // Naikkan dari 800 → 1200ms biar FCM sempat init
+} else {
                     showMessage('❌ ' + result.pesan, 'error');
                     btn.disabled = false;
                     btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Masuk';
