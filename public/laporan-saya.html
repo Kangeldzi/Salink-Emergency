@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Laporan Saya — SALINK</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d1117" id="themeColorMeta">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SALINK">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg-primary: #0d1117; --bg-secondary: #161b22; --bg-card: rgba(22, 27, 34, 0.92);
+  --bg-input: rgba(22, 27, 34, 0.6); --text-primary: #e6edf3; --text-secondary: #8b949e;
+  --text-muted: #6e7681; --border-color: #30363d; --shadow-color: rgba(0,0,0,0.4);
+  --shadow-light: rgba(0,0,0,0.2); --accent-blue: #58a6ff; --accent-blue-dark: #1f6feb;
+  --accent-blue-gradient: linear-gradient(135deg, #58a6ff, #1f6feb);
+  --accent-green: #25D366; --accent-red: #f85149; --accent-gold: #f0d080;
+  --accent-purple: #c792ea; --toggle-bg: #30363d; --toggle-thumb: #58a6ff;
+  --header-bg: rgba(22, 27, 34, 0.95); --footer-bg: rgba(13, 17, 23, 0.95);
+  --modal-bg: rgba(22, 27, 34, 0.98); --input-border: #30363d;
+  --header-height: 60px; --footer-height: 65px; --danger: #f85149; --success: #3fb950;
+  --warning: #f0d080; --info: #58a6ff; --radius: 14px;
+}
+[data-theme="light"] {
+  --bg-primary: #f0f4f8; --bg-secondary: #e8edf2; --bg-card: rgba(255, 255, 255, 0.92);
+  --bg-input: rgba(0,0,0,0.04); --text-primary: #1a1a2e; --text-secondary: #4a4a6a;
+  --text-muted: #6a6a8a; --border-color: #d0d7de; --shadow-color: rgba(0,0,0,0.08);
+  --shadow-light: rgba(0,0,0,0.04); --accent-blue: #4facfe; --accent-blue-dark: #00c6fb;
+  --accent-blue-gradient: linear-gradient(135deg, #4facfe, #00c6fb);
+  --accent-red: #e31837; --accent-gold: #8d6b4b; --accent-purple: #7c3aed;
+  --toggle-bg: #d0d7de; --toggle-thumb: #4facfe;
+  --header-bg: rgba(255, 255, 255, 0.95); --footer-bg: rgba(255, 255, 255, 0.95);
+  --modal-bg: rgba(255, 255, 255, 0.98); --input-border: #dce1e8;
+  --danger: #e31837; --success: #2ea44f; --warning: #8d6b4b; --info: #4facfe;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { min-height: 100vh; padding-bottom: calc(var(--footer-height) + 16px); background: var(--bg-primary); color: var(--text-primary); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; transition: background 0.3s ease, color 0.3s ease; }
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+::-webkit-scrollbar-thumb { background: var(--accent-blue); border-radius: 3px; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes modalIn { from { transform: scale(0.85) translateY(30px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes toastIn { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes toastOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(30px); opacity: 0; } }
+@keyframes notifPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.3); } }
+@keyframes blink { 0%, 100% { color: #ff0000; text-shadow: 0 0 20px rgba(255,0,0,0.8); transform: scale(1); } 50% { color: #00C2FF; text-shadow: 0 0 20px rgba(0,194,255,0.8); transform: scale(1.1); } }
+@keyframes statBump { 0% { transform: scale(1); } 50% { transform: scale(1.25); color: var(--accent-blue); } 100% { transform: scale(1); } }
+@keyframes syncPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+/* HEADER */
+.app-bar { position: fixed; top: 0; width: 100%; height: var(--header-height); background: var(--header-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: flex; justify-content: space-between; align-items: center; padding: 0 12px; z-index: 1000; box-shadow: 0 2px 20px var(--shadow-color); border-bottom: 1px solid var(--border-color); }
+.app-title { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text-primary); font-size: 1.1rem; cursor: pointer; text-decoration: none; font-family: 'Poppins', sans-serif; }
+.app-title .siren-icon-header { font-size: 1.5rem; display: inline-block; animation: spin 1.5s linear infinite, blink 1s ease-in-out infinite; line-height: 1; }
+.header-center { display: flex; align-items: center; gap: 8px; }
+.header-right { display: flex; align-items: center; gap: 6px; }
+.menu-btn, .back-btn, .user-btn, .refresh-btn { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; flex-shrink: 0; transition: all 0.3s; text-decoration: none; overflow: hidden; }
+.menu-btn:active, .back-btn:active, .user-btn:active, .refresh-btn:active { transform: scale(0.95); }
+.refresh-btn.loading i { animation: spin 1s linear infinite; }
+.user-btn img { width: 100%; height: 100%; object-fit: cover; }
+.theme-toggle { position: relative; width: 44px; height: 24px; background: var(--toggle-bg); border-radius: 30px; cursor: pointer; transition: all 0.3s ease; border: 1px solid var(--border-color); flex-shrink: 0; }
+.theme-toggle.active { background: rgba(88,166,255,0.3); }
+.theme-toggle .toggle-thumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--toggle-thumb); transition: all 0.3s ease; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; }
+.theme-toggle.active .toggle-thumb { left: 22px; }
+.theme-toggle .toggle-thumb i { color: #fff; }
+
+/* SYNC INDICATOR */
+.sync-indicator { position: fixed; top: calc(var(--header-height) + 6px); right: 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 3px 10px; font-size: 0.55rem; color: var(--text-muted); z-index: 999; display: none; align-items: center; gap: 4px; animation: syncPulse 1s ease-in-out infinite; }
+.sync-indicator.active { display: flex; }
+.sync-indicator i { color: var(--accent-blue); font-size: 0.6rem; }
+
+/* DELETE CONFIRM MODAL */
+.delete-confirm-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(20px); z-index: 999999; display: none; align-items: center; justify-content: center; padding: 20px; }
+.delete-confirm-modal.active { display: flex; }
+.delete-confirm-content { background: var(--modal-bg); border-radius: 20px; max-width: 380px; width: 100%; padding: 24px 20px; border: 1px solid var(--accent-red); box-shadow: 0 30px 60px rgba(248,81,73,0.3); text-align: center; }
+.delete-confirm-icon { width: 60px; height: 60px; margin: 0 auto 14px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(248,81,73,0.15); color: var(--accent-red); font-size: 1.8rem; }
+.delete-confirm-title { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-bottom: 8px; }
+.delete-confirm-msg { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 6px; line-height: 1.5; }
+.delete-confirm-warning { font-size: 0.7rem; color: var(--accent-red); background: rgba(248,81,73,0.08); padding: 8px 12px; border-radius: 10px; margin: 10px 0; border: 1px solid rgba(248,81,73,0.2); font-weight: 600; }
+.delete-confirm-actions { display: flex; gap: 10px; margin-top: 16px; }
+.delete-confirm-actions button { flex: 1; padding: 12px; border-radius: 12px; border: none; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+.delete-confirm-cancel { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-color) !important; }
+.delete-confirm-delete { background: var(--accent-red); color: #fff; }
+
+/* SIDEBAR */
+.sidebar-overlay-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1099; display: none; opacity: 0; transition: opacity 0.3s; }
+.sidebar-overlay-bg.active { display: block; opacity: 1; }
+.sidebar { position: fixed; top: var(--header-height); left: 0; width: 290px; max-height: calc(100vh - var(--header-height)); background: var(--bg-secondary); z-index: 1100; overflow-y: auto; box-shadow: 15px 0 30px var(--shadow-color); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; transform: translateX(-100%); transition: transform 0.3s; border-radius: 0 0 12px 0; }
+.sidebar.active { transform: translateX(0); }
+.sidebar-close { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; z-index: 10; }
+.sidebar-header { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 16px; border-bottom: 1px solid var(--border-color); background: var(--bg-card); }
+.sidebar-user-avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--accent-blue-gradient); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; font-size: 1.1rem; overflow: hidden; border: 2px solid var(--accent-blue); }
+.sidebar-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.sidebar-user-name { font-size: 0.85rem; font-weight: 600; }
+.sidebar-user-email { font-size: 0.6rem; color: var(--text-muted); }
+.nav-menu { list-style: none; padding: 6px 12px 12px; flex: 1; }
+.nav-section-title { font-size: 0.55rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; padding: 10px 14px 4px; font-weight: 600; }
+.nav-item { margin-bottom: 2px; }
+.nav-link { display: flex; align-items: center; gap: 12px; padding: 10px 14px; color: var(--text-primary); text-decoration: none; border-radius: 8px; font-size: 0.8rem; background: var(--bg-input); border: 1px solid transparent; cursor: pointer; }
+.nav-link.active { background: rgba(88,166,255,0.15); color: var(--accent-blue); border: 1px solid var(--accent-blue); }
+.nav-link i { width: 22px; text-align: center; font-size: 0.95rem; color: var(--accent-blue); }
+.nav-logout .nav-link { color: var(--accent-red); }
+.nav-logout .nav-link i { color: var(--accent-red); }
+
+/* MAIN */
+.main-content { max-width: 760px; margin: 0 auto; padding: calc(var(--header-height) + 14px) 14px calc(var(--footer-height) + 20px); }
+.user-banner { display: flex; align-items: center; gap: 13px; margin-bottom: 15px; padding: 15px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); }
+.avatar { width: 48px; height: 48px; flex: 0 0 48px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-blue-gradient); color: white; font-size: 19px; font-weight: 800; overflow: hidden; border: 2px solid var(--accent-blue); }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.user-info { min-width: 0; flex: 1; }
+.user-name { font-size: 15px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.user-username { margin-top: 4px; color: var(--text-muted); font-size: 12px; }
+
+/* STATS */
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 17px; }
+.stat-card { padding: 15px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; transition: all 0.3s; }
+.stat-icon { font-size: 20px; margin-bottom: 9px; }
+.stat-value { font-size: 23px; font-weight: 800; color: var(--text-primary); }
+.stat-value.bump { animation: statBump 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+.stat-label { margin-top: 3px; color: var(--text-muted); font-size: 11px; }
+
+/* FILTER */
+.filter-wrap { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 15px; }
+.filter-wrap::-webkit-scrollbar { display: none; }
+.filter-btn { flex: 0 0 auto; padding: 9px 14px; border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg-input); color: var(--text-muted); cursor: pointer; font-size: 12px; font-weight: 700; font-family: inherit; }
+.filter-btn.active { background: rgba(88,166,255,0.16); border-color: rgba(88,166,255,0.45); color: var(--accent-blue); }
+
+/* SECTION */
+.section-title { display: flex; align-items: center; justify-content: space-between; margin: 5px 2px 10px; }
+.section-title h2 { font-size: 15px; font-weight: 800; }
+.section-title span { color: var(--text-muted); font-size: 11px; }
+
+/* REPORT CARD */
+.report-card { margin-bottom: 12px; padding: 15px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius); transition: all 0.3s; }
+.report-head { display: flex; align-items: flex-start; gap: 10px; }
+.type-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 9px; border-radius: 999px; background: rgba(88,166,255,0.1); color: var(--accent-blue); font-size: 10px; font-weight: 800; border: 1px solid rgba(88,166,255,0.2); }
+.report-date { flex: 1; text-align: right; color: var(--text-muted); font-size: 10px; line-height: 1.4; }
+.report-location { margin-top: 12px; display: flex; gap: 9px; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.report-description { margin-top: 11px; color: var(--text-secondary); font-size: 12px; line-height: 1.65; }
+.report-meta { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.meta-pill { padding: 5px 8px; border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-muted); font-size: 9px; }
+.status-active { color: var(--warning); border-color: rgba(240,208,128,0.3); background: rgba(240,208,128,0.07); }
+.status-resolved { color: var(--success); border-color: rgba(63,185,80,0.3); background: rgba(63,185,80,0.07); }
+.report-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 14px; }
+.action-btn { min-height: 38px; border: 1px solid var(--border-color); border-radius: 11px; background: var(--bg-input); color: var(--text-primary); cursor: pointer; font-size: 10px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 4px; font-family: inherit; }
+.action-btn:active { transform: scale(0.97); }
+.action-btn.primary { border-color: rgba(88,166,255,0.3); background: rgba(88,166,255,0.1); color: var(--accent-blue); }
+.action-btn.danger { border-color: rgba(248,81,73,0.3); background: rgba(248,81,73,0.08); color: var(--accent-red); }
+
+/* STATE */
+.state { padding: 45px 20px; text-align: center; border: 1px dashed rgba(255,255,255,0.1); border-radius: var(--radius); color: var(--text-muted); background: var(--bg-card); }
+.state-icon { font-size: 35px; margin-bottom: 12px; }
+.state h3 { color: var(--text-primary); font-size: 15px; }
+.state p { margin-top: 6px; font-size: 11px; line-height: 1.6; }
+.hidden { display: none !important; }
+.spinner { width: 36px; height: 36px; margin: 0 auto 12px; border: 3px solid var(--border-color); border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 0.8s linear infinite; }
+
+/* MODAL */
+.modal { position: fixed; inset: 0; z-index: 2000; display: none; align-items: flex-end; background: rgba(0,0,0,0.85); backdrop-filter: blur(8px); padding: 0; }
+.modal.show { display: flex; animation: fadeIn 0.3s ease; }
+.modal-box { width: 100%; max-width: 760px; max-height: 88vh; margin: 0 auto; overflow-y: auto; background: var(--modal-bg); border: 1px solid var(--border-color); border-radius: 22px 22px 0 0; padding: 18px; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 17px; padding-bottom: 10px; border-bottom: 1px solid var(--border-color); }
+.modal-head h3 { font-size: 16px; }
+.modal-close { width: 35px; height: 35px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-input); color: var(--text-primary); cursor: pointer; font-family: inherit; }
+.detail-row { padding: 11px 0; border-bottom: 1px solid var(--border-color); }
+.detail-label { color: var(--text-muted); font-size: 10px; margin-bottom: 5px; }
+.detail-value { color: var(--text-primary); font-size: 12px; line-height: 1.6; word-break: break-word; }
+
+/* BOTTOM NAV */
+.bottom-nav { position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; height: var(--footer-height) !important; background: var(--footer-bg) !important; backdrop-filter: blur(15px) !important; border-top: 1px solid var(--border-color) !important; z-index: 1000 !important; display: flex !important; justify-content: space-around !important; align-items: center !important; padding: 0 4px !important; }
+.nav-item-bottom { display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 4px; padding: 4px 8px; cursor: pointer; text-decoration: none; color: var(--text-muted); border: none; background: transparent; flex: 1 !important; height: 100% !important; font-family: inherit; }
+.nav-item-bottom .nav-icon { font-size: 1.6rem; line-height: 1.2; display: block; }
+.nav-item-bottom .nav-label { font-size: 0.65rem; font-weight: 500; }
+.nav-item-bottom.active .nav-label { color: var(--accent-blue); font-weight: 600; }
+.nav-item-bottom .badge { position: absolute; top: 0 !important; right: 0 !important; background: var(--accent-red); color: white; font-size: 0.55rem; border-radius: 50%; min-width: 18px; height: 18px; display: none; align-items: center; justify-content: center; font-weight: bold; padding: 0 4px; }
+.nav-item-bottom .badge.show { display: flex !important; }
+
+/* TOAST */
+.toast-container { position: fixed; bottom: calc(var(--footer-height) + 20px); left: 50%; transform: translateX(-50%); z-index: 10000; max-width: 400px; width: 90%; }
+.toast { background: var(--modal-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; animation: toastIn 0.4s ease; margin-bottom: 8px; }
+.toast.hide { animation: toastOut 0.4s ease forwards; }
+.toast .toast-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(88,166,255,0.15); color: var(--accent-blue); }
+.toast .toast-content { flex: 1; }
+.toast .toast-title { font-size: 0.75rem; font-weight: 600; }
+.toast .toast-message { font-size: 0.7rem; color: var(--text-secondary); }
+.toast .toast-close { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; }
+</style>
+</head>
+<body>
+
+<!-- SYNC INDICATOR -->
+<div class="sync-indicator" id="syncIndicator"><i class="fas fa-sync-alt fa-spin"></i> Sync...</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div class="delete-confirm-modal" id="deleteConfirmModal">
+  <div class="delete-confirm-content">
+    <div class="delete-confirm-icon"><i class="fas fa-trash-alt"></i></div>
+    <div class="delete-confirm-title">Hapus Permanen?</div>
+    <div class="delete-confirm-msg" id="deleteConfirmMsg">Item ini akan dihapus dari SEMUA halaman.</div>
+    <div class="delete-confirm-warning"><i class="fas fa-exclamation-triangle"></i> Tindakan ini TIDAK BISA DIBATALKAN</div>
+    <div class="delete-confirm-actions">
+      <button class="delete-confirm-cancel" onclick="closeDeleteConfirm()"><i class="fas fa-times"></i> Batal</button>
+      <button class="delete-confirm-delete" onclick="confirmDeleteNow()"><i class="fas fa-trash"></i> Ya, Hapus</button>
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header class="app-bar">
+  <a href="dashboard.html" class="app-title"><span class="siren-icon-header">🚨</span><span>SALINK</span></a>
+  <div class="header-center">
+    <button class="menu-btn" id="menuBtn"><i class="fas fa-bars"></i></button>
+    <button class="refresh-btn" id="refreshBtn"><i class="fas fa-sync-alt"></i></button>
+    <div class="theme-toggle" id="themeToggle"><div class="toggle-thumb" id="toggleThumb"><i class="fas fa-moon" id="toggleIcon"></i></div></div>
+  </div>
+  <div class="header-right">
+    <button class="user-btn" id="userBtn" data-action="profile"><i class="fas fa-user"></i></button>
+    <a href="dashboard.html" class="back-btn"><i class="fas fa-arrow-left"></i></a>
+  </div>
+</header>
+
+<!-- SIDEBAR -->
+<div class="sidebar-overlay-bg" id="sidebarOverlay"></div>
+<div class="sidebar" id="sidebar">
+  <button class="sidebar-close" id="sidebarClose"><i class="fas fa-times"></i></button>
+  <div class="sidebar-header">
+    <div class="sidebar-user-avatar" id="sidebarUserAvatar"><i class="fas fa-user"></i></div>
+    <div class="sidebar-user-name" id="sidebarUserName">Guest</div>
+    <div class="sidebar-user-email" id="sidebarUserEmail">guest@salink.id</div>
+  </div>
+  <ul class="nav-menu">
+    <li class="nav-item"><a href="dashboard.html" class="nav-link"><i class="fas fa-home"></i><span>Home</span></a></li>
+    <li class="nav-item"><a href="profil.html" class="nav-link"><i class="fas fa-user-circle"></i><span>Profil Saya</span></a></li>
+    <div class="nav-section-title">🚨 MENU DARURAT</div>
+    <li class="nav-item"><a href="kontak-darurat.html" class="nav-link"><i class="fas fa-phone-alt"></i><span>Kontak Darurat</span></a></li>
+    <li class="nav-item"><a href="laporan-darurat.html" class="nav-link"><i class="fas fa-exclamation-circle"></i><span>Laporan Darurat</span></a></li>
+    <li class="nav-item"><a href="lokasi-bantuan.html" class="nav-link"><i class="fas fa-hospital"></i><span>Lokasi Bantuan</span></a></li>
+    <li class="nav-item"><a href="alert-sekitar.html" class="nav-link"><i class="fas fa-bell"></i><span>Alert Sekitar</span></a></li>
+    <div class="nav-section-title">📊 STATISTIK</div>
+    <li class="nav-item"><a href="statistik.html" class="nav-link"><i class="fas fa-chart-pie"></i><span>Statistik</span></a></li>
+    <li class="nav-item"><a href="laporan-saya.html" class="nav-link active"><i class="fas fa-clipboard-list"></i><span>Laporan Saya</span></a></li>
+    <li class="nav-item nav-logout" id="logoutNavItem" style="display:none;">
+      <a href="#" class="nav-link" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Keluar</span></a>
+    </li>
+  </ul>
+</div>
+
+<!-- MAIN -->
+<div class="main-content">
+  <section class="user-banner">
+    <div id="avatar" class="avatar">U</div>
+    <div class="user-info">
+      <div id="userName" class="user-name">Memuat akun...</div>
+      <div id="userUsername" class="user-username">—</div>
+    </div>
+  </section>
+
+  <section class="stats-grid">
+    <div class="stat-card"><div class="stat-icon">📝</div><div id="statPosts" class="stat-value">0</div><div class="stat-label">Postingan Saya</div></div>
+    <div class="stat-card"><div class="stat-icon">🚨</div><div id="statEmergency" class="stat-value">0</div><div class="stat-label">Emergency Saya</div></div>
+    <div class="stat-card"><div class="stat-icon">❤️</div><div id="statLikes" class="stat-value">0</div><div class="stat-label">Total Like</div></div>
+    <div class="stat-card"><div class="stat-icon">👁️</div><div id="statViews" class="stat-value">0</div><div class="stat-label">Total Viewer</div></div>
+  </section>
+
+  <div class="filter-wrap">
+    <button class="filter-btn active" data-filter="all" onclick="setFilter('all', this)">Semua</button>
+    <button class="filter-btn" data-filter="post" onclick="setFilter('post', this)">📝 Postingan</button>
+    <button class="filter-btn" data-filter="emergency" onclick="setFilter('emergency', this)">🚨 Emergency</button>
+  </div>
+
+  <div class="section-title"><h2 id="sectionTitle">Aktivitas Saya</h2><span id="itemCount">0 item</span></div>
+
+  <div id="loadingState" class="state"><div class="spinner"></div><h3>Memuat data...</h3><p>Mengambil aktivitas akun Anda dari database SALINK.</p></div>
+  <div id="errorState" class="state hidden"><div class="state-icon">⚠️</div><h3>Data tidak dapat dimuat</h3><p id="errorMessage">Terjadi kesalahan.</p></div>
+  <div id="emptyState" class="state hidden"><div class="state-icon">📭</div><h3>Belum ada aktivitas</h3><p>Belum ditemukan postingan atau laporan emergency milik akun ini.</p></div>
+  <div id="content" class="hidden"></div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <a href="dashboard.html" class="nav-item-bottom" data-workspace="home"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></a>
+  <a href="toko.html" class="nav-item-bottom" data-workspace="toko"><span class="nav-icon">🛒</span><span class="nav-label">Toko</span></a>
+  <button class="nav-item-bottom" id="bottomInviteNav" data-workspace="invite"><span class="nav-icon">📨</span><span class="nav-label">Invite</span><span class="badge" id="inviteBadge">0</span></button>
+  <button class="nav-item-bottom" id="bottomNotifNav" data-workspace="notification"><span class="nav-icon">🔔</span><span class="nav-label">Notif</span><span class="badge" id="notifBadge">0</span></button>
+  <a href="profil.html" class="nav-item-bottom" data-workspace="profile"><span class="nav-icon">👤</span><span class="nav-label">Profil</span></a>
+</nav>
+
+<!-- MODAL DETAIL -->
+<div id="detailModal" class="modal" onclick="closeModalOutside(event)">
+  <div class="modal-box">
+    <div class="modal-head"><h3>📋 Detail Laporan</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+/* ====================================================================
+ * SALINK LAPORAN SAYA v4.0 — with CENTRAL SYNC
+ * ==================================================================== */
+
+const API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
+const LOGIN_URL = 'login-register.html';
+const DASHBOARD_URL = 'dashboard.html';
+const PROFILE_URL = 'profil.html';
+const EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
+
+const EMERGENCY_LABELS = { 'fire': '🔥 Kebakaran', 'medical': '🚑 Medis & Kematian', 'crime': '🚓 Kriminal', 'disaster': '🌪️ Bencana Alam' };
+const EMERGENCY_ICONS = { 'fire': '🔥', 'medical': '🚑', 'crime': '🚓', 'disaster': '🌪️' };
+
+let currentUser = null;
+let currentTheme = 'dark';
+let emergencyReports = [];
+let posts = [];
+let currentFilter = 'all';
+let pendingDelete = null;
+let syncChannel = null;
+
+try {
+    syncChannel = new BroadcastChannel('salink_sync');
+    syncChannel.onmessage = (event) => handleSyncMessage(event.data);
+} catch(e) {}
+
+// ====================================================================
+// CENTRAL DELETE
+// ====================================================================
+function requestDelete(type, id, description) {
+    if (!confirm('⚠️ KONFIRMASI PERTAMA\n\nAnda akan menghapus ' + description + '.\n\nLanjutkan?')) return;
+    pendingDelete = { type, id, description };
+    document.getElementById('deleteConfirmMsg').innerHTML = `Anda akan menghapus <strong>${description}</strong> dari SEMUA halaman:<br><br>✅ Dashboard<br>✅ Profil<br>✅ Laporan Saya<br>✅ Statistik<br>✅ Command Center`;
+    document.getElementById('deleteConfirmModal').classList.add('active');
+}
+function closeDeleteConfirm() { pendingDelete = null; document.getElementById('deleteConfirmModal').classList.remove('active'); }
+async function confirmDeleteNow() {
+    if (!pendingDelete) return;
+    const { type, id } = pendingDelete;
+    document.getElementById('deleteConfirmModal').classList.remove('active');
+    pendingDelete = null;
+    showSyncIndicator();
+    try {
+        let allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
+        allPosts = allPosts.filter(p => p.id !== id);
+        localStorage.setItem('salink_posts', JSON.stringify(allPosts));
+        let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+        ems = ems.filter(e => e.id !== id);
+        localStorage.setItem('salink_emergencies', JSON.stringify(ems));
+        try { await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'delete_content', data: { type, id, userId: currentUser?.username || '' } }) }); } catch(e) {}
+        broadcastSync('delete_post', { id });
+        await loadAll();
+        showToast('✅ Dihapus', 'Data dihapus dari semua halaman', 'fa-check-circle', 'success');
+    } catch(e) {
+        showToast('⚠️ Gagal', 'Tidak dapat menghapus', 'fa-exclamation-triangle', 'error');
+    }
+    hideSyncIndicator();
+}
+
+// SYNC
+function handleSyncMessage(data) {
+    if (!data || !data.type) return;
+    showSyncIndicator();
+    loadAll().finally(() => hideSyncIndicator());
+}
+function showSyncIndicator() { document.getElementById('syncIndicator')?.classList.add('active'); }
+function hideSyncIndicator() { setTimeout(() => document.getElementById('syncIndicator')?.classList.remove('active'), 1500); }
+function broadcastSync(type, data = {}) {
+    if (syncChannel) { try { syncChannel.postMessage({ type, data, timestamp: Date.now() }); } catch(e) {} }
+    try { localStorage.setItem('salink_sync_trigger', JSON.stringify({ type, data, timestamp: Date.now() })); setTimeout(() => localStorage.removeItem('salink_sync_trigger'), 100); } catch(e) {}
+}
+
+// HELPERS
+function esc(v) { if (v === null || v === undefined) return ''; return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+function getValue(obj, keys, fallback = '') { for (const key of keys) { if (obj && obj[key] !== undefined && obj[key] !== null && String(obj[key]).trim() !== '') return obj[key]; } return fallback; }
+function formatNumber(v) { return Number(v || 0).toLocaleString('id-ID'); }
+function formatDate(value) { if (!value) return 'Tanggal tidak tersedia'; const d = new Date(value); if (Number.isNaN(d.getTime())) return String(value); return d.toLocaleString('id-ID', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+function getTimeAgo(ts) { const diff = Date.now() - ts; const sec = Math.floor(diff/1000), min = Math.floor(sec/60), hr = Math.floor(min/60), day = Math.floor(hr/24); if (sec < 60) return 'Baru saja'; if (min < 60) return `${min}m lalu`; if (hr < 24) return `${hr}j lalu`; if (day < 7) return `${day}h lalu`; return new Date(ts).toLocaleDateString('id-ID'); }
+function typeInfo(type) { const map = { fire: { icon: '🔥', label: 'Kebakaran' }, medical: { icon: '🚑', label: 'Medis & Kematian' }, crime: { icon: '🚓', label: 'Kriminal' }, disaster: { icon: '🌪️', label: 'Bencana Alam' } }; return map[String(type || '').trim().toLowerCase()] || { icon: '🚨', label: 'Emergency' }; }
+function normalizeStatus(s) { const v = String(s || '').toLowerCase(); if (['resolved','selesai','closed','ditangani'].includes(v)) return { key: 'resolved', label: 'Selesai Ditangani', className: 'status-resolved' }; return { key: 'active', label: 'Aktif', className: 'status-active' }; }
+function parseLikesCount(p) { try { if (typeof p.likes === 'string' && p.likes.trim().startsWith('[')) { const arr = JSON.parse(p.likes); if (Array.isArray(arr)) return arr.length; } } catch(e) {} return 0; }
+function parseViewerCount(p) { return parseInt(getValue(p, ['viewerCount', 'viewCount', 'views'], 0), 10) || 0; }
+
+// TOAST
+function showToast(title, message, icon = 'fa-info-circle', type = 'info') {
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML = `<div class="toast-icon"><i class="fas ${icon}"></i></div><div class="toast-content"><div class="toast-title">${esc(title)}</div><div class="toast-message">${esc(message)}</div></div><button class="toast-close"><i class="fas fa-times"></i></button>`;
+    toast.querySelector('.toast-close').onclick = () => { toast.classList.add('hide'); setTimeout(() => toast.remove(), 400); };
+    container.appendChild(toast);
+    setTimeout(() => { toast.classList.add('hide'); setTimeout(() => toast.remove(), 400); }, 4500);
+}
+
+// THEME
+function loadTheme() {
+    const t = localStorage.getItem('salink_theme') || 'dark';
+    if (t === 'light') { currentTheme = 'light'; document.documentElement.setAttribute('data-theme', 'light'); document.getElementById('themeToggle')?.classList.add('active'); document.getElementById('toggleIcon').className = 'fas fa-sun'; }
+}
+function toggleTheme() {
+    const html = document.documentElement;
+    const tt = document.getElementById('themeToggle');
+    const ti = document.getElementById('toggleIcon');
+    if (currentTheme === 'dark') { currentTheme = 'light'; html.setAttribute('data-theme', 'light'); tt?.classList.add('active'); ti.className = 'fas fa-sun'; localStorage.setItem('salink_theme', 'light'); }
+    else { currentTheme = 'dark'; html.removeAttribute('data-theme'); tt?.classList.remove('active'); ti.className = 'fas fa-moon'; localStorage.setItem('salink_theme', 'dark'); }
+}
+
+// SIDEBAR
+function openSidebar() { document.getElementById('sidebar')?.classList.add('active'); document.getElementById('sidebarOverlay')?.classList.add('active'); }
+function closeSidebar() { document.getElementById('sidebar')?.classList.remove('active'); document.getElementById('sidebarOverlay')?.classList.remove('active'); }
+
+// USER
+function getCurrentUser() { try { const raw = localStorage.getItem('salink_user'); if (!raw) return null; const p = JSON.parse(raw); if (p && typeof p === 'object') return p; } catch(e) {} return null; }
+function loadCurrentUser() {
+    currentUser = getCurrentUser();
+    if (!currentUser) { showError('Akun tidak ditemukan. Silakan login kembali.'); return; }
+    renderUser(); updateSidebar();
+    document.getElementById('logoutNavItem').style.display = 'block';
+}
+function renderUser() {
+    if (!currentUser) return;
+    const name = getValue(currentUser, ['fullName', 'name'], 'Pengguna SALINK');
+    const username = getValue(currentUser, ['username'], '');
+    const photo = getValue(currentUser, ['profilePicture', 'photo'], '');
+    document.getElementById('userName').textContent = name;
+    document.getElementById('userUsername').textContent = username ? '@' + username : 'Akun SALINK';
+    const avatar = document.getElementById('avatar');
+    if (photo) avatar.innerHTML = '<img src="' + esc(photo) + '" alt="">';
+    else avatar.textContent = String(name).charAt(0).toUpperCase() || 'U';
+    const userBtn = document.getElementById('userBtn');
+    if (userBtn) { if (photo) userBtn.innerHTML = `<img src="${esc(photo)}">`; else userBtn.innerHTML = '<i class="fas fa-user"></i>'; }
+}
+function updateSidebar() {
+    if (!currentUser) return;
+    document.getElementById('sidebarUserName').textContent = currentUser.fullName || 'User';
+    document.getElementById('sidebarUserEmail').textContent = currentUser.email || currentUser.username || '-';
+    if (currentUser.profilePicture) document.getElementById('sidebarUserAvatar').innerHTML = `<img src="${esc(currentUser.profilePicture)}">`;
+    else document.getElementById('sidebarUserAvatar').innerHTML = currentUser.gender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>';
+}
+
+// API
+async function fetchSALINK(action) {
+    const url = API_URL + (API_URL.includes('?') ? '&' : '?') + 'action=' + encodeURIComponent(action) + '&_=' + Date.now();
+    const r = await fetch(url, { method: 'GET', cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    if (j && j.status && j.status !== 'success') throw new Error(j.message || 'API error');
+    return j;
+}
+function extractArray(r) { if (Array.isArray(r)) return r; if (r && Array.isArray(r.data)) return r.data; return []; }
+
+// LOAD
+async function loadAll() {
+    showState('loading');
+    currentUser = getCurrentUser();
+    if (!currentUser) { showError('Akun tidak ditemukan'); return; }
+    renderUser();
+    const identifiers = { username: String(currentUser.username || '').toLowerCase(), email: String(currentUser.email || '').toLowerCase() };
+    try {
+        // Emergencies
+        try {
+            const er = await fetchSALINK('get_emergencies');
+            const allEms = extractArray(er);
+            emergencyReports = allEms.filter(e => {
+                const s = String(getValue(e, ['sender', 'senderUsername', 'userId'], '')).toLowerCase();
+                const su = String(getValue(e, ['senderUsername', 'username'], '')).toLowerCase();
+                return (identifiers.username && (s === identifiers.username || su === identifiers.username));
+            });
+        } catch(e) { emergencyReports = []; }
+        // Posts (merge API + local)
+        let apiPosts = [];
+        try { const pr = await fetchSALINK('get_posts'); apiPosts = extractArray(pr); } catch(e) {}
+        let localPosts = [];
+        try { const raw = localStorage.getItem('salink_posts'); if (raw) { const p = JSON.parse(raw); if (Array.isArray(p)) localPosts = p; } } catch(e) {}
+        const postMap = new Map();
+        apiPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
+        localPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
+        const allPosts = Array.from(postMap.values());
+        posts = allPosts.filter(p => {
+            const uid = String(getValue(p, ['userId', 'username'], '')).toLowerCase();
+            return identifiers.username && uid === identifiers.username;
+        }).filter(p => { const hasText = p.text && p.text.trim(); const hasMedia = p.mediaData && p.mediaData !== ''; return hasText || hasMedia; }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        localStorage.setItem('salink_posts', JSON.stringify(allPosts));
+        updateStats();
+        render();
+    } catch(e) { console.error(e); showError(e.message); }
+}
+
+function updateStats() {
+    const upd = (el, val) => { if (!el) return; const f = formatNumber(val); if (el.textContent !== f) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); setTimeout(() => el.classList.remove('bump'), 600); } el.textContent = f; };
+    let likes = 0, views = 0;
+    posts.forEach(p => { likes += parseLikesCount(p); views += parseViewerCount(p); });
+    upd(document.getElementById('statPosts'), posts.length);
+    upd(document.getElementById('statEmergency'), emergencyReports.length);
+    upd(document.getElementById('statLikes'), likes);
+    upd(document.getElementById('statViews'), views);
+}
+
+function setFilter(f, btn) { currentFilter = f; document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); render(); }
+
+function render() {
+    let items = [];
+    if (currentFilter === 'all' || currentFilter === 'post') posts.forEach(p => items.push({ kind: 'post', data: p }));
+    if (currentFilter === 'all' || currentFilter === 'emergency') emergencyReports.forEach(e => items.push({ kind: 'emergency', data: e }));
+    items.sort((a, b) => new Date(getValue(b.data, ['timestamp'], 0)).getTime() - new Date(getValue(a.data, ['timestamp'], 0)).getTime());
+    document.getElementById('itemCount').textContent = items.length + ' item';
+    if (!items.length) { document.getElementById('content').innerHTML = ''; showState('empty'); return; }
+    hideStates();
+    document.getElementById('content').classList.remove('hidden');
+    document.getElementById('content').innerHTML = items.map(i => i.kind === 'emergency' ? renderEmergency(i.data) : renderPost(i.data)).join('');
+}
+
+function renderEmergency(item) {
+    const type = typeInfo(getValue(item, ['type']));
+    const status = normalizeStatus(getValue(item, ['status']));
+    const location = getValue(item, ['address', 'location'], '-');
+    const desc = getValue(item, ['description', 'text'], '-');
+    const id = getValue(item, ['id'], '');
+    return `
+        <article class="report-card">
+            <div class="report-head">
+                <div class="type-badge">${type.icon} ${esc(type.label)}</div>
+                <div class="report-date">${esc(formatDate(getValue(item, ['timestamp'])))}</div>
+            </div>
+            <div class="report-location"><span>📍</span><span>${esc(location)}</span></div>
+            <div class="report-description">${esc(desc)}</div>
+            <div class="report-meta">
+                <span class="meta-pill ${status.className}">${esc(status.label)}</span>
+                ${id ? `<span class="meta-pill">ID: ${esc(id.substring(0, 12))}...</span>` : ''}
+            </div>
+            <div class="report-actions">
+                ${id ? `<button class="action-btn primary" onclick="window.location.href='detail-emergency.html?id=${encodeURIComponent(id)}'">👁️ Detail</button>` : '<button class="action-btn" disabled>👁️ Detail</button>'}
+                <button class="action-btn" onclick='shareItem(${safeJSONString(item)})'>🔗 Bagikan</button>
+                <button class="action-btn danger" onclick="requestDelete('emergency', '${esc(id)}', '${esc(type.label)}')">🗑️ Hapus</button>
+            </div>
+        </article>
+    `;
+}
+
+function renderPost(item) {
+    const text = getValue(item, ['text'], '');
+    const likes = parseLikesCount(item);
+    const views = parseViewerCount(item);
+    const id = getValue(item, ['id'], '');
+    const isSpecial = item.isSpecial && item.specialType;
+    const badge = isSpecial ? `${EMERGENCY_ICONS[item.specialType]} ${EMERGENCY_LABELS[item.specialType]}` : '📝 Postingan';
+    return `
+        <article class="report-card">
+            <div class="report-head">
+                <div class="type-badge">${badge}</div>
+                <div class="report-date">${esc(formatDate(getValue(item, ['timestamp'])))}</div>
+            </div>
+            ${text ? `<div class="report-description" style="color:var(--text-primary);font-size:13px;">${esc(text)}</div>` : ''}
+            <div class="report-meta">
+                <span class="meta-pill">❤️ ${formatNumber(likes)}</span>
+                <span class="meta-pill">👁️ ${formatNumber(views)}</span>
+            </div>
+            <div class="report-actions">
+                <button class="action-btn primary" onclick='showPostDetail(${safeJSONString(item)})'>👁️ Detail</button>
+                <button class="action-btn" onclick='shareItem(${safeJSONString(item)})'>🔗 Bagikan</button>
+                <button class="action-btn danger" onclick="requestDelete('post', '${esc(id)}', 'Postingan')">🗑️ Hapus</button>
+            </div>
+        </article>
+    `;
+}
+function safeJSONString(v) { return JSON.stringify(v).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/'/g, '\\u0027'); }
+
+function shareItem(item) {
+    const text = getValue(item, ['text', 'description'], 'SALINK Item');
+    if (navigator.share) navigator.share({ title: 'SALINK', text, url: window.location.href }).catch(() => {});
+    else navigator.clipboard.writeText(text + '\n' + window.location.href).then(() => showToast('📋', 'Disalin', 'fa-copy'));
+}
+function showPostDetail(item) {
+    const rows = [
+        ['Jenis', item.isSpecial ? `${EMERGENCY_ICONS[item.specialType]} ${EMERGENCY_LABELS[item.specialType]}` : '📝 Postingan'],
+        ['Waktu', formatDate(getValue(item, ['timestamp']))],
+        ['Isi', getValue(item, ['text'], 'Tidak tersedia')],
+        ['Total Like', formatNumber(parseLikesCount(item))],
+        ['Total Viewer', formatNumber(parseViewerCount(item))]
+    ];
+    document.getElementById('detailContent').innerHTML = rows.map(r => `<div class="detail-row"><div class="detail-label">${esc(r[0])}</div><div class="detail-value">${esc(r[1])}</div></div>`).join('');
+    document.getElementById('detailModal').classList.add('show');
+}
+function closeModal() { document.getElementById('detailModal').classList.remove('show'); }
+function closeModalOutside(e) { if (e.target.id === 'detailModal') closeModal(); }
+
+function showState(s) { hideStates(); document.getElementById('content').classList.add('hidden'); if (s === 'loading') document.getElementById('loadingState').classList.remove('hidden'); if (s === 'empty') document.getElementById('emptyState').classList.remove('hidden'); }
+function hideStates() { ['loadingState', 'errorState', 'emptyState'].forEach(id => document.getElementById(id)?.classList.add('hidden')); }
+function showError(msg) { hideStates(); document.getElementById('errorMessage').textContent = msg; document.getElementById('errorState').classList.remove('hidden'); }
+
+function handleLogout() {
+    if (confirm('Keluar dari akun?')) {
+        ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies'].forEach(k => localStorage.removeItem(k));
+        window.location.href = DASHBOARD_URL + '?logout=1';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 SALINK Laporan Saya v4.0 Initializing...');
+    loadTheme();
+    loadCurrentUser();
+    if (!currentUser) return;
+    await loadAll();
+
+    document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
+    document.getElementById('menuBtn')?.addEventListener('click', () => openSidebar());
+    document.getElementById('sidebarClose')?.addEventListener('click', closeSidebar);
+    document.getElementById('sidebarOverlay')?.addEventListener('click', closeSidebar);
+    document.getElementById('refreshBtn')?.addEventListener('click', async function() { this.classList.add('loading'); await loadAll(); this.classList.remove('loading'); showToast('🔄', 'Data diperbarui', 'fa-sync-alt'); });
+    document.getElementById('logoutBtn')?.addEventListener('click', (e) => { e.preventDefault(); handleLogout(); });
+    document.getElementById('userBtn')?.addEventListener('click', () => window.location.href = PROFILE_URL);
+
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'salink_sync_trigger') { try { const data = JSON.parse(e.newValue); if (data && data.type) handleSyncMessage(data); } catch(err) {} }
+        if (e.key === 'salink_posts' || e.key === 'salink_emergencies') loadAll();
+        if (e.key === 'salink_user') loadCurrentUser();
+        if (e.key === 'salink_theme') loadTheme();
+    });
+
+    setInterval(() => { if (!document.hidden && currentUser) loadAll(); }, 30000);
+    console.log('✅ Laporan Saya v4.0 Ready!');
+});
+
+window.requestDelete = requestDelete;
+window.confirmDeleteNow = confirmDeleteNow;
+window.closeDeleteConfirm = closeDeleteConfirm;
+window.setFilter = setFilter;
+window.shareItem = shareItem;
+window.showPostDetail = showPostDetail;
+window.closeModal = closeModal;
+window.closeModalOutside = closeModalOutside;
+</script>
+<!-- SALINK FCM + EMERGENCY ALERT UNIVERSAL -->
+<script src="/firebase-config.js"></script>
+<script src="/fcm-client.js"></script>
+<script src="/salink-emergency.js"></script>
+<script>
+(function() {
+  'use strict';
+  window.addEventListener('load', async function() {
+    const isLoggedIn = localStorage.getItem('salink_logged_in');
+    const userData = localStorage.getItem('salink_user');
+    if (isLoggedIn !== 'true' || !userData) return;
+    let user;
+    try { user = JSON.parse(userData); } catch(e) { return; }
+    if (!user || !user.username) return;
+    try {
+      if (typeof SalinkFCM === 'undefined') return;
+      const initResult = await SalinkFCM.init();
+      if (!initResult.ok) return;
+      await SalinkFCM.saveToken({
+        userId: user.id,
+        username: user.username,
+        email: user.email
+      });
+      console.log('✅ [FCM] Token saved');
+    } catch (err) {
+      console.error('❌ [FCM]', err);
+    }
+  });
+})();
+</script>
+</body>
+</html>
