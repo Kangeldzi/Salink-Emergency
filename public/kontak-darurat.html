@@ -1,0 +1,1386 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SALINK - Kontak Darurat</title>
+
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0d1117" id="themeColorMeta">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SALINK">
+    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-card: rgba(22, 27, 34, 0.92);
+            --bg-input: rgba(22, 27, 34, 0.6);
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --border-color: #30363d;
+            --shadow-color: rgba(0,0,0,0.4);
+            --shadow-light: rgba(0,0,0,0.2);
+            --accent-blue: #58a6ff;
+            --accent-blue-dark: #1f6feb;
+            --accent-blue-gradient: linear-gradient(135deg, #58a6ff, #1f6feb);
+            --accent-green: #25D366;
+            --accent-red: #f85149;
+            --accent-gold: #f0d080;
+            --accent-purple: #c792ea;
+            --toggle-bg: #30363d;
+            --toggle-thumb: #58a6ff;
+            --header-bg: rgba(22, 27, 34, 0.95);
+            --footer-bg: rgba(13, 17, 23, 0.95);
+            --modal-bg: rgba(22, 27, 34, 0.98);
+            --input-border: #30363d;
+            --header-height: 60px;
+            --footer-height: 65px;
+            --danger: #f85149;
+            --success: #3fb950;
+        }
+        [data-theme="light"] {
+            --bg-primary: #f0f4f8;
+            --bg-secondary: #e8edf2;
+            --bg-card: rgba(255, 255, 255, 0.92);
+            --bg-input: rgba(0,0,0,0.04);
+            --text-primary: #1a1a2e;
+            --text-secondary: #4a4a6a;
+            --text-muted: #6a6a8a;
+            --border-color: #d0d7de;
+            --shadow-color: rgba(0,0,0,0.08);
+            --shadow-light: rgba(0,0,0,0.04);
+            --accent-blue: #4facfe;
+            --accent-blue-dark: #00c6fb;
+            --accent-blue-gradient: linear-gradient(135deg, #4facfe, #00c6fb);
+            --accent-red: #e31837;
+            --accent-gold: #8d6b4b;
+            --accent-purple: #7c3aed;
+            --toggle-bg: #d0d7de;
+            --toggle-thumb: #4facfe;
+            --header-bg: rgba(255, 255, 255, 0.95);
+            --footer-bg: rgba(255, 255, 255, 0.95);
+            --modal-bg: rgba(255, 255, 255, 0.98);
+            --input-border: #dce1e8;
+            --danger: #e31837;
+            --success: #2ea44f;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary); color: var(--text-primary);
+            min-height: 100vh; overflow-x: hidden;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+        ::-webkit-scrollbar { width: 3px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        ::-webkit-scrollbar-thumb { background: var(--accent-blue); border-radius: 3px; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes modalIn { from { transform: scale(0.8) translateY(30px); opacity: 0; } to { transform: scale(1) translateY(0); opacity: 1; } }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes blink { 0%, 100% { color: #ff0000; text-shadow: 0 0 20px rgba(255,0,0,0.8); transform: scale(1); } 50% { color: #00C2FF; text-shadow: 0 0 20px rgba(0,194,255,0.8); transform: scale(1.1); } }
+        @keyframes toastIn { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes toastOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(30px); opacity: 0; } }
+        @keyframes notifPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.3); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+        /* HEADER */
+        .app-bar {
+            position: fixed; top: 0; width: 100%; height: var(--header-height);
+            background: var(--header-bg); backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 12px; z-index: 1000;
+            box-shadow: 0 2px 20px var(--shadow-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .app-title {
+            display: flex; align-items: center; gap: 8px;
+            font-weight: 700; color: var(--text-primary); font-size: 1.1rem;
+            cursor: pointer; font-family: 'Poppins', sans-serif;
+        }
+        .app-title .siren-icon-header {
+            font-size: 1.5rem; display: inline-block;
+            animation: spin 1.5s linear infinite, blink 1s ease-in-out infinite;
+            line-height: 1; transform-origin: center;
+        }
+        .app-title span { font-size: 1rem; }
+        .header-center { display: flex; align-items: center; gap: 8px; }
+        .header-right { display: flex; align-items: center; gap: 6px; }
+
+        .menu-btn, .search-btn, .back-btn, .user-btn {
+            width: 36px; height: 36px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--bg-input); border: 1px solid var(--border-color);
+            color: var(--text-primary); cursor: pointer; flex-shrink: 0;
+            transition: all 0.3s; text-decoration: none; overflow: hidden;
+        }
+        .menu-btn:hover, .search-btn:hover, .back-btn:hover, .user-btn:hover { border-color: var(--accent-blue); transform: scale(1.05); }
+        .menu-btn:active, .search-btn:active, .back-btn:active, .user-btn:active { transform: scale(0.95); }
+        .menu-btn i, .search-btn i, .back-btn i, .user-btn i { font-size: 1rem; }
+        .user-btn img { width: 100%; height: 100%; object-fit: cover; }
+        .user-btn .user-initials { font-size: 0.9rem; font-weight: 600; color: #fff; }
+
+        .theme-toggle {
+            position: relative; width: 44px; height: 24px;
+            background: var(--toggle-bg); border-radius: 30px; cursor: pointer;
+            transition: all 0.3s ease; border: 1px solid var(--border-color); flex-shrink: 0;
+        }
+        .theme-toggle.active { background: rgba(88,166,255,0.3); }
+        .theme-toggle .toggle-thumb {
+            position: absolute; top: 2px; left: 2px;
+            width: 18px; height: 18px; border-radius: 50%;
+            background: var(--toggle-thumb); transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(88,166,255,0.3);
+            display: flex; align-items: center; justify-content: center; font-size: 0.55rem;
+        }
+        .theme-toggle.active .toggle-thumb { left: 22px; }
+        .theme-toggle .toggle-thumb i { color: #fff; }
+
+        /* SIDEBAR */
+        .sidebar-overlay-bg {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 1099; display: none;
+            opacity: 0; transition: opacity 0.3s ease;
+        }
+        .sidebar-overlay-bg.active { display: block; opacity: 1; }
+        .sidebar {
+            position: fixed; top: var(--header-height); left: 0;
+            width: 290px; max-height: calc(100vh - var(--header-height));
+            background: var(--bg-secondary); z-index: 1100;
+            overflow-y: auto; box-shadow: 15px 0 30px var(--shadow-color);
+            border-right: 1px solid var(--border-color);
+            display: flex; flex-direction: column;
+            transform: translateX(-100%); transition: transform 0.3s ease;
+            border-radius: 0 0 12px 0;
+        }
+        .sidebar.active { transform: translateX(0); }
+        .sidebar-close {
+            position: absolute; top: 10px; right: 10px;
+            width: 28px; height: 28px; border-radius: 50%;
+            background: var(--bg-input); border: 1px solid var(--border-color);
+            color: var(--text-primary); cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.7rem; z-index: 10; transition: all 0.3s;
+        }
+        .sidebar-close:hover { border-color: var(--accent-blue); transform: rotate(90deg); }
+        .sidebar-header {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 4px; padding: 10px 16px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--bg-card); flex-shrink: 0;
+        }
+        .sidebar-user-avatar {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: var(--accent-blue-gradient);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-weight: bold; font-size: 1.1rem;
+            box-shadow: 0 0 20px rgba(88,166,255,0.3);
+            overflow: hidden; border: 2px solid var(--accent-blue); flex-shrink: 0;
+        }
+        .sidebar-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .sidebar-user-name { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); text-align: center; }
+        .sidebar-user-email { font-size: 0.6rem; color: var(--text-muted); text-align: center; }
+        .nav-menu { list-style: none; padding: 6px 12px 12px; flex: 1; overflow-y: auto; }
+        .nav-section-title {
+            font-size: 0.55rem; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 1px;
+            padding: 10px 14px 4px; font-weight: 600;
+        }
+        .nav-item { margin-bottom: 2px; }
+        .nav-link {
+            display: flex; align-items: center; gap: 12px;
+            padding: 8px 14px; color: var(--text-primary); text-decoration: none;
+            border-radius: 8px; font-size: 0.8rem; background: var(--bg-input);
+            border: 1px solid transparent; cursor: pointer; transition: all 0.3s;
+        }
+        .nav-link:hover { border-color: var(--accent-blue); transform: translateX(5px); }
+        .nav-link.active {
+            background: rgba(88,166,255,0.15); color: var(--accent-blue);
+            border: 1px solid var(--accent-blue);
+        }
+        .nav-link i { width: 22px; text-align: center; font-size: 0.95rem; color: var(--accent-blue); }
+        .nav-link.special { background: rgba(88,166,255,0.1); border: 1px dashed var(--accent-blue); }
+        .nav-logout { margin-top: 8px; border-top: 1px solid var(--border-color); padding-top: 8px; }
+        .nav-logout .nav-link { color: var(--accent-red); }
+        .nav-logout .nav-link:hover { color: var(--accent-red); border-color: var(--accent-red); }
+        .nav-logout .nav-link i { color: var(--accent-red); }
+
+        /* MAIN */
+        .main-content {
+            padding: calc(var(--header-height) + 14px) 14px calc(var(--footer-height) + 20px);
+            max-width: 600px; margin: 0 auto; width: 100%; min-height: 100vh;
+        }
+
+        .brand-section {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; margin-bottom: 16px; background: var(--bg-card);
+            padding: 12px 16px; border-radius: 14px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 15px var(--shadow-light);
+        }
+        .brand-left { display: flex; align-items: center; gap: 12px; }
+        .brand-icon { font-size: 2rem; line-height: 1; }
+        .brand-title { font-size: 1.1rem; font-weight: 700; color: var(--text-primary); font-family: 'Poppins', sans-serif; }
+        .brand-subtitle { font-size: 0.6rem; color: var(--text-muted); font-weight: 500; }
+        .back-home-btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--bg-input); border: 1px solid var(--border-color);
+            color: var(--text-primary); padding: 6px 14px; border-radius: 10px;
+            font-size: 0.7rem; cursor: pointer; transition: all 0.3s;
+            text-decoration: none; font-weight: 500;
+        }
+        .back-home-btn:hover { border-color: var(--accent-blue); background: var(--bg-card); }
+
+        .hero {
+            background: var(--accent-blue-gradient); border-radius: 16px;
+            padding: 20px 24px; margin-bottom: 16px; color: #fff;
+            box-shadow: 0 4px 20px rgba(88,166,255,0.3);
+        }
+        .hero-icon { font-size: 2.2rem; margin-bottom: 6px; }
+        .hero h1 { font-size: 1.3rem; font-weight: 700; font-family: 'Poppins', sans-serif; }
+        .hero p { font-size: 0.75rem; opacity: 0.85; line-height: 1.5; max-width: 500px; margin-top: 4px; }
+
+        .control-card {
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            border-radius: 14px; padding: 14px 16px; margin-bottom: 16px;
+            box-shadow: 0 4px 15px var(--shadow-light);
+        }
+        .search-box { position: relative; margin-bottom: 12px; }
+        .search-box .search-icon {
+            position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+            color: var(--text-muted); font-size: 0.9rem;
+        }
+        .search-box input {
+            width: 100%; padding: 10px 14px 10px 38px;
+            background: var(--bg-input); border: 1px solid var(--border-color);
+            border-radius: 10px; color: var(--text-primary); font-size: 0.75rem;
+            transition: all 0.3s;
+        }
+        .search-box input:focus { outline: none; border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(88,166,255,0.1); }
+        .search-box input::placeholder { color: var(--text-muted); }
+
+        .filter-title { font-size: 0.7rem; font-weight: 600; color: var(--text-primary); margin-bottom: 8px; }
+        .filter-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+        .filter-btn {
+            padding: 5px 12px; border-radius: 16px;
+            border: 1px solid var(--border-color); background: var(--bg-input);
+            color: var(--text-muted); font-size: 0.6rem; font-weight: 500;
+            cursor: pointer; transition: all 0.3s;
+        }
+        .filter-btn:hover { border-color: var(--accent-blue); color: var(--text-primary); }
+        .filter-btn.active {
+            background: var(--accent-blue-gradient); color: #fff;
+            border-color: var(--accent-blue);
+            box-shadow: 0 2px 12px rgba(88,166,255,0.3);
+        }
+        .filter-btn:active { transform: scale(0.95); }
+
+        .summary {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+        }
+        .summary-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); font-family: 'Poppins', sans-serif; }
+        .summary-count { font-size: 0.65rem; color: var(--text-muted); }
+        .refresh-btn {
+            background: var(--bg-input); border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 6px 12px; color: var(--text-muted);
+            font-size: 0.6rem; cursor: pointer; transition: all 0.3s;
+        }
+        .refresh-btn:hover { border-color: var(--accent-blue); color: var(--text-primary); }
+
+        .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .contact-card {
+            background: var(--bg-card); border: 1px solid var(--border-color);
+            border-radius: 14px; padding: 14px 16px;
+            box-shadow: 0 4px 15px var(--shadow-light);
+            transition: all 0.3s;
+        }
+        .contact-card:hover { transform: translateY(-3px); border-color: var(--accent-blue); box-shadow: 0 8px 25px var(--shadow-color); }
+        .contact-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+        .contact-icon {
+            width: 44px; height: 44px; border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.3rem; background: var(--bg-input); flex-shrink: 0;
+        }
+        .contact-level {
+            font-size: 0.5rem; padding: 2px 8px; border-radius: 10px;
+            background: var(--bg-input); color: var(--text-muted); font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .contact-name { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); font-family: 'Poppins', sans-serif; }
+        .contact-category { font-size: 0.6rem; color: var(--text-muted); margin-top: 2px; }
+        .contact-location {
+            display: flex; align-items: flex-start; gap: 6px;
+            padding: 8px 0; border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color); margin: 8px 0;
+            font-size: 0.65rem; color: var(--text-secondary); line-height: 1.4;
+        }
+        .contact-location .loc-icon { flex-shrink: 0; }
+        .contact-distance {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: rgba(88,166,255,0.1); color: var(--accent-blue);
+            padding: 3px 10px; border-radius: 10px; font-size: 0.6rem;
+            font-weight: 600; margin-bottom: 8px;
+        }
+        .contact-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+        .contact-action {
+            display: flex; align-items: center; justify-content: center;
+            gap: 4px; padding: 6px 8px; border-radius: 8px;
+            border: 1px solid var(--border-color); background: var(--bg-input);
+            color: var(--text-muted); font-size: 0.6rem; font-weight: 500;
+            text-decoration: none; cursor: pointer; transition: all 0.3s;
+            font-family: inherit;
+        }
+        .contact-action:hover { border-color: var(--accent-blue); color: var(--text-primary); background: var(--bg-card); }
+        .contact-action.phone { color: var(--success); border-color: rgba(63,185,80,0.2); }
+        .contact-action.phone:hover { background: rgba(63,185,80,0.1); }
+        .contact-action.whatsapp { color: #25D366; border-color: rgba(37,211,102,0.2); }
+        .contact-action.whatsapp:hover { background: rgba(37,211,102,0.1); }
+        .contact-action.maps { color: var(--accent-blue); border-color: rgba(88,166,255,0.2); }
+        .contact-action.maps:hover { background: rgba(88,166,255,0.1); }
+        .contact-action.detail { color: var(--text-muted); }
+        .contact-action.detail:hover { border-color: var(--accent-blue); color: var(--text-primary); }
+        .contact-action.unavailable { opacity: 0.4; cursor: not-allowed; }
+        .contact-action.unavailable:hover { border-color: var(--border-color); background: var(--bg-input); color: var(--text-muted); }
+
+        .state-card {
+            grid-column: 1 / -1; background: var(--bg-card);
+            border-radius: 14px; padding: 30px 20px; text-align: center;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 15px var(--shadow-light);
+        }
+        .state-card .state-icon { font-size: 2.5rem; margin-bottom: 10px; opacity: 0.5; }
+        .state-card .state-title { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; font-family: 'Poppins', sans-serif; }
+        .state-card .state-text { font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; }
+        .state-card .state-text b { color: var(--accent-blue); }
+        .spinner {
+            width: 36px; height: 36px; margin: 0 auto 12px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-blue);
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+        }
+
+        /* MODAL */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px); z-index: 2000;
+            display: none; align-items: center; justify-content: center; padding: 20px;
+        }
+        .modal-overlay.active { display: flex; animation: fadeIn 0.3s ease; }
+        .modal-content {
+            background: var(--modal-bg); border-radius: 20px;
+            max-width: 460px; width: 100%; max-height: 85vh; overflow-y: auto;
+            padding: 20px 18px; border: 1px solid var(--border-color);
+            box-shadow: 0 30px 60px var(--shadow-color);
+            animation: modalIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+            margin: 0 auto;
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 12px; padding-bottom: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .modal-title {
+            font-size: 1rem; font-weight: 600; color: var(--text-primary);
+            display: flex; align-items: center; gap: 8px; font-family: 'Poppins', sans-serif;
+        }
+        .modal-close {
+            background: var(--bg-input); border: none; color: var(--text-primary);
+            width: 30px; height: 30px; border-radius: 50%; font-size: 0.9rem;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s; border: 1px solid var(--border-color);
+        }
+        .modal-close:hover { background: var(--bg-card); transform: rotate(90deg); }
+        .modal-body { color: var(--text-primary); font-size: 0.75rem; padding: 0 2px; }
+        .modal-body .detail-row {
+            display: flex; padding: 6px 0;
+            border-bottom: 1px solid var(--border-color); font-size: 0.7rem;
+        }
+        .modal-body .detail-label { color: var(--text-muted); width: 100px; flex-shrink: 0; font-weight: 500; }
+        .modal-body .detail-value { color: var(--text-primary); word-break: break-word; }
+        .modal-footer {
+            margin-top: 16px; padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+            display: flex; justify-content: center; gap: 10px;
+        }
+        .modal-footer .btn-close-modal {
+            background: var(--bg-input); color: var(--text-primary);
+            border: 1px solid var(--border-color); border-radius: 5px;
+            padding: 8px 30px; font-size: 0.75rem; cursor: pointer;
+            transition: all 0.3s; font-weight: 500; font-family: inherit;
+        }
+        .modal-footer .btn-close-modal:hover { background: var(--bg-card); border-color: var(--accent-blue); }
+
+        /* BOTTOM NAV */
+        .bottom-nav {
+            position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important;
+            width: 100% !important; height: var(--footer-height) !important;
+            min-height: 65px !important; max-height: 65px !important;
+            background: var(--footer-bg) !important; backdrop-filter: blur(15px) !important;
+            border-top: 1px solid var(--border-color) !important;
+            z-index: 1000 !important; display: flex !important;
+            flex-direction: row !important; justify-content: space-around !important;
+            align-items: center !important; padding: 0 4px !important;
+            box-shadow: 0 -5px 20px var(--shadow-color) !important;
+        }
+        .nav-item-bottom {
+            display: flex !important; flex-direction: column !important;
+            align-items: center !important; justify-content: center !important;
+            gap: 4px; padding: 4px 8px; border-radius: 10px; cursor: pointer;
+            transition: all 0.3s; text-decoration: none; color: var(--text-muted);
+            border: none; background: transparent; position: relative !important;
+            min-width: 50px; font-size: 11px; flex: 1 !important; height: 100% !important;
+            max-height: 65px !important; font-family: inherit;
+        }
+        .nav-item-bottom .nav-icon { font-size: 1.6rem; line-height: 1.2; display: block; transition: transform 0.3s ease; }
+        .nav-item-bottom .nav-label { font-size: 0.65rem; font-weight: 500; transition: all 0.3s ease; white-space: nowrap; }
+        .nav-item-bottom:hover .nav-icon { transform: scale(1.15); }
+        .nav-item-bottom.active .nav-icon { transform: scale(1.2); filter: drop-shadow(0 0 8px rgba(88,166,255,0.5)); }
+        .nav-item-bottom.active .nav-label { color: var(--accent-blue); font-weight: 600; }
+        .nav-item-bottom .badge {
+            position: absolute; top: 0 !important; right: 0 !important;
+            background: var(--accent-red); color: white; font-size: 0.55rem;
+            border-radius: 50%; min-width: 18px; height: 18px;
+            display: none; align-items: center; justify-content: center;
+            font-weight: bold; box-shadow: 0 0 10px rgba(248,81,73,0.5);
+            padding: 0 4px; animation: notifPulse 1s ease-in-out infinite; z-index: 10 !important;
+        }
+        .nav-item-bottom .badge.show { display: flex !important; }
+
+        /* TOAST */
+        .toast-container {
+            position: fixed; bottom: calc(var(--footer-height) + 20px);
+            left: 50%; transform: translateX(-50%); z-index: 3000;
+            max-width: 400px; width: 90%;
+        }
+        .toast {
+            background: var(--modal-bg); border: 1px solid var(--border-color);
+            border-radius: 12px; padding: 12px 16px;
+            box-shadow: 0 10px 30px var(--shadow-color);
+            display: flex; align-items: center; gap: 12px;
+            animation: toastIn 0.4s ease; margin-bottom: 8px;
+        }
+        .toast.hide { animation: toastOut 0.4s ease forwards; }
+        .toast .toast-icon {
+            width: 32px; height: 32px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; background: rgba(88,166,255,0.15); color: var(--accent-blue);
+        }
+        .toast .toast-content { flex: 1; }
+        .toast .toast-title { font-size: 0.75rem; font-weight: 600; color: var(--text-primary); }
+        .toast .toast-message { font-size: 0.7rem; color: var(--text-secondary); }
+        .toast .toast-close {
+            background: none; border: none; color: var(--text-muted);
+            cursor: pointer; font-size: 0.8rem; padding: 4px;
+        }
+
+        /* PREVIEW OVERLAY */
+        .preview-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px); z-index: 1500;
+            display: none; align-items: center; justify-content: center; padding: 20px;
+        }
+        .preview-overlay.active { display: flex; animation: fadeIn 0.4s ease; }
+        .preview-overlay-content {
+            background: var(--modal-bg); border-radius: 20px;
+            max-width: 420px; width: 100%; padding: 30px 24px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 30px 60px var(--shadow-color);
+            text-align: center; margin: 0 10px;
+            animation: modalIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275);
+        }
+        .preview-overlay-content .overlay-icon {
+            width: 70px; height: 70px; margin: 0 auto 16px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 50%; background: var(--accent-blue-gradient);
+            box-shadow: 0 0 30px rgba(88,166,255,0.3);
+        }
+        .preview-overlay-content .overlay-icon i { font-size: 2rem; color: #fff; }
+        .preview-overlay-content h2 { font-size: 1.2rem; margin-bottom: 8px; color: var(--text-primary); font-weight: 700; }
+        .preview-overlay-content p { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6; }
+        .preview-overlay-content .overlay-buttons { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+        .preview-overlay-content .overlay-buttons button {
+            padding: 10px 24px; border-radius: 10px; border: none;
+            font-size: 0.8rem; font-weight: 600; cursor: pointer;
+            flex: 1; max-width: 180px; font-family: inherit;
+        }
+        .preview-overlay-content .overlay-buttons .btn-login { background: var(--accent-blue-gradient); color: #fff; }
+        .preview-overlay-content .overlay-buttons .btn-cancel { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-color); }
+
+        .preview-badge {
+            position: fixed; top: var(--header-height); left: 0; right: 0;
+            background: var(--bg-card); backdrop-filter: blur(10px);
+            padding: 6px 16px; text-align: center; z-index: 999;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.7rem; color: var(--text-secondary); display: none;
+        }
+        .preview-badge .login-link { color: var(--accent-blue); font-weight: 600; cursor: pointer; text-decoration: underline; }
+        .preview-badge.active { display: block; }
+
+        .shake-element { animation: shake 0.3s ease; }
+
+        @media (max-width: 480px) {
+            .bottom-nav { height: 58px !important; min-height: 58px !important; max-height: 58px !important; }
+            .nav-item-bottom .nav-icon { font-size: 1.4rem !important; }
+            .nav-item-bottom .nav-label { font-size: 0.55rem !important; }
+            .contact-grid { grid-template-columns: 1fr; gap: 10px; }
+            .filter-btn { font-size: 0.55rem; padding: 4px 10px; }
+            .hero { padding: 16px; }
+            .hero h1 { font-size: 1.1rem; }
+            .modal-content { padding: 16px; }
+            .modal-body .detail-row { flex-direction: column; gap: 2px; }
+            .modal-body .detail-label { width: auto; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- PREVIEW OVERLAY -->
+    <div class="preview-overlay" id="previewOverlay">
+        <div class="preview-overlay-content">
+            <div class="overlay-icon"><i class="fas fa-lock"></i></div>
+            <h2>🔒 Mode Preview</h2>
+            <p>Anda sedang melihat halaman dalam mode baca. Untuk dapat berinteraksi penuh, silakan masuk atau daftar terlebih dahulu.</p>
+            <div class="overlay-buttons">
+                <button class="btn-login" id="overlayLoginBtn"><i class="fas fa-sign-in-alt"></i> Masuk Sekarang</button>
+                <button class="btn-cancel" id="overlayCancelBtn"><i class="fas fa-times"></i> Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="preview-badge" id="previewBadge">
+        <i class="fas fa-eye"></i>
+        <span>Mode Preview - </span>
+        <span class="login-link" id="badgeLoginLink">Masuk untuk berinteraksi</span>
+    </div>
+
+    <!-- HEADER -->
+    <header class="app-bar">
+        <div class="app-title" onclick="window.location.href='dashboard.html'">
+            <span class="siren-icon-header">🚨</span>
+            <span>SALINK</span>
+        </div>
+        <div class="header-center">
+            <button class="menu-btn" id="menuBtn"><i class="fas fa-bars"></i></button>
+            <button class="search-btn" id="searchBtn"><i class="fas fa-search"></i></button>
+            <div class="theme-toggle" id="themeToggle">
+                <div class="toggle-thumb" id="toggleThumb">
+                    <i class="fas fa-moon" id="toggleIcon"></i>
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <button class="user-btn" id="userBtn" data-action="profile"><i class="fas fa-user"></i></button>
+            <a href="dashboard.html" class="back-btn" title="Kembali ke Dashboard">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+        </div>
+    </header>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar-overlay-bg" id="sidebarOverlay"></div>
+    <div class="sidebar" id="sidebar">
+        <button class="sidebar-close" id="sidebarClose"><i class="fas fa-times"></i></button>
+        <div class="sidebar-header">
+            <div class="sidebar-user-avatar" id="sidebarUserAvatar"><i class="fas fa-user"></i></div>
+            <div class="sidebar-user-name" id="sidebarUserName">Guest</div>
+            <div class="sidebar-user-email" id="sidebarUserEmail">guest@salink.id</div>
+        </div>
+        <ul class="nav-menu">
+            <li class="nav-item"><a href="dashboard.html" class="nav-link"><i class="fas fa-home"></i><span>Home</span></a></li>
+
+            <div class="nav-section-title">🚨 MENU DARURAT</div>
+            <li class="nav-item"><a href="kontak-darurat.html" class="nav-link active"><i class="fas fa-phone-alt"></i><span>Kontak Darurat</span></a></li>
+            <li class="nav-item"><a href="laporan-darurat.html" class="nav-link" data-action="login"><i class="fas fa-exclamation-circle"></i><span>Laporan Darurat</span></a></li>
+            <li class="nav-item"><a href="lokasi-bantuan.html" class="nav-link"><i class="fas fa-hospital"></i><span>Lokasi Bantuan</span></a></li>
+            <li class="nav-item"><a href="alert-sekitar.html" class="nav-link"><i class="fas fa-bell"></i><span>Alert Sekitar</span></a></li>
+
+            <div class="nav-section-title">📊 STATISTIK & INFO</div>
+            <li class="nav-item"><a href="statistik.html" class="nav-link"><i class="fas fa-chart-pie"></i><span>Statistik Emergency</span></a></li>
+            <li class="nav-item"><a href="statistik-emergency.html" class="nav-link"><i class="fas fa-satellite-dish"></i><span>Command Center</span></a></li>
+            <li class="nav-item"><a href="laporan-saya.html" class="nav-link" data-action="login"><i class="fas fa-clipboard-list"></i><span>Laporan Saya</span></a></li>
+
+            <div class="nav-section-title">👤 AKUN SAYA</div>
+            <li class="nav-item">
+                <a href="profil.html" class="nav-link special" data-action="profile">
+                    <i class="fas fa-user-circle"></i>
+                    <span>Buka Menu Lengkap Saya →</span>
+                </a>
+            </li>
+            <li class="nav-item nav-logout" id="logoutNavItem" style="display:none;">
+                <a href="#" class="nav-link" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Keluar</span></a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- MAIN -->
+    <main class="main-content">
+        <div class="brand-section">
+            <div class="brand-left">
+                <div class="brand-icon">📞</div>
+                <div>
+                    <div class="brand-title">SALINK</div>
+                    <div class="brand-subtitle">KONTAK DARURAT</div>
+                </div>
+            </div>
+            <button class="back-home-btn" onclick="goHome()">
+                <i class="fas fa-arrow-left"></i> Beranda
+            </button>
+        </div>
+
+        <section class="hero">
+            <div class="hero-icon">📞</div>
+            <h1>Kontak Darurat</h1>
+            <p>
+                Hubungi instansi atau layanan darurat yang tersedia secara langsung.
+                Nomor telepon dan WhatsApp diambil dari database kontak SALINK.
+                <span id="gpsStatusText" style="display:block;font-size:0.65rem;margin-top:6px;opacity:0.8;"></span>
+            </p>
+        </section>
+
+        <section class="control-card">
+            <div class="search-box">
+                <span class="search-icon">🔎</span>
+                <input id="searchInput" type="search" placeholder="Cari instansi, desa, kecamatan..." autocomplete="off">
+            </div>
+            <div class="filter-title">Pilih jenis layanan</div>
+            <div class="filter-buttons" id="filterContainer">
+                <button class="filter-btn active" data-type="" onclick="setFilter(this)">🆘 Semua</button>
+                <button class="filter-btn" data-type="fire" onclick="setFilter(this)">🔥 Kebakaran</button>
+                <button class="filter-btn" data-type="medical" onclick="setFilter(this)">🚑 Medis</button>
+                <button class="filter-btn" data-type="crime" onclick="setFilter(this)">🚓 Keamanan</button>
+                <button class="filter-btn" data-type="disaster" onclick="setFilter(this)">🌪️ Bencana</button>
+                <button class="filter-btn" data-type="general" onclick="setFilter(this)">🏛️ Umum</button>
+            </div>
+        </section>
+
+        <div class="summary">
+            <div>
+                <div class="summary-title">📇 Direktori Kontak</div>
+                <div class="summary-count" id="summaryCount">Memuat data...</div>
+            </div>
+            <button class="refresh-btn" onclick="loadContacts()">
+                <i class="fas fa-sync-alt"></i> Perbarui
+            </button>
+        </div>
+
+        <section class="contact-grid" id="contactContainer">
+            <div class="state-card">
+                <div class="spinner"></div>
+                <div class="state-title">Memuat kontak darurat...</div>
+                <div class="state-text">SALINK sedang mengambil data dari database.</div>
+            </div>
+        </section>
+    </main>
+
+    <!-- BOTTOM NAV -->
+    <nav class="bottom-nav" role="navigation" aria-label="Main Navigation">
+        <a href="dashboard.html" class="nav-item-bottom" data-workspace="home" aria-label="Home">
+            <span class="nav-icon">🏠</span><span class="nav-label">Home</span>
+        </a>
+        <a href="toko.html" class="nav-item-bottom" data-workspace="toko" aria-label="Toko">
+            <span class="nav-icon">🛒</span><span class="nav-label">Toko</span>
+        </a>
+        <button class="nav-item-bottom" id="bottomInviteNav" data-workspace="invite" aria-label="Invite">
+            <span class="nav-icon">📨</span><span class="nav-label">Invite</span>
+            <span class="badge" id="inviteBadge">0</span>
+        </button>
+        <button class="nav-item-bottom" id="bottomNotifNav" data-workspace="notification" aria-label="Notification">
+            <span class="nav-icon">🔔</span><span class="nav-label">Notif</span>
+            <span class="badge" id="notifBadge">0</span>
+        </button>
+        <a href="profil.html" class="nav-item-bottom" data-workspace="profile" data-action="profile" aria-label="Profile">
+            <span class="nav-icon">👤</span><span class="nav-label">Profil</span>
+        </a>
+    </nav>
+
+    <!-- DETAIL MODAL -->
+    <div class="modal-overlay" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-info-circle"></i>
+                    <span id="detailModalTitle">Detail Kontak</span>
+                </div>
+                <button class="modal-close" id="detailModalClose"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="detailModalBody"></div>
+            <div class="modal-footer">
+                <button class="btn-close-modal" onclick="closeDetailModal()">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+/* ====================================================================
+ * SALINK KONTAK-DARURAT v4.3
+ * Backend: code.gs v2.7.1
+ *
+ * ✅ Emergency alert ditangani oleh salink-emergency.js
+ * ✅ File ini fokus pada: kontak directory, search, filter, detail modal
+ * ==================================================================== */
+
+const API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
+const LOGIN_URL = 'login-register.html';
+const DASHBOARD_URL = 'dashboard.html';
+const PROFILE_URL = 'profil.html';
+
+// ====================================================================
+// STATE
+// ====================================================================
+let currentUser = null;
+let isPreviewMode = true;
+let currentTheme = 'dark';
+let allContacts = [];
+let activeFilter = '';
+let isSidebarOpen = false;
+let isLoading = false;
+let userLat = null;
+let userLng = null;
+let deferredPrompt = null;
+
+// ====================================================================
+// HELPERS
+// ====================================================================
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+function escapeAttr(str) {
+    if (!str) return '';
+    return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function toRad(d) { return d * Math.PI / 180; }
+function calcDistance(lat1, lon1, lat2, lon2) {
+    if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return null;
+    const R = 6371;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+function formatDistance(km) {
+    if (km == null || !isFinite(km)) return '';
+    if (km < 1) return Math.round(km * 1000) + ' meter';
+    return km.toFixed(2) + ' km';
+}
+
+// ====================================================================
+// TOAST
+// ====================================================================
+function showToast(title, message, icon = 'fa-info-circle') {
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML = `
+        <div class="toast-icon"><i class="fas ${icon}"></i></div>
+        <div class="toast-content">
+            <div class="toast-title">${escapeHTML(title)}</div>
+            <div class="toast-message">${escapeHTML(message)}</div>
+        </div>
+        <button class="toast-close"><i class="fas fa-times"></i></button>
+    `;
+    toast.querySelector('.toast-close').onclick = () => {
+        toast.classList.add('hide');
+        setTimeout(() => toast.remove(), 400);
+    };
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('hide');
+        setTimeout(() => toast.remove(), 400);
+    }, 5000);
+}
+
+// ====================================================================
+// THEME
+// ====================================================================
+function loadTheme() {
+    const savedTheme = localStorage.getItem('salink_theme');
+    if (savedTheme === 'light') {
+        currentTheme = 'light';
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.getElementById('themeToggle')?.classList.add('active');
+        const ti = document.getElementById('toggleIcon');
+        if (ti) ti.className = 'fas fa-sun';
+    }
+}
+function toggleTheme() {
+    const html = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    const toggleIcon = document.getElementById('toggleIcon');
+    if (currentTheme === 'dark') {
+        currentTheme = 'light';
+        html.setAttribute('data-theme', 'light');
+        themeToggle?.classList.add('active');
+        if (toggleIcon) toggleIcon.className = 'fas fa-sun';
+        localStorage.setItem('salink_theme', 'light');
+    } else {
+        currentTheme = 'dark';
+        html.removeAttribute('data-theme');
+        themeToggle?.classList.remove('active');
+        if (toggleIcon) toggleIcon.className = 'fas fa-moon';
+        localStorage.setItem('salink_theme', 'dark');
+    }
+}
+
+// ====================================================================
+// PWA
+// ====================================================================
+function setupPWA() {
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js', { scope: './' })
+                .then(() => console.log('✅ PWA: SW registered'))
+                .catch(err => console.warn('⚠️ PWA: SW gagal:', err.message));
+        });
+    }
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+    });
+    window.addEventListener('appinstalled', () => {
+        localStorage.setItem('salink_installed', 'true');
+        deferredPrompt = null;
+        showToast('🎉 Selamat!', 'Aplikasi SALINK berhasil diinstall!', 'fa-rocket');
+    });
+}
+
+// ====================================================================
+// PREVIEW MODE
+// ====================================================================
+function showPreviewOverlay() {
+    const o = document.getElementById('previewOverlay');
+    if (o) { o.classList.add('active'); document.body.style.overflow = 'hidden'; }
+    showToast('🔒 Mode Preview', 'Login untuk mengakses fitur ini', 'fa-lock');
+}
+function hidePreviewOverlay() {
+    const o = document.getElementById('previewOverlay');
+    if (o) { o.classList.remove('active'); document.body.style.overflow = ''; }
+}
+function redirectToLogin() {
+    window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent('kontak-darurat.html');
+}
+function applyPreviewMode() {
+    if (isPreviewMode) {
+        document.getElementById('previewBadge')?.classList.add('active');
+    } else {
+        document.getElementById('previewBadge')?.classList.remove('active');
+    }
+}
+
+// ====================================================================
+// LOGIN GUARD
+// ====================================================================
+function setupLoginGuard() {
+    document.addEventListener('click', function(e) {
+        const target = e.target.closest('[data-action]');
+        if (!target) return;
+        const action = target.dataset.action;
+        if (action === 'profile') {
+            if (isPreviewMode) {
+                e.preventDefault(); e.stopPropagation();
+                showPreviewOverlay();
+                return;
+            }
+            e.preventDefault(); e.stopPropagation();
+            window.location.href = PROFILE_URL;
+            return;
+        }
+        if (action === 'login') {
+            if (isPreviewMode) {
+                e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+                showPreviewOverlay();
+                target.classList.add('shake-element');
+                setTimeout(() => target.classList.remove('shake-element'), 300);
+                return false;
+            }
+        }
+    }, true);
+}
+
+// ====================================================================
+// SIDEBAR
+// ====================================================================
+function toggleSidebar() { isSidebarOpen ? closeSidebar() : openSidebar(); }
+function openSidebar() {
+    document.getElementById('sidebar')?.classList.add('active');
+    document.getElementById('sidebarOverlay')?.classList.add('active');
+    isSidebarOpen = true;
+    document.body.style.overflow = 'hidden';
+}
+function closeSidebar() {
+    document.getElementById('sidebar')?.classList.remove('active');
+    document.getElementById('sidebarOverlay')?.classList.remove('active');
+    isSidebarOpen = false;
+    document.body.style.overflow = '';
+}
+
+// ====================================================================
+// USER
+// ====================================================================
+function loadCurrentUser() {
+    const savedUser = localStorage.getItem('salink_user');
+    if (savedUser) {
+        try {
+            currentUser = JSON.parse(savedUser);
+            if (currentUser && currentUser.username) isPreviewMode = false;
+        } catch (e) { currentUser = null; }
+    }
+    if (!currentUser) isPreviewMode = true;
+
+    const savedLat = localStorage.getItem('salink_user_lat');
+    const savedLng = localStorage.getItem('salink_user_lng');
+    if (savedLat && savedLng) {
+        userLat = parseFloat(savedLat);
+        userLng = parseFloat(savedLng);
+        const gpsEl = document.getElementById('gpsStatusText');
+        if (gpsEl) gpsEl.textContent = '📍 GPS aktif: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6);
+    } else {
+        const gpsEl = document.getElementById('gpsStatusText');
+        if (gpsEl) gpsEl.textContent = '💡 GPS belum aktif. Buka dashboard untuk aktivasi.';
+    }
+    updateUserUI();
+    updateSidebar();
+    applyPreviewMode();
+}
+function updateUserUI() {
+    const userBtn = document.getElementById('userBtn');
+    if (!userBtn) return;
+    if (!currentUser) { userBtn.innerHTML = '<i class="fas fa-user"></i>'; return; }
+    if (currentUser.profilePicture) {
+        userBtn.innerHTML = `<img src="${escapeAttr(currentUser.profilePicture)}" alt="Profile">`;
+    } else {
+        const icon = currentUser.gender === 'female' ? 'fa-female' : 'fa-user';
+        userBtn.innerHTML = `<i class="fas ${icon}"></i>`;
+    }
+}
+function updateSidebar() {
+    if (!currentUser) {
+        document.getElementById('sidebarUserName').textContent = 'Guest';
+        document.getElementById('sidebarUserEmail').textContent = 'guest@salink.id';
+        document.getElementById('sidebarUserAvatar').innerHTML = '<i class="fas fa-user"></i>';
+        document.getElementById('logoutNavItem').style.display = 'none';
+        return;
+    }
+    document.getElementById('sidebarUserName').textContent = currentUser.fullName || 'User';
+    document.getElementById('sidebarUserEmail').textContent = currentUser.email || currentUser.username || '-';
+    if (currentUser.profilePicture) {
+        document.getElementById('sidebarUserAvatar').innerHTML = `<img src="${escapeAttr(currentUser.profilePicture)}" alt="">`;
+    } else {
+        document.getElementById('sidebarUserAvatar').innerHTML = currentUser.gender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>';
+    }
+    document.getElementById('logoutNavItem').style.display = 'block';
+}
+
+// ====================================================================
+// GO HOME
+// ====================================================================
+function goHome() { window.location.href = DASHBOARD_URL; }
+
+// ====================================================================
+// API CALL
+// ====================================================================
+async function apiCall(action, data = {}) {
+    try {
+        if (action.startsWith('get_')) {
+            const params = new URLSearchParams({ action, ...data, timestamp: Date.now() });
+            const response = await fetch(API_URL + '?' + params.toString(), {
+                method: 'GET', headers: { 'Accept': 'application/json' }, cache: 'no-store'
+            });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return await response.json();
+        } else {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action, data, timestamp: Date.now() })
+            });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return await response.json();
+        }
+    } catch (error) {
+        console.error('❌ API Error:', error);
+        return { status: 'error', message: error.message };
+    }
+}
+async function apiGetContacts() {
+    const r = await apiCall('get_contacts');
+    if (r.status === 'success' && Array.isArray(r.data)) {
+        localStorage.setItem('salink_contacts', JSON.stringify(r.data));
+        return r.data;
+    }
+    return JSON.parse(localStorage.getItem('salink_contacts') || '[]');
+}
+
+// ====================================================================
+// LOAD CONTACTS
+// ====================================================================
+async function loadContacts() {
+    if (isLoading) return;
+    isLoading = true;
+    const container = document.getElementById('contactContainer');
+    const count = document.getElementById('summaryCount');
+
+    container.innerHTML = `<div class="state-card"><div class="spinner"></div><div class="state-title">Memuat kontak darurat...</div><div class="state-text">Menghubungkan ke database SALINK.</div></div>`;
+    count.textContent = 'Mengambil data...';
+
+    try {
+        const data = await apiGetContacts();
+        if (data && data.length > 0) {
+            allContacts = data;
+            if (userLat !== null && userLng !== null) {
+                allContacts = allContacts.map(c => {
+                    const d = calcDistance(userLat, userLng, parseFloat(c.latitude), parseFloat(c.longitude));
+                    if (d !== null && isFinite(d)) {
+                        return { ...c, distanceKm: d, distanceText: formatDistance(d) };
+                    }
+                    return c;
+                });
+                allContacts.sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
+            }
+            renderContacts();
+            showToast('✅ Berhasil', 'Data kontak berhasil dimuat!', 'fa-check-circle');
+        } else {
+            allContacts = [];
+            container.innerHTML = `<div class="state-card"><div class="state-icon">📭</div><div class="state-title">Belum ada kontak darurat</div><div class="state-text">Database kontak masih kosong. Kontak dapat ditambahkan melalui Google Spreadsheet.</div></div>`;
+            count.textContent = '0 kontak tersedia';
+        }
+    } catch (error) {
+        console.error('❌ Error:', error);
+        container.innerHTML = `<div class="state-card"><div class="state-icon">⚠️</div><div class="state-title">Gagal mengambil data</div><div class="state-text">${escapeHTML(error.message || 'Terjadi kesalahan')}<br><br>Tekan <b>Perbarui</b> untuk mencoba lagi.</div></div>`;
+        count.textContent = 'Data tidak tersedia';
+        showToast('⚠️ Error', 'Gagal memuat data kontak.', 'fa-exclamation-triangle');
+    }
+    isLoading = false;
+}
+
+// ====================================================================
+// FILTER
+// ====================================================================
+function setFilter(button) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    button.classList.add('active');
+    activeFilter = button.dataset.type || '';
+    renderContacts();
+}
+
+// ====================================================================
+// RENDER CONTACTS
+// ====================================================================
+function renderContacts() {
+    const container = document.getElementById('contactContainer');
+    const count = document.getElementById('summaryCount');
+    const searchInput = document.getElementById('searchInput');
+    const search = (searchInput?.value || '').trim().toLowerCase();
+
+    let filtered = allContacts.filter(c => {
+        if (activeFilter && !matchesType(c, activeFilter)) return false;
+        if (!search) return true;
+        const searchable = [c.name, c.category, c.type, c.level, c.province, c.city, c.district, c.village, c.address, c.serviceArea]
+            .map(v => String(v || '').toLowerCase()).join(' ');
+        return searchable.includes(search);
+    });
+
+    count.textContent = filtered.length + ' kontak tersedia' + (userLat !== null ? ' (diurutkan berdasarkan jarak)' : '');
+
+    if (filtered.length === 0) {
+        container.innerHTML = `<div class="state-card"><div class="state-icon">🔎</div><div class="state-title">Kontak tidak ditemukan</div><div class="state-text">Belum ada kontak yang sesuai dengan pencarian atau filter Anda.</div></div>`;
+        return;
+    }
+    container.innerHTML = filtered.map(renderContactCard).join('');
+}
+function matchesType(c, filter) {
+    const text = [c.type, c.category, c.name, c.serviceArea].map(v => String(v || '').toLowerCase()).join(' ');
+    const map = {
+        fire: ['fire', 'damkar', 'pemadam', 'kebakaran'],
+        medical: ['medical', 'medis', 'puskesmas', 'rumah sakit', 'rumahsakit', 'ambulance', 'ambulans', 'kesehatan'],
+        crime: ['crime', 'kriminal', 'polisi', 'polsek', 'polres', 'keamanan'],
+        disaster: ['disaster', 'bencana', 'bpbd', 'basarnas', 'sar'],
+        general: ['general', 'umum', 'emergency', 'darurat', 'desa', 'kecamatan', 'kabupaten', 'provinsi']
+    };
+    return map[filter]?.some(k => text.includes(k)) || false;
+}
+function getContactIcon(c) {
+    const text = [c.type, c.category, c.name].map(v => String(v || '').toLowerCase()).join(' ');
+    if (text.includes('fire') || text.includes('damkar') || text.includes('kebakaran')) return '🔥';
+    if (text.includes('medical') || text.includes('medis') || text.includes('rumah sakit') || text.includes('ambulance')) return '🚑';
+    if (text.includes('crime') || text.includes('polisi') || text.includes('polres')) return '🚓';
+    if (text.includes('disaster') || text.includes('bencana') || text.includes('bpbd')) return '🌪️';
+    return '🏛️';
+}
+function renderContactCard(contact) {
+    const name = escapeHTML(contact.name || 'Instansi Darurat');
+    const category = escapeHTML(contact.category || contact.type || 'Layanan Darurat');
+    const level = escapeHTML(contact.level || 'Umum');
+    const location = buildLocationText(contact);
+    const phone = cleanPhone(contact.phone);
+    const whatsapp = cleanPhone(contact.whatsapp);
+    const mapsURL = contact.mapsURL || buildMapsURL(contact.latitude, contact.longitude);
+    const distance = contact.distanceText || '';
+
+    const phoneBtn = phone
+        ? `<a class="contact-action phone" href="tel:${escapeAttr(phone)}"><i class="fas fa-phone-alt"></i> Telepon</a>`
+        : `<span class="contact-action unavailable"><i class="fas fa-phone-alt"></i> Telepon</span>`;
+    const waBtn = whatsapp
+        ? `<a class="contact-action whatsapp" href="${escapeAttr(buildWhatsAppURL(whatsapp))}" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> WhatsApp</a>`
+        : `<span class="contact-action unavailable"><i class="fab fa-whatsapp"></i> WhatsApp</span>`;
+    const mapsBtn = mapsURL
+        ? `<a class="contact-action maps" href="${escapeAttr(mapsURL)}" target="_blank" rel="noopener"><i class="fas fa-map-marked-alt"></i> Maps</a>`
+        : `<span class="contact-action unavailable"><i class="fas fa-map-marked-alt"></i> Maps</span>`;
+
+    const contactIndex = allContacts.indexOf(contact);
+
+    return `
+        <article class="contact-card">
+            <div class="contact-top">
+                <div class="contact-icon">${getContactIcon(contact)}</div>
+                <div class="contact-level">${level}</div>
+            </div>
+            <div class="contact-name">${name}</div>
+            <div class="contact-category">${category}</div>
+            <div class="contact-location">
+                <span class="loc-icon">📍</span>
+                <span>${location}</span>
+            </div>
+            ${distance ? `<div class="contact-distance"><i class="fas fa-route"></i> ${escapeHTML(distance)}</div>` : ''}
+            <div class="contact-actions">
+                ${phoneBtn}
+                ${waBtn}
+                ${mapsBtn}
+                <button class="contact-action detail" onclick="showContactDetail(${contactIndex})">
+                    <i class="fas fa-info-circle"></i> Detail
+                </button>
+            </div>
+        </article>
+    `;
+}
+function buildLocationText(c) {
+    const parts = [c.address, c.village, c.district, c.city, c.province].map(v => String(v || '').trim()).filter(Boolean);
+    return parts.length ? escapeHTML(parts.join(', ')) : 'Lokasi belum dicantumkan';
+}
+function cleanPhone(value) {
+    if (value == null) return '';
+    return String(value).trim().replace(/[^\d+]/g, '');
+}
+function buildWhatsAppURL(phone) {
+    let n = cleanPhone(phone);
+    if (n.startsWith('+')) n = n.substring(1);
+    if (n.startsWith('0')) n = '62' + n.substring(1);
+    return n ? 'https://wa.me/' + encodeURIComponent(n) : '';
+}
+function buildMapsURL(lat, lng) {
+    const la = parseFloat(lat), ln = parseFloat(lng);
+    if (isNaN(la) || isNaN(ln)) return '';
+    return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(la + ',' + ln);
+}
+
+// ====================================================================
+// DETAIL MODAL
+// ====================================================================
+function showContactDetail(index) {
+    const contact = allContacts[index];
+    if (!contact) return;
+    const modal = document.getElementById('detailModal');
+    const title = document.getElementById('detailModalTitle');
+    const body = document.getElementById('detailModalBody');
+    title.textContent = contact.name || 'Detail Kontak';
+    const fields = [
+        { label: 'Nama', value: contact.name },
+        { label: 'Kategori', value: contact.category || contact.type },
+        { label: 'Level', value: contact.level },
+        { label: 'Wilayah Layanan', value: contact.serviceArea },
+        { label: 'Jam Operasional', value: contact.operationalHours },
+        { label: 'Telepon', value: contact.phone },
+        { label: 'WhatsApp', value: contact.whatsapp },
+        { label: 'Alamat', value: buildLocationText(contact) },
+        { label: 'Provinsi', value: contact.province },
+        { label: 'Kab/Kota', value: contact.city },
+        { label: 'Kecamatan', value: contact.district },
+        { label: 'Desa/Kelurahan', value: contact.village }
+    ].filter(f => f.value);
+    body.innerHTML = fields.map(f => `<div class="detail-row"><span class="detail-label">${escapeHTML(f.label)}</span><span class="detail-value">${escapeHTML(f.value)}</span></div>`).join('');
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeDetailModal() {
+    document.getElementById('detailModal').classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+// ====================================================================
+// LOGOUT
+// ====================================================================
+function handleLogout() {
+    if (confirm('Apakah Anda yakin ingin keluar?')) {
+        currentUser = null;
+        ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies','salink_last_emergency_check'].forEach(k => localStorage.removeItem(k));
+        updateUserUI();
+        updateSidebar();
+        showToast('👋 Logout Berhasil', 'Anda telah keluar dari akun', 'fa-sign-out-alt');
+        setTimeout(() => { window.location.href = DASHBOARD_URL + '?logout=1'; }, 500);
+    }
+}
+
+// ====================================================================
+// INIT
+// ====================================================================
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 SALINK Kontak Darurat v4.3 Initializing...');
+    console.log('✅ Emergency alert ditangani oleh salink-emergency.js');
+
+    setupPWA();
+    loadTheme();
+    loadCurrentUser();
+    setupLoginGuard();
+
+    // Load contacts
+    loadContacts();
+
+    // Event listeners
+    document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
+    document.getElementById('menuBtn')?.addEventListener('click', (e) => { e.preventDefault(); toggleSidebar(); });
+    document.getElementById('sidebarClose')?.addEventListener('click', closeSidebar);
+    document.getElementById('sidebarOverlay')?.addEventListener('click', closeSidebar);
+    document.getElementById('searchInput')?.addEventListener('input', renderContacts);
+    document.getElementById('searchBtn')?.addEventListener('click', () => document.getElementById('searchInput')?.focus());
+
+    // Preview overlay
+    document.getElementById('overlayLoginBtn')?.addEventListener('click', redirectToLogin);
+    document.getElementById('overlayCancelBtn')?.addEventListener('click', hidePreviewOverlay);
+    document.getElementById('badgeLoginLink')?.addEventListener('click', redirectToLogin);
+    document.getElementById('previewOverlay')?.addEventListener('click', function(e) { if (e.target === this) hidePreviewOverlay(); });
+
+    // User button
+    document.getElementById('userBtn')?.addEventListener('click', function(e) {
+        e.preventDefault(); e.stopPropagation();
+        if (isPreviewMode) showPreviewOverlay();
+        else window.location.href = PROFILE_URL;
+    });
+
+    // Detail modal
+    document.getElementById('detailModalClose')?.addEventListener('click', closeDetailModal);
+    document.getElementById('detailModal')?.addEventListener('click', function(e) { if (e.target === this) closeDetailModal(); });
+
+    // Logout
+    document.getElementById('logoutBtn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        handleLogout();
+        closeSidebar();
+    });
+
+    // Bottom nav
+    document.getElementById('bottomInviteNav')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (isPreviewMode) { showPreviewOverlay(); return; }
+        showToast('📨 Invite', 'Buka dashboard untuk invite', 'fa-user-plus');
+    });
+    document.getElementById('bottomNotifNav')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (isPreviewMode) { showPreviewOverlay(); return; }
+        showToast('🔔 Notifikasi', 'Buka dashboard untuk notif', 'fa-bell');
+    });
+
+    if (isPreviewMode) setTimeout(() => showPreviewOverlay(), 1200);
+
+    console.log('✅ Kontak Darurat v4.3 Ready!');
+    console.log('👤 Mode:', isPreviewMode ? 'PREVIEW' : 'FULL');
+});
+
+window.addEventListener('storage', function(e) {
+    if (e.key === 'salink_user') loadCurrentUser();
+    if (e.key === 'salink_theme') loadTheme();
+});
+    </script>
+
+    <!-- ============================================================ -->
+    <!-- SALINK FCM + EMERGENCY ALERT UNIVERSAL INTEGRATION v4.3      -->
+    <!-- ============================================================ -->
+    <script src="/firebase-config.js"></script>
+    <script src="/fcm-client.js"></script>
+    <script src="/salink-emergency.js"></script>
+    <script>
+    (function() {
+      'use strict';
+
+      // ==================================================
+      // FCM INIT — Save token setelah user login
+      // ==================================================
+      window.addEventListener('load', async function() {
+        const isLoggedIn = localStorage.getItem('salink_logged_in');
+        const userData = localStorage.getItem('salink_user');
+        if (isLoggedIn !== 'true' || !userData) {
+          console.log('ℹ️ [FCM] User belum login — FCM skip');
+          return;
+        }
+
+        let user;
+        try { user = JSON.parse(userData); } catch(e) {
+          console.warn('⚠️ [FCM] salink_user tidak valid');
+          return;
+        }
+        if (!user || !user.username) {
+          console.warn('⚠️ [FCM] salink_user tidak punya username');
+          return;
+        }
+
+        console.log('🚀 [FCM] Init untuk:', user.username);
+
+        try {
+          if (typeof SalinkFCM === 'undefined') {
+            console.warn('⚠️ [FCM] SalinkFCM tidak tersedia');
+            return;
+          }
+
+          const initResult = await SalinkFCM.init();
+          if (!initResult.ok) {
+            console.warn('⚠️ [FCM] init gagal:', initResult.reason);
+            return;
+          }
+
+          console.log('✅ [FCM] Siap. Token:', initResult.token.substring(0, 30) + '...');
+
+          const saveResult = await SalinkFCM.saveToken({
+            userId: user.id,
+            username: user.username,
+            email: user.email
+          });
+
+          if (saveResult.ok) {
+            console.log('✅ [FCM] Token tersimpan di backend');
+          }
+        } catch (err) {
+          console.error('❌ [FCM] error:', err);
+        }
+      });
+
+      // ==================================================
+      // SALINK EMERGENCY ALERT — Ready check
+      // ==================================================
+      window.addEventListener('load', function() {
+        if (typeof SalinkEmergency === 'undefined') {
+          console.warn('⚠️ [SalinkEmergency] Script belum tersedia');
+          return;
+        }
+        console.log('✅ [SalinkEmergency] Ready — polling 15s');
+      });
+    })();
+    </script>
+    <!-- ============================================================ -->
+
+</body>
+</html>
