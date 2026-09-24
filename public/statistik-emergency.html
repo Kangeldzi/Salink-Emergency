@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SALINK — Command Center</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d1117" id="themeColorMeta">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SALINK">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+:root {
+  --bg-primary: #0d1117; --bg-secondary: #161b22;
+  --bg-card: rgba(22, 27, 34, 0.92); --bg-input: rgba(22, 27, 34, 0.6);
+  --text-primary: #e6edf3; --text-secondary: #8b949e; --text-muted: #6e7681;
+  --border-color: #30363d; --border-light: rgba(255,255,255,0.06);
+  --shadow-color: rgba(0,0,0,0.4); --shadow-light: rgba(0,0,0,0.2);
+  --accent-blue: #58a6ff; --accent-blue-dark: #1f6feb;
+  --accent-blue-gradient: linear-gradient(135deg, #58a6ff, #1f6feb);
+  --accent-green: #25D366; --accent-red: #f85149; --accent-gold: #f0d080;
+  --accent-purple: #c792ea;
+  --toggle-bg: #30363d; --toggle-thumb: #58a6ff;
+  --header-bg: rgba(22, 27, 34, 0.95); --footer-bg: rgba(13, 17, 23, 0.95);
+  --modal-bg: rgba(22, 27, 34, 0.98);
+  --header-height: 60px; --footer-height: 65px;
+  --danger: #f85149; --success: #3fb950;
+  --fire: #f97316; --medical: #38bdf8; --crime: #a78bfa; --disaster: #facc15;
+}
+[data-theme="light"] {
+  --bg-primary: #f0f4f8; --bg-secondary: #e8edf2;
+  --bg-card: rgba(255, 255, 255, 0.92); --bg-input: rgba(0,0,0,0.04);
+  --text-primary: #1a1a2e; --text-secondary: #4a4a6a; --text-muted: #6a6a8a;
+  --border-color: #d0d7de; --border-light: rgba(0,0,0,0.06);
+  --shadow-color: rgba(0,0,0,0.08); --shadow-light: rgba(0,0,0,0.04);
+  --accent-blue: #4facfe; --accent-blue-dark: #00c6fb;
+  --accent-blue-gradient: linear-gradient(135deg, #4facfe, #00c6fb);
+  --accent-red: #e31837; --accent-gold: #8d6b4b; --accent-purple: #7c3aed;
+  --toggle-bg: #d0d7de; --toggle-thumb: #4facfe;
+  --header-bg: rgba(255, 255, 255, 0.95); --footer-bg: rgba(255, 255, 255, 0.95);
+  --modal-bg: rgba(255, 255, 255, 0.98);
+  --danger: #e31837; --success: #2ea44f;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--bg-primary); color: var(--text-primary); font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; overflow-x: hidden; padding-bottom: calc(var(--footer-height) + 16px); transition: background 0.3s ease, color 0.3s ease; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+::-webkit-scrollbar-thumb { background: var(--accent-blue); border-radius: 3px; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } }
+@keyframes blink { 0%, 100% { color: #ff0000; text-shadow: 0 0 20px rgba(255,0,0,0.8); } 50% { color: #00C2FF; text-shadow: 0 0 20px rgba(0,194,255,0.8); } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes syncPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+@keyframes toastIn { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes toastOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(30px); opacity: 0; } }
+@keyframes notifPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.3); } }
+
+/* HEADER */
+.app-bar { position: fixed; top: 0; width: 100%; height: var(--header-height); background: var(--header-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: flex; justify-content: space-between; align-items: center; padding: 0 12px; z-index: 1000; box-shadow: 0 2px 20px var(--shadow-color); border-bottom: 1px solid var(--border-color); }
+.app-title { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text-primary); font-size: 1.1rem; cursor: pointer; text-decoration: none; font-family: 'Poppins', sans-serif; }
+.app-title .siren-icon-header { font-size: 1.5rem; display: inline-block; animation: spin 1.5s linear infinite, blink 1s ease-in-out infinite; line-height: 1; }
+.header-center { display: flex; align-items: center; gap: 8px; }
+.header-right { display: flex; align-items: center; gap: 6px; }
+.menu-btn, .back-btn, .user-btn { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; text-decoration: none; }
+.menu-btn:active, .back-btn:active, .user-btn:active { transform: scale(0.95); }
+.user-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.theme-toggle { position: relative; width: 44px; height: 24px; background: var(--toggle-bg); border-radius: 30px; cursor: pointer; border: 1px solid var(--border-color); }
+.theme-toggle.active { background: rgba(88,166,255,0.3); }
+.theme-toggle .toggle-thumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--toggle-thumb); transition: all 0.3s; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; }
+.theme-toggle.active .toggle-thumb { left: 22px; }
+.theme-toggle .toggle-thumb i { color: #fff; }
+
+/* SYNC INDICATOR */
+.sync-indicator { position: fixed; top: calc(var(--header-height) + 6px); right: 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 3px 10px; font-size: 0.55rem; color: var(--text-muted); z-index: 999; display: none; align-items: center; gap: 4px; animation: syncPulse 1s ease-in-out infinite; }
+.sync-indicator.active { display: flex; }
+.sync-indicator i { color: var(--accent-blue); font-size: 0.6rem; }
+
+/* SIDEBAR */
+.sidebar-overlay-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1099; display: none; opacity: 0; transition: opacity 0.3s; }
+.sidebar-overlay-bg.active { display: block; opacity: 1; }
+.sidebar { position: fixed; top: var(--header-height); left: 0; width: 290px; max-height: calc(100vh - var(--header-height)); background: var(--bg-secondary); z-index: 1100; overflow-y: auto; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; transform: translateX(-100%); transition: transform 0.3s; border-radius: 0 0 12px 0; }
+.sidebar.active { transform: translateX(0); }
+.sidebar-close { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; z-index: 10; }
+.sidebar-header { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 16px; border-bottom: 1px solid var(--border-color); background: var(--bg-card); }
+.sidebar-user-avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--accent-blue-gradient); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; font-size: 1.1rem; overflow: hidden; border: 2px solid var(--accent-blue); }
+.sidebar-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.sidebar-user-name { font-size: 0.85rem; font-weight: 600; }
+.sidebar-user-email { font-size: 0.6rem; color: var(--text-muted); }
+.nav-menu { list-style: none; padding: 6px 12px 12px; flex: 1; }
+.nav-section-title { font-size: 0.55rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; padding: 10px 14px 4px; font-weight: 600; }
+.nav-item { margin-bottom: 2px; }
+.nav-link { display: flex; align-items: center; gap: 12px; padding: 10px 14px; color: var(--text-primary); text-decoration: none; border-radius: 8px; font-size: 0.8rem; background: var(--bg-input); border: 1px solid transparent; cursor: pointer; }
+.nav-link.active { background: rgba(88,166,255,0.15); color: var(--accent-blue); border: 1px solid var(--accent-blue); }
+.nav-link i { width: 22px; text-align: center; font-size: 0.95rem; color: var(--accent-blue); }
+.nav-logout .nav-link { color: var(--accent-red); }
+.nav-logout .nav-link i { color: var(--accent-red); }
+
+/* MAIN */
+.app { position: relative; z-index: 1; max-width: 1560px; margin: 0 auto; padding: calc(var(--header-height) + 14px) 22px 30px; }
+.app-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 14px 22px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; backdrop-filter: blur(16px); box-shadow: 0 8px 32px var(--shadow-color); }
+.header-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.header-left .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 12px var(--danger); animation: pulse-dot 1.8s ease-in-out infinite; }
+.header-left h1 { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; }
+.header-left .badge { font-size: 8px; padding: 2px 10px; border-radius: 999px; background: rgba(56, 189, 248, 0.10); color: var(--accent-blue); border: 1px solid rgba(56, 189, 248, 0.15); letter-spacing: 0.06em; text-transform: uppercase; }
+.header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.status-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); border-radius: 999px; font-size: 9px; letter-spacing: 0.06em; color: var(--text-secondary); text-transform: uppercase; white-space: nowrap; }
+.status-chip .led { width: 6px; height: 6px; border-radius: 50%; }
+.status-chip.online .led { background: var(--success); box-shadow: 0 0 10px var(--success); }
+.status-chip.offline .led { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
+.icon-btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 8px; font-size: 10px; font-weight: 500; font-family: inherit; cursor: pointer; text-decoration: none; }
+.icon-btn:hover { border-color: var(--accent-blue); color: var(--text-primary); }
+.icon-btn.primary { background: linear-gradient(135deg, rgba(88, 166, 255, 0.12), rgba(88, 166, 255, 0.04)); border-color: rgba(88, 166, 255, 0.2); color: var(--accent-blue); }
+
+.kpi-grid { margin-top: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.kpi-card { position: relative; padding: 14px 16px 12px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; transition: all 0.3s; }
+.kpi-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--kpi-color, var(--accent-blue)); opacity: 0.5; }
+.kpi-card:hover { transform: translateY(-2px); border-color: var(--kpi-color, var(--accent-blue)); box-shadow: 0 12px 48px var(--shadow-color); }
+.kpi-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.kpi-label { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); font-weight: 600; }
+.kpi-icon { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); font-size: 12px; }
+.kpi-value { margin-top: 6px; font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1.1; }
+.kpi-meta { margin-top: 2px; font-size: 9px; color: var(--text-muted); }
+
+.panel-grid { margin-top: 14px; display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+.panel { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; padding: 14px 16px 16px; display: flex; flex-direction: column; min-height: 250px; position: relative; overflow: hidden; }
+.panel.span-6 { grid-column: span 6; }
+.panel.span-12 { grid-column: span 12; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.panel-title { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; display: flex; align-items: center; gap: 5px; }
+.panel-title .badge { font-size: 7px; padding: 1px 7px; border-radius: 999px; background: rgba(88, 166, 255, 0.08); color: var(--accent-blue); border: 1px solid rgba(88, 166, 255, 0.12); }
+.chart-wrap { flex: 1; min-height: 0; position: relative; }
+.chart { width: 100%; height: 100%; min-height: 200px; }
+
+#map { width: 100%; height: 100%; min-height: 300px; border-radius: 6px; background: var(--bg-secondary); z-index: 0; }
+.leaflet-container { background: var(--bg-secondary); font-family: 'Inter', sans-serif; border-radius: 6px; }
+
+.table-wrap { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; margin-top: 14px; overflow: hidden; }
+.table-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border-color); gap: 8px; flex-wrap: wrap; }
+.table-title { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; display: flex; align-items: center; gap: 5px; }
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 11px; }
+thead th { text-align: left; padding: 8px 12px; font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); font-weight: 600; background: var(--bg-input); border-bottom: 1px solid var(--border-color); white-space: nowrap; }
+tbody td { padding: 8px 12px; border-bottom: 1px solid rgba(255,255,255,0.03); color: var(--text-secondary); vertical-align: middle; }
+tbody tr:hover { background: rgba(88, 166, 255, 0.03); }
+.pill { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 999px; font-size: 8px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; border: 1px solid transparent; white-space: nowrap; }
+.pill.fire { background: rgba(249, 115, 22, 0.10); color: #fb923c; border-color: rgba(249, 115, 22, 0.18); }
+.pill.medical { background: rgba(56, 189, 248, 0.10); color: #7dd3fc; border-color: rgba(56, 189, 248, 0.18); }
+.pill.crime { background: rgba(167, 139, 250, 0.10); color: #c4b5fd; border-color: rgba(167, 139, 250, 0.18); }
+.pill.disaster { background: rgba(250, 204, 21, 0.10); color: #fde68a; border-color: rgba(250, 204, 21, 0.18); }
+.pill.active { background: rgba(248, 81, 73, 0.10); color: var(--accent-red); border-color: rgba(248, 81, 73, 0.18); }
+.pill.resolved { background: rgba(52, 211, 153, 0.10); color: var(--success); }
+.pill.btn-delete { background: rgba(248,81,73,0.1); color: var(--accent-red); border: 1px solid rgba(248,81,73,0.3); cursor: pointer; }
+.table-empty { padding: 24px 16px; text-align: center; color: var(--text-muted); font-size: 11px; }
+
+/* BOTTOM NAV */
+.bottom-nav { position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; height: var(--footer-height) !important; background: var(--footer-bg) !important; backdrop-filter: blur(15px) !important; border-top: 1px solid var(--border-color) !important; z-index: 1000 !important; display: flex !important; justify-content: space-around !important; align-items: center !important; padding: 0 4px !important; }
+.nav-item-bottom { display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 4px; padding: 4px 8px; cursor: pointer; text-decoration: none; color: var(--text-muted); border: none; background: transparent; flex: 1 !important; height: 100% !important; font-family: inherit; }
+.nav-item-bottom .nav-icon { font-size: 1.6rem; line-height: 1.2; display: block; }
+.nav-item-bottom .nav-label { font-size: 0.65rem; font-weight: 500; }
+.nav-item-bottom.active .nav-label { color: var(--accent-blue); font-weight: 600; }
+.nav-item-bottom .badge { position: absolute; top: 0 !important; right: 0 !important; background: var(--accent-red); color: white; font-size: 0.55rem; border-radius: 50%; min-width: 18px; height: 18px; display: none; align-items: center; justify-content: center; font-weight: bold; padding: 0 4px; }
+.nav-item-bottom .badge.show { display: flex !important; }
+
+/* TOAST */
+.toast-container { position: fixed; bottom: calc(var(--footer-height) + 20px); left: 50%; transform: translateX(-50%); z-index: 10000; max-width: 400px; width: 90%; }
+.toast { background: var(--modal-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; animation: toastIn 0.4s ease; margin-bottom: 8px; }
+.toast.hide { animation: toastOut 0.4s ease forwards; }
+.toast .toast-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(88,166,255,0.15); color: var(--accent-blue); }
+.toast .toast-content { flex: 1; }
+.toast .toast-title { font-size: 0.75rem; font-weight: 600; }
+.toast .toast-message { font-size: 0.7rem; color: var(--text-secondary); }
+.toast .toast-close { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; }
+
+/* DELETE CONFIRM MODAL */
+.delete-confirm-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); backdrop-filter: blur(20px); z-index: 999999; display: none; align-items: center; justify-content: center; padding: 20px; }
+.delete-confirm-modal.active { display: flex; }
+.delete-confirm-content { background: var(--modal-bg); border-radius: 20px; max-width: 380px; width: 100%; padding: 24px 20px; border: 1px solid var(--accent-red); text-align: center; }
+.delete-confirm-icon { width: 60px; height: 60px; margin: 0 auto 14px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(248,81,73,0.15); color: var(--accent-red); font-size: 1.8rem; }
+.delete-confirm-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 8px; }
+.delete-confirm-msg { font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 6px; line-height: 1.5; }
+.delete-confirm-warning { font-size: 0.7rem; color: var(--accent-red); background: rgba(248,81,73,0.08); padding: 8px 12px; border-radius: 10px; margin: 10px 0; border: 1px solid rgba(248,81,73,0.2); font-weight: 600; }
+.delete-confirm-actions { display: flex; gap: 10px; margin-top: 16px; }
+.delete-confirm-actions button { flex: 1; padding: 12px; border-radius: 12px; border: none; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+.delete-confirm-cancel { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-color) !important; }
+.delete-confirm-delete { background: var(--accent-red); color: #fff; }
+
+@media (max-width: 1100px) { .panel.span-6 { grid-column: span 12; } }
+@media (max-width: 768px) { .app { padding: calc(var(--header-height) + 10px) 10px calc(var(--footer-height) + 20px); } .app-header { flex-direction: column; align-items: stretch; } .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .kpi-grid { grid-template-columns: 1fr 1fr; gap: 6px; } .kpi-value { font-size: 18px; } .panel { padding: 10px; min-height: 200px; } .chart { min-height: 160px; } #map { min-height: 200px; } }
+</style>
+</head>
+<body>
+
+<div class="sync-indicator" id="syncIndicator"><i class="fas fa-sync-alt fa-spin"></i> Sync...</div>
+
+<!-- DELETE CONFIRM MODAL -->
+<div class="delete-confirm-modal" id="deleteConfirmModal">
+  <div class="delete-confirm-content">
+    <div class="delete-confirm-icon"><i class="fas fa-trash-alt"></i></div>
+    <div class="delete-confirm-title">Hapus Permanen?</div>
+    <div class="delete-confirm-msg" id="deleteConfirmMsg">Item ini akan dihapus dari SEMUA halaman.</div>
+    <div class="delete-confirm-warning"><i class="fas fa-exclamation-triangle"></i> Tindakan ini TIDAK BISA DIBATALKAN</div>
+    <div class="delete-confirm-actions">
+      <button class="delete-confirm-cancel" onclick="closeDeleteConfirm()"><i class="fas fa-times"></i> Batal</button>
+      <button class="delete-confirm-delete" onclick="confirmDeleteNow()"><i class="fas fa-trash"></i> Ya, Hapus</button>
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<header class="app-bar">
+  <a href="dashboard.html" class="app-title"><span class="siren-icon-header">🚨</span><span>SALINK</span></a>
+  <div class="header-center">
+    <button class="menu-btn" id="menuBtn"><i class="fas fa-bars"></i></button>
+    <div class="theme-toggle" id="themeToggle"><div class="toggle-thumb" id="toggleThumb"><i class="fas fa-moon" id="toggleIcon"></i></div></div>
+  </div>
+  <div class="header-right">
+    <button class="user-btn" id="userBtn" data-action="profile"><i class="fas fa-user"></i></button>
+    <a href="dashboard.html" class="back-btn"><i class="fas fa-arrow-left"></i></a>
+  </div>
+</header>
+
+<!-- SIDEBAR -->
+<div class="sidebar-overlay-bg" id="sidebarOverlay"></div>
+<div class="sidebar" id="sidebar">
+  <button class="sidebar-close" id="sidebarClose"><i class="fas fa-times"></i></button>
+  <div class="sidebar-header">
+    <div class="sidebar-user-avatar" id="sidebarUserAvatar"><i class="fas fa-user"></i></div>
+    <div class="sidebar-user-name" id="sidebarUserName">Guest</div>
+    <div class="sidebar-user-email" id="sidebarUserEmail">guest@salink.id</div>
+  </div>
+  <ul class="nav-menu">
+    <li class="nav-item"><a href="dashboard.html" class="nav-link"><i class="fas fa-home"></i><span>Home</span></a></li>
+    <div class="nav-section-title">🚨 MENU DARURAT</div>
+    <li class="nav-item"><a href="kontak-darurat.html" class="nav-link"><i class="fas fa-phone-alt"></i><span>Kontak Darurat</span></a></li>
+    <li class="nav-item"><a href="laporan-darurat.html" class="nav-link"><i class="fas fa-exclamation-circle"></i><span>Laporan Darurat</span></a></li>
+    <li class="nav-item"><a href="lokasi-bantuan.html" class="nav-link"><i class="fas fa-hospital"></i><span>Lokasi Bantuan</span></a></li>
+    <li class="nav-item"><a href="alert-sekitar.html" class="nav-link"><i class="fas fa-bell"></i><span>Alert Sekitar</span></a></li>
+    <div class="nav-section-title">📊 STATISTIK & INFO</div>
+    <li class="nav-item"><a href="statistik.html" class="nav-link"><i class="fas fa-chart-pie"></i><span>Statistik Emergency</span></a></li>
+    <li class="nav-item"><a href="statistik-emergency.html" class="nav-link active"><i class="fas fa-satellite-dish"></i><span>Command Center</span></a></li>
+    <li class="nav-item"><a href="laporan-saya.html" class="nav-link"><i class="fas fa-clipboard-list"></i><span>Laporan Saya</span></a></li>
+    <li class="nav-item"><a href="profil.html" class="nav-link"><i class="fas fa-user-circle"></i><span>Profil Saya</span></a></li>
+    <li class="nav-item nav-logout" id="logoutNavItem" style="display:none;">
+      <a href="#" class="nav-link" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Keluar</span></a>
+    </li>
+  </ul>
+</div>
+
+<!-- MAIN -->
+<div class="app" role="main">
+  <header class="app-header">
+    <div class="header-left">
+      <span class="pulse-dot"></span>
+      <h1>Emergency Alert System — Command Center</h1>
+      <span class="badge">REAL-TIME</span>
+    </div>
+    <div class="header-actions">
+      <div class="status-chip online"><span class="led"></span><span>LIVE DATA</span></div>
+      <button class="icon-btn" id="refreshBtn"><i class="fas fa-sync-alt"></i> Refresh</button>
+      <button class="icon-btn primary" id="exportBtn"><i class="fas fa-download"></i> Export CSV</button>
+    </div>
+  </header>
+
+  <section class="kpi-grid">
+    <div class="kpi-card" style="--kpi-color:var(--fire)"><div class="kpi-head"><span class="kpi-label">🔥 Kebakaran</span><span class="kpi-icon">🔥</span></div><div class="kpi-value" id="kpiFire">—</div><div class="kpi-meta">Reports</div></div>
+    <div class="kpi-card" style="--kpi-color:var(--medical)"><div class="kpi-head"><span class="kpi-label">🚑 Medis</span><span class="kpi-icon">🚑</span></div><div class="kpi-value" id="kpiMedical">—</div><div class="kpi-meta">Reports</div></div>
+    <div class="kpi-card" style="--kpi-color:var(--crime)"><div class="kpi-head"><span class="kpi-label">🚓 Kriminal</span><span class="kpi-icon">🚓</span></div><div class="kpi-value" id="kpiCrime">—</div><div class="kpi-meta">Reports</div></div>
+    <div class="kpi-card" style="--kpi-color:var(--disaster)"><div class="kpi-head"><span class="kpi-label">🌪️ Bencana</span><span class="kpi-icon">🌪️</span></div><div class="kpi-value" id="kpiDisaster">—</div><div class="kpi-meta">Reports</div></div>
+    <div class="kpi-card" style="--kpi-color:var(--accent-blue)"><div class="kpi-head"><span class="kpi-label">🚨 Total</span><span class="kpi-icon">🚨</span></div><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-meta">All categories</div></div>
+    <div class="kpi-card" style="--kpi-color:var(--success)"><div class="kpi-head"><span class="kpi-label">✅ Aktif</span><span class="kpi-icon">✅</span></div><div class="kpi-value" id="kpiActive">—</div><div class="kpi-meta">Last 24 hours</div></div>
+    <div class="kpi-card" style="--kpi-color:var(--accent-gold)"><div class="kpi-head"><span class="kpi-label">📝 Posts</span><span class="kpi-icon">📝</span></div><div class="kpi-value" id="kpiPosts">—</div><div class="kpi-meta">Total posts</div></div>
+    <div class="kpi-card" style="--kpi-color:var(--success)"><div class="kpi-head"><span class="kpi-label">❤️ Likes</span><span class="kpi-icon">❤️</span></div><div class="kpi-value" id="kpiLikes">—</div><div class="kpi-meta">Total likes</div></div>
+  </section>
+
+  <section class="panel-grid">
+    <div class="panel span-6">
+      <div class="panel-head"><div class="panel-title">📊 Reports by Category <span class="badge">BAR</span></div></div>
+      <div class="chart-wrap"><div id="chartBar" class="chart"></div></div>
+    </div>
+    <div class="panel span-6">
+      <div class="panel-head"><div class="panel-title">🍩 Composition <span class="badge">DOUGHNUT</span></div></div>
+      <div class="chart-wrap"><div id="chartDoughnut" class="chart"></div></div>
+    </div>
+  </section>
+
+  <section class="panel-grid">
+    <div class="panel span-12">
+      <div class="panel-head"><div class="panel-title">📈 Emergency Trend (7 Hari) <span class="badge">AREA</span></div></div>
+      <div class="chart-wrap"><div id="chartArea" class="chart"></div></div>
+    </div>
+  </section>
+
+  <section class="panel-grid">
+    <div class="panel span-12">
+      <div class="panel-head"><div class="panel-title">📍 Emergency Location Distribution <span class="badge">MAP</span></div></div>
+      <div class="chart-wrap" style="position:relative"><div id="map"></div></div>
+    </div>
+  </section>
+
+  <section class="table-wrap">
+    <div class="table-head">
+      <div class="table-title">📋 Recent Emergency Reports</div>
+      <span style="font-size:0.65rem;color:var(--text-muted);" id="tableCount">0 records</span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Category</th><th>Location</th><th>Time</th><th>Status</th><th>Action</th></tr>
+        </thead>
+        <tbody id="reportsBody"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <a href="dashboard.html" class="nav-item-bottom" data-workspace="home"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></a>
+  <a href="toko.html" class="nav-item-bottom" data-workspace="toko"><span class="nav-icon">🛒</span><span class="nav-label">Toko</span></a>
+  <button class="nav-item-bottom" id="bottomInviteNav"><span class="nav-icon">📨</span><span class="nav-label">Invite</span><span class="badge" id="inviteBadge">0</span></button>
+  <button class="nav-item-bottom" id="bottomNotifNav"><span class="nav-icon">🔔</span><span class="nav-label">Notif</span><span class="badge" id="notifBadge">0</span></button>
+  <a href="profil.html" class="nav-item-bottom" data-workspace="profile"><span class="nav-icon">👤</span><span class="nav-label">Profil</span></a>
+</nav>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+/* ====================================================================
+ * SALINK COMMAND CENTER v4.0 — with CENTRAL SYNC
+ * ====================================================================
+ * ✅ Central Delete Function
+ * ✅ Cross-Tab Sync via BroadcastChannel + storage event
+ * ✅ Real-time stats dari localStorage
+ * ✅ Charts + Map + Table
+ * ==================================================================== */
+
+const API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
+const DASHBOARD_URL = 'dashboard.html';
+const PROFILE_URL = 'profil.html';
+const EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
+
+const CATEGORY_MAP = { fire: { label: "🔥 Kebakaran", color: "#f97316" }, medical: { label: "🚑 Medis", color: "#38bdf8" }, crime: { label: "🚓 Kriminal", color: "#a78bfa" }, disaster: { label: "🌪️ Bencana", color: "#facc15" } };
+const STATUS_MAP = { active: { label: "Aktif", color: "#f85149" }, resolved: { label: "Resolved", color: "#22c55e" } };
+
+let currentTheme = 'dark';
+let currentUser = null;
+let isLoading = false;
+let pendingDelete = null;
+let syncChannel = null;
+let chartInstances = {};
+let leafletMap = null;
+let mapMarkersLayer = null;
+
+try {
+    syncChannel = new BroadcastChannel('salink_sync');
+    syncChannel.onmessage = (event) => handleSyncMessage(event.data);
+} catch(e) {}
+
+function handleSyncMessage(data) {
+    if (!data || !data.type) return;
+    showSyncIndicator();
+    setTimeout(() => { loadData(); hideSyncIndicator(); }, 300);
+}
+function showSyncIndicator() { document.getElementById('syncIndicator')?.classList.add('active'); }
+function hideSyncIndicator() { setTimeout(() => document.getElementById('syncIndicator')?.classList.remove('active'), 1500); }
+function broadcastSync(type, data = {}) {
+    if (syncChannel) { try { syncChannel.postMessage({ type, data, timestamp: Date.now() }); } catch(e) {} }
+    try { localStorage.setItem('salink_sync_trigger', JSON.stringify({ type, data, timestamp: Date.now() })); setTimeout(() => localStorage.removeItem('salink_sync_trigger'), 100); } catch(e) {}
+}
+
+// CENTRAL DELETE
+function requestDelete(type, id, description) {
+    if (!confirm('⚠️ KONFIRMASI PERTAMA\n\nAnda akan menghapus ' + description + '.\n\nLanjutkan?')) return;
+    pendingDelete = { type, id, description };
+    document.getElementById('deleteConfirmMsg').innerHTML = `Anda akan menghapus <strong>${description}</strong> dari SEMUA halaman.`;
+    document.getElementById('deleteConfirmModal').classList.add('active');
+}
+function closeDeleteConfirm() { pendingDelete = null; document.getElementById('deleteConfirmModal').classList.remove('active'); }
+async function confirmDeleteNow() {
+    if (!pendingDelete) return;
+    const { type, id } = pendingDelete;
+    document.getElementById('deleteConfirmModal').classList.remove('active');
+    pendingDelete = null;
+    showSyncIndicator();
+    try {
+        let allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
+        allPosts = allPosts.filter(p => p.id !== id);
+        localStorage.setItem('salink_posts', JSON.stringify(allPosts));
+        let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+        ems = ems.filter(e => e.id !== id);
+        localStorage.setItem('salink_emergencies', JSON.stringify(ems));
+        try { await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'delete_content', data: { type, id, userId: currentUser?.username || '' } }) }); } catch(e) {}
+        broadcastSync('delete_post', { id });
+        loadData();
+        showToast('✅ Dihapus', 'Data dihapus dari semua halaman', 'fa-check-circle');
+    } catch(e) { showToast('⚠️ Gagal', 'Tidak dapat menghapus', 'fa-exclamation-triangle'); }
+    hideSyncIndicator();
+}
+
+// HELPERS
+function esc(v) { if (v === null || v === undefined) return ''; return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+function formatNumber(v) { return Number(v || 0).toLocaleString('id-ID'); }
+function formatDate(v) { if (!v) return '—'; const d = new Date(v); if (isNaN(d.getTime())) return '—'; return d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }); }
+function getTimeAgo(ts) { const diff = Date.now() - ts; const sec = Math.floor(diff/1000), min = Math.floor(sec/60), hr = Math.floor(min/60), day = Math.floor(hr/24); if (sec < 60) return 'Baru saja'; if (min < 60) return min + 'm lalu'; if (hr < 24) return hr + 'j lalu'; return day + 'h lalu'; }
+function isValidCoord(lat, lng) { const la = Number(lat), ln = Number(lng); return Number.isFinite(la) && Number.isFinite(ln) && la >= -90 && la <= 90 && ln >= -180 && ln <= 180 && !(la === 0 && ln === 0); }
+
+// TOAST
+function showToast(title, message, icon = 'fa-info-circle') {
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    const c = document.getElementById('toastContainer');
+    if (!c) return;
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.innerHTML = `<div class="toast-icon"><i class="fas ${icon}"></i></div><div class="toast-content"><div class="toast-title">${esc(title)}</div><div class="toast-message">${esc(message)}</div></div><button class="toast-close"><i class="fas fa-times"></i></button>`;
+    t.querySelector('.toast-close').onclick = () => { t.classList.add('hide'); setTimeout(() => t.remove(), 400); };
+    c.appendChild(t);
+    setTimeout(() => { t.classList.add('hide'); setTimeout(() => t.remove(), 400); }, 4000);
+}
+
+// THEME
+function loadTheme() {
+    const t = localStorage.getItem('salink_theme') || 'dark';
+    if (t === 'light') { currentTheme = 'light'; document.documentElement.setAttribute('data-theme', 'light'); document.getElementById('themeToggle')?.classList.add('active'); document.getElementById('toggleIcon').className = 'fas fa-sun'; }
+}
+function toggleTheme() {
+    const html = document.documentElement;
+    const tt = document.getElementById('themeToggle');
+    const ti = document.getElementById('toggleIcon');
+    if (currentTheme === 'dark') { currentTheme = 'light'; html.setAttribute('data-theme', 'light'); tt?.classList.add('active'); ti.className = 'fas fa-sun'; localStorage.setItem('salink_theme', 'light'); }
+    else { currentTheme = 'dark'; html.removeAttribute('data-theme'); tt?.classList.remove('active'); ti.className = 'fas fa-moon'; localStorage.setItem('salink_theme', 'dark'); }
+    setTimeout(() => { initCharts(); }, 200);
+}
+
+// SIDEBAR
+function openSidebar() { document.getElementById('sidebar')?.classList.add('active'); document.getElementById('sidebarOverlay')?.classList.add('active'); }
+function closeSidebar() { document.getElementById('sidebar')?.classList.remove('active'); document.getElementById('sidebarOverlay')?.classList.remove('active'); }
+
+// USER
+function loadUser() {
+    try { const raw = localStorage.getItem('salink_user'); if (raw) currentUser = JSON.parse(raw); } catch(e) {}
+    const userBtn = document.getElementById('userBtn');
+    if (userBtn) { if (currentUser?.profilePicture) userBtn.innerHTML = `<img src="${esc(currentUser.profilePicture)}">`; else userBtn.innerHTML = '<i class="fas fa-user"></i>'; }
+    const sidebarName = document.getElementById('sidebarUserName');
+    const sidebarEmail = document.getElementById('sidebarUserEmail');
+    const sidebarAvatar = document.getElementById('sidebarUserAvatar');
+    const logoutItem = document.getElementById('logoutNavItem');
+    if (!currentUser) { if (sidebarName) sidebarName.textContent = 'Guest'; if (sidebarEmail) sidebarEmail.textContent = 'guest@salink.id'; if (sidebarAvatar) sidebarAvatar.innerHTML = '<i class="fas fa-user"></i>'; if (logoutItem) logoutItem.style.display = 'none'; return; }
+    if (sidebarName) sidebarName.textContent = currentUser.fullName || 'User';
+    if (sidebarEmail) sidebarEmail.textContent = currentUser.email || currentUser.username || '-';
+    if (sidebarAvatar) { if (currentUser.profilePicture) sidebarAvatar.innerHTML = `<img src="${esc(currentUser.profilePicture)}">`; else sidebarAvatar.innerHTML = currentUser.gender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>'; }
+    if (logoutItem) logoutItem.style.display = 'block';
+}
+
+// LOAD DATA
+async function loadData() {
+    if (isLoading) return;
+    isLoading = true;
+    try {
+        let allPosts = [];
+        try { allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]'); } catch(e) {}
+        let allEms = [];
+        try { allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) {}
+
+        // Merge with API
+        try {
+            const r = await fetch(API_URL + '?action=get_emergencies&_=' + Date.now(), { cache: 'no-store' });
+            if (r.ok) { const j = await r.json(); if (j.status === 'success' && Array.isArray(j.data)) { const map = new Map(); allEms.forEach(e => { if (e.id) map.set(e.id, e); }); j.data.forEach(e => { if (e.id) map.set(e.id, e); }); allEms = Array.from(map.values()); localStorage.setItem('salink_emergencies', JSON.stringify(allEms)); } }
+        } catch(e) {}
+
+        // Compute stats
+        let totalLikes = 0;
+        allPosts.forEach(p => { try { const l = typeof p.likes === 'string' ? JSON.parse(p.likes) : (p.likes || []); totalLikes += Array.isArray(l) ? l.length : 0; } catch(e) {} });
+
+        const byType = { fire: 0, medical: 0, crime: 0, disaster: 0 };
+        allEms.forEach(e => { if (e.type && byType.hasOwnProperty(e.type)) byType[e.type]++; });
+        const activeEms = allEms.filter(e => (e.expiresAt || (new Date(e.timestamp).getTime() + EMERGENCY_DURATION)) > Date.now());
+
+        // Update KPI
+        const upd = (el, val) => { if (!el) return; el.textContent = formatNumber(val); };
+        upd(document.getElementById('kpiFire'), byType.fire);
+        upd(document.getElementById('kpiMedical'), byType.medical);
+        upd(document.getElementById('kpiCrime'), byType.crime);
+        upd(document.getElementById('kpiDisaster'), byType.disaster);
+        upd(document.getElementById('kpiTotal'), allEms.length);
+        upd(document.getElementById('kpiActive'), activeEms.length);
+        upd(document.getElementById('kpiPosts'), allPosts.length);
+        upd(document.getElementById('kpiLikes'), totalLikes);
+
+        // Charts
+        initCharts({ byType, allEms });
+        renderMap(allEms);
+        renderTable(allEms);
+    } catch(e) { console.error(e); }
+    finally { isLoading = false; }
+}
+
+function initCharts(data = null) {
+    if (typeof echarts === 'undefined') return;
+    const isDark = currentTheme === 'dark';
+    const textColor = isDark ? '#94a3b8' : '#4a4a6a';
+    const gridColor = isDark ? 'rgba(148,163,184,0.06)' : 'rgba(0,0,0,0.06)';
+
+    let allEms = [];
+    try { allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) {}
+    const byType = { fire: 0, medical: 0, crime: 0, disaster: 0 };
+    allEms.forEach(e => { if (e.type && byType.hasOwnProperty(e.type)) byType[e.type]++; });
+
+    const cats = ['fire', 'medical', 'crime', 'disaster'];
+    const labels = cats.map(c => CATEGORY_MAP[c].label);
+    const values = cats.map(c => byType[c]);
+    const colors = cats.map(c => CATEGORY_MAP[c].color);
+
+    const barDom = document.getElementById('chartBar');
+    if (barDom) {
+        if (!chartInstances.bar) chartInstances.bar = echarts.init(barDom);
+        chartInstances.bar.setOption({
+            tooltip: { backgroundColor: isDark ? "rgba(6,8,15,0.92)" : "rgba(255,255,255,0.95)", textStyle: { color: textColor, fontSize: 11 }, trigger: "axis" },
+            grid: { left: 30, right: 15, top: 15, bottom: 30, containLabel: true },
+            xAxis: { type: "category", data: labels, axisLine: { lineStyle: { color: gridColor } }, axisLabel: { color: textColor, fontSize: 9 }, axisTick: { show: false } },
+            yAxis: { type: "value", min: 0, max: Math.max(1, Math.max(...values) * 1.3), axisLine: { show: false }, axisLabel: { color: textColor, fontSize: 8 }, splitLine: { lineStyle: { color: gridColor } } },
+            series: [{ type: "bar", data: values.map((v, i) => ({ value: v, itemStyle: { color: colors[i], borderRadius: [4, 4, 0, 0] } })), barWidth: "40%" }]
+        }, true);
+    }
+
+    const doughnutDom = document.getElementById('chartDoughnut');
+    if (doughnutDom) {
+        if (!chartInstances.doughnut) chartInstances.doughnut = echarts.init(doughnutDom);
+        chartInstances.doughnut.setOption({
+            tooltip: { backgroundColor: isDark ? "rgba(6,8,15,0.92)" : "rgba(255,255,255,0.95)", textStyle: { color: textColor, fontSize: 11 }, trigger: "item" },
+            legend: { bottom: 0, textStyle: { color: textColor, fontSize: 9 } },
+            series: [{ type: "pie", radius: ["48%", "72%"], center: ["50%", "42%"], data: cats.map((c, i) => ({ name: labels[i], value: values[i], itemStyle: { color: colors[i] } })), label: { show: false } }]
+        }, true);
+    }
+
+    // Area chart 7 days
+    const days = [];
+    for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        d.setHours(0, 0, 0, 0);
+        days.push({ label: d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }), start: d.getTime(), end: d.getTime() + 86400000 });
+    }
+    const fire = [], medical = [], crime = [], disaster = [];
+    days.forEach(day => {
+        let f = 0, m = 0, c = 0, dd = 0;
+        allEms.forEach(e => {
+            const ts = new Date(e.timestamp).getTime();
+            if (ts >= day.start && ts < day.end) {
+                if (e.type === 'fire') f++; else if (e.type === 'medical') m++; else if (e.type === 'crime') c++; else if (e.type === 'disaster') dd++;
+            }
+        });
+        fire.push(f); medical.push(m); crime.push(c); disaster.push(dd);
+    });
+
+    const areaDom = document.getElementById('chartArea');
+    if (areaDom) {
+        if (!chartInstances.area) chartInstances.area = echarts.init(areaDom);
+        chartInstances.area.setOption({
+            tooltip: { backgroundColor: isDark ? "rgba(6,8,15,0.92)" : "rgba(255,255,255,0.95)", textStyle: { color: textColor, fontSize: 11 }, trigger: "axis" },
+            grid: { left: 30, right: 15, top: 15, bottom: 30, containLabel: true },
+            xAxis: { type: "category", data: days.map(d => d.label), axisLine: { lineStyle: { color: gridColor } }, axisLabel: { color: textColor, fontSize: 8 } },
+            yAxis: { type: "value", min: 0, axisLine: { show: false }, axisLabel: { color: textColor, fontSize: 8 }, splitLine: { lineStyle: { color: gridColor } } },
+            series: [
+                { name: '🔥 Kebakaran', type: "line", data: fire, smooth: true, lineStyle: { color: '#f97316', width: 2 }, itemStyle: { color: '#f97316' }, areaStyle: { color: 'rgba(249,115,22,0.2)' } },
+                { name: '🚑 Medis', type: "line", data: medical, smooth: true, lineStyle: { color: '#38bdf8', width: 2 }, itemStyle: { color: '#38bdf8' }, areaStyle: { color: 'rgba(56,189,248,0.2)' } },
+                { name: '🚓 Kriminal', type: "line", data: crime, smooth: true, lineStyle: { color: '#a78bfa', width: 2 }, itemStyle: { color: '#a78bfa' }, areaStyle: { color: 'rgba(167,139,250,0.2)' } },
+                { name: '🌪️ Bencana', type: "line", data: disaster, smooth: true, lineStyle: { color: '#facc15', width: 2 }, itemStyle: { color: '#facc15' }, areaStyle: { color: 'rgba(250,204,21,0.2)' } }
+            ]
+        }, true);
+    }
+}
+
+function renderMap(allEms) {
+    const el = document.getElementById('map');
+    if (!el) return;
+    if (!leafletMap) {
+        leafletMap = L.map(el).setView([-2.5, 118], 4);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(leafletMap);
+        mapMarkersLayer = L.layerGroup().addTo(leafletMap);
+    }
+    mapMarkersLayer.clearLayers();
+    const validEms = allEms.filter(e => isValidCoord(e.latitude, e.longitude));
+    if (validEms.length === 0) return;
+    const bounds = [];
+    validEms.forEach(e => {
+        const lat = Number(e.latitude);
+        const lng = Number(e.longitude);
+        bounds.push([lat, lng]);
+        const color = CATEGORY_MAP[e.type]?.color || '#94a3b8';
+        const emoji = { fire: "🔥", medical: "🚑", crime: "🚓", disaster: "🌪️" }[e.type] || "•";
+        const icon = L.divIcon({
+            html: `<div style="width:26px;height:26px;border-radius:50%;background:${color};border:2px solid #fff;display:grid;place-items:center;font-size:11px;box-shadow:0 0 10px ${color}88;">${emoji}</div>`,
+            iconSize: [26, 26], iconAnchor: [13, 13], className: ''
+        });
+        const marker = L.marker([lat, lng], { icon });
+        marker.bindPopup(`<div style="font-family:Inter;font-size:11px;"><b>${CATEGORY_MAP[e.type]?.label || e.type}</b><br>${esc(e.location || '-')}<br>${formatDate(e.timestamp)}</div>`);
+        marker.addTo(mapMarkersLayer);
+    });
+    if (bounds.length) { try { leafletMap.fitBounds(bounds, { padding: [30, 30], maxZoom: 12 }); } catch(e) {} }
+    setTimeout(() => leafletMap.invalidateSize(), 200);
+}
+
+function renderTable(allEms) {
+    const body = document.getElementById('reportsBody');
+    const countEl = document.getElementById('tableCount');
+    if (!body) return;
+    const sorted = [...allEms].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()).slice(0, 20);
+    if (countEl) countEl.textContent = sorted.length + ' records';
+    if (sorted.length === 0) {
+        body.innerHTML = `<tr><td colspan="6" class="table-empty">📊 Belum ada emergency tersimpan</td></tr>`;
+        return;
+    }
+    body.innerHTML = sorted.map(e => {
+        const cat = CATEGORY_MAP[e.type] || { label: e.type, color: '#94a3b8' };
+        return `<tr>
+            <td><span style="font-family:monospace;font-size:9px;color:var(--text-muted)">#${esc(String(e.id || '').slice(0, 8))}</span></td>
+            <td><span class="pill ${esc(e.type)}">${esc(cat.label)}</span></td>
+            <td>${esc(e.location || '-')}</td>
+            <td>${esc(getTimeAgo(new Date(e.timestamp).getTime()))}</td>
+            <td><span class="pill active">AKTIF</span></td>
+            <td><button class="pill btn-delete" onclick="requestDelete('emergency', '${esc(e.id)}', '${esc(cat.label)}')"><i class="fas fa-trash"></i> Hapus</button></td>
+        </tr>`;
+    }).join('');
+}
+
+function exportCSV() {
+    let allEms = [];
+    try { allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) {}
+    if (allEms.length === 0) { showToast('⚠️ Info', 'Tidak ada data untuk diexport', 'fa-exclamation-triangle'); return; }
+    const headers = ['ID', 'Type', 'Location', 'Sender', 'Timestamp', 'Latitude', 'Longitude'];
+    const lines = [headers.join(',')];
+    allEms.forEach(e => {
+        const row = [e.id, e.type, e.location, e.sender, e.timestamp, e.latitude || '', e.longitude || ''];
+        lines.push(row.map(v => { const s = String(v || ''); if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"'; return s; }).join(','));
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'salink-emergency-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('📥 Berhasil', 'Data diexport ke CSV', 'fa-download');
+}
+
+// LOGOUT
+function handleLogout() {
+    if (confirm('Keluar dari akun?')) {
+        ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies'].forEach(k => localStorage.removeItem(k));
+        window.location.href = DASHBOARD_URL + '?logout=1';
+    }
+}
+
+// RESIZE
+window.addEventListener('resize', () => {
+    Object.values(chartInstances).forEach(c => { try { c.resize(); } catch(e) {} });
+    if (leafletMap) { try { leafletMap.invalidateSize(); } catch(e) {} }
+});
+
+// INIT
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 SALINK Command Center v4.0 Initializing...');
+    loadTheme();
+    loadUser();
+
+    document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
+    document.getElementById('menuBtn')?.addEventListener('click', () => openSidebar());
+    document.getElementById('sidebarClose')?.addEventListener('click', closeSidebar);
+    document.getElementById('sidebarOverlay')?.addEventListener('click', closeSidebar);
+    document.getElementById('refreshBtn')?.addEventListener('click', function() { const i = this.querySelector('i'); i.classList.add('fa-spin'); loadData().then(() => i.classList.remove('fa-spin')); });
+    document.getElementById('exportBtn')?.addEventListener('click', exportCSV);
+    document.getElementById('userBtn')?.addEventListener('click', () => window.location.href = PROFILE_URL);
+    document.getElementById('logoutBtn')?.addEventListener('click', (e) => { e.preventDefault(); handleLogout(); });
+
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'salink_sync_trigger') { try { const data = JSON.parse(e.newValue); if (data && data.type) handleSyncMessage(data); } catch(err) {} }
+        if (e.key === 'salink_posts' || e.key === 'salink_emergencies') loadData();
+        if (e.key === 'salink_user') loadUser();
+        if (e.key === 'salink_theme') loadTheme();
+    });
+
+    loadData();
+    setTimeout(() => initCharts(), 500);
+
+    setInterval(() => { if (!document.hidden) loadData(); }, 30000);
+
+    console.log('✅ Command Center v4.0 Ready!');
+});
+
+window.requestDelete = requestDelete;
+window.confirmDeleteNow = confirmDeleteNow;
+window.closeDeleteConfirm = closeDeleteConfirm;
+</script>
+
+<!-- ============================================================ -->
+<!-- SALINK FCM + EMERGENCY ALERT UNIVERSAL INTEGRATION           -->
+<!-- v4.3: Universal untuk 14 file HTML (kecuali dashboard.html) -->
+<!-- ============================================================ -->
+<script src="/firebase-config.js"></script>
+<script src="/fcm-client.js"></script>
+<script src="/salink-emergency.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // ==================================================
+  // FCM INIT — Save token setelah user login
+  // ==================================================
+  window.addEventListener('load', async function() {
+    const isLoggedIn = localStorage.getItem('salink_logged_in');
+    const userData = localStorage.getItem('salink_user');
+    if (isLoggedIn !== 'true' || !userData) {
+      console.log('ℹ️ [FCM] User belum login — FCM skip');
+      return;
+    }
+
+    let user;
+    try { user = JSON.parse(userData); } catch(e) {
+      console.warn('⚠️ [FCM] salink_user tidak valid');
+      return;
+    }
+    if (!user || !user.username) {
+      console.warn('⚠️ [FCM] salink_user tidak punya username');
+      return;
+    }
+
+    console.log('🚀 [FCM] Init untuk:', user.username, '(Command Center)');
+
+    try {
+      if (typeof SalinkFCM === 'undefined') {
+        console.warn('⚠️ [FCM] SalinkFCM tidak tersedia — cek /fcm-client.js');
+        return;
+      }
+
+      const initResult = await SalinkFCM.init();
+      if (!initResult.ok) {
+        console.warn('⚠️ [FCM] init gagal:', initResult.reason);
+        return;
+      }
+
+      console.log('✅ [FCM] Siap. Token:', initResult.token.substring(0, 30) + '...');
+
+      const saveResult = await SalinkFCM.saveToken({
+        userId: user.id,
+        username: user.username,
+        email: user.email
+      });
+
+      if (saveResult.ok) {
+        console.log('✅ [FCM] Token tersimpan di backend');
+      } else {
+        console.warn('⚠️ [FCM] Gagal simpan token:', saveResult);
+      }
+    } catch (err) {
+      console.error('❌ [FCM] error:', err);
+    }
+  });
+
+  // ==================================================
+  // SALINK EMERGENCY ALERT — Ready check
+  // ==================================================
+  window.addEventListener('load', function() {
+    if (typeof SalinkEmergency === 'undefined') {
+      console.warn('⚠️ [SalinkEmergency] Script belum tersedia');
+      return;
+    }
+    console.log('✅ [SalinkEmergency] Ready di Command Center — polling 15s');
+  });
+})();
+</script>
+<!-- ============================================================ -->
+
+</body>
+</html>
