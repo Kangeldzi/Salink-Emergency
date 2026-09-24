@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>SALINK - Statistik Emergency</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0d1117" id="themeColorMeta">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SALINK">
+<link rel="apple-touch-icon" href="icon-192.png">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg-primary: #0d1117; --bg-secondary: #161b22; --bg-card: rgba(22, 27, 34, 0.92);
+  --bg-input: rgba(22, 27, 34, 0.6); --text-primary: #e6edf3; --text-secondary: #8b949e;
+  --text-muted: #6e7681; --border-color: #30363d; --shadow-color: rgba(0,0,0,0.4);
+  --shadow-light: rgba(0,0,0,0.2); --accent-blue: #58a6ff; --accent-blue-dark: #1f6feb;
+  --accent-blue-gradient: linear-gradient(135deg, #58a6ff, #1f6feb);
+  --accent-green: #25D366; --accent-red: #f85149; --accent-gold: #f0d080;
+  --accent-purple: #c792ea; --toggle-bg: #30363d; --toggle-thumb: #58a6ff;
+  --header-bg: rgba(22, 27, 34, 0.95); --footer-bg: rgba(13, 17, 23, 0.95);
+  --modal-bg: rgba(22, 27, 34, 0.98); --input-border: #30363d;
+  --header-height: 60px; --footer-height: 65px; --danger: #f85149; --success: #3fb950;
+}
+[data-theme="light"] {
+  --bg-primary: #f0f4f8; --bg-secondary: #e8edf2; --bg-card: rgba(255, 255, 255, 0.92);
+  --bg-input: rgba(0,0,0,0.04); --text-primary: #1a1a2e; --text-secondary: #4a4a6a;
+  --text-muted: #6a6a8a; --border-color: #d0d7de; --shadow-color: rgba(0,0,0,0.08);
+  --shadow-light: rgba(0,0,0,0.04); --accent-blue: #4facfe; --accent-blue-dark: #00c6fb;
+  --accent-blue-gradient: linear-gradient(135deg, #4facfe, #00c6fb);
+  --accent-red: #e31837; --accent-gold: #8d6b4b; --accent-purple: #7c3aed;
+  --toggle-bg: #d0d7de; --toggle-thumb: #4facfe;
+  --header-bg: rgba(255, 255, 255, 0.95); --footer-bg: rgba(255, 255, 255, 0.95);
+  --modal-bg: rgba(255, 255, 255, 0.98); --input-border: #dce1e8;
+  --danger: #e31837; --success: #2ea44f;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; transition: background 0.3s ease, color 0.3s ease; }
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+::-webkit-scrollbar-thumb { background: var(--accent-blue); border-radius: 3px; }
+
+@keyframes blink { 0%, 100% { color: #ff0000; text-shadow: 0 0 20px rgba(255,0,0,0.8); } 50% { color: #00C2FF; text-shadow: 0 0 20px rgba(0,194,255,0.8); } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes toastIn { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes toastOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(30px); opacity: 0; } }
+@keyframes notifPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.3); } }
+@keyframes syncPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+@keyframes statBump { 0% { transform: scale(1); } 50% { transform: scale(1.15); color: var(--accent-blue); } 100% { transform: scale(1); } }
+
+/* HEADER */
+.app-bar { position: fixed; top: 0; width: 100%; height: var(--header-height); background: var(--header-bg); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: flex; justify-content: space-between; align-items: center; padding: 0 12px; z-index: 1000; box-shadow: 0 2px 20px var(--shadow-color); border-bottom: 1px solid var(--border-color); }
+.app-title { display: flex; align-items: center; gap: 8px; font-weight: 700; color: var(--text-primary); font-size: 1.1rem; cursor: pointer; text-decoration: none; font-family: 'Poppins', sans-serif; }
+.app-title .siren-icon-header { font-size: 1.5rem; display: inline-block; animation: spin 1.5s linear infinite, blink 1s ease-in-out infinite; line-height: 1; }
+.header-center { display: flex; align-items: center; gap: 8px; }
+.header-right { display: flex; align-items: center; gap: 6px; }
+.menu-btn, .back-btn, .user-btn { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; text-decoration: none; }
+.menu-btn:active, .back-btn:active, .user-btn:active { transform: scale(0.95); }
+.user-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.theme-toggle { position: relative; width: 44px; height: 24px; background: var(--toggle-bg); border-radius: 30px; cursor: pointer; border: 1px solid var(--border-color); }
+.theme-toggle.active { background: rgba(88,166,255,0.3); }
+.theme-toggle .toggle-thumb { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--toggle-thumb); transition: all 0.3s; display: flex; align-items: center; justify-content: center; font-size: 0.55rem; }
+.theme-toggle.active .toggle-thumb { left: 22px; }
+.theme-toggle .toggle-thumb i { color: #fff; }
+
+/* SYNC INDICATOR */
+.sync-indicator { position: fixed; top: calc(var(--header-height) + 6px); right: 10px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 3px 10px; font-size: 0.55rem; color: var(--text-muted); z-index: 999; display: none; align-items: center; gap: 4px; animation: syncPulse 1s ease-in-out infinite; }
+.sync-indicator.active { display: flex; }
+.sync-indicator i { color: var(--accent-blue); font-size: 0.6rem; }
+
+/* SIDEBAR */
+.sidebar-overlay-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1099; display: none; opacity: 0; transition: opacity 0.3s; }
+.sidebar-overlay-bg.active { display: block; opacity: 1; }
+.sidebar { position: fixed; top: var(--header-height); left: 0; width: 290px; max-height: calc(100vh - var(--header-height)); background: var(--bg-secondary); z-index: 1100; overflow-y: auto; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; transform: translateX(-100%); transition: transform 0.3s; border-radius: 0 0 12px 0; }
+.sidebar.active { transform: translateX(0); }
+.sidebar-close { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; z-index: 10; }
+.sidebar-header { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 16px; border-bottom: 1px solid var(--border-color); background: var(--bg-card); }
+.sidebar-user-avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--accent-blue-gradient); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; font-size: 1.1rem; overflow: hidden; border: 2px solid var(--accent-blue); }
+.sidebar-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.sidebar-user-name { font-size: 0.85rem; font-weight: 600; }
+.sidebar-user-email { font-size: 0.6rem; color: var(--text-muted); }
+.nav-menu { list-style: none; padding: 6px 12px 12px; flex: 1; }
+.nav-section-title { font-size: 0.55rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; padding: 10px 14px 4px; font-weight: 600; }
+.nav-item { margin-bottom: 2px; }
+.nav-link { display: flex; align-items: center; gap: 12px; padding: 10px 14px; color: var(--text-primary); text-decoration: none; border-radius: 8px; font-size: 0.8rem; background: var(--bg-input); border: 1px solid transparent; cursor: pointer; }
+.nav-link.active { background: rgba(88,166,255,0.15); color: var(--accent-blue); border: 1px solid var(--accent-blue); }
+.nav-link i { width: 22px; text-align: center; font-size: 0.95rem; color: var(--accent-blue); }
+.nav-logout .nav-link { color: var(--accent-red); }
+.nav-logout .nav-link i { color: var(--accent-red); }
+
+/* MAIN */
+.main-content { padding: calc(var(--header-height) + 14px) 14px calc(var(--footer-height) + 20px); max-width: 600px; margin: 0 auto; width: 100%; min-height: 100vh; }
+.page-title { font-size: 1.3rem; margin-bottom: 4px; font-weight: 700; }
+.page-description { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 16px; line-height: 1.5; }
+
+/* STATS GRID */
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+.stat-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; transition: all 0.4s; }
+.stat-card:hover { border-color: var(--accent-blue); transform: translateY(-2px); }
+.stat-icon { font-size: 1.5rem; margin-bottom: 6px; }
+.stat-label { font-size: 0.6rem; color: var(--text-secondary); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-size: 1.5rem; font-weight: 700; color: var(--accent-blue); margin-top: 2px; }
+.stat-value.bump { animation: statBump 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+.stat-description { font-size: 0.55rem; color: var(--text-muted); margin-top: 4px; }
+
+/* SECTION CARD */
+.section-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.section-title { font-size: 0.95rem; font-weight: 600; }
+.section-subtitle { font-size: 0.65rem; color: var(--text-muted); margin-top: 2px; }
+
+/* TYPE GRID */
+.type-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.type-card { border: 1px solid var(--border-color); border-radius: 10px; padding: 12px; background: var(--bg-input); text-align: center; }
+.type-icon { font-size: 1.8rem; }
+.type-name { font-size: 0.6rem; color: var(--text-secondary); font-weight: 600; margin-top: 4px; }
+.type-value { font-size: 1.3rem; font-weight: 700; color: var(--accent-blue); margin-top: 2px; }
+
+/* LATEST */
+.latest-card { border: 1px solid var(--border-color); border-radius: 10px; padding: 14px; background: var(--bg-input); }
+.latest-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 20px; background: rgba(248,81,73,0.15); color: var(--accent-red); font-size: 0.6rem; font-weight: 700; }
+.latest-title { font-size: 1rem; font-weight: 700; color: var(--text-primary); margin-top: 6px; }
+.latest-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.65rem; color: var(--text-secondary); margin-top: 4px; }
+.latest-description { font-size: 0.75rem; color: var(--text-secondary); margin-top: 6px; line-height: 1.5; }
+.detail-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 8px; background: var(--accent-blue-gradient); color: #fff; font-weight: 600; font-size: 0.7rem; text-decoration: none; margin-top: 8px; cursor: pointer; border: none; font-family: inherit; }
+
+/* MAP */
+.real-map-wrapper { width: 100%; height: 280px; overflow: hidden; border-radius: 10px; background: var(--bg-input); }
+.real-google-map { width: 100%; height: 100%; border: 0; display: block; }
+.map-location-info { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.map-coordinate { font-size: 0.65rem; color: var(--text-secondary); }
+.map-open-btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 8px; background: var(--bg-input); color: var(--accent-blue); border: 1px solid var(--border-color); font-size: 0.65rem; font-weight: 600; text-decoration: none; }
+.map-empty-state { min-height: 200px; display: flex; align-items: center; justify-content: center; flex-direction: column; text-align: center; padding: 20px; color: var(--text-muted); }
+.map-empty-icon { font-size: 2.5rem; margin-bottom: 8px; }
+.map-empty-title { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); }
+.map-empty-text { font-size: 0.7rem; max-width: 300px; margin-top: 4px; line-height: 1.5; }
+
+/* HOURLY */
+.hourly-wrapper { overflow-x: auto; padding-bottom: 4px; }
+.hourly-chart { min-width: 600px; height: 180px; display: flex; align-items: flex-end; gap: 4px; padding: 10px 4px 4px; }
+.hour-bar-item { flex: 1; min-width: 18px; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+.hour-count { min-height: 14px; font-size: 0.5rem; color: var(--text-muted); margin-bottom: 2px; }
+.hour-bar { width: 100%; max-width: 20px; min-height: 2px; border-radius: 4px 4px 2px 2px; background: var(--accent-blue-gradient); }
+.hour-label { margin-top: 4px; font-size: 0.45rem; color: var(--text-muted); }
+
+/* LOADING */
+.loading { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 100px; color: var(--text-muted); font-size: 0.75rem; }
+.spinner { width: 20px; height: 20px; border: 3px solid var(--border-color); border-top-color: var(--accent-blue); border-radius: 50%; animation: spin 0.8s linear infinite; }
+.error-state { padding: 20px; text-align: center; color: var(--text-muted); }
+.error-icon { font-size: 2rem; margin-bottom: 6px; }
+.error-title { font-weight: 700; color: var(--text-primary); }
+.error-text { font-size: 0.75rem; margin-top: 4px; line-height: 1.5; }
+
+/* BOTTOM NAV */
+.bottom-nav { position: fixed !important; bottom: 0 !important; left: 0 !important; right: 0 !important; width: 100% !important; height: var(--footer-height) !important; background: var(--footer-bg) !important; backdrop-filter: blur(15px) !important; border-top: 1px solid var(--border-color) !important; z-index: 1000 !important; display: flex !important; justify-content: space-around !important; align-items: center !important; padding: 0 4px !important; }
+.nav-item-bottom { display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 4px; padding: 4px 8px; cursor: pointer; text-decoration: none; color: var(--text-muted); border: none; background: transparent; flex: 1 !important; height: 100% !important; font-family: inherit; }
+.nav-item-bottom .nav-icon { font-size: 1.6rem; line-height: 1.2; display: block; }
+.nav-item-bottom .nav-label { font-size: 0.65rem; font-weight: 500; }
+.nav-item-bottom.active .nav-label { color: var(--accent-blue); font-weight: 600; }
+.nav-item-bottom .badge { position: absolute; top: 0 !important; right: 0 !important; background: var(--accent-red); color: white; font-size: 0.55rem; border-radius: 50%; min-width: 18px; height: 18px; display: none; align-items: center; justify-content: center; font-weight: bold; padding: 0 4px; }
+.nav-item-bottom .badge.show { display: flex !important; }
+
+/* TOAST */
+.toast-container { position: fixed; bottom: calc(var(--footer-height) + 20px); left: 50%; transform: translateX(-50%); z-index: 10000; max-width: 400px; width: 90%; }
+.toast { background: var(--modal-bg); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; animation: toastIn 0.4s ease; margin-bottom: 8px; }
+.toast.hide { animation: toastOut 0.4s ease forwards; }
+.toast .toast-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: rgba(88,166,255,0.15); color: var(--accent-blue); }
+.toast .toast-content { flex: 1; }
+.toast .toast-title { font-size: 0.75rem; font-weight: 600; }
+.toast .toast-message { font-size: 0.7rem; color: var(--text-secondary); }
+.toast .toast-close { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; }
+</style>
+</head>
+<body>
+
+<!-- SYNC INDICATOR -->
+<div class="sync-indicator" id="syncIndicator"><i class="fas fa-sync-alt fa-spin"></i> Sync...</div>
+
+<!-- HEADER -->
+<header class="app-bar">
+  <a href="dashboard.html" class="app-title"><span class="siren-icon-header">🚨</span><span>SALINK</span></a>
+  <div class="header-center">
+    <button class="menu-btn" id="menuBtn"><i class="fas fa-bars"></i></button>
+    <div class="theme-toggle" id="themeToggle"><div class="toggle-thumb" id="toggleThumb"><i class="fas fa-moon" id="toggleIcon"></i></div></div>
+  </div>
+  <div class="header-right">
+    <button class="user-btn" id="userBtn" data-action="profile"><i class="fas fa-user"></i></button>
+    <a href="dashboard.html" class="back-btn"><i class="fas fa-arrow-left"></i></a>
+  </div>
+</header>
+
+<!-- SIDEBAR -->
+<div class="sidebar-overlay-bg" id="sidebarOverlay"></div>
+<div class="sidebar" id="sidebar">
+  <button class="sidebar-close" id="sidebarClose"><i class="fas fa-times"></i></button>
+  <div class="sidebar-header">
+    <div class="sidebar-user-avatar" id="sidebarUserAvatar"><i class="fas fa-user"></i></div>
+    <div class="sidebar-user-name" id="sidebarUserName">Guest</div>
+    <div class="sidebar-user-email" id="sidebarUserEmail">guest@salink.id</div>
+  </div>
+  <ul class="nav-menu">
+    <li class="nav-item"><a href="dashboard.html" class="nav-link"><i class="fas fa-home"></i><span>Home</span></a></li>
+    <div class="nav-section-title">🚨 MENU DARURAT</div>
+    <li class="nav-item"><a href="kontak-darurat.html" class="nav-link"><i class="fas fa-phone-alt"></i><span>Kontak Darurat</span></a></li>
+    <li class="nav-item"><a href="laporan-darurat.html" class="nav-link"><i class="fas fa-exclamation-circle"></i><span>Laporan Darurat</span></a></li>
+    <li class="nav-item"><a href="lokasi-bantuan.html" class="nav-link"><i class="fas fa-hospital"></i><span>Lokasi Bantuan</span></a></li>
+    <li class="nav-item"><a href="alert-sekitar.html" class="nav-link"><i class="fas fa-bell"></i><span>Alert Sekitar</span></a></li>
+    <div class="nav-section-title">📊 STATISTIK & INFO</div>
+    <li class="nav-item"><a href="statistik.html" class="nav-link active"><i class="fas fa-chart-pie"></i><span>Statistik Emergency</span></a></li>
+    <li class="nav-item"><a href="statistik-emergency.html" class="nav-link"><i class="fas fa-satellite-dish"></i><span>Command Center</span></a></li>
+    <li class="nav-item"><a href="laporan-saya.html" class="nav-link"><i class="fas fa-clipboard-list"></i><span>Laporan Saya</span></a></li>
+    <li class="nav-item"><a href="profil.html" class="nav-link"><i class="fas fa-user-circle"></i><span>Profil Saya</span></a></li>
+    <li class="nav-item nav-logout" id="logoutNavItem" style="display:none;">
+      <a href="#" class="nav-link" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Keluar</span></a>
+    </li>
+  </ul>
+</div>
+
+<!-- MAIN -->
+<main class="main-content">
+  <h1 class="page-title">📊 Statistik Emergency</h1>
+  <p class="page-description">Pantau statistik laporan emergency dari data REAL yang tersimpan di device Anda. Semua data dihitung dari localStorage + API untuk akurasi maksimal.</p>
+
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+    <button id="refreshBtn" style="padding:8px 14px;border-radius:8px;background:var(--accent-blue-gradient);color:#fff;border:none;font-weight:600;font-size:0.7rem;cursor:pointer;font-family:inherit;">🔄 Perbarui Statistik</button>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-icon">🚨</div><div class="stat-label">Emergency Aktif</div><div class="stat-value" id="activeCount">—</div><div class="stat-description">Dalam 24 jam terakhir</div></div>
+    <div class="stat-card"><div class="stat-icon">📊</div><div class="stat-label">Total Emergency</div><div class="stat-value" id="totalEmergencyCount">—</div><div class="stat-description">Semua laporan tersimpan</div></div>
+    <div class="stat-card"><div class="stat-icon">📝</div><div class="stat-label">Total Postingan</div><div class="stat-value" id="totalPostsCount">—</div><div class="stat-description">Biasa + Khusus</div></div>
+    <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-label">Tim Siaga</div><div class="stat-value" id="contactCount">—</div><div class="stat-description">User online aktif</div></div>
+    <div class="stat-card"><div class="stat-icon">❤️</div><div class="stat-label">Total Like</div><div class="stat-value" id="totalLikes">—</div><div class="stat-description">Dari semua postingan</div></div>
+    <div class="stat-card"><div class="stat-icon">👁️</div><div class="stat-label">Total Viewer</div><div class="stat-value" id="totalViewers">—</div><div class="stat-description">Dilihat oleh user</div></div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-header">
+      <div>
+        <div class="section-title">📊 Distribusi Jenis Emergency</div>
+        <div class="section-subtitle">Berdasarkan laporan tersimpan (semua waktu)</div>
+      </div>
+    </div>
+    <div class="type-grid">
+      <div class="type-card"><div class="type-icon">🔥</div><div class="type-name">Kebakaran</div><div class="type-value" id="fireCount">—</div></div>
+      <div class="type-card"><div class="type-icon">🚑</div><div class="type-name">Medis</div><div class="type-value" id="medicalCount">—</div></div>
+      <div class="type-card"><div class="type-icon">🚓</div><div class="type-name">Kriminal</div><div class="type-value" id="crimeCount">—</div></div>
+      <div class="type-card"><div class="type-icon">🌪️</div><div class="type-name">Bencana</div><div class="type-value" id="disasterCount">—</div></div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-header">
+      <div>
+        <div class="section-title">🆕 Laporan Emergency Terbaru</div>
+        <div class="section-subtitle">Laporan paling baru dari database</div>
+      </div>
+    </div>
+    <div id="latestContainer">
+      <div class="loading"><div class="spinner"></div>Memuat...</div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-header">
+      <div>
+        <div class="section-title">🗺️ Lokasi Emergency Terbaru</div>
+        <div class="section-subtitle">Peta hanya tampil jika koordinat GPS valid</div>
+      </div>
+    </div>
+    <div id="mapContainer">
+      <div class="map-empty-state"><div class="map-empty-icon">🗺️</div><div class="map-empty-title">Memuat...</div></div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <div class="section-header">
+      <div>
+        <div class="section-title">🕐 Aktivitas Emergency Per Jam</div>
+        <div class="section-subtitle">Distribusi berdasarkan jam (0-23)</div>
+      </div>
+    </div>
+    <div id="hourlyContainer" class="hourly-wrapper">
+      <div class="loading"><div class="spinner"></div>Memuat...</div>
+    </div>
+  </div>
+</main>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <a href="dashboard.html" class="nav-item-bottom" data-workspace="home"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></a>
+  <a href="toko.html" class="nav-item-bottom" data-workspace="toko"><span class="nav-icon">🛒</span><span class="nav-label">Toko</span></a>
+  <button class="nav-item-bottom" id="bottomInviteNav"><span class="nav-icon">📨</span><span class="nav-label">Invite</span><span class="badge" id="inviteBadge">0</span></button>
+  <button class="nav-item-bottom" id="bottomNotifNav"><span class="nav-icon">🔔</span><span class="nav-label">Notif</span><span class="badge" id="notifBadge">0</span></button>
+  <a href="profil.html" class="nav-item-bottom" data-workspace="profile"><span class="nav-icon">👤</span><span class="nav-label">Profil</span></a>
+</nav>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+/* ====================================================================
+ * SALINK STATISTIK v4.0 — with REALTIME HYBRID STATS
+ * ====================================================================
+ * ✅ Central Sync via BroadcastChannel + storage event
+ * ✅ Real-time recalculate dari localStorage (posts + emergencies)
+ * ✅ Hybrid: coba API dulu, fallback hitung manual
+ * ✅ Auto-refresh tiap 30 detik
+ * ==================================================================== */
+
+const API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
+const DASHBOARD_URL = 'dashboard.html';
+const PROFILE_URL = 'profil.html';
+const LOGIN_URL = 'login-register.html';
+const EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
+
+let currentTheme = 'dark';
+let currentUser = null;
+let isLoading = false;
+let isPreviewMode = true;
+let syncChannel = null;
+
+try {
+    syncChannel = new BroadcastChannel('salink_sync');
+    syncChannel.onmessage = (event) => handleSyncMessage(event.data);
+} catch(e) {}
+
+function handleSyncMessage(data) {
+    if (!data || !data.type) return;
+    showSyncIndicator();
+    setTimeout(() => { loadStatistics(); hideSyncIndicator(); }, 300);
+}
+function showSyncIndicator() { document.getElementById('syncIndicator')?.classList.add('active'); }
+function hideSyncIndicator() { setTimeout(() => document.getElementById('syncIndicator')?.classList.remove('active'), 1500); }
+
+// HELPERS
+function esc(v) { if (v === null || v === undefined) return ''; return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;'); }
+function formatNumber(v) { return Number(v || 0).toLocaleString('id-ID'); }
+function formatDate(value) { if (!value) return 'Waktu tidak tersedia'; const d = new Date(value); if (isNaN(d.getTime())) return String(value); return d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }); }
+function validNumber(v) { const n = Number(v); return Number.isFinite(n) ? n : null; }
+function getEmergencyLabel(type) { const m = { fire: '🔥 Kebakaran', medical: '🚑 Medis', crime: '🚓 Keamanan', disaster: '🌪️ Bencana' }; return m[String(type || '').toLowerCase()] || '🆘 Emergency'; }
+function isValidCoord(lat, lng) { const la = Number(lat), ln = Number(lng); return Number.isFinite(la) && Number.isFinite(ln) && la >= -90 && la <= 90 && ln >= -180 && ln <= 180 && !(la === 0 && ln === 0); }
+
+// TOAST
+function showToast(title, message, icon = 'fa-info-circle') {
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML = `<div class="toast-icon"><i class="fas ${icon}"></i></div><div class="toast-content"><div class="toast-title">${esc(title)}</div><div class="toast-message">${esc(message)}</div></div><button class="toast-close"><i class="fas fa-times"></i></button>`;
+    toast.querySelector('.toast-close').onclick = () => { toast.classList.add('hide'); setTimeout(() => toast.remove(), 400); };
+    container.appendChild(toast);
+    setTimeout(() => { toast.classList.add('hide'); setTimeout(() => toast.remove(), 400); }, 4000);
+}
+
+// THEME
+function loadTheme() {
+    const t = localStorage.getItem('salink_theme') || 'dark';
+    if (t === 'light') { currentTheme = 'light'; document.documentElement.setAttribute('data-theme', 'light'); document.getElementById('themeToggle')?.classList.add('active'); document.getElementById('toggleIcon').className = 'fas fa-sun'; }
+}
+function toggleTheme() {
+    const html = document.documentElement;
+    const tt = document.getElementById('themeToggle');
+    const ti = document.getElementById('toggleIcon');
+    if (currentTheme === 'dark') { currentTheme = 'light'; html.setAttribute('data-theme', 'light'); tt?.classList.add('active'); ti.className = 'fas fa-sun'; localStorage.setItem('salink_theme', 'light'); }
+    else { currentTheme = 'dark'; html.removeAttribute('data-theme'); tt?.classList.remove('active'); ti.className = 'fas fa-moon'; localStorage.setItem('salink_theme', 'dark'); }
+}
+
+// SIDEBAR
+function openSidebar() { document.getElementById('sidebar')?.classList.add('active'); document.getElementById('sidebarOverlay')?.classList.add('active'); }
+function closeSidebar() { document.getElementById('sidebar')?.classList.remove('active'); document.getElementById('sidebarOverlay')?.classList.remove('active'); }
+
+// PREVIEW
+function showPreviewOverlay() {
+    showToast('🔒 Mode Preview', 'Login untuk membuka profil Anda', 'fa-lock');
+    setTimeout(() => { window.location.href = LOGIN_URL; }, 800);
+}
+
+// USER
+function loadUser() {
+    try { const raw = localStorage.getItem('salink_user'); if (raw) { currentUser = JSON.parse(raw); } } catch(e) {}
+    if (!currentUser || !currentUser.username) { isPreviewMode = true; } else { isPreviewMode = false; }
+    const userBtn = document.getElementById('userBtn');
+    if (userBtn) { if (currentUser && currentUser.profilePicture) userBtn.innerHTML = `<img src="${esc(currentUser.profilePicture)}">`; else userBtn.innerHTML = '<i class="fas fa-user"></i>'; }
+    const sidebarName = document.getElementById('sidebarUserName');
+    const sidebarEmail = document.getElementById('sidebarUserEmail');
+    const sidebarAvatar = document.getElementById('sidebarUserAvatar');
+    const logoutItem = document.getElementById('logoutNavItem');
+    if (!currentUser) {
+        if (sidebarName) sidebarName.textContent = 'Guest';
+        if (sidebarEmail) sidebarEmail.textContent = 'guest@salink.id';
+        if (sidebarAvatar) sidebarAvatar.innerHTML = '<i class="fas fa-user"></i>';
+        if (logoutItem) logoutItem.style.display = 'none';
+        return;
+    }
+    if (sidebarName) sidebarName.textContent = currentUser.fullName || 'User';
+    if (sidebarEmail) sidebarEmail.textContent = currentUser.email || currentUser.username || '-';
+    if (sidebarAvatar) { if (currentUser.profilePicture) sidebarAvatar.innerHTML = `<img src="${esc(currentUser.profilePicture)}">`; else sidebarAvatar.innerHTML = currentUser.gender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>'; }
+    if (logoutItem) logoutItem.style.display = 'block';
+}
+
+// API
+async function fetchSALINK(action) {
+    const sep = API_URL.includes('?') ? '&' : '?';
+    const url = API_URL + sep + 'action=' + encodeURIComponent(action) + '&_=' + Date.now();
+    const r = await fetch(url, { method: 'GET', cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const j = await r.json();
+    if (!j || j.status !== 'success') throw new Error((j && j.message) || 'API error');
+    return j;
+}
+
+// ====================================================================
+// REAL-TIME STATS (Hybrid)
+// ====================================================================
+function calculateRealStats() {
+    let allPosts = [];
+    try { allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]'); } catch(e) {}
+    let allEms = [];
+    try { allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) {}
+
+    const activeEms = allEms.filter(e => (e.expiresAt || (new Date(e.timestamp).getTime() + EMERGENCY_DURATION)) > Date.now());
+
+    let totalLikes = 0, totalViewers = 0;
+    allPosts.forEach(p => {
+        try { const likes = typeof p.likes === 'string' ? JSON.parse(p.likes) : (p.likes || []); totalLikes += Array.isArray(likes) ? likes.length : 0; } catch(e) {}
+        totalViewers += parseInt(p.viewerCount || 0, 10) || 0;
+    });
+
+    const byType = { fire: 0, medical: 0, crime: 0, disaster: 0 };
+    allPosts.forEach(p => { if (p.isSpecial && p.specialType && byType.hasOwnProperty(p.specialType)) byType[p.specialType]++; });
+    allEms.forEach(e => { if (e.type && byType.hasOwnProperty(e.type)) byType[e.type]++; });
+
+    // Hourly
+    const hourly = Array.from({ length: 24 }, (_, i) => ({ label: String(i).padStart(2, '0'), count: 0 }));
+    allEms.forEach(e => { const d = new Date(e.timestamp); if (!isNaN(d.getTime())) hourly[d.getHours()].count++; });
+
+    return { totalPosts: allPosts.length, totalEms: allEms.length, activeEms: activeEms.length, totalLikes, totalViewers, byType, hourly, allEms, allPosts };
+}
+
+async function loadStatistics() {
+    if (isLoading) return;
+    isLoading = true;
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) { refreshBtn.disabled = true; refreshBtn.textContent = '⏳ Memuat...'; }
+
+    try {
+        const realStats = calculateRealStats();
+
+        // Update Stats Grid
+        const upd = (el, val) => {
+            if (!el) return;
+            const formatted = formatNumber(val);
+            if (el.textContent !== formatted) { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); setTimeout(() => el.classList.remove('bump'), 600); }
+            el.textContent = formatted;
+        };
+        upd(document.getElementById('activeCount'), realStats.activeEms);
+        upd(document.getElementById('totalEmergencyCount'), realStats.totalEms);
+        upd(document.getElementById('totalPostsCount'), realStats.totalPosts);
+        upd(document.getElementById('totalLikes'), realStats.totalLikes);
+        upd(document.getElementById('totalViewers'), realStats.totalViewers);
+
+        // Team count (hybrid: API + local fallback)
+        let teamsCount = 0;
+        try {
+            const ur = await fetchSALINK('get_users');
+            const users = Array.isArray(ur.data) ? ur.data : [];
+            const fiveMinAgo = Date.now() - 5 * 60 * 1000;
+            teamsCount = users.filter(u => u.lastActive && new Date(u.lastActive).getTime() > fiveMinAgo).length;
+            if (teamsCount === 0) teamsCount = users.length;
+        } catch(e) { 
+            try {
+                const users = JSON.parse(localStorage.getItem('salink_users') || '[]');
+                teamsCount = users.length;
+            } catch(e2) { teamsCount = 0; }
+        }
+        upd(document.getElementById('contactCount'), teamsCount);
+
+        // Distribusi
+        upd(document.getElementById('fireCount'), realStats.byType.fire);
+        upd(document.getElementById('medicalCount'), realStats.byType.medical);
+        upd(document.getElementById('crimeCount'), realStats.byType.crime);
+        upd(document.getElementById('disasterCount'), realStats.byType.disaster);
+
+        // Latest Emergency
+        renderLatestEmergency(realStats.allEms);
+
+        // Map
+        renderMap(realStats.allEms);
+
+        // Hourly
+        renderHourly(realStats.hourly);
+
+    } catch (error) {
+        console.error('Error:', error);
+        showToast('⚠️ Error', 'Gagal memuat statistik', 'fa-exclamation-triangle');
+    } finally {
+        isLoading = false;
+        if (refreshBtn) { refreshBtn.disabled = false; refreshBtn.textContent = '🔄 Perbarui Statistik'; }
+    }
+}
+
+function renderLatestEmergency(allEms) {
+    const container = document.getElementById('latestContainer');
+    if (!allEms || allEms.length === 0) {
+        container.innerHTML = `<div class="error-state"><div class="error-icon">🆘</div><div class="error-title">Belum Ada Emergency</div><div class="error-text">Belum tersedia laporan emergency dalam database.</div></div>`;
+        return;
+    }
+    const sorted = [...allEms].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    const emergency = sorted[0];
+    const type = String(emergency.type || '').toLowerCase();
+    const label = getEmergencyLabel(type);
+    container.innerHTML = `
+        <div class="latest-card">
+            <div class="latest-badge">${esc(label)}</div>
+            <div class="latest-title">${esc(emergency.title || label)}</div>
+            <div class="latest-meta">
+                <span>👤 ${esc(emergency.sender || 'User')}</span>
+                <span>🕐 ${esc(formatDate(emergency.timestamp))}</span>
+                <span>📍 ${esc(emergency.location || '-')}</span>
+            </div>
+            <div class="latest-description">${esc(emergency.description || 'Tidak ada deskripsi')}</div>
+            ${emergency.id ? `<button class="detail-btn" onclick="window.location.href='detail-emergency.html?id=${encodeURIComponent(emergency.id)}'">🔎 Lihat Detail</button>` : ''}
+        </div>
+    `;
+}
+
+function renderMap(allEms) {
+    const mapContainer = document.getElementById('mapContainer');
+    if (!allEms || allEms.length === 0) {
+        mapContainer.innerHTML = `<div class="map-empty-state"><div class="map-empty-icon">🗺️</div><div class="map-empty-title">Belum Ada Emergency</div></div>`;
+        return;
+    }
+    const sorted = [...allEms].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    const emergency = sorted.find(e => isValidCoord(e.latitude, e.longitude));
+    if (!emergency) {
+        mapContainer.innerHTML = `<div class="map-empty-state"><div class="map-empty-icon">📍</div><div class="map-empty-title">Lokasi Belum Tersedia</div><div class="map-empty-text">Emergency terbaru belum memiliki koordinat GPS valid.</div></div>`;
+        return;
+    }
+    const lat = Number(emergency.latitude);
+    const lng = Number(emergency.longitude);
+    const embedURL = 'https://www.google.com/maps?q=' + encodeURIComponent(lat + ',' + lng) + '&output=embed';
+    const mapsURL = emergency.mapsURL || 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(lat + ',' + lng);
+    mapContainer.innerHTML = `
+        <div class="real-map-wrapper"><iframe class="real-google-map" src="${esc(embedURL)}" loading="lazy" allowfullscreen></iframe></div>
+        <div class="map-location-info">
+            <div class="map-coordinate">📍 ${lat.toFixed(6)}, ${lng.toFixed(6)}</div>
+            <a href="${esc(mapsURL)}" target="_blank" rel="noopener" class="map-open-btn">🗺️ Buka di Google Maps</a>
+        </div>
+    `;
+}
+
+function renderHourly(hourly) {
+    const container = document.getElementById('hourlyContainer');
+    if (!Array.isArray(hourly) || hourly.length === 0) {
+        container.innerHTML = `<div class="error-state"><div class="error-icon">📊</div><div class="error-title">Belum Ada Data</div></div>`;
+        return;
+    }
+    const max = Math.max(1, ...hourly.map(h => h.count));
+    container.innerHTML = `<div class="hourly-chart">${hourly.map(h => {
+        const height = h.count === 0 ? 2 : Math.max(6, (h.count / max * 100));
+        return `<div class="hour-bar-item" title="${esc(h.label)}: ${h.count} laporan"><div class="hour-count">${h.count}</div><div class="hour-bar" style="height:${height}%"></div><div class="hour-label">${esc(h.label)}</div></div>`;
+    }).join('')}</div>`;
+}
+
+// LOGOUT
+function handleLogout() {
+    if (confirm('Keluar dari akun?')) {
+        ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies'].forEach(k => localStorage.removeItem(k));
+        window.location.href = DASHBOARD_URL + '?logout=1';
+    }
+}
+
+// INVITE / NOTIF NAV
+function handleInviteNav() {
+    if (isPreviewMode) { showPreviewOverlay(); return; }
+    showToast('📨 Invite', 'Buka dashboard untuk invite teman', 'fa-user-plus');
+}
+function handleNotifNav() {
+    if (isPreviewMode) { showPreviewOverlay(); return; }
+    showToast('🔔 Notif', 'Buka dashboard untuk notifikasi', 'fa-bell');
+}
+
+// INIT
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 SALINK Statistik v4.0 Initializing...');
+    loadTheme();
+    loadUser();
+
+    document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
+    document.getElementById('menuBtn')?.addEventListener('click', () => openSidebar());
+    document.getElementById('sidebarClose')?.addEventListener('click', closeSidebar);
+    document.getElementById('sidebarOverlay')?.addEventListener('click', closeSidebar);
+    document.getElementById('refreshBtn')?.addEventListener('click', () => loadStatistics());
+    document.getElementById('userBtn')?.addEventListener('click', () => {
+        if (isPreviewMode) { showPreviewOverlay(); return; }
+        window.location.href = PROFILE_URL;
+    });
+    document.getElementById('logoutBtn')?.addEventListener('click', (e) => { e.preventDefault(); handleLogout(); });
+    document.getElementById('bottomInviteNav')?.addEventListener('click', handleInviteNav);
+    document.getElementById('bottomNotifNav')?.addEventListener('click', handleNotifNav);
+
+    // Cross-tab
+    window.addEventListener('storage', function(e) {
+        if (e.key === 'salink_sync_trigger') {
+            try { const data = JSON.parse(e.newValue); if (data && data.type) handleSyncMessage(data); } catch(err) {}
+        }
+        if (e.key === 'salink_posts' || e.key === 'salink_emergencies') loadStatistics();
+        if (e.key === 'salink_user') loadUser();
+        if (e.key === 'salink_theme') loadTheme();
+    });
+
+    loadStatistics();
+
+    // Auto-refresh tiap 30 detik
+    setInterval(() => { if (!document.hidden) loadStatistics(); }, 30000);
+
+    console.log('✅ Statistik v4.0 Ready!');
+});
+</script>
+
+<!-- ============================================================ -->
+<!-- SALINK FCM + EMERGENCY ALERT UNIVERSAL INTEGRATION           -->
+<!-- v4.3: Dipakai oleh 14 file HTML (kecuali dashboard.html)     -->
+<!-- ============================================================ -->
+<script src="/firebase-config.js"></script>
+<script src="/fcm-client.js"></script>
+<script src="/salink-emergency.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // ==================================================
+  // FCM INIT — Save token setelah user login
+  // ==================================================
+  window.addEventListener('load', async function() {
+    const isLoggedIn = localStorage.getItem('salink_logged_in');
+    const userData = localStorage.getItem('salink_user');
+    if (isLoggedIn !== 'true' || !userData) {
+      console.log('ℹ️ [FCM] User belum login — FCM skip');
+      return;
+    }
+
+    let user;
+    try { user = JSON.parse(userData); } catch(e) {
+      console.warn('⚠️ [FCM] salink_user tidak valid');
+      return;
+    }
+    if (!user || !user.username) {
+      console.warn('⚠️ [FCM] salink_user tidak punya username');
+      return;
+    }
+
+    console.log('🚀 [FCM] Init untuk:', user.username);
+
+    try {
+      if (typeof SalinkFCM === 'undefined') {
+        console.warn('⚠️ [FCM] SalinkFCM tidak tersedia — cek /fcm-client.js');
+        return;
+      }
+
+      const initResult = await SalinkFCM.init();
+      if (!initResult.ok) {
+        console.warn('⚠️ [FCM] init gagal:', initResult.reason);
+        return;
+      }
+
+      console.log('✅ [FCM] Siap. Token:', initResult.token.substring(0, 30) + '...');
+
+      const saveResult = await SalinkFCM.saveToken({
+        userId: user.id,
+        username: user.username,
+        email: user.email
+      });
+
+      if (saveResult.ok) {
+        console.log('✅ [FCM] Token tersimpan di backend');
+      } else {
+        console.warn('⚠️ [FCM] Gagal simpan token:', saveResult);
+      }
+    } catch (err) {
+      console.error('❌ [FCM] error:', err);
+    }
+  });
+
+  // ==================================================
+  // SALINK EMERGENCY ALERT — Ready check
+  // ==================================================
+  window.addEventListener('load', function() {
+    if (typeof SalinkEmergency === 'undefined') {
+      console.warn('⚠️ [SalinkEmergency] Script belum tersedia');
+      return;
+    }
+    console.log('✅ [SalinkEmergency] Ready — polling 15s');
+  });
+})();
+</script>
+<!-- ============================================================ -->
+
+</body>
+</html>
