@@ -1133,6 +1133,13 @@ function preloadAllAudio() {
 }
 
 function playRegularSound() {
+    // ✅ v2.0: Pakai SalinkEmergency kalau tersedia
+    if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency &&
+        typeof SalinkEmergency.playRegular === 'function') {
+        SalinkEmergency.playRegular();
+        return;
+    }
+    // Fallback: alur lama
     try {
         unlockAudio();
         const cached = audioCache['regular'];
@@ -1146,7 +1153,7 @@ function playRegularSound() {
         } else {
             new Audio(REGULAR_SOUND_URL).play().catch(() => {});
         }
-    } catch(e) {}
+    } catch(e) { console.warn('playRegularSound:', e.message); }
 }
 
 function playEmergencyLoop(type) {
@@ -2555,20 +2562,30 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
         localStorage.setItem('salink_posts', JSON.stringify(posts));
         renderPosts();
         apiSavePost(post).then(ok => { if (ok) console.log('✅ Post saved'); });
+
         if (isSpecial && specialData) {
-            const emPayload = {
-                type: specialData.type, title: EMERGENCY_LABELS[specialData.type],
-                sender: currentUser.fullName, senderUsername: currentUser.username,
-                senderPhone: currentUser.phone || '',
-                location: specialData.location, address: specialData.address,
-                latitude: specialData.latitude, longitude: specialData.longitude,
-                mapsURL: specialData.mapsURL, description: text, status: 'active',
-                province: currentUser.province || '', city: currentUser.city || '',
-                district: currentUser.district || '', village: currentUser.village || ''
-            };
-            apiSaveEmergency(emPayload);
-            triggerLocalEmergencyVisual(specialData.type, currentUser.fullName, specialData.location, text);
-        } else {
+        const emPayload = {
+        type: specialData.type, title: EMERGENCY_LABELS[specialData.type],
+        sender: currentUser.fullName, senderUsername: currentUser.username,
+        senderPhone: currentUser.phone || '',
+        location: specialData.location, address: specialData.address,
+        latitude: specialData.latitude, longitude: specialData.longitude,
+        mapsURL: specialData.mapsURL, description: text, status: 'active',
+        province: currentUser.province || '', city: currentUser.city || '',
+        district: currentUser.district || '', village: currentUser.village || ''
+    };
+    apiSaveEmergency(emPayload);
+    triggerLocalEmergencyVisual(specialData.type, currentUser.fullName, specialData.location, text);
+
+    // ✅ v2.0: Trigger animasi tombol grid di HP PENGIRIM
+    // (efek sama persis seperti terima notif dari user lain)
+    if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency &&
+        typeof SalinkEmergency.triggerGridAlarmFromPost === 'function') {
+        setTimeout(() => {
+            SalinkEmergency.triggerGridAlarmFromPost(specialData.type, true);
+        }, 500); // delay 500ms supaya notif toast muncul dulu
+      }
+    }  else {
             playRegularSound();
             showToast('📝', 'Postingan baru berhasil', 'fa-check-circle');
         }
@@ -3000,48 +3017,67 @@ function updateMap() {
 // ====================================================================
 // EMERGENCY BUTTON CLICK
 // ====================================================================
-function handleEmergencyClick(e) {
+
+    function handleEmergencyClick(e) {
     e.preventDefault(); e.stopPropagation();
     const btn = e.currentTarget;
     const type = btn.dataset.type;
+
     if (isPreviewMode) { showPreviewOverlay(); return; }
     if (!currentUser) { redirectToLogin(); return; }
-    unlockAudio();
 
+    // Unlock audio pada tap pertama
+    if (typeof unlockAudio === 'function') unlockAudio();
+
+    // ✅ v2.0: Cek dulu apakah SalinkEmergency tersedia
+    const hasSalinkEmergency = (typeof SalinkEmergency !== 'undefined' && SalinkEmergency);
+
+    // ==================================================
+    // PRIORITAS 1: Full screen alarm aktif → dismiss
+    // ==================================================
+    if (fullScreenAlarmActive) {
+        if (hasSalinkEmergency && typeof SalinkEmergency.dismissAlarm === 'function') {
+            SalinkEmergency.dismissAlarm(true);
+        } else if (typeof dismissFullScreenAlarm === 'function') {
+            dismissFullScreenAlarm(true);
+        }
+        return;
+    }
+
+    // ==================================================
+    // PRIORITAS 2: Grid button alarm aktif → pakai SalinkEmergency
+    // ==================================================
+    if (hasSalinkEmergency && typeof SalinkEmergency.handleGridButtonTap === 'function') {
+        SalinkEmergency.handleGridButtonTap(type);
+        return;
+    }
+
+    // ==================================================
+    // FALLBACK: Alur lama (kalau SalinkEmergency tidak ada)
+    // ==================================================
     if (buttonLoopAudio) {
         dismissFloatingEmergency();
         showToast('✅ Alarm Dimatikan', 'Notifikasi darurat dimatikan', 'fa-check-circle');
         return;
     }
-    if (fullScreenAlarmActive) {
-        dismissFullScreenAlarm(true);
-        return;
-    }
+
     const url = EMERGENCY_AUDIO[type];
     if (!url) return;
     stopEmergencyLoop();
     const cached = audioCache[type];
     const audio = cached || new Audio(url);
     audio.volume = 1.0;
-    audio.loop = false;
+    audio.loop = true;
     audio.currentTime = 0;
     activeEmergencyAudio = audio;
     activeEmergencyBtn = btn;
     audio.play().then(() => {
-        btn.classList.add('playing');
+        btn.classList.add('playing', 'grid-alarm-active');
         const st = btn.querySelector('.play-status');
-        if (st) st.textContent = '🔊 Alarm Berbunyi...';
-        setTimeout(() => {
-            if (activeEmergencyBtn === btn && activeEmergencyAudio === audio) {
-                audio.pause(); audio.currentTime = 0;
-                activeEmergencyAudio = null; activeEmergencyBtn = null;
-                btn.classList.remove('playing');
-                const counts = getActiveEmergencyCountByType();
-                if (st) st.textContent = counts[type] > 0 ? '🔔 ' + counts[type] + ' Notifikasi' : '▶ Tap untuk Alarm';
-            }
-        }, 15000);
+        if (st) st.textContent = '🔊 Alarm Berbunyi — Tap untuk matikan';
     }).catch(err => { showToast('⚠️ Error', 'Tidak dapat memutar audio', 'fa-exclamation-triangle'); });
 }
+        
 function setupChartNavigation() {
     document.querySelectorAll('.chart-nav-btn').forEach(btn => {
         btn.addEventListener('click', function(e) { e.preventDefault(); switchChart(this.dataset.chart); });
