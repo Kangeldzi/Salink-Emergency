@@ -1005,11 +1005,16 @@
 
     <div class="toast-container" id="toastContainer"></div>
 
-        <script>
+      <script>
 /* ====================================================================
- * SALINK DASHBOARD v4.4 — PART 3
- * Constants, Audio System, Dual-Mode Detection,
- * Full Screen Alarm, Swipe Dismiss, GPS Location
+ * SALINK DASHBOARD v4.5 — FINAL INTEGRATED
+ * ====================================================================
+ * FIX v4.5:
+ * ✅ Load /salink-emergency.js (universal emergency alert)
+ * ✅ handleEmergencyClick → pakai SalinkEmergency.handleGridButtonTap()
+ * ✅ createPost (khusus) → trigger SalinkEmergency.triggerGridAlarmFromPost()
+ * ✅ playRegularSound → pakai SalinkEmergency.playRegular() jika tersedia
+ * ✅ Fallback inline tetap ada kalau SalinkEmergency tidak ready
  * ==================================================================== */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
@@ -1048,7 +1053,9 @@ const POST_TYPE_MAP = {
     'disaster': { isSpecial: true, specialType: 'disaster' }
 };
 
+// ====================================================================
 // STATE
+// ====================================================================
 let currentUser = null, isPreviewMode = true, currentTheme = 'dark';
 let posts = [], notifications = [], statistics = null, chartInstances = {};
 let emergencyOverlayTimeout = null, floatingNotificationTimeout = null;
@@ -1133,7 +1140,7 @@ function preloadAllAudio() {
 }
 
 function playRegularSound() {
-    // ✅ v2.0: Pakai SalinkEmergency kalau tersedia
+    // ✅ v4.5: Pakai SalinkEmergency kalau tersedia
     if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency &&
         typeof SalinkEmergency.playRegular === 'function') {
         SalinkEmergency.playRegular();
@@ -1545,7 +1552,7 @@ async function ambilLokasiSaya() {
             const nominatimUrl = `${NOMINATIM_URL}?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=id`;
             const response = await fetch(nominatimUrl, {
                 method: 'GET',
-                headers: { 'User-Agent': 'SALINK-Emergency-App/4.4' }
+                headers: { 'User-Agent': 'SALINK-Emergency-App/4.5' }
             });
             if (response.ok) {
                 const data = await response.json();
@@ -1730,7 +1737,7 @@ function updateEmergencyBadges() {
         if (btn) {
             btn.classList.toggle('has-notification', count > 0);
             const st = btn.querySelector('.play-status');
-            if (st && !btn.classList.contains('playing') && !btn.classList.contains('new-emergency')) {
+            if (st && !btn.classList.contains('playing') && !btn.classList.contains('new-emergency') && !btn.classList.contains('grid-alarm-active')) {
                 st.textContent = count > 0 ? '🔔 ' + count + ' Notifikasi' : '▶ Tap untuk Alarm';
             }
         }
@@ -1897,15 +1904,6 @@ function startEmergencyCleanup() {
         updateEmergencyBadges();
     }, EMERGENCY_CLEANUP_INTERVAL);
 }
-
-console.log('✅ [v4.4] Part 3 loaded — Audio, Emergency, GPS ready');
-    </script>
-
-    <script>
-/* ====================================================================
- * SALINK DASHBOARD v4.4 — PART 4
- * API Calls, Posts CRUD, Search, Charts, Init
- * ==================================================================== */
 
 // ====================================================================
 // API CALLS
@@ -2526,7 +2524,7 @@ function sharePost(postId) {
 }
 
 // ====================================================================
-// CREATE POST
+// CREATE POST — v4.5 dengan SalinkEmergency trigger
 // ====================================================================
 async function createPost(text, mediaFile, isSpecial, specialData) {
     if (isPreviewMode) { showPreviewOverlay(); return; }
@@ -2564,28 +2562,27 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
         apiSavePost(post).then(ok => { if (ok) console.log('✅ Post saved'); });
 
         if (isSpecial && specialData) {
-        const emPayload = {
-        type: specialData.type, title: EMERGENCY_LABELS[specialData.type],
-        sender: currentUser.fullName, senderUsername: currentUser.username,
-        senderPhone: currentUser.phone || '',
-        location: specialData.location, address: specialData.address,
-        latitude: specialData.latitude, longitude: specialData.longitude,
-        mapsURL: specialData.mapsURL, description: text, status: 'active',
-        province: currentUser.province || '', city: currentUser.city || '',
-        district: currentUser.district || '', village: currentUser.village || ''
-    };
-    apiSaveEmergency(emPayload);
-    triggerLocalEmergencyVisual(specialData.type, currentUser.fullName, specialData.location, text);
+            const emPayload = {
+                type: specialData.type, title: EMERGENCY_LABELS[specialData.type],
+                sender: currentUser.fullName, senderUsername: currentUser.username,
+                senderPhone: currentUser.phone || '',
+                location: specialData.location, address: specialData.address,
+                latitude: specialData.latitude, longitude: specialData.longitude,
+                mapsURL: specialData.mapsURL, description: text, status: 'active',
+                province: currentUser.province || '', city: currentUser.city || '',
+                district: currentUser.district || '', village: currentUser.village || ''
+            };
+            apiSaveEmergency(emPayload);
+            triggerLocalEmergencyVisual(specialData.type, currentUser.fullName, specialData.location, text);
 
-    // ✅ v2.0: Trigger animasi tombol grid di HP PENGIRIM
-    // (efek sama persis seperti terima notif dari user lain)
-    if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency &&
-        typeof SalinkEmergency.triggerGridAlarmFromPost === 'function') {
-        setTimeout(() => {
-            SalinkEmergency.triggerGridAlarmFromPost(specialData.type, true);
-        }, 500); // delay 500ms supaya notif toast muncul dulu
-      }
-    }  else {
+            // ✅ v4.5: Trigger animasi tombol grid di HP PENGIRIM
+            if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency &&
+                typeof SalinkEmergency.triggerGridAlarmFromPost === 'function') {
+                setTimeout(() => {
+                    SalinkEmergency.triggerGridAlarmFromPost(specialData.type, true);
+                }, 500);
+            }
+        } else {
             playRegularSound();
             showToast('📝', 'Postingan baru berhasil', 'fa-check-circle');
         }
@@ -3015,10 +3012,9 @@ function updateMap() {
 }
 
 // ====================================================================
-// EMERGENCY BUTTON CLICK
+// EMERGENCY BUTTON CLICK — v4.5 pakai SalinkEmergency
 // ====================================================================
-
-    function handleEmergencyClick(e) {
+function handleEmergencyClick(e) {
     e.preventDefault(); e.stopPropagation();
     const btn = e.currentTarget;
     const type = btn.dataset.type;
@@ -3026,15 +3022,11 @@ function updateMap() {
     if (isPreviewMode) { showPreviewOverlay(); return; }
     if (!currentUser) { redirectToLogin(); return; }
 
-    // Unlock audio pada tap pertama
     if (typeof unlockAudio === 'function') unlockAudio();
 
-    // ✅ v2.0: Cek dulu apakah SalinkEmergency tersedia
     const hasSalinkEmergency = (typeof SalinkEmergency !== 'undefined' && SalinkEmergency);
 
-    // ==================================================
     // PRIORITAS 1: Full screen alarm aktif → dismiss
-    // ==================================================
     if (fullScreenAlarmActive) {
         if (hasSalinkEmergency && typeof SalinkEmergency.dismissAlarm === 'function') {
             SalinkEmergency.dismissAlarm(true);
@@ -3044,17 +3036,13 @@ function updateMap() {
         return;
     }
 
-    // ==================================================
-    // PRIORITAS 2: Grid button alarm aktif → pakai SalinkEmergency
-    // ==================================================
+    // PRIORITAS 2: Grid button alarm → pakai SalinkEmergency (audio loop + animasi)
     if (hasSalinkEmergency && typeof SalinkEmergency.handleGridButtonTap === 'function') {
         SalinkEmergency.handleGridButtonTap(type);
         return;
     }
 
-    // ==================================================
-    // FALLBACK: Alur lama (kalau SalinkEmergency tidak ada)
-    // ==================================================
+    // FALLBACK: alur lama (kalau SalinkEmergency tidak tersedia)
     if (buttonLoopAudio) {
         dismissFloatingEmergency();
         showToast('✅ Alarm Dimatikan', 'Notifikasi darurat dimatikan', 'fa-check-circle');
@@ -3077,7 +3065,7 @@ function updateMap() {
         if (st) st.textContent = '🔊 Alarm Berbunyi — Tap untuk matikan';
     }).catch(err => { showToast('⚠️ Error', 'Tidak dapat memutar audio', 'fa-exclamation-triangle'); });
 }
-        
+
 function setupChartNavigation() {
     document.querySelectorAll('.chart-nav-btn').forEach(btn => {
         btn.addEventListener('click', function(e) { e.preventDefault(); switchChart(this.dataset.chart); });
@@ -3716,7 +3704,7 @@ function showInstallPrompt() {
 // INIT
 // ====================================================================
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 SALINK Dashboard v4.4 — CLEAN BUILD');
+    console.log('🚀 SALINK Dashboard v4.5 — FINAL INTEGRATED');
     preloadAllAudio();
     setupIdleDetection();
     setupVisibilityDetection();
@@ -3811,7 +3799,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (nm && nm.classList.contains('active')) renderNotifList();
     }, 15000);
 
-    console.log('✅ SALINK Dashboard v4.4 Ready!');
+    console.log('✅ SALINK Dashboard v4.5 Ready!');
 });
 
 // ====================================================================
@@ -3853,18 +3841,20 @@ window.goToEmergency = goToEmergency;
 window.openEmergencyDetail = openEmergencyDetail;
 window.ambilLokasiSaya = ambilLokasiSaya;
 
-console.log('✅ SALINK Dashboard v4.4 Loaded');
+console.log('✅ SALINK Dashboard v4.5 Script Loaded');
     </script>
 
     <!-- ============================================================ -->
-    <!-- FCM SETUP SALINK -->
+    <!-- FCM SETUP SALINK + EMERGENCY ALERT                            -->
     <!-- ============================================================ -->
     <script src="/firebase-config.js"></script>
     <script src="/fcm-client.js"></script>
+    <script src="/salink-emergency.js"></script>
     <script>
     (function() {
       'use strict';
 
+      // FCM INIT
       window.addEventListener('load', async function() {
         const isLoggedIn = localStorage.getItem('salink_logged_in');
         const userData = localStorage.getItem('salink_user');
@@ -3918,8 +3908,17 @@ console.log('✅ SALINK Dashboard v4.4 Loaded');
           console.error('❌ [FCM] error:', err);
         }
       });
+
+      // Cek SalinkEmergency ready
+      window.addEventListener('load', function() {
+        if (typeof SalinkEmergency === 'undefined') {
+          console.warn('⚠️ [SalinkEmergency] Script belum tersedia — cek /salink-emergency.js');
+        } else {
+          console.log('✅ [SalinkEmergency] Ready — grid alarm + auto-trigger post');
+        }
+      });
     })();
     </script>
 
 </body>
-</html>
+</html>                                                          
