@@ -1895,9 +1895,6 @@ function calculateRealStatistics() {
     };
 }
 
-// ====================================================================
-// ✅ v5.1: UPDATE STATS CARDS — Baca dari variabel, bukan localStorage
-// ====================================================================
 
 // ====================================================================
 // ✅ v5.2: UPDATE STATS CARDS — Fix "Selesai Ditangani" & "Tingkat Respon"
@@ -2057,9 +2054,25 @@ function renderPosts() {
         const isOwner = currentUser && post.userId === currentUser.username;
         const profilePic = post.userProfilePic ? '<img src="' + escapeAttr(post.userProfilePic) + '" alt="">' : (post.userGender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>');
         const specialBadge = post.isSpecial && post.specialType ? '<span style="background:rgba(88,166,255,0.15);padding:2px 8px;border-radius:10px;font-size:0.5rem;color:var(--accent-blue);margin-left:6px;">' + EMERGENCY_ICONS[post.specialType] + ' ' + EMERGENCY_LABELS[post.specialType] + '</span>' : '';
-        let mediaHTML = '';
-        if (post.mediaType === 'image') mediaHTML = '<div class="post-media"><img src="' + escapeAttr(post.mediaData) + '" alt=""></div>';
-        else if (post.mediaType === 'video') mediaHTML = '<div class="post-media"><video controls><source src="' + escapeAttr(post.mediaData) + '"></video></div>';
+        // ✅ v5.3: Load media dari localStorage by ID
+let mediaHTML = '';
+if (post.mediaType && post.mediaId) {
+    // Ambil dari localStorage
+    let mediaStore = {};
+    try { mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}'); } catch(e) {}
+    const mediaEntry = mediaStore[post.mediaId];
+    const mediaSource = mediaEntry && mediaEntry.data ? mediaEntry.data : post.mediaData;
+
+    if (post.mediaType === 'image' && mediaSource) {
+        mediaHTML = '<div class="post-media"><img src="' + escapeAttr(mediaSource) + '" alt="" loading="lazy" onerror="this.parentElement.innerHTML=\'<div style=\\\'padding:20px;text-align:center;color:var(--text-muted);font-size:0.7rem;\\\'>🖼️ Media tidak tersedia</div>\';"></div>';
+    } else if (post.mediaType === 'video' && mediaSource) {
+        mediaHTML = '<div class="post-media"><video controls preload="metadata"><source src="' + escapeAttr(mediaSource) + '"></video></div>';
+    }
+} else if (post.mediaType && post.mediaData) {
+    // Fallback: pakai mediaData langsung (legacy posts)
+    if (post.mediaType === 'image') mediaHTML = '<div class="post-media"><img src="' + escapeAttr(post.mediaData) + '" alt=""></div>';
+    else if (post.mediaType === 'video') mediaHTML = '<div class="post-media"><video controls><source src="' + escapeAttr(post.mediaData) + '"></video></div>';
+}
         const el = document.createElement('div');
         el.className = 'post';
         el.id = 'post-' + post.id;
@@ -2186,6 +2199,22 @@ function renderFullPostCard(p, isExpired) {
         '</div>' +
         '<div class="pcf-sender">📤 Dilaporkan oleh: <strong onclick="handleProfileClick(\'' + escapeAttr(p.userId) + '\')">' + escapeHTML(p.userFullName) + '</strong></div>' +
         (p.text ? '<div class="pcf-text">' + escapeHTML(p.text) + '</div>' : '') +
+        
+   (function() {
+    // ✅ v5.3: Render media dari localStorage
+    if (!p.mediaType) return '';
+    let mediaStore = {};
+    try { mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}'); } catch(e) {}
+    const entry = p.mediaId ? mediaStore[p.mediaId] : null;
+    const src = entry && entry.data ? entry.data : p.mediaData;
+    if (!src) return '';
+    if (p.mediaType === 'image') {
+        return '<div style="width:100%;max-height:280px;border-radius:10px;overflow:hidden;margin:10px 0;border:1px solid var(--border-color);"><img src="' + escapeAttr(src) + '" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy"></div>';
+    } else if (p.mediaType === 'video') {
+        return '<div style="width:100%;border-radius:10px;overflow:hidden;margin:10px 0;border:1px solid var(--border-color);"><video controls preload="metadata" style="width:100%;max-height:280px;display:block;"><source src="' + escapeAttr(src) + '"></video></div>';
+    }
+    return '';
+})() +
         '<div class="pcf-location"><i class="fas fa-map-marker-alt"></i><span>' + escapeHTML(p.specialLocation || p.specialAddress || 'Lokasi tidak diketahui') + '</span></div>' +
         (coords ? '<div class="pcf-coords"><i class="fas fa-crosshairs"></i> ' + escapeHTML(coords) + '</div>' : '') +
         '<div class="pcf-actions">' +
@@ -2311,9 +2340,10 @@ function sharePost(postId) {
     if (navigator.share) navigator.share({ title: 'SALINK', text: text, url: url }).catch(() => {});
     else navigator.clipboard.writeText(text + '\n' + url).then(() => showToast('📋', 'Link disalin', 'fa-copy'));
 }
-
+            
+            
 // ====================================================================
-// 20. CREATE POST — FIX: 1 ID untuk semua
+// 20. ✅ v5.3: CREATE POST — Media di localStorage (anti-hilang)
 // ====================================================================
 async function createPost(text, mediaFile, isSpecial, specialData) {
     if (isPreviewMode) { showPreviewOverlay(); return; }
@@ -2328,20 +2358,52 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
         if (!hasText && !hasMedia) { showToast('⚠️ Postingan kosong', 'Isi teks atau upload foto/video', 'fa-exclamation-triangle'); return; }
     }
 
-    // ✅ FIX Lokasi 2: 1 ID untuk semua
     const uniqueId = 'content-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10);
     const postId = uniqueId;
     const emergencyId = uniqueId;
     const notifId = uniqueId;
+    const mediaId = 'media-' + uniqueId;
 
-    let mediaType = '', mediaData = '';
+    let mediaType = '';
+    let mediaDataRef = '';       // ✅ Referensi kecil untuk sheet
+    let mediaDataFull = '';      // ✅ Base64 penuh untuk localStorage
+    let mediaThumbnail = '';
 
     const finish = async () => {
+        // ✅ Simpan base64 PENUH di localStorage terpisah (tidak ada limit)
+        if (mediaDataFull) {
+            try {
+                let mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}');
+                mediaStore[mediaId] = {
+                    type: mediaType,
+                    data: mediaDataFull,
+                    fullData: mediaDataFull,   // alias
+                    timestamp: Date.now(),
+                    size: mediaDataFull.length
+                };
+                localStorage.setItem('salink_post_media', JSON.stringify(mediaStore));
+                console.log('💾 [createPost] Media saved to localStorage. ID:', mediaId, '| Size:', mediaDataFull.length);
+            } catch(e) {
+                console.error('❌ [createPost] Gagal simpan media:', e.message);
+                showToast('⚠️ Error', 'Gagal menyimpan media (storage penuh?)', 'fa-exclamation-triangle');
+            }
+        }
+
         const post = {
-            id: postId, userId: currentUser.username, userFullName: currentUser.fullName,
-            userGender: currentUser.gender || 'male', userProfilePic: currentUser.profilePicture || '',
-            text: text || '', mediaType: mediaType, mediaData: mediaData, timestamp: Date.now(),
-            likes: '[]', comments: '[]', viewerCount: 0,
+            id: postId,
+            userId: currentUser.username,
+            userFullName: currentUser.fullName,
+            userGender: currentUser.gender || 'male',
+            userProfilePic: currentUser.profilePicture || '',
+            text: text || '',
+            mediaType: mediaType,
+            mediaData: mediaDataRef,           // ✅ Referensi kecil (bukan base64 penuh)
+            mediaId: mediaId,                  // ✅ ID untuk ambil dari localStorage
+            mediaThumbnail: mediaThumbnail,    // ✅ Thumbnail mini untuk fallback
+            timestamp: Date.now(),
+            likes: '[]',
+            comments: '[]',
+            viewerCount: 0,
             isSpecial: isSpecial || false,
             specialType: isSpecial && specialData ? specialData.type : '',
             specialLocation: isSpecial && specialData ? specialData.location : '',
@@ -2350,17 +2412,28 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
             longitude: isSpecial && specialData ? specialData.longitude : '',
             mapsURL: isSpecial && specialData ? specialData.mapsURL : '',
             postType: isSpecial ? 'khusus' : 'biasa',
-            country: currentUser.country || '', province: currentUser.province || '',
-            city: currentUser.city || '', district: currentUser.district || '',
-            village: currentUser.village || '', address: currentUser.address || ''
+            country: currentUser.country || '',
+            province: currentUser.province || '',
+            city: currentUser.city || '',
+            district: currentUser.district || '',
+            village: currentUser.village || '',
+            address: currentUser.address || ''
         };
+
         posts.unshift(post);
-        localStorage.setItem('salink_posts', JSON.stringify(posts));
+        try {
+            localStorage.setItem('salink_posts', JSON.stringify(posts));
+        } catch(e) {
+            // Kalau quota penuh, hapus media lama
+            console.warn('⚠️ localStorage penuh, cleanup media lama...');
+            cleanupOldMedia();
+            try { localStorage.setItem('salink_posts', JSON.stringify(posts)); } catch(e2) {}
+        }
         renderPosts();
+
         apiSavePost(post).then(ok => { if (ok) console.log('✅ [createPost] Post saved:', postId); });
 
         if (isSpecial && specialData) {
-            // Emergency payload — ID sama
             const emPayload = {
                 id: emergencyId,
                 type: specialData.type,
@@ -2384,7 +2457,6 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
                 if (ok) console.log('✅ [createPost] Emergency saved:', emergencyId);
             });
 
-            // Notification payload — ID sama
             const notifPayload = {
                 id: notifId,
                 type: specialData.type,
@@ -2398,14 +2470,10 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
                 read: 'FALSE',
                 soundKey: specialData.type
             };
-            apiCall('save_notification', notifPayload).then(r => {
-                if (r && r.status === 'success') console.log('✅ [createPost] Notification saved:', notifId);
-            }).catch(e => console.warn('⚠️ Notification save failed:', e));
+            apiCall('save_notification', notifPayload).catch(e => console.warn('⚠️ Notification save failed:', e));
 
-            // Trigger local visual — dengan ID sama
             triggerLocalEmergencyVisual(emergencyId, specialData.type, currentUser.fullName, specialData.location, text);
 
-            // Trigger grid alarm di HP pengirim
             if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency &&
                 typeof SalinkEmergency.triggerGridAlarmFromPost === 'function') {
                 setTimeout(() => {
@@ -2444,14 +2512,32 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
     if (mediaFile) {
         const reader = new FileReader();
         reader.onload = (e) => {
-            mediaData = e.target.result;
+            mediaDataFull = e.target.result;         // base64 penuh
             mediaType = mediaFile.type.indexOf('image/') === 0 ? 'image' : 'video';
+            mediaDataRef = mediaId;                  // referensi
+            mediaThumbnail = mediaDataFull.substring(0, 2000);  // 2KB thumbnail
             finish();
         };
         reader.readAsDataURL(mediaFile);
     } else finish();
 }
 
+// ✅ Helper: Cleanup media lama kalau localStorage penuh
+function cleanupOldMedia() {
+    try {
+        const mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}');
+        const entries = Object.keys(mediaStore).map(k => ({ id: k, ts: mediaStore[k].timestamp || 0 }));
+        entries.sort((a, b) => a.ts - b.ts); // paling lama dulu
+        // Hapus 30% paling lama
+        const toDelete = entries.slice(0, Math.ceil(entries.length * 0.3));
+        toDelete.forEach(e => delete mediaStore[e.id]);
+        localStorage.setItem('salink_post_media', JSON.stringify(mediaStore));
+        console.log('🧹 [cleanupOldMedia] Deleted', toDelete.length, 'old media entries');
+    } catch(e) {
+        console.error('❌ cleanupOldMedia error:', e.message);
+    }
+}
+        
 // ====================================================================
 // 21. TRIGGER LOCAL EMERGENCY VISUAL — FIX: Terima emergencyId param
 // ====================================================================
@@ -3865,8 +3951,36 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (nm && nm.classList.contains('active')) renderNotifList();
     }, 15000);
 
-    console.log('✅ SALINK Dashboard v5.0 Ready!');
-});
+       console.log('✅ SALINK Dashboard v5.0 Ready!');
+
+    // ✅ v5.3: Cleanup media yang postingannya sudah tidak ada
+    setTimeout(() => {
+        try {
+            const mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}');
+            const allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
+            const activeMediaIds = new Set(allPosts.map(p => p.mediaId).filter(Boolean));
+
+            let deleted = 0;
+            Object.keys(mediaStore).forEach(mediaId => {
+                const ts = (mediaStore[mediaId] && mediaStore[mediaId].timestamp) || 0;
+                const isOld = (Date.now() - ts) > 30 * 24 * 60 * 60 * 1000; // 30 hari
+                if (!activeMediaIds.has(mediaId) || isOld) {
+                    delete mediaStore[mediaId];
+                    deleted++;
+                }
+            });
+
+            if (deleted > 0) {
+                localStorage.setItem('salink_post_media', JSON.stringify(mediaStore));
+                console.log('🧹 [Media Cleanup] Deleted', deleted, 'orphan/old media');
+            } else {
+                console.log('✅ [Media Cleanup] No cleanup needed');
+            }
+        } catch(e) {
+            console.warn('⚠️ Media cleanup error:', e);
+        }
+    }, 5000);
+}); 
 
 // ====================================================================
 // 36. EXPOSE GLOBAL
