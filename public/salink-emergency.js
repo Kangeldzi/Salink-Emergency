@@ -528,6 +528,40 @@
                 user-select: none; -webkit-user-select: none;
                 touch-action: none; overflow: hidden;
             }
+           .salink-full-screen-alarm .salink-btn-detail {
+    position: absolute;
+    bottom: 155px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 32px;
+    background: linear-gradient(135deg, var(--alarm-color, #f85149), rgba(248,81,73,0.7));
+    color: #fff;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 14px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.4), 0 0 30px var(--alarm-color, #f85149);
+    z-index: 10;
+    font-family: 'Poppins', sans-serif;
+    transition: all 0.3s ease;
+    animation: salinkPulse 2s ease-in-out infinite;
+    letter-spacing: 0.5px;
+}
+.salink-full-screen-alarm .salink-btn-detail:hover {
+    transform: translateX(-50%) scale(1.05);
+    box-shadow: 0 12px 35px rgba(0,0,0,0.5), 0 0 50px var(--alarm-color, #f85149);
+}
+.salink-full-screen-alarm .salink-btn-detail:active {
+    transform: translateX(-50%) scale(0.95);
+}
+.salink-full-screen-alarm .salink-btn-detail i {
+    font-size: 1.2rem;
+} 
             .salink-full-screen-alarm.active {
                 display: flex;
                 animation: salinkFullScreenFlash 1s ease-in-out infinite;
@@ -1100,6 +1134,10 @@
                 <div class="salink-alarm-info-item"><i class="fas fa-clock"></i><span id="salinkAlarmTime">-</span></div>
             </div>
             <div class="salink-alarm-instruction">Alarm berbunyi terus menerus.<br>Swipe ke arah manapun untuk mematikan.</div>
+            <button class="salink-btn-detail" id="salinkAlarmDetailBtn">
+                   <i class="fas fa-info-circle"></i>
+                   <span>Detail Emergency</span>
+            </button>
             <div class="salink-swipe-indicator">
                 <span class="salink-swipe-text">Swipe untuk mematikan</span>
                 <div class="salink-swipe-arrows">
@@ -1162,6 +1200,22 @@
 
         setupFullScreenAlarmSwipe();
 
+        // ✅ Tombol Detail Emergency
+const detailBtn = document.getElementById('salinkAlarmDetailBtn');
+if (detailBtn) {
+    detailBtn.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (em.id) {
+            // Simpan ID, tutup alarm, lalu redirect
+            const targetUrl = 'detail-emergency.html?id=' + encodeURIComponent(em.id);
+            console.log('🔗 [FullScreenAlarm] Redirect ke:', targetUrl);
+            window.location.href = targetUrl;
+        } else {
+            showToast('⚠️ Error', 'ID emergency tidak tersedia', 'fa-exclamation-triangle');
+        }
+    };
+}
         if (em.id) {
             state.readNotifs[em.id] = true;
             saveReadNotifs();
