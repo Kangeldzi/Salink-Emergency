@@ -985,16 +985,34 @@
 
     <script>
 /* ====================================================================
- * SALINK DASHBOARD v4.6 — PART 1 JS
- * Constants, Audio, Emergency, GPS
- * FIX v4.6:
- * ✅ Fix #2: createPost generate ID unik SEKALI untuk semua
- * ✅ Fix #2: triggerLocalEmergencyVisual terima emergencyId param
- * ✅ Fix #2: apiSaveEmergency terima id dari luar
- * ✅ Fix #2: loadData dedupe by id
- * ✅ Fix #1: handleEmergencyClick percayakan ke SalinkEmergency
+ * SALINK DASHBOARD v5.0 — FULL REWRITE (NO PATCH)
+ * ====================================================================
+ * Semua perbaikan terintegrasi:
+ *
+ * ✅ Lokasi 1: handleEmergencyClick v3.0 (state machine)
+ * ✅ Lokasi 2: createPost — 1 ID untuk semua (post + emergency + notif)
+ * ✅ Lokasi 3: triggerLocalEmergencyVisual — terima emergencyId param
+ * ✅ Lokasi 4: loadData — dedupe by ID semua sheet
+ * ✅ Lokasi 5: Set _salinkEmergencySetup flag (hindari dobel handler)
+ * ✅ Lokasi 6: renderPostsStats — dedupe by Set
+ *
+ * FITUR LENGKAP:
+ * ✅ Audio system (preload, loop, auto-pause)
+ * ✅ Dual mode detection (STANDBY vs AKTIF)
+ * ✅ Full screen alarm + swipe 4 arah
+ * ✅ Floating emergency + tombol grid animasi
+ * ✅ Cross-tab sync (BroadcastChannel)
+ * ✅ GPS + Nominatim reverse geocoding
+ * ✅ Posts CRUD, likes, comments, viewer count
+ * ✅ Search (users, posts, emergencies)
+ * ✅ Invite modal, notif modal
+ * ✅ Charts (pie, bar, line, area, doughnut, gauge, heatmap, map)
+ * ✅ FCM integration
  * ==================================================================== */
 
+// ====================================================================
+// 1. KONSTANTA
+// ====================================================================
 const API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
 const LOGIN_URL = 'login-register.html';
 const DASHBOARD_URL = 'dashboard.html';
@@ -1008,7 +1026,6 @@ const AUTO_REFRESH = 60000;
 const EMERGENCY_CLEANUP_INTERVAL = 60000;
 const IDLE_THRESHOLD_MS = 30000;
 const SWIPE_MIN_DISTANCE = 50;
-const EMERGENCY_BTN_AUDIO_MAX_MS = 120000;
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
 
 const EMERGENCY_LABELS = { 'fire': '🔥 Kebakaran', 'medical': '🚑 Medis & Kematian', 'crime': '🚓 Kriminal', 'disaster': '🌪️ Bencana Alam' };
@@ -1033,14 +1050,14 @@ const POST_TYPE_MAP = {
 };
 
 // ====================================================================
-// STATE
+// 2. STATE
 // ====================================================================
 let currentUser = null, isPreviewMode = true, currentTheme = 'dark';
 let posts = [], notifications = [], statistics = null, chartInstances = {};
-let emergencyOverlayTimeout = null, floatingNotificationTimeout = null;
+let floatingNotificationTimeout = null;
 let userLat = null, userLng = null, allUsers = [];
 let currentPostType = 'biasa';
-let deferredPrompt = null, activeEmergencyBtn = null, activeEmergencyAudio = null;
+let deferredPrompt = null;
 let notifFilter = 'all';
 let readNotifs = {};
 let dismissedEmergencies = {};
@@ -1051,28 +1068,22 @@ let emergencyPollTimer = null;
 let lastNotifCheck = 0;
 let idleTimer = null;
 let isIdleStandby = false;
-let buttonLoopAudio = null;
-let buttonLoopTimer = null;
-let buttonLoopType = null;
-let buttonLoopVibrateTimer = null;
 let searchTab = 'all';
 let searchEmergencyFilter = 'all';
 let searchDebounceTimer = null;
 let recentSearches = JSON.parse(localStorage.getItem('salink_recent_searches') || '[]');
 const MAX_RECENT_SEARCHES = 8;
 let currentGpsData = null;
-
 let fullScreenAlarmActive = false;
 let fullScreenAlarmEmergency = null;
 let fullScreenAlarmVibrateTimer = null;
-
 const audioCache = {};
 let _audioContext = null;
 let _audioUnlocked = false;
 let sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}');
 
 // ====================================================================
-// AUDIO SYSTEM
+// 3. AUDIO SYSTEM
 // ====================================================================
 function unlockAudio() {
     if (_audioUnlocked) return;
@@ -1119,6 +1130,7 @@ function preloadAllAudio() {
 }
 
 function playRegularSound() {
+    // Delegasi ke SalinkEmergency kalau tersedia
     if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency &&
         typeof SalinkEmergency.playRegular === 'function') {
         SalinkEmergency.playRegular();
@@ -1140,97 +1152,8 @@ function playRegularSound() {
     } catch(e) { console.warn('playRegularSound:', e.message); }
 }
 
-function playEmergencyLoop(type) {
-    try {
-        unlockAudio();
-        const url = EMERGENCY_AUDIO[type];
-        if (!url) return null;
-        stopEmergencyLoop();
-        const cached = audioCache[type];
-        const audio = cached || new Audio(url);
-        audio.currentTime = 0;
-        audio.volume = 1.0;
-        audio.loop = true;
-        emergencyAudioLoop = audio;
-        const p = audio.play();
-        if (p !== undefined) {
-            p.then(() => console.log('🔊 Emergency loop:', type))
-             .catch(() => {
-                try {
-                    const fb = new Audio(url);
-                    fb.volume = 1.0;
-                    fb.loop = true;
-                    emergencyAudioLoop = fb;
-                    fb.play().catch(() => {});
-                } catch(e) {}
-             });
-        }
-        return audio;
-    } catch(e) {
-        return null;
-    }
-}
-
-function stopEmergencyLoop() {
-    if (emergencyAudioLoop) {
-        try {
-            emergencyAudioLoop.pause();
-            emergencyAudioLoop.currentTime = 0;
-            emergencyAudioLoop.loop = false;
-        } catch(e) {}
-        emergencyAudioLoop = null;
-    }
-}
-
-document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-        if (emergencyAudioLoop && !emergencyAudioLoop.paused) {
-            try { emergencyAudioLoop.pause(); } catch(e) {}
-        }
-    } else {
-        if (emergencyAudioLoop && emergencyAudioLoop.paused && (activeOverlayEmergency || fullScreenAlarmEmergency)) {
-            try { emergencyAudioLoop.play().catch(() => {}); } catch(e) {}
-        }
-    }
-});
-
-function startButtonLoop(type) {
-    stopButtonLoop();
-    const url = EMERGENCY_AUDIO[type];
-    if (!url) return;
-    try {
-        unlockAudio();
-        const cached = audioCache[type];
-        const audio = cached || new Audio(url);
-        audio.currentTime = 0;
-        audio.volume = 1.0;
-        audio.loop = true;
-        buttonLoopAudio = audio;
-        buttonLoopType = type;
-        audio.play().catch(() => {});
-        buttonLoopVibrateTimer = setInterval(() => {
-            if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500, 200]);
-        }, 2000);
-    } catch(e) {}
-}
-
-function stopButtonLoop() {
-    if (buttonLoopAudio) {
-        try {
-            buttonLoopAudio.pause();
-            buttonLoopAudio.currentTime = 0;
-            buttonLoopAudio.loop = false;
-        } catch(e) {}
-        buttonLoopAudio = null;
-    }
-    if (buttonLoopTimer) { clearTimeout(buttonLoopTimer); buttonLoopTimer = null; }
-    if (buttonLoopVibrateTimer) { clearInterval(buttonLoopVibrateTimer); buttonLoopVibrateTimer = null; }
-    buttonLoopType = null;
-    if (navigator.vibrate) navigator.vibrate(0);
-}
-
 // ====================================================================
-// DUAL MODE DETECTION
+// 4. DUAL MODE DETECTION
 // ====================================================================
 function isStandbyMode() {
     if (document.hidden) return true;
@@ -1254,324 +1177,28 @@ function setupIdleDetection() {
 }
 
 // ====================================================================
-// FULL SCREEN ALARM
+// 5. FULL SCREEN ALARM (Legacy — untuk fallback)
 // ====================================================================
 function showFullScreenAlarm(em) {
-    const alarm = document.getElementById('fullScreenAlarm');
-    if (!alarm) return;
-    if (isDismissed(em.id)) return;
-    if (fullScreenAlarmActive) return;
-
-    const type = em.type || 'fire';
-    const icon = EMERGENCY_ICONS[type] || '🚨';
-    const label = EMERGENCY_LABELS[type] || 'DARURAT';
-    const cssClass = EMERGENCY_CSS_CLASS[type] || 'fire';
-
-    document.getElementById('alarmIcon').textContent = icon;
-    document.getElementById('alarmTitle').textContent = label.replace(/^[^\s]+\s/, '');
-    document.getElementById('alarmSender').textContent = em.sender || 'User';
-    document.getElementById('alarmLocation').textContent = em.location || '-';
-    document.getElementById('alarmTime').textContent = formatDate(em.timestamp);
-
-    const addrRow = document.getElementById('alarmAddressRow');
-    const addrEl = document.getElementById('alarmAddress');
-    if (em.address && em.address !== em.location) {
-        addrRow.style.display = 'flex';
-        addrEl.textContent = em.address;
-    } else {
-        addrRow.style.display = 'none';
+    // Delegasi ke SalinkEmergency
+    if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency &&
+        typeof SalinkEmergency.showAlarm === 'function') {
+        SalinkEmergency.showAlarm(em);
+        return;
     }
-
-    const coordsRow = document.getElementById('alarmCoordsRow');
-    const coordsEl = document.getElementById('alarmCoords');
-    if (em.coords) {
-        coordsRow.style.display = 'flex';
-        coordsEl.textContent = em.coords;
-    } else {
-        coordsRow.style.display = 'none';
-    }
-
-    alarm.className = 'full-screen-alarm active ' + cssClass;
-
-    fullScreenAlarmActive = true;
-    fullScreenAlarmEmergency = em;
-    activeOverlayEmergency = em;
-    alarm.dataset.emergencyId = em.id || '';
-
-    document.body.style.overflow = 'hidden';
-    playEmergencyLoop(type);
-
-    if (navigator.vibrate) {
-        navigator.vibrate([500, 200, 500, 200, 500, 200]);
-        fullScreenAlarmVibrateTimer = setInterval(() => {
-            if (fullScreenAlarmActive) navigator.vibrate([500, 200, 500, 200, 500, 200]);
-        }, EMERGENCY_VIBRATE_INTERVAL_MS);
-    }
-
-    setupFullScreenAlarmSwipe();
-
-    if (em.id) { readNotifs[em.id] = true; saveReadNotifs(); }
-    console.log('🚨 [FullScreen Alarm] ACTIVE:', type, em.id);
+    console.warn('⚠️ SalinkEmergency tidak tersedia');
 }
 
 function dismissFullScreenAlarm(userAction) {
-    const alarm = document.getElementById('fullScreenAlarm');
-    if (!alarm) return;
-    const emergencyId = alarm.dataset.emergencyId;
-    if (emergencyId) dismissEmergency(emergencyId);
-    alarm.classList.remove('active', 'fire', 'medical', 'crime', 'disaster');
-    alarm.dataset.emergencyId = '';
-    document.body.style.overflow = '';
-    clearInterval(fullScreenAlarmVibrateTimer);
-    fullScreenAlarmVibrateTimer = null;
-    stopEmergencyLoop();
-    hideFloatingNotification();
-    fullScreenAlarmActive = false;
-    fullScreenAlarmEmergency = null;
-    activeOverlayEmergency = null;
-    if (navigator.vibrate) navigator.vibrate(0);
-    if (userAction) showToast('✅ Alarm Dimatikan', 'Anda telah mengonfirmasi notifikasi darurat', 'fa-check-circle', 'success');
-    console.log('✅ [FullScreen Alarm] Dismissed');
-}
-
-function setupFullScreenAlarmSwipe() {
-    const alarm = document.getElementById('fullScreenAlarm');
-    if (!alarm || alarm._swipeSetup) return;
-    alarm._swipeSetup = true;
-
-    const feedback = document.getElementById('swipeFeedback');
-    let startX = 0, startY = 0, moving = false;
-
-    const showFeedback = (dir) => {
-        if (!feedback) return;
-        const icons = { up: '⬆️', down: '⬇️', left: '⬅️', right: '➡️' };
-        feedback.textContent = icons[dir] || '✅';
-        feedback.classList.add('active');
-        setTimeout(() => feedback.classList.remove('active'), 300);
-    };
-
-    alarm.addEventListener('touchstart', (e) => {
-        if (!fullScreenAlarmActive) return;
-        const t = e.touches[0];
-        startX = t.clientX;
-        startY = t.clientY;
-        moving = true;
-    }, { passive: true });
-
-    alarm.addEventListener('touchmove', (e) => {
-        if (!moving || !fullScreenAlarmActive) return;
-        e.preventDefault();
-    }, { passive: false });
-
-    alarm.addEventListener('touchend', (e) => {
-        if (!moving || !fullScreenAlarmActive) return;
-        moving = false;
-        const t = e.changedTouches[0];
-        const dx = t.clientX - startX;
-        const dy = t.clientY - startY;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        if (distance < SWIPE_MIN_DISTANCE) return;
-        let dir = 'up';
-        if (Math.abs(dx) > Math.abs(dy)) dir = dx > 0 ? 'right' : 'left';
-        else dir = dy > 0 ? 'down' : 'up';
-        showFeedback(dir);
-        if (navigator.vibrate) navigator.vibrate(100);
-        setTimeout(() => dismissFullScreenAlarm(true), 150);
-    }, { passive: true });
-
-    let md = false, mx = 0, my = 0;
-    alarm.addEventListener('mousedown', (e) => {
-        if (!fullScreenAlarmActive) return;
-        md = true; mx = e.clientX; my = e.clientY;
-    });
-    alarm.addEventListener('mouseup', (e) => {
-        if (!md || !fullScreenAlarmActive) return;
-        md = false;
-        const dx = e.clientX - mx, dy = e.clientY - my;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        if (distance < SWIPE_MIN_DISTANCE) return;
-        let dir = 'up';
-        if (Math.abs(dx) > Math.abs(dy)) dir = dx > 0 ? 'right' : 'left';
-        else dir = dy > 0 ? 'down' : 'up';
-        showFeedback(dir);
-        setTimeout(() => dismissFullScreenAlarm(true), 150);
-    });
-
-    document.getElementById('alarmIconWrapper')?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (fullScreenAlarmActive) dismissFullScreenAlarm(true);
-    });
-}
-
-// ====================================================================
-// FLOATING EMERGENCY
-// ====================================================================
-function showFloatingEmergency(em) {
-    const type = em.type || 'fire';
-    const icon = EMERGENCY_ICONS[type] || '🚨';
-    const label = EMERGENCY_LABELS[type] || 'DARURAT';
-
-    showFloatingNotification('emergency',
-        `${icon} ${label}`,
-        `${em.sender || 'User'} melaporkan darurat`,
-        `📍 ${em.location || 'Lokasi tidak diketahui'}`,
-        'Lihat',
-        () => {
-            document.getElementById('hologramDisplay')?.scrollIntoView({ behavior: 'smooth' });
-            if (em.id) {
-                setTimeout(() => {
-                    window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(em.id);
-                }, 500);
-            }
-        }
-    );
-
-    animateEmergencyButton(type);
-    startButtonLoop(type);
-
-    if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 1000]);
-    showToast(`🚨 ${label}`, `${em.sender} melaporkan darurat!`, 'fa-exclamation-triangle');
-}
-
-function dismissFloatingEmergency() {
-    stopButtonLoop();
-    stopEmergencyButtonAnimation();
-    hideFloatingNotification();
-    if (navigator.vibrate) navigator.vibrate(0);
-}
-
-// ====================================================================
-// TRIGGER EMERGENCY
-// ====================================================================
-function triggerEmergencyFromNotification(notif) {
-    if (isDismissed(notif.id)) return;
-    const em = {
-        id: notif.id,
-        type: notif.type,
-        sender: notif.sender || 'User',
-        senderUsername: notif.senderUsername || '',
-        location: notif.message || 'Lokasi tidak diketahui',
-        address: notif.message || '',
-        text: notif.message || '',
-        mapsURL: '', coords: '',
-        timestamp: notif.timestamp,
-        expiresAt: notif.timestamp + EMERGENCY_DURATION
-    };
-    let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-    if (!ems.find(e => e.id === em.id)) {
-        ems.unshift(em);
-        try { localStorage.setItem('salink_emergencies', JSON.stringify(ems)); } catch(e) {}
-        renderHologram();
-    }
-    updateEmergencyBadges();
-    updateNotifBadge();
-    if (isStandbyMode()) {
-        console.log('🔴 [Emergency] STANDBY mode → FULL SCREEN ALARM');
-        showFullScreenAlarm(em);
-    } else {
-        console.log('🟢 [Emergency] AKTIF mode → FLOATING + BUTTON GRID');
-        showFloatingEmergency(em);
-    }
-}
-
-// ====================================================================
-// GPS: AMBIL LOKASI SAYA
-// ====================================================================
-async function ambilLokasiSaya() {
-    const btn = document.getElementById('gpsLocationBtn');
-    const btnText = document.getElementById('gpsLocationBtnText');
-    const resultBox = document.getElementById('gpsLocationResult');
-    const errorBox = document.getElementById('gpsError');
-    const addrEl = document.getElementById('gpsAddress');
-    const coordsEl = document.getElementById('gpsCoords');
-    const mapsLink = document.getElementById('gpsMapsLink');
-
-    if (!navigator.geolocation) {
-        errorBox.textContent = '❌ Browser Anda tidak mendukung GPS.';
-        errorBox.classList.add('active');
+    if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency &&
+        typeof SalinkEmergency.dismissAlarm === 'function') {
+        SalinkEmergency.dismissAlarm(userAction);
         return;
     }
-
-    btn.classList.add('loading');
-    btnText.innerHTML = '<span class="gps-location-loading"></span> Mengambil lokasi...';
-    resultBox.classList.remove('active');
-    errorBox.classList.remove('active');
-
-    try {
-        const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-                enableHighAccuracy: true,
-                timeout: 15000,
-                maximumAge: 0
-            });
-        });
-
-        const lat = position.coords.latitude.toFixed(6);
-        const lng = position.coords.longitude.toFixed(6);
-        const accuracy = Math.round(position.coords.accuracy || 0);
-        const mapsURL = `https://www.google.com/maps?q=${lat},${lng}`;
-
-        console.log('📍 GPS OK:', lat, lng, '±', accuracy, 'm');
-        coordsEl.textContent = `${lat}, ${lng} (±${accuracy}m)`;
-        addrEl.textContent = '🔄 Mengambil alamat...';
-        resultBox.classList.add('active');
-        mapsLink.href = mapsURL;
-
-        currentGpsData = {
-            lat: parseFloat(lat),
-            lng: parseFloat(lng),
-            accuracy: accuracy,
-            address: `${lat}, ${lng}`,
-            mapsURL: mapsURL
-        };
-
-        try {
-            const nominatimUrl = `${NOMINATIM_URL}?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=id`;
-            const response = await fetch(nominatimUrl, {
-                method: 'GET',
-                headers: { 'User-Agent': 'SALINK-Emergency-App/4.6' }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                if (data && data.display_name) {
-                    addrEl.textContent = '📍 ' + data.display_name;
-                    currentGpsData.address = data.display_name;
-                } else {
-                    addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
-                }
-            } else {
-                addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
-            }
-        } catch(e) {
-            addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
-        }
-
-        btn.classList.remove('loading');
-        btnText.textContent = '✅ Lokasi Ditemukan — Tap untuk Ambil Ulang';
-        btn.style.background = 'linear-gradient(135deg, #3fb950, #2ea44f)';
-        showToast('📍 Lokasi Ditemukan', `Akurasi ±${accuracy}m`, 'fa-location-arrow', 'success');
-
-    } catch(error) {
-        console.error('❌ GPS error:', error);
-        btn.classList.remove('loading');
-        btnText.textContent = '📍 Ambil Lokasi Saya';
-        btn.style.background = '';
-
-        let errMsg = 'Gagal mengambil lokasi. ';
-        switch(error.code) {
-            case 1: errMsg += 'Izin lokasi ditolak. Aktifkan di Settings browser.'; break;
-            case 2: errMsg += 'Lokasi tidak tersedia.'; break;
-            case 3: errMsg += 'Timeout. Coba lagi.'; break;
-            default: errMsg += error.message || 'Coba lagi.';
-        }
-        errorBox.textContent = '❌ ' + errMsg;
-        errorBox.classList.add('active');
-        showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle', 'error');
-    }
 }
 
 // ====================================================================
-// STORAGE HELPERS
+// 6. STORAGE HELPERS
 // ====================================================================
 function loadReadNotifs() {
     try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); } catch(e) { readNotifs = {}; }
@@ -1613,7 +1240,7 @@ function getActiveEmergencies() {
 }
 
 // ====================================================================
-// ADAPTERS
+// 7. ADAPTERS
 // ====================================================================
 function adaptEmergency(em) {
     const ts = em.timestamp ? new Date(em.timestamp).getTime() : Date.now();
@@ -1667,7 +1294,7 @@ function adaptNotification(n) {
 }
 
 // ====================================================================
-// HELPERS
+// 8. HELPERS
 // ====================================================================
 function formatDate(ts) {
     const d = new Date(ts);
@@ -1699,9 +1326,8 @@ function escapeAttr(str) {
     return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-
 // ====================================================================
-// BADGES
+// 9. BADGES
 // ====================================================================
 function updateEmergencyBadges() {
     const counts = getActiveEmergencyCountByType();
@@ -1749,7 +1375,7 @@ function getActiveEmergencyCountByType() {
 }
 
 // ====================================================================
-// TOAST & FLOATING
+// 10. TOAST & FLOATING NOTIFICATION
 // ====================================================================
 function showToast(title, message, icon, type) {
     icon = icon || 'fa-info-circle';
@@ -1800,91 +1426,163 @@ function hideFloatingNotification() {
     clearTimeout(floatingNotificationTimeout);
 }
 
-// ====================================================================
-// EMERGENCY BUTTON ANIMATION
-// ====================================================================
-function animateEmergencyButton(type) {
-    const btnMap = { 'fire': 'fireBtn', 'medical': 'medicalBtn', 'crime': 'securityBtn', 'disaster': 'disasterBtn' };
-    const btn = document.getElementById(btnMap[type]);
-    if (!btn) return;
-    btn.classList.add('new-emergency', 'has-notification');
-    const st = btn.querySelector('.play-status');
-    if (st) st.textContent = '🔔 Ada Darurat! Tap untuk matikan';
-}
-function stopEmergencyButtonAnimation() {
-    document.querySelectorAll('.emergency-btn').forEach(btn => {
-        btn.classList.remove('new-emergency', 'playing');
-    });
-    updateEmergencyBadges();
-}
-
-// ====================================================================
-// STORAGE EMERGENCY
-// ====================================================================
-function saveEmergencyToStorage(data) {
-    let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-    data.savedAt = Date.now();
-    data.expiresAt = data.expiresAt || (Date.now() + EMERGENCY_DURATION);
-    data.id = data.id || 'emergency-' + Date.now();
-    ems.unshift(data);
-    localStorage.setItem('salink_emergencies', JSON.stringify(ems));
-}
-
-// ====================================================================
-// POLLING
-// ====================================================================
-function startEmergencyPolling() {
-    if (emergencyPollTimer) clearInterval(emergencyPollTimer);
-    emergencyPollTimer = setInterval(async () => {
-        if (fullScreenAlarmActive) return;
-        try {
-            const notifs = await apiGetNotifications();
-            if (notifs && notifs.length > 0) {
-                notifications = notifs;
-                const newEmergency = detectNewEmergencyNotifications(notifications);
-                if (newEmergency) triggerEmergencyFromNotification(newEmergency);
-                updateNotifBadge();
+function showFloatingEmergency(em) {
+    const type = em.type || 'fire';
+    const icon = EMERGENCY_ICONS[type] || '🚨';
+    const label = EMERGENCY_LABELS[type] || 'DARURAT';
+    showFloatingNotification('emergency',
+        `${icon} ${label}`,
+        `${em.sender || 'User'} melaporkan darurat`,
+        `📍 ${em.location || 'Lokasi tidak diketahui'}`,
+        'Lihat',
+        () => {
+            document.getElementById('hologramDisplay')?.scrollIntoView({ behavior: 'smooth' });
+            if (em.id) {
+                setTimeout(() => { window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(em.id); }, 500);
             }
-        } catch(e) {}
-    }, EMERGENCY_POLL_INTERVAL);
-}
-
-function detectNewEmergencyNotifications(notifs) {
-    if (!notifs || notifs.length === 0) return null;
-    const lastCheck = parseInt(localStorage.getItem('salink_last_emergency_check') || '0');
-    const now = Date.now();
-    const newEmergencyNotifs = notifs.filter(n => {
-        const isEmergencyType = ['fire', 'medical', 'crime', 'disaster'].indexOf(n.type) !== -1;
-        if (!isEmergencyType) return false;
-        if (readNotifs[n.id]) return false;
-        if (isDismissed(n.id)) return false;
-        return (n.timestamp || 0) > lastCheck;
-    });
-    if (newEmergencyNotifs.length === 0) {
-        localStorage.setItem('salink_last_emergency_check', String(now));
-        return null;
-    }
-    newEmergencyNotifs.sort((a, b) => b.timestamp - a.timestamp);
-    const latest = newEmergencyNotifs[0];
-    if (currentUser && latest.senderUsername === currentUser.username) {
-        readNotifs[latest.id] = true;
-        saveReadNotifs();
-        localStorage.setItem('salink_last_emergency_check', String(now));
-        return null;
-    }
-    localStorage.setItem('salink_last_emergency_check', String(now));
-    return latest;
-}
-
-function startEmergencyCleanup() {
-    setInterval(() => {
-        renderHologram();
-        updateEmergencyBadges();
-    }, EMERGENCY_CLEANUP_INTERVAL);
+        }
+    );
+    if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 1000]);
+    showToast(`🚨 ${label}`, `${em.sender} melaporkan darurat!`, 'fa-exclamation-triangle');
 }
 
 // ====================================================================
-// API CALLS
+// 11. TRIGGER EMERGENCY FROM NOTIFICATION
+// ====================================================================
+function triggerEmergencyFromNotification(notif) {
+    if (isDismissed(notif.id)) return;
+    const em = {
+        id: notif.id,
+        type: notif.type,
+        sender: notif.sender || 'User',
+        senderUsername: notif.senderUsername || '',
+        location: notif.message || 'Lokasi tidak diketahui',
+        address: notif.message || '',
+        text: notif.message || '',
+        mapsURL: '', coords: '',
+        timestamp: notif.timestamp,
+        expiresAt: notif.timestamp + EMERGENCY_DURATION
+    };
+    let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+    if (!ems.find(e => e.id === em.id)) {
+        ems.unshift(em);
+        try { localStorage.setItem('salink_emergencies', JSON.stringify(ems)); } catch(e) {}
+        renderHologram();
+    }
+    updateEmergencyBadges();
+    updateNotifBadge();
+    if (isStandbyMode()) {
+        console.log('🔴 [Emergency] STANDBY mode → FULL SCREEN ALARM');
+        showFullScreenAlarm(em);
+    } else {
+        console.log('🟢 [Emergency] AKTIF mode → FLOATING + BUTTON GRID');
+        showFloatingEmergency(em);
+        // Trigger animasi tombol grid
+        if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency &&
+            typeof SalinkEmergency.triggerGridAlarmFromPost === 'function') {
+            SalinkEmergency.triggerGridAlarmFromPost(notif.type, false);
+        }
+    }
+}
+
+// ====================================================================
+// 12. GPS: AMBIL LOKASI SAYA
+// ====================================================================
+async function ambilLokasiSaya() {
+    const btn = document.getElementById('gpsLocationBtn');
+    const btnText = document.getElementById('gpsLocationBtnText');
+    const resultBox = document.getElementById('gpsLocationResult');
+    const errorBox = document.getElementById('gpsError');
+    const addrEl = document.getElementById('gpsAddress');
+    const coordsEl = document.getElementById('gpsCoords');
+    const mapsLink = document.getElementById('gpsMapsLink');
+
+    if (!navigator.geolocation) {
+        errorBox.textContent = '❌ Browser Anda tidak mendukung GPS.';
+        errorBox.classList.add('active');
+        return;
+    }
+
+    btn.classList.add('loading');
+    btnText.innerHTML = '<span class="gps-location-loading"></span> Mengambil lokasi...';
+    resultBox.classList.remove('active');
+    errorBox.classList.remove('active');
+
+    try {
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0
+            });
+        });
+
+        const lat = position.coords.latitude.toFixed(6);
+        const lng = position.coords.longitude.toFixed(6);
+        const accuracy = Math.round(position.coords.accuracy || 0);
+        const mapsURL = `https://www.google.com/maps?q=${lat},${lng}`;
+
+        console.log('📍 GPS OK:', lat, lng, '±', accuracy, 'm');
+        coordsEl.textContent = `${lat}, ${lng} (±${accuracy}m)`;
+        addrEl.textContent = '🔄 Mengambil alamat...';
+        resultBox.classList.add('active');
+        mapsLink.href = mapsURL;
+
+        currentGpsData = {
+            lat: parseFloat(lat),
+            lng: parseFloat(lng),
+            accuracy: accuracy,
+            address: `${lat}, ${lng}`,
+            mapsURL: mapsURL
+        };
+
+        try {
+            const nominatimUrl = `${NOMINATIM_URL}?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=id`;
+            const response = await fetch(nominatimUrl, {
+                method: 'GET',
+                headers: { 'User-Agent': 'SALINK-Emergency-App/5.0' }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (data && data.display_name) {
+                    addrEl.textContent = '📍 ' + data.display_name;
+                    currentGpsData.address = data.display_name;
+                } else {
+                    addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
+                }
+            } else {
+                addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
+            }
+        } catch(e) {
+            addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
+        }
+
+        btn.classList.remove('loading');
+        btnText.textContent = '✅ Lokasi Ditemukan — Tap untuk Ambil Ulang';
+        btn.style.background = 'linear-gradient(135deg, #3fb950, #2ea44f)';
+        showToast('📍 Lokasi Ditemukan', `Akurasi ±${accuracy}m`, 'fa-location-arrow', 'success');
+
+    } catch(error) {
+        console.error('❌ GPS error:', error);
+        btn.classList.remove('loading');
+        btnText.textContent = '📍 Ambil Lokasi Saya';
+        btn.style.background = '';
+
+        let errMsg = 'Gagal mengambil lokasi. ';
+        switch(error.code) {
+            case 1: errMsg += 'Izin lokasi ditolak. Aktifkan di Settings browser.'; break;
+            case 2: errMsg += 'Lokasi tidak tersedia.'; break;
+            case 3: errMsg += 'Timeout. Coba lagi.'; break;
+            default: errMsg += error.message || 'Coba lagi.';
+        }
+        errorBox.textContent = '❌ ' + errMsg;
+        errorBox.classList.add('active');
+        showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle', 'error');
+    }
+}
+
+// ====================================================================
+// 13. API CALLS
 // ====================================================================
 async function apiCall(action, data) {
     data = data || {};
@@ -1965,7 +1663,6 @@ async function apiSavePost(postData) {
     return r.status === 'success';
 }
 
-// ✅ FIX #2: apiSaveEmergency terima id dari luar (tidak generate sendiri)
 async function apiSaveEmergency(emergencyData) {
     const payload = {
         id: emergencyData.id || ('emergency-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10)),
@@ -2018,7 +1715,7 @@ async function incrementViewerCount(postId) {
 }
 
 // ====================================================================
-// CROSS-TAB SYNC
+// 14. CROSS-TAB SYNC
 // ====================================================================
 let syncChannel = null;
 try {
@@ -2080,7 +1777,7 @@ function loadPostsFromStorage() {
 }
 
 // ====================================================================
-// CENTRAL DELETE
+// 15. CENTRAL DELETE
 // ====================================================================
 let pendingDelete = null;
 function requestDelete(type, id, description) {
@@ -2144,7 +1841,7 @@ async function confirmDeleteNow() {
 }
 
 // ====================================================================
-// STATS
+// 16. STATS CALCULATION
 // ====================================================================
 function calculateRealStatistics() {
     const allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
@@ -2183,7 +1880,7 @@ function updateStatsCards() {
 }
 
 // ====================================================================
-// RENDER HOLOGRAM
+// 17. RENDER HOLOGRAM
 // ====================================================================
 function renderHologram() {
     const list = document.getElementById('hologramList');
@@ -2242,7 +1939,7 @@ function openEmergencyDetail(id) {
 }
 
 // ====================================================================
-// POSTS CRUD
+// 18. RENDER POSTS
 // ====================================================================
 function renderPosts() {
     const feed = document.getElementById('postFeed');
@@ -2326,16 +2023,33 @@ function renderPosts() {
     renderPostsStats();
 }
 
+// ====================================================================
+// 19. RENDER POSTS STATS — FIX: Dedupe by Set
+// ====================================================================
 function renderPostsStats() {
     const container = document.getElementById('postsList');
     if (!container) return;
-    const sorted = posts.slice().sort((a,b) => b.timestamp - a.timestamp);
+
+    // ✅ FIX Lokasi 6: Dedupe by Set (safety net)
+    const uniquePosts = [];
+    const seenIds = new Set();
+    posts.forEach(p => {
+        if (p && p.id && !seenIds.has(p.id)) {
+            seenIds.add(p.id);
+            uniquePosts.push(p);
+        }
+    });
+
+    const sorted = uniquePosts.sort((a, b) => b.timestamp - a.timestamp);
+
     const countEl = document.getElementById('postsCount');
     if (countEl) countEl.textContent = sorted.length;
+
     if (sorted.length === 0) {
         container.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text-muted);font-size:0.65rem;"><i class="fas fa-inbox" style="display:block;font-size:1.2rem;margin-bottom:4px;opacity:0.3;"></i><p>Belum ada postingan</p></div>';
         return;
     }
+
     container.innerHTML = sorted.slice(0, 15).map(p => {
         let isExpired = false;
         if (p.isSpecial && p.specialType) {
@@ -2346,6 +2060,7 @@ function renderPostsStats() {
         return renderCompactPostCard(p);
     }).join('');
 }
+
 function renderCompactPostCard(p) {
     if (!p.userId || !p.userFullName || p.userFullName.trim() === '') return '';
     const isOwner = currentUser && p.userId === currentUser.username;
@@ -2387,6 +2102,7 @@ function renderFullPostCard(p, isExpired) {
         '<div class="pcf-expiry"><i class="fas fa-clock"></i> ' + remaining + '</div>' +
     '</div>';
 }
+
 function attachPostListeners() {
     document.querySelectorAll('.comment-toggle').forEach(el => {
         el.onclick = function(e) {
@@ -2503,22 +2219,29 @@ function sharePost(postId) {
 }
 
 // ====================================================================
-// ✅ CREATE POST — FIX #2: satu ID untuk semua
+// 20. CREATE POST — FIX: 1 ID untuk semua
 // ====================================================================
 async function createPost(text, mediaFile, isSpecial, specialData) {
     if (isPreviewMode) { showPreviewOverlay(); return; }
     if (!currentUser) { redirectToLogin(); return; }
+
     const hasText = text && text.trim() !== '';
     const hasMedia = mediaFile && mediaFile.size > 0;
+
     if (isSpecial) {
         if (!hasText) { showToast('⚠️ Pesan kosong', 'Postingan khusus wajib isi pesan notifikasi', 'fa-exclamation-triangle'); return; }
     } else {
         if (!hasText && !hasMedia) { showToast('⚠️ Postingan kosong', 'Isi teks atau upload foto/video', 'fa-exclamation-triangle'); return; }
     }
-    const postId = 'post-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
-    // ✅ FIX #2: Satu ID untuk post + emergency + localStorage
-    const emergencyId = 'emergency-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10);
+
+    // ✅ FIX Lokasi 2: 1 ID untuk semua
+    const uniqueId = 'content-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10);
+    const postId = uniqueId;
+    const emergencyId = uniqueId;
+    const notifId = uniqueId;
+
     let mediaType = '', mediaData = '';
+
     const finish = async () => {
         const post = {
             id: postId, userId: currentUser.username, userFullName: currentUser.fullName,
@@ -2540,10 +2263,10 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
         posts.unshift(post);
         localStorage.setItem('salink_posts', JSON.stringify(posts));
         renderPosts();
-        apiSavePost(post).then(ok => { if (ok) console.log('✅ Post saved'); });
+        apiSavePost(post).then(ok => { if (ok) console.log('✅ [createPost] Post saved:', postId); });
 
         if (isSpecial && specialData) {
-            // ✅ FIX #2: Kirim ID yang SAMA ke apiSaveEmergency & triggerLocalEmergencyVisual
+            // Emergency payload — ID sama
             const emPayload = {
                 id: emergencyId,
                 type: specialData.type,
@@ -2563,10 +2286,32 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
                 district: currentUser.district || '',
                 village: currentUser.village || ''
             };
-            apiSaveEmergency(emPayload);
+            apiSaveEmergency(emPayload).then(ok => {
+                if (ok) console.log('✅ [createPost] Emergency saved:', emergencyId);
+            });
+
+            // Notification payload — ID sama
+            const notifPayload = {
+                id: notifId,
+                type: specialData.type,
+                title: EMERGENCY_LABELS[specialData.type] + ' — ' + (text.substring(0, 50)),
+                message: text.substring(0, 200),
+                sender: currentUser.fullName,
+                senderUsername: currentUser.username,
+                link: DETAIL_URL + '?id=' + encodeURIComponent(emergencyId),
+                postId: postId,
+                timestamp: new Date().toISOString(),
+                read: 'FALSE',
+                soundKey: specialData.type
+            };
+            apiCall('save_notification', notifPayload).then(r => {
+                if (r && r.status === 'success') console.log('✅ [createPost] Notification saved:', notifId);
+            }).catch(e => console.warn('⚠️ Notification save failed:', e));
+
+            // Trigger local visual — dengan ID sama
             triggerLocalEmergencyVisual(emergencyId, specialData.type, currentUser.fullName, specialData.location, text);
 
-            // Trigger grid alarm setelah 500ms
+            // Trigger grid alarm di HP pengirim
             if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency &&
                 typeof SalinkEmergency.triggerGridAlarmFromPost === 'function') {
                 setTimeout(() => {
@@ -2577,7 +2322,10 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
             playRegularSound();
             showToast('📝', 'Postingan baru berhasil', 'fa-check-circle');
         }
+
         broadcastSync('new_post', { id: postId });
+
+        // Reset form
         const pi = document.getElementById('postInput'); if (pi) pi.value = '';
         const pst = document.getElementById('postSpecialText'); if (pst) pst.value = '';
         const mu = document.getElementById('mediaUpload'); if (mu) mu.value = '';
@@ -2598,6 +2346,7 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
             if (txt) txt.textContent = '📍 Ambil Lokasi Saya';
         }
     };
+
     if (mediaFile) {
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -2609,26 +2358,43 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
     } else finish();
 }
 
-// ✅ FIX #2: triggerLocalEmergencyVisual terima emergencyId dari luar
+// ====================================================================
+// 21. TRIGGER LOCAL EMERGENCY VISUAL — FIX: Terima emergencyId param
+// ====================================================================
 function triggerLocalEmergencyVisual(emergencyId, type, sender, location, text) {
+    // ✅ FIX Lokasi 3: Pakai emergencyId dari luar (dari createPost)
     const em = {
-        id: emergencyId,  // ✅ pakai ID dari createPost, bukan generate baru
-        type: type, sender: sender,
+        id: emergencyId,
+        type: type,
+        sender: sender,
         senderUsername: currentUser ? currentUser.username : 'user',
         location: location || 'Lokasi tidak diketahui',
-        address: location || '', text: text || '',
+        address: location || '',
+        text: text || '',
         mapsURL: currentGpsData ? currentGpsData.mapsURL : '',
-        coords: currentGpsData ? currentGpsData.lat + ', ' + currentGpsData.lng : '',
+        coords: currentGpsData ? (currentGpsData.lat + ', ' + currentGpsData.lng) : '',
         timestamp: Date.now(),
         expiresAt: Date.now() + EMERGENCY_DURATION
     };
-    saveEmergencyToStorage(em);
+
+    // ✅ FIX: Cek dulu apakah sudah ada (hindari duplikat)
+    let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+    const existingIndex = ems.findIndex(e => e.id === em.id);
+    if (existingIndex > -1) {
+        ems[existingIndex] = em;
+    } else {
+        ems.unshift(em);
+    }
+    localStorage.setItem('salink_emergencies', JSON.stringify(ems));
+
     renderHologram();
     updateEmergencyBadges();
     updateNotifBadge();
+
     readNotifs[em.id] = true;
     saveReadNotifs();
     dismissEmergency(em.id);
+
     showFloatingNotification('emergency',
         EMERGENCY_ICONS[type] + ' ' + EMERGENCY_LABELS[type],
         em.sender + ' melaporkan darurat di ' + em.location,
@@ -2642,7 +2408,7 @@ function triggerLocalEmergencyVisual(emergencyId, type, sender, location, text) 
 }
 
 // ====================================================================
-// NOTIF MODAL
+// 22. NOTIF MODAL
 // ====================================================================
 function getAllNotifications() {
     const list = [];
@@ -2755,7 +2521,7 @@ function goToLocation(location) {
 }
 
 // ====================================================================
-// INVITE
+// 23. INVITE MODAL
 // ====================================================================
 function openInviteModal() {
     if (isPreviewMode) { showPreviewOverlay(); return; }
@@ -2834,7 +2600,7 @@ async function sendInvite(username, btnEl) {
 }
 
 // ====================================================================
-// CHARTS
+// 24. CHARTS
 // ====================================================================
 function getChartColors() {
     const isDark = currentTheme === 'dark';
@@ -3004,7 +2770,7 @@ function updateMap() {
 }
 
 // ====================================================================
-// EMERGENCY BUTTON CLICK — v4.6 (FIX #1)
+// 25. HANDLE EMERGENCY CLICK — FIX Lokasi 1 (v3.0)
 // ====================================================================
 function handleEmergencyClick(e) {
     e.preventDefault(); e.stopPropagation();
@@ -3016,7 +2782,7 @@ function handleEmergencyClick(e) {
 
     if (typeof unlockAudio === 'function') unlockAudio();
 
-    // ✅ FIX #1: Percayakan sepenuhnya ke SalinkEmergency
+    // ✅ Lokasi 1: Percayakan sepenuhnya ke SalinkEmergency
     const hasSalinkEmergency = (typeof SalinkEmergency !== 'undefined' && SalinkEmergency);
 
     // PRIORITAS 1: Full screen alarm aktif → dismiss
@@ -3029,33 +2795,15 @@ function handleEmergencyClick(e) {
         return;
     }
 
-    // PRIORITAS 2: Pakai SalinkEmergency (audio loop + animasi + tap kedua STOP)
+    // PRIORITAS 2: Pakai SalinkEmergency (state machine)
     if (hasSalinkEmergency && typeof SalinkEmergency.handleGridButtonTap === 'function') {
         SalinkEmergency.handleGridButtonTap(type);
         return;
     }
 
-    // FALLBACK: alur lama (kalau SalinkEmergency tidak tersedia)
-    if (buttonLoopAudio) {
-        dismissFloatingEmergency();
-        showToast('✅ Alarm Dimatikan', 'Notifikasi darurat dimatikan', 'fa-check-circle');
-        return;
-    }
-    const url = EMERGENCY_AUDIO[type];
-    if (!url) return;
-    stopEmergencyLoop();
-    const cached = audioCache[type];
-    const audio = cached || new Audio(url);
-    audio.volume = 1.0;
-    audio.loop = true;
-    audio.currentTime = 0;
-    activeEmergencyAudio = audio;
-    activeEmergencyBtn = btn;
-    audio.play().then(() => {
-        btn.classList.add('playing', 'grid-alarm-active');
-        const st = btn.querySelector('.play-status');
-        if (st) st.textContent = '🔊 Alarm Berbunyi — Tap untuk matikan';
-    }).catch(err => { showToast('⚠️ Error', 'Tidak dapat memutar audio', 'fa-exclamation-triangle'); });
+    // FALLBACK
+    console.warn('⚠️ [handleEmergencyClick] SalinkEmergency tidak tersedia');
+    showToast('⚠️ Error', 'Sistem alarm tidak tersedia', 'fa-exclamation-triangle');
 }
 
 function setupChartNavigation() {
@@ -3065,7 +2813,7 @@ function setupChartNavigation() {
 }
 
 // ====================================================================
-// USER & PREVIEW
+// 26. USER & PREVIEW MODE
 // ====================================================================
 function loadUser() {
     const s = localStorage.getItem('salink_user');
@@ -3170,48 +2918,121 @@ function setupLoginGuard() {
 }
 
 // ====================================================================
-// ✅ LOAD DATA — FIX #2: DEDUPE by ID
+// 27. LOAD DATA — FIX Lokasi 4 (dedupe by ID)
 // ====================================================================
 async function loadData() {
-    const results = await Promise.allSettled([apiGetPosts(), apiGetEmergencies(), apiGetNotifications(), apiGetStatistics(), apiGetUsers()]);
+    const results = await Promise.allSettled([
+        apiGetPosts(),
+        apiGetEmergencies(),
+        apiGetNotifications(),
+        apiGetStatistics(),
+        apiGetUsers()
+    ]);
+
+    // ============================================================
+    // POSTS — Dedupe by ID
+    // ============================================================
     let localPosts = [];
     let apiPosts = [];
-    try { const raw = localStorage.getItem('salink_posts'); if (raw) { const parsed = JSON.parse(raw); if (Array.isArray(parsed)) localPosts = parsed; } } catch(e) { localPosts = []; }
+    try {
+        const raw = localStorage.getItem('salink_posts');
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) localPosts = parsed;
+        }
+    } catch(e) { localPosts = []; }
+
     if (results[0].status === 'fulfilled' && results[0].value) apiPosts = results[0].value;
 
-    // ✅ FIX #2: Dedupe posts by id
     const postMap = new Map();
     apiPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
     localPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
+
     posts = Array.from(postMap.values())
-        .filter(p => { if (!p || !p.id || !p.userId || !p.userFullName) return false; const hasText = p.text && p.text.trim() !== ''; const hasMedia = p.mediaData && p.mediaData !== ''; return hasText || hasMedia; })
+        .filter(p => {
+            if (!p || !p.id || !p.userId || !p.userFullName) return false;
+            const hasText = p.text && p.text.trim() !== '';
+            const hasMedia = p.mediaData && p.mediaData !== '';
+            return hasText || hasMedia;
+        })
         .sort((a, b) => b.timestamp - a.timestamp);
     localStorage.setItem('salink_posts', JSON.stringify(posts));
 
-    let localEms = []; try { localEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) { localEms = []; }
+    // ============================================================
+    // EMERGENCIES — Dedupe by ID + filter expired
+    // ============================================================
+    let localEms = [];
+    try {
+        localEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+    } catch(e) { localEms = []; }
+
     let apiEms = [];
     if (results[1].status === 'fulfilled' && results[1].value) apiEms = results[1].value;
 
-    // ✅ FIX #2: Dedupe emergencies by id — KUNCI UTAMA agar tidak duplikat di Hologram
     const emMap = new Map();
     apiEms.forEach(e => { if (e && e.id) emMap.set(e.id, e); });
     localEms.forEach(e => { if (e && e.id) emMap.set(e.id, e); });
-    localStorage.setItem('salink_emergencies', JSON.stringify(Array.from(emMap.values())));
 
-    if (results[2].status === 'fulfilled' && results[2].value) {
-        notifications = results[2].value;
-        const newEmergency = detectNewEmergencyNotifications(notifications);
-        if (newEmergency) setTimeout(() => triggerEmergencyFromNotification(newEmergency), 1500);
+    const now = Date.now();
+    const validEms = Array.from(emMap.values()).filter(e => {
+        if (!e || !e.id) return false;
+        const ts = typeof e.timestamp === 'number' ? e.timestamp : new Date(e.timestamp).getTime();
+        const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
+        return exp > now;
+    });
+    localStorage.setItem('salink_emergencies', JSON.stringify(validEms));
+
+    // ============================================================
+    // NOTIFICATIONS — Dedupe by ID
+    // ============================================================
+    let localNotifs = [];
+    try {
+        localNotifs = JSON.parse(localStorage.getItem('salink_notifications') || '[]');
+    } catch(e) { localNotifs = []; }
+
+    let apiNotifs = [];
+    if (results[2].status === 'fulfilled' && results[2].value) apiNotifs = results[2].value;
+
+    const notifMap = new Map();
+    apiNotifs.forEach(n => { if (n && n.id) notifMap.set(n.id, n); });
+    localNotifs.forEach(n => { if (n && n.id) notifMap.set(n.id, n); });
+
+    notifications = Array.from(notifMap.values())
+        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    try {
+        localStorage.setItem('salink_notifications', JSON.stringify(notifications));
+    } catch(e) {}
+
+    // Trigger notif baru
+    const newEmergency = detectNewEmergencyNotifications(notifications);
+    if (newEmergency) {
+        setTimeout(() => triggerEmergencyFromNotification(newEmergency), 1500);
     }
+
+    // ============================================================
+    // STATS & USERS
+    // ============================================================
     if (results[3].status === 'fulfilled' && results[3].value) statistics = results[3].value;
     else statistics = null;
+
     if (results[4].status === 'fulfilled' && results[4].value) allUsers = results[4].value;
-    renderPosts(); renderHologram(); updateEmergencyBadges(); updateNotifBadge();
-    updateInviteBadge(); updateAllCharts(); updateStatsCards();
+
+    // ============================================================
+    // RENDER
+    // ============================================================
+    renderPosts();
+    renderHologram();
+    updateEmergencyBadges();
+    updateNotifBadge();
+    updateInviteBadge();
+    updateAllCharts();
+    updateStatsCards();
+
+    console.log('📊 [loadData] Posts:', posts.length, '| Emergencies:', validEms.length, '| Notifs:', notifications.length);
 }
 
 // ====================================================================
-// THEME
+// 28. THEME
 // ====================================================================
 function loadTheme() {
     const t = localStorage.getItem('salink_theme');
@@ -3244,7 +3065,7 @@ function toggleTheme() {
 }
 
 // ====================================================================
-// SIDEBAR & MODAL
+// 29. SIDEBAR & MODAL
 // ====================================================================
 function openSidebar() { const s = document.getElementById('sidebar'); const so = document.getElementById('sidebarOverlay'); if (s) s.classList.add('active'); if (so) so.classList.add('active'); }
 function closeSidebar() { const s = document.getElementById('sidebar'); const so = document.getElementById('sidebarOverlay'); if (s) s.classList.remove('active'); if (so) so.classList.remove('active'); }
@@ -3257,7 +3078,7 @@ function openModal(id) { const m = document.getElementById(id); if (m) m.classLi
 function closeModal(id) { const m = document.getElementById(id); if (m) m.classList.remove('active'); document.body.style.overflow = ''; }
 
 // ====================================================================
-// SEARCH
+// 30. SEARCH
 // ====================================================================
 function openSearchModal() {
     if (isPreviewMode) { showPreviewOverlay(); return; }
@@ -3494,7 +3315,7 @@ function setupSearchInput() {
 }
 
 // ====================================================================
-// URL PARAMS & VISIBILITY
+// 31. URL PARAMS & VISIBILITY
 // ====================================================================
 function checkURLParams() {
     const params = new URLSearchParams(window.location.search);
@@ -3534,7 +3355,7 @@ function setupVisibilityDetection() {
 }
 
 // ====================================================================
-// BOTTOM NAV
+// 32. BOTTOM NAV
 // ====================================================================
 function initBottomNav() {
     document.querySelectorAll('.nav-item-bottom').forEach(item => {
@@ -3554,7 +3375,7 @@ function initBottomNav() {
 }
 
 // ====================================================================
-// POST INPUT
+// 33. POST INPUT SETUP
 // ====================================================================
 function setupPostInput() {
     const select = document.getElementById('postTypeSelect');
@@ -3659,7 +3480,7 @@ function validatePost() {
 }
 
 // ====================================================================
-// PWA
+// 34. PWA
 // ====================================================================
 function setupPWA() {
     if ('serviceWorker' in navigator) {
@@ -3699,10 +3520,11 @@ function showInstallPrompt() {
 }
 
 // ====================================================================
-// INIT
+// 35. INIT — DOMContentLoaded
 // ====================================================================
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 SALINK Dashboard v4.6 — FINAL INTEGRATED');
+    console.log('🚀 SALINK Dashboard v5.0 — FULL REWRITE');
+
     preloadAllAudio();
     setupIdleDetection();
     setupVisibilityDetection();
@@ -3748,9 +3570,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    // ✅ FIX Lokasi 5: Setup tombol grid + set flag
     document.querySelectorAll('.emergency-btn').forEach(b => {
         b.removeEventListener('click', handleEmergencyClick);
         b.addEventListener('click', handleEmergencyClick);
+        b._salinkEmergencySetup = true;  // ← flag untuk salink-emergency.js
     });
 
     const gpsB = document.getElementById('gpsLocationBtn'); if (gpsB) gpsB.addEventListener('click', ambilLokasiSaya);
@@ -3765,7 +3589,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (e.key === 'Escape') {
             const sm = document.getElementById('searchModal');
             if (sm && sm.classList.contains('active')) closeSearchModal();
-            if (fullScreenAlarmActive) dismissFullScreenAlarm(true);
         }
     });
 
@@ -3785,8 +3608,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadData();
     setTimeout(() => initAllCharts(), 500);
 
-    startEmergencyPolling();
-    startEmergencyCleanup();
+    // Polling
+    if (emergencyPollTimer) clearInterval(emergencyPollTimer);
+    emergencyPollTimer = setInterval(async () => {
+        if (fullScreenAlarmActive) return;
+        try {
+            const notifs = await apiGetNotifications();
+            if (notifs && notifs.length > 0) {
+                notifications = notifs;
+                const newEmergency = detectNewEmergencyNotifications(notifications);
+                if (newEmergency) triggerEmergencyFromNotification(newEmergency);
+                updateNotifBadge();
+            }
+        } catch(e) {}
+    }, EMERGENCY_POLL_INTERVAL);
+
+    // Cleanup
+    setInterval(() => {
+        renderHologram();
+        updateEmergencyBadges();
+    }, EMERGENCY_CLEANUP_INTERVAL);
 
     if (isPreviewMode) setTimeout(() => showPreviewOverlay(), 1200);
 
@@ -3797,11 +3638,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (nm && nm.classList.contains('active')) renderNotifList();
     }, 15000);
 
-    console.log('✅ SALINK Dashboard v4.6 Ready!');
+    console.log('✅ SALINK Dashboard v5.0 Ready!');
 });
 
 // ====================================================================
-// EXPOSE GLOBAL
+// 36. EXPOSE GLOBAL
 // ====================================================================
 window.openProfileUser = openProfileUser;
 window.requestDelete = requestDelete;
@@ -3839,7 +3680,7 @@ window.goToEmergency = goToEmergency;
 window.openEmergencyDetail = openEmergencyDetail;
 window.ambilLokasiSaya = ambilLokasiSaya;
 
-console.log('✅ SALINK Dashboard v4.6 Script Loaded');
+console.log('✅ SALINK Dashboard v5.0 Script Loaded — Full Rewrite, No Patch');
     </script>
 
     <!-- ============================================================ -->
