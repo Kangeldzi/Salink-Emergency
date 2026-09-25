@@ -1898,8 +1898,11 @@ function calculateRealStatistics() {
 // ====================================================================
 // ✅ v5.1: UPDATE STATS CARDS — Baca dari variabel, bukan localStorage
 // ====================================================================
+
+// ====================================================================
+// ✅ v5.2: UPDATE STATS CARDS — Fix "Selesai Ditangani" & "Tingkat Respon"
+// ====================================================================
 function updateStatsCards() {
-    // ✅ Laporan Aktif = jumlah emergency yang belum resolved & belum expired
     const allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
     const now = Date.now();
 
@@ -1908,26 +1911,33 @@ function updateStatsCards() {
 
     allEms.forEach(e => {
         if (!e) return;
+
         let ts;
         if (typeof e.timestamp === 'number') ts = e.timestamp;
         else if (e.timestamp) ts = new Date(e.timestamp).getTime();
         else ts = now;
-
         if (isNaN(ts)) ts = now;
+
         const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
-
-        // Skip yang expired
-        if (exp <= now) return;
-
         const status = String(e.status || 'active').toLowerCase();
-        if (status === 'resolved' || status === 'selesai' || status === 'ditangani' || status === 'completed' || status === 'closed') {
+
+        // ✅ Selesai Ditangani = 
+        //    - Status resolved MANUAL (kalau ada)
+        //    - ATAU expired (>24 jam) → auto-resolve
+        const isManuallyResolved = ['resolved', 'selesai', 'ditangani', 'completed', 'closed'].indexOf(status) !== -1;
+        const isExpired = exp <= now;
+
+        if (isManuallyResolved) {
+            resolvedCount++;
+        } else if (isExpired) {
+            // ✅ Auto-resolve setelah 24 jam
             resolvedCount++;
         } else {
             activeCount++;
         }
     });
 
-    // ✅ Tim Siaga = user yang aktif dalam 24 jam terakhir
+    // Tim Siaga = user yang aktif dalam 24 jam terakhir
     let teamsDisplay = 0;
     if (allUsers && allUsers.length > 0) {
         const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
@@ -1940,19 +1950,11 @@ function updateStatsCards() {
             }
             return false;
         }).length;
-        // Kalau tidak ada yang online, tetap tampilkan total user terdaftar
         teamsDisplay = teamsOnline > 0 ? teamsOnline : allUsers.length;
     }
 
-    // ✅ Tingkat Respons
-    const totalEms = allEms.filter(e => {
-        if (!e) return false;
-        let ts = typeof e.timestamp === 'number' ? e.timestamp : new Date(e.timestamp).getTime();
-        if (isNaN(ts)) ts = now;
-        const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
-        return exp > now;
-    }).length;
-
+    // Tingkat Respon = (resolved / total) * 100
+    const totalEms = activeCount + resolvedCount;
     const responseRate = totalEms > 0 ? Math.round((resolvedCount / totalEms) * 100) : 0;
 
     // Update DOM
@@ -1970,7 +1972,7 @@ function updateStatsCards() {
         totalUsers: allUsers.length
     });
 }
-
+        
 // ====================================================================
 // 17. RENDER HOLOGRAM
 // ====================================================================
@@ -2736,34 +2738,121 @@ function getWeeklyChartData() {
     });
     return { labels: labels, fire: fire, medical: medical, crime: crime, disaster: disaster };
 }
+// ====================================================================
+// ✅ v5.2: INIT ALL CHARTS — Force re-render kalau sudah ada
+// ====================================================================
 function initAllCharts() {
-    if (typeof Chart === 'undefined') return;
+    if (typeof Chart === 'undefined') {
+        console.warn('⚠️ Chart.js belum di-load');
+        return;
+    }
+
     const colors = getChartColors();
     const data = getChartData();
     const labels = ['🔥 Kebakaran', '🚑 Medis', '🚓 Kriminal', '🌪️ Bencana'];
     const values = [data.fire, data.medical, data.crime, data.disaster];
     const bgColors = [colors.fire, colors.medical, colors.security, colors.disaster];
-    const pieCtx = document.getElementById('pieChart');
-    if (pieCtx && !chartInstances.pie) chartInstances.pie = new Chart(pieCtx, { type: 'pie', data: { labels: labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#fff', borderWidth: 2 }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } } });
-    const barCtx = document.getElementById('barChart');
-    if (barCtx && !chartInstances.bar) chartInstances.bar = new Chart(barCtx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Jumlah Kejadian', data: values, backgroundColor: bgColors, borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } } });
+
     const weekly = getWeeklyChartData();
+
+    // PIE
+    const pieCtx = document.getElementById('pieChart');
+    if (pieCtx) {
+        if (chartInstances.pie) {
+            chartInstances.pie.data.datasets[0].data = values;
+            chartInstances.pie.update();
+        } else {
+            chartInstances.pie = new Chart(pieCtx, {
+                type: 'pie',
+                data: { labels: labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#fff', borderWidth: 2 }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } }
+            });
+        }
+    }
+
+    // BAR
+    const barCtx = document.getElementById('barChart');
+    if (barCtx) {
+        if (chartInstances.bar) {
+            chartInstances.bar.data.datasets[0].data = values;
+            chartInstances.bar.update();
+        } else {
+            chartInstances.bar = new Chart(barCtx, {
+                type: 'bar',
+                data: { labels: labels, datasets: [{ label: 'Jumlah Kejadian', data: values, backgroundColor: bgColors, borderRadius: 6 }] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } }
+            });
+        }
+    }
+
+    // LINE
     const lineCtx = document.getElementById('lineChart');
-    if (lineCtx && !chartInstances.line) chartInstances.line = new Chart(lineCtx, { type: 'line', data: { labels: weekly.labels, datasets: [
-        { label: '🔥 Kebakaran', data: weekly.fire, borderColor: colors.fire, backgroundColor: colors.fire + '20', tension: 0.4 },
-        { label: '🚑 Medis', data: weekly.medical, borderColor: colors.medical, backgroundColor: colors.medical + '20', tension: 0.4 },
-        { label: '🚓 Kriminal', data: weekly.crime, borderColor: colors.security, backgroundColor: colors.security + '20', tension: 0.4 },
-        { label: '🌪️ Bencana', data: weekly.disaster, borderColor: colors.disaster, backgroundColor: colors.disaster + '20', tension: 0.4 }
-    ] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } } });
+    if (lineCtx) {
+        if (chartInstances.line) {
+            chartInstances.line.data.labels = weekly.labels;
+            chartInstances.line.data.datasets[0].data = weekly.fire;
+            chartInstances.line.data.datasets[1].data = weekly.medical;
+            chartInstances.line.data.datasets[2].data = weekly.crime;
+            chartInstances.line.data.datasets[3].data = weekly.disaster;
+            chartInstances.line.update();
+        } else {
+            chartInstances.line = new Chart(lineCtx, {
+                type: 'line',
+                data: { labels: weekly.labels, datasets: [
+                    { label: '🔥 Kebakaran', data: weekly.fire, borderColor: colors.fire, backgroundColor: colors.fire + '20', tension: 0.4 },
+                    { label: '🚑 Medis', data: weekly.medical, borderColor: colors.medical, backgroundColor: colors.medical + '20', tension: 0.4 },
+                    { label: '🚓 Kriminal', data: weekly.crime, borderColor: colors.security, backgroundColor: colors.security + '20', tension: 0.4 },
+                    { label: '🌪️ Bencana', data: weekly.disaster, borderColor: colors.disaster, backgroundColor: colors.disaster + '20', tension: 0.4 }
+                ] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } }
+            });
+        }
+    }
+
+    // AREA
     const areaCtx = document.getElementById('areaChart');
-    if (areaCtx && !chartInstances.area) chartInstances.area = new Chart(areaCtx, { type: 'line', data: { labels: weekly.labels, datasets: [
-        { label: '🔥 Kebakaran', data: weekly.fire, borderColor: colors.fire, backgroundColor: colors.fire + '40', tension: 0.4, fill: true },
-        { label: '🚑 Medis', data: weekly.medical, borderColor: colors.medical, backgroundColor: colors.medical + '40', tension: 0.4, fill: true },
-        { label: '🚓 Kriminal', data: weekly.crime, borderColor: colors.security, backgroundColor: colors.security + '40', tension: 0.4, fill: true },
-        { label: '🌪️ Bencana', data: weekly.disaster, borderColor: colors.disaster, backgroundColor: colors.disaster + '40', tension: 0.4, fill: true }
-    ] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, stacked: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } } });
+    if (areaCtx) {
+        if (chartInstances.area) {
+            chartInstances.area.data.labels = weekly.labels;
+            chartInstances.area.data.datasets[0].data = weekly.fire;
+            chartInstances.area.data.datasets[1].data = weekly.medical;
+            chartInstances.area.data.datasets[2].data = weekly.crime;
+            chartInstances.area.data.datasets[3].data = weekly.disaster;
+            chartInstances.area.update();
+        } else {
+            chartInstances.area = new Chart(areaCtx, {
+                type: 'line',
+                data: { labels: weekly.labels, datasets: [
+                    { label: '🔥 Kebakaran', data: weekly.fire, borderColor: colors.fire, backgroundColor: colors.fire + '40', tension: 0.4, fill: true },
+                    { label: '🚑 Medis', data: weekly.medical, borderColor: colors.medical, backgroundColor: colors.medical + '40', tension: 0.4, fill: true },
+                    { label: '🚓 Kriminal', data: weekly.crime, borderColor: colors.security, backgroundColor: colors.security + '40', tension: 0.4, fill: true },
+                    { label: '🌪️ Bencana', data: weekly.disaster, borderColor: colors.disaster, backgroundColor: colors.disaster + '40', tension: 0.4, fill: true }
+                ] },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, stacked: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } }
+            });
+        }
+    }
+
+    // DOUGHNUT
     const doughnutCtx = document.getElementById('doughnutChart');
-    if (doughnutCtx && !chartInstances.doughnut) chartInstances.doughnut = new Chart(doughnutCtx, { type: 'doughnut', data: { labels: labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#fff', borderWidth: 3, hoverOffset: 10 }] }, options: { responsive: true, maintainAspectRatio: true, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } } });
+    if (doughnutCtx) {
+        if (chartInstances.doughnut) {
+            chartInstances.doughnut.data.datasets[0].data = values;
+            chartInstances.doughnut.update();
+        } else {
+            chartInstances.doughnut = new Chart(doughnutCtx, {
+                type: 'doughnut',
+                data: { labels: labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#fff', borderWidth: 3, hoverOffset: 10 }] },
+                options: { responsive: true, maintainAspectRatio: true, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } }
+            });
+        }
+    }
+
+    // GAUGE & HEATMAP (SVG-based, tidak pakai Chart.js)
+    updateGaugeChart();
+    updateHeatmap();
+
+    console.log('📊 [initAllCharts] Rendered. Posts:', posts.length);
 }
 function switchChart(type) {
     document.querySelectorAll('.chart-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.chart === type));
@@ -3009,181 +3098,156 @@ function setupLoginGuard() {
     }, true);
 }
 
-
 // ====================================================================
-// 27. ✅ v5.1: LOAD DATA — SAFE MERGE (Tidak overwrite localStorage)
+// 27. ✅ v5.2: LOAD DATA — Render dari localStorage DULU, baru API
 // ====================================================================
 async function loadData() {
-    const results = await Promise.allSettled([
-        apiGetPosts(),
-        apiGetEmergencies(),
-        apiGetNotifications(),
-        apiGetStatistics(),
-        apiGetUsers()
-    ]);
+    // ============================================================
+    // STEP 1: TAMPILKAN DATA DARI LOCALSTORAGE DULU (INSTANT)
+    // ============================================================
+    console.log('📊 [loadData] Step 1: Load from localStorage (instant)');
 
-    // ============================================================
-    // POSTS — Safe Merge (keep local + API)
-    // ============================================================
     let localPosts = [];
     try {
-        const raw = localStorage.getItem('salink_posts');
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed)) localPosts = parsed;
-        }
+        localPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
     } catch(e) { localPosts = []; }
 
-    let apiPosts = [];
-    if (results[0].status === 'fulfilled' && results[0].value && results[0].value.length > 0) {
-        apiPosts = results[0].value;
-    }
-
-    // ✅ Merge by ID: API + local
-    const postMap = new Map();
-    localPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
-    apiPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
-
-    posts = Array.from(postMap.values())
-        .filter(p => {
-            if (!p || !p.id || !p.userId || !p.userFullName) return false;
-            const hasText = p.text && p.text.trim() !== '';
-            const hasMedia = p.mediaData && p.mediaData !== '';
-            return hasText || hasMedia;
-        })
-        .sort((a, b) => b.timestamp - a.timestamp);
-
-    // ✅ SAFE SAVE: Hanya save kalau lebih banyak atau sama dengan sebelumnya
-    try {
-        const currentLocal = JSON.parse(localStorage.getItem('salink_posts') || '[]');
-        if (posts.length >= currentLocal.length) {
-            localStorage.setItem('salink_posts', JSON.stringify(posts));
-        }
-    } catch(e) {
-        localStorage.setItem('salink_posts', JSON.stringify(posts));
-    }
-
-    // ============================================================
-    // EMERGENCIES — Safe Merge (keep local + API)
-    // ============================================================
     let localEms = [];
     try {
         localEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
     } catch(e) { localEms = []; }
 
-    let apiEms = [];
-    if (results[1].status === 'fulfilled' && results[1].value && results[1].value.length > 0) {
-        apiEms = results[1].value;
-    }
-
-    // ✅ Merge by ID: API + local
-    const emMap = new Map();
-    localEms.forEach(e => { if (e && e.id) emMap.set(e.id, e); });
-    apiEms.forEach(e => { if (e && e.id) emMap.set(e.id, e); });
-
-    // ✅ Filter expired dengan TOLERANSI lebih baik
-    const now = Date.now();
-    const validEms = Array.from(emMap.values()).filter(e => {
-        if (!e || !e.id) return false;
-        let ts;
-        if (typeof e.timestamp === 'number') ts = e.timestamp;
-        else if (e.timestamp) ts = new Date(e.timestamp).getTime();
-        else ts = now; // fallback: anggap baru
-
-        if (isNaN(ts)) ts = now;
-
-        const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
-        return exp > now;
-    });
-
-    // ✅ SAFE SAVE: Hanya save kalau lebih banyak atau sama dengan sebelumnya
-    try {
-        const currentLocal = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-        if (validEms.length >= currentLocal.length) {
-            localStorage.setItem('salink_emergencies', JSON.stringify(validEms));
-        }
-        console.log('💾 [loadData] Emergencies kept:', validEms.length, '| local:', currentLocal.length);
-    } catch(e) {
-        localStorage.setItem('salink_emergencies', JSON.stringify(validEms));
-    }
-
-    // ============================================================
-    // NOTIFICATIONS — Safe Merge
-    // ============================================================
     let localNotifs = [];
     try {
         localNotifs = JSON.parse(localStorage.getItem('salink_notifications') || '[]');
     } catch(e) { localNotifs = []; }
 
-    let apiNotifs = [];
-    if (results[2].status === 'fulfilled' && results[2].value && results[2].value.length > 0) {
-        apiNotifs = results[2].value;
-    }
-
-    const notifMap = new Map();
-    localNotifs.forEach(n => { if (n && n.id) notifMap.set(n.id, n); });
-    apiNotifs.forEach(n => { if (n && n.id) notifMap.set(n.id, n); });
-
-    notifications = Array.from(notifMap.values())
-        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-    try {
-        const currentLocal = JSON.parse(localStorage.getItem('salink_notifications') || '[]');
-        if (notifications.length >= currentLocal.length) {
-            localStorage.setItem('salink_notifications', JSON.stringify(notifications));
-        }
-    } catch(e) {
-        localStorage.setItem('salink_notifications', JSON.stringify(notifications));
-    }
-
-    // Trigger notif baru
-    const newEmergency = detectNewEmergencyNotifications(notifications);
-    if (newEmergency) {
-        setTimeout(() => triggerEmergencyFromNotification(newEmergency), 1500);
-    }
-
-    // ============================================================
-    // STATS & USERS
-    // ============================================================
-    if (results[3].status === 'fulfilled' && results[3].value) {
-        statistics = results[3].value;
-    }
-
-    // ✅ USERS: Safe merge
     let localUsers = [];
     try {
         localUsers = JSON.parse(localStorage.getItem('salink_users') || '[]');
     } catch(e) { localUsers = []; }
 
-    let apiUsers = [];
-    if (results[4].status === 'fulfilled' && results[4].value && results[4].value.length > 0) {
-        apiUsers = results[4].value;
-    }
+    // Set global variables
+    posts = localPosts
+        .filter(p => p && p.id && p.userId && p.userFullName)
+        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-    const userMap = new Map();
-    localUsers.forEach(u => { if (u && u.username) userMap.set(u.username, u); });
-    apiUsers.forEach(u => { if (u && u.username) userMap.set(u.username, u); });
+    const now = Date.now();
+    const validLocalEms = localEms.filter(e => {
+        if (!e || !e.id) return false;
+        let ts = typeof e.timestamp === 'number' ? e.timestamp : new Date(e.timestamp).getTime();
+        if (isNaN(ts)) ts = now;
+        const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
+        return exp > now;
+    });
 
-    allUsers = Array.from(userMap.values());
-    try {
-        if (allUsers.length > 0) {
-            localStorage.setItem('salink_users', JSON.stringify(allUsers));
-        }
-    } catch(e) {}
+    notifications = localNotifs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    allUsers = localUsers;
 
-    // ============================================================
-    // RENDER
-    // ============================================================
+    // ✅ RENDER SEKARANG — user langsung lihat data
     renderPosts();
     renderHologram();
     updateEmergencyBadges();
     updateNotifBadge();
     updateInviteBadge();
-    updateAllCharts();
     updateStatsCards();
+    // Chart: pastikan chart sudah di-init
+    if (chartInstances.pie || chartInstances.bar) {
+        updateAllCharts();
+    }
 
-    console.log('📊 [loadData] Posts:', posts.length, '| Emergencies:', validEms.length, '| Notifs:', notifications.length, '| Users:', allUsers.length);
-}
+    console.log('✅ [loadData] Local render selesai. Posts:', posts.length, '| Ems:', validLocalEms.length, '| Users:', allUsers.length);
+
+    // ============================================================
+    // STEP 2: FETCH API (background, tidak blocking)
+    // ============================================================
+    console.log('🌐 [loadData] Step 2: Fetch API in background...');
+
+    try {
+        const results = await Promise.allSettled([
+            apiGetPosts(),
+            apiGetEmergencies(),
+            apiGetNotifications(),
+            apiGetStatistics(),
+            apiGetUsers()
+        ]);
+
+        // POSTS — merge
+        let apiPosts = (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) ? results[0].value : [];
+        const postMap = new Map();
+        posts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
+        apiPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
+        posts = Array.from(postMap.values())
+            .filter(p => p && p.id && p.userId && p.userFullName &&
+                ((p.text && p.text.trim() !== '') || (p.mediaData && p.mediaData !== '')))
+            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        try { localStorage.setItem('salink_posts', JSON.stringify(posts)); } catch(e) {}
+
+        // EMERGENCIES — merge
+        let apiEms = (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) ? results[1].value : [];
+        const emMap = new Map();
+        validLocalEms.forEach(e => { if (e && e.id) emMap.set(e.id, e); });
+        apiEms.forEach(e => { if (e && e.id) emMap.set(e.id, e); });
+        const mergedEms = Array.from(emMap.values()).filter(e => {
+            if (!e || !e.id) return false;
+            let ts = typeof e.timestamp === 'number' ? e.timestamp : new Date(e.timestamp).getTime();
+            if (isNaN(ts)) ts = now;
+            const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
+            return exp > now;
+        });
+        try {
+            const currentLocal = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+            if (mergedEms.length >= currentLocal.length) {
+                localStorage.setItem('salink_emergencies', JSON.stringify(mergedEms));
+            }
+        } catch(e) {}
+
+        // NOTIFICATIONS — merge
+        let apiNotifs = (results[2].status === 'fulfilled' && Array.isArray(results[2].value)) ? results[2].value : [];
+        const notifMap = new Map();
+        notifications.forEach(n => { if (n && n.id) notifMap.set(n.id, n); });
+        apiNotifs.forEach(n => { if (n && n.id) notifMap.set(n.id, n); });
+        notifications = Array.from(notifMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        try { localStorage.setItem('salink_notifications', JSON.stringify(notifications)); } catch(e) {}
+
+        // STATS
+        if (results[3].status === 'fulfilled' && results[3].value) {
+            statistics = results[3].value;
+        }
+
+        // USERS — merge
+        let apiUsers = (results[4].status === 'fulfilled' && Array.isArray(results[4].value)) ? results[4].value : [];
+        const userMap = new Map();
+        allUsers.forEach(u => { if (u && u.username) userMap.set(u.username, u); });
+        apiUsers.forEach(u => { if (u && u.username) userMap.set(u.username, u); });
+        allUsers = Array.from(userMap.values());
+        try {
+            if (allUsers.length > 0) {
+                localStorage.setItem('salink_users', JSON.stringify(allUsers));
+            }
+        } catch(e) {}
+
+        // Trigger notif baru
+        const newEmergency = detectNewEmergencyNotifications(notifications);
+        if (newEmergency) {
+            setTimeout(() => triggerEmergencyFromNotification(newEmergency), 1500);
+        }
+
+        // ✅ RE-RENDER dengan data API
+        renderPosts();
+        renderHologram();
+        updateEmergencyBadges();
+        updateNotifBadge();
+        updateInviteBadge();
+        updateStatsCards();
+        updateAllCharts();
+
+        console.log('✅ [loadData] API render selesai. Posts:', posts.length, '| Ems:', mergedEms.length, '| Users:', allUsers.length);
+
+    } catch (err) {
+        console.warn('⚠️ [loadData] API fetch error (tetap pakai data lokal):', err.message);
+    }
+}  
     
 // ====================================================================
 // 28. THEME
@@ -3759,8 +3823,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    await loadData();
-    setTimeout(() => initAllCharts(), 500);
+    // ✅ v5.2: Init chart DULU sebelum loadData
+            initAllCharts();
+
+// Lalu loadData — yang akan otomatis update chart saat selesai
+            await loadData();
+
+// Force re-init chart setelah loadData untuk memastikan
+            setTimeout(() => {
+            initAllCharts();
+            console.log('🔄 [Init] Charts re-rendered after loadData');
+}, 800);
 
     // Polling
     if (emergencyPollTimer) clearInterval(emergencyPollTimer);
