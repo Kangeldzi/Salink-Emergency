@@ -1231,11 +1231,25 @@ function dismissEmergency(emergencyId) {
 function getAllEmergencies() {
     try { return JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) { return []; }
 }
+// ====================================================================
+// ✅ v5.1: GET ACTIVE EMERGENCIES — Toleran parsing
+// ====================================================================
 function getActiveEmergencies() {
     const all = getAllEmergencies();
+    const now = Date.now();
+
     return all.filter(e => {
-        const exp = e.expiresAt || (new Date(e.timestamp).getTime() + EMERGENCY_DURATION);
-        return exp > Date.now();
+        if (!e || !e.id) return false;
+
+        let ts;
+        if (typeof e.timestamp === 'number') ts = e.timestamp;
+        else if (e.timestamp) ts = new Date(e.timestamp).getTime();
+        else ts = now;
+
+        if (isNaN(ts)) ts = now;
+
+        const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
+        return exp > now;
     });
 }
 
@@ -1840,13 +1854,23 @@ async function confirmDeleteNow() {
     hideSyncIndicator();
 }
 
+
 // ====================================================================
-// 16. STATS CALCULATION
+// 16. ✅ v5.1: CALCULATE STATS — Lebih toleran
 // ====================================================================
 function calculateRealStatistics() {
     const allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
     const allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-    const activeEms = allEms.filter(e => (e.expiresAt || (new Date(e.timestamp).getTime() + EMERGENCY_DURATION)) > Date.now());
+    const now = Date.now();
+
+    const activeEms = allEms.filter(e => {
+        if (!e) return false;
+        let ts = typeof e.timestamp === 'number' ? e.timestamp : new Date(e.timestamp).getTime();
+        if (isNaN(ts)) ts = now;
+        const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
+        return exp > now;
+    });
+
     let totalLikes = 0, totalViewers = 0;
     allPosts.forEach(p => {
         try {
@@ -1855,28 +1879,96 @@ function calculateRealStatistics() {
         } catch(e) {}
         totalViewers += parseInt(p.viewerCount || 0, 10) || 0;
     });
+
     const byType = { fire: 0, medical: 0, crime: 0, disaster: 0 };
     allPosts.forEach(p => {
         if (p.isSpecial && p.specialType && byType.hasOwnProperty(p.specialType)) byType[p.specialType]++;
     });
-    return { totalPosts: allPosts.length, totalEmergencies: allEms.length, activeEmergencies: activeEms.length, totalLikes: totalLikes, totalViewers: totalViewers, byType: byType };
+
+    return {
+        totalPosts: allPosts.length,
+        totalEmergencies: allEms.length,
+        activeEmergencies: activeEms.length,
+        totalLikes: totalLikes,
+        totalViewers: totalViewers,
+        byType: byType
+    };
 }
 
+// ====================================================================
+// ✅ v5.1: UPDATE STATS CARDS — Baca dari variabel, bukan localStorage
+// ====================================================================
 function updateStatsCards() {
-    const realStats = calculateRealStatistics();
+    // ✅ Laporan Aktif = jumlah emergency yang belum resolved & belum expired
+    const allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+    const now = Date.now();
+
+    let activeCount = 0;
+    let resolvedCount = 0;
+
+    allEms.forEach(e => {
+        if (!e) return;
+        let ts;
+        if (typeof e.timestamp === 'number') ts = e.timestamp;
+        else if (e.timestamp) ts = new Date(e.timestamp).getTime();
+        else ts = now;
+
+        if (isNaN(ts)) ts = now;
+        const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
+
+        // Skip yang expired
+        if (exp <= now) return;
+
+        const status = String(e.status || 'active').toLowerCase();
+        if (status === 'resolved' || status === 'selesai' || status === 'ditangani' || status === 'completed' || status === 'closed') {
+            resolvedCount++;
+        } else {
+            activeCount++;
+        }
+    });
+
+    // ✅ Tim Siaga = user yang aktif dalam 24 jam terakhir
     let teamsDisplay = 0;
-    if (allUsers.length > 0) {
-        const fiveMinAgo = Date.now() - 5 * 60 * 1000;
-        const teamsOnline = allUsers.filter(u => u.isOnline === true || (u.lastActive && new Date(u.lastActive).getTime() > fiveMinAgo)).length;
+    if (allUsers && allUsers.length > 0) {
+        const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+        const teamsOnline = allUsers.filter(u => {
+            if (!u) return false;
+            if (u.isOnline === true) return true;
+            if (u.lastActive) {
+                const t = new Date(u.lastActive).getTime();
+                return !isNaN(t) && t > oneDayAgo;
+            }
+            return false;
+        }).length;
+        // Kalau tidak ada yang online, tetap tampilkan total user terdaftar
         teamsDisplay = teamsOnline > 0 ? teamsOnline : allUsers.length;
     }
-    const responseRate = realStats.totalEmergencies > 0
-        ? Math.round(((realStats.totalEmergencies - realStats.activeEmergencies) / realStats.totalEmergencies) * 100)
-        : 0;
-    const sa = document.getElementById('statActive'); if (sa) sa.textContent = realStats.activeEmergencies;
-    const sc = document.getElementById('statCompleted'); if (sc) sc.textContent = realStats.totalEmergencies - realStats.activeEmergencies;
+
+    // ✅ Tingkat Respons
+    const totalEms = allEms.filter(e => {
+        if (!e) return false;
+        let ts = typeof e.timestamp === 'number' ? e.timestamp : new Date(e.timestamp).getTime();
+        if (isNaN(ts)) ts = now;
+        const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
+        return exp > now;
+    }).length;
+
+    const responseRate = totalEms > 0 ? Math.round((resolvedCount / totalEms) * 100) : 0;
+
+    // Update DOM
+    const sa = document.getElementById('statActive'); if (sa) sa.textContent = activeCount;
+    const sc = document.getElementById('statCompleted'); if (sc) sc.textContent = resolvedCount;
     const st = document.getElementById('statTeams'); if (st) st.textContent = teamsDisplay;
     const sr = document.getElementById('statResponse'); if (sr) sr.textContent = responseRate + '%';
+
+    console.log('📊 [updateStatsCards]', {
+        active: activeCount,
+        resolved: resolvedCount,
+        teams: teamsDisplay,
+        response: responseRate + '%',
+        totalEms: totalEms,
+        totalUsers: allUsers.length
+    });
 }
 
 // ====================================================================
@@ -2917,8 +3009,9 @@ function setupLoginGuard() {
     }, true);
 }
 
+
 // ====================================================================
-// 27. LOAD DATA — FIX Lokasi 4 (dedupe by ID)
+// 27. ✅ v5.1: LOAD DATA — SAFE MERGE (Tidak overwrite localStorage)
 // ====================================================================
 async function loadData() {
     const results = await Promise.allSettled([
@@ -2930,10 +3023,9 @@ async function loadData() {
     ]);
 
     // ============================================================
-    // POSTS — Dedupe by ID
+    // POSTS — Safe Merge (keep local + API)
     // ============================================================
     let localPosts = [];
-    let apiPosts = [];
     try {
         const raw = localStorage.getItem('salink_posts');
         if (raw) {
@@ -2942,11 +3034,15 @@ async function loadData() {
         }
     } catch(e) { localPosts = []; }
 
-    if (results[0].status === 'fulfilled' && results[0].value) apiPosts = results[0].value;
+    let apiPosts = [];
+    if (results[0].status === 'fulfilled' && results[0].value && results[0].value.length > 0) {
+        apiPosts = results[0].value;
+    }
 
+    // ✅ Merge by ID: API + local
     const postMap = new Map();
-    apiPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
     localPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
+    apiPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
 
     posts = Array.from(postMap.values())
         .filter(p => {
@@ -2956,10 +3052,19 @@ async function loadData() {
             return hasText || hasMedia;
         })
         .sort((a, b) => b.timestamp - a.timestamp);
-    localStorage.setItem('salink_posts', JSON.stringify(posts));
+
+    // ✅ SAFE SAVE: Hanya save kalau lebih banyak atau sama dengan sebelumnya
+    try {
+        const currentLocal = JSON.parse(localStorage.getItem('salink_posts') || '[]');
+        if (posts.length >= currentLocal.length) {
+            localStorage.setItem('salink_posts', JSON.stringify(posts));
+        }
+    } catch(e) {
+        localStorage.setItem('salink_posts', JSON.stringify(posts));
+    }
 
     // ============================================================
-    // EMERGENCIES — Dedupe by ID + filter expired
+    // EMERGENCIES — Safe Merge (keep local + API)
     // ============================================================
     let localEms = [];
     try {
@@ -2967,23 +3072,43 @@ async function loadData() {
     } catch(e) { localEms = []; }
 
     let apiEms = [];
-    if (results[1].status === 'fulfilled' && results[1].value) apiEms = results[1].value;
+    if (results[1].status === 'fulfilled' && results[1].value && results[1].value.length > 0) {
+        apiEms = results[1].value;
+    }
 
+    // ✅ Merge by ID: API + local
     const emMap = new Map();
-    apiEms.forEach(e => { if (e && e.id) emMap.set(e.id, e); });
     localEms.forEach(e => { if (e && e.id) emMap.set(e.id, e); });
+    apiEms.forEach(e => { if (e && e.id) emMap.set(e.id, e); });
 
+    // ✅ Filter expired dengan TOLERANSI lebih baik
     const now = Date.now();
     const validEms = Array.from(emMap.values()).filter(e => {
         if (!e || !e.id) return false;
-        const ts = typeof e.timestamp === 'number' ? e.timestamp : new Date(e.timestamp).getTime();
+        let ts;
+        if (typeof e.timestamp === 'number') ts = e.timestamp;
+        else if (e.timestamp) ts = new Date(e.timestamp).getTime();
+        else ts = now; // fallback: anggap baru
+
+        if (isNaN(ts)) ts = now;
+
         const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
         return exp > now;
     });
-    localStorage.setItem('salink_emergencies', JSON.stringify(validEms));
+
+    // ✅ SAFE SAVE: Hanya save kalau lebih banyak atau sama dengan sebelumnya
+    try {
+        const currentLocal = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+        if (validEms.length >= currentLocal.length) {
+            localStorage.setItem('salink_emergencies', JSON.stringify(validEms));
+        }
+        console.log('💾 [loadData] Emergencies kept:', validEms.length, '| local:', currentLocal.length);
+    } catch(e) {
+        localStorage.setItem('salink_emergencies', JSON.stringify(validEms));
+    }
 
     // ============================================================
-    // NOTIFICATIONS — Dedupe by ID
+    // NOTIFICATIONS — Safe Merge
     // ============================================================
     let localNotifs = [];
     try {
@@ -2991,17 +3116,25 @@ async function loadData() {
     } catch(e) { localNotifs = []; }
 
     let apiNotifs = [];
-    if (results[2].status === 'fulfilled' && results[2].value) apiNotifs = results[2].value;
+    if (results[2].status === 'fulfilled' && results[2].value && results[2].value.length > 0) {
+        apiNotifs = results[2].value;
+    }
 
     const notifMap = new Map();
-    apiNotifs.forEach(n => { if (n && n.id) notifMap.set(n.id, n); });
     localNotifs.forEach(n => { if (n && n.id) notifMap.set(n.id, n); });
+    apiNotifs.forEach(n => { if (n && n.id) notifMap.set(n.id, n); });
 
     notifications = Array.from(notifMap.values())
         .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
     try {
+        const currentLocal = JSON.parse(localStorage.getItem('salink_notifications') || '[]');
+        if (notifications.length >= currentLocal.length) {
+            localStorage.setItem('salink_notifications', JSON.stringify(notifications));
+        }
+    } catch(e) {
         localStorage.setItem('salink_notifications', JSON.stringify(notifications));
-    } catch(e) {}
+    }
 
     // Trigger notif baru
     const newEmergency = detectNewEmergencyNotifications(notifications);
@@ -3012,10 +3145,31 @@ async function loadData() {
     // ============================================================
     // STATS & USERS
     // ============================================================
-    if (results[3].status === 'fulfilled' && results[3].value) statistics = results[3].value;
-    else statistics = null;
+    if (results[3].status === 'fulfilled' && results[3].value) {
+        statistics = results[3].value;
+    }
 
-    if (results[4].status === 'fulfilled' && results[4].value) allUsers = results[4].value;
+    // ✅ USERS: Safe merge
+    let localUsers = [];
+    try {
+        localUsers = JSON.parse(localStorage.getItem('salink_users') || '[]');
+    } catch(e) { localUsers = []; }
+
+    let apiUsers = [];
+    if (results[4].status === 'fulfilled' && results[4].value && results[4].value.length > 0) {
+        apiUsers = results[4].value;
+    }
+
+    const userMap = new Map();
+    localUsers.forEach(u => { if (u && u.username) userMap.set(u.username, u); });
+    apiUsers.forEach(u => { if (u && u.username) userMap.set(u.username, u); });
+
+    allUsers = Array.from(userMap.values());
+    try {
+        if (allUsers.length > 0) {
+            localStorage.setItem('salink_users', JSON.stringify(allUsers));
+        }
+    } catch(e) {}
 
     // ============================================================
     // RENDER
@@ -3028,9 +3182,9 @@ async function loadData() {
     updateAllCharts();
     updateStatsCards();
 
-    console.log('📊 [loadData] Posts:', posts.length, '| Emergencies:', validEms.length, '| Notifs:', notifications.length);
+    console.log('📊 [loadData] Posts:', posts.length, '| Emergencies:', validEms.length, '| Notifs:', notifications.length, '| Users:', allUsers.length);
 }
-
+    
 // ====================================================================
 // 28. THEME
 // ====================================================================
