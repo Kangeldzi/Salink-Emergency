@@ -1,20 +1,22 @@
 /* ====================================================================
- * SALINK EMERGENCY ALERT — UNIVERSAL CLIENT v2.1
+ * SALINK EMERGENCY ALERT — UNIVERSAL CLIENT v3.0
  * ====================================================================
- * FIX v2.1:
- * ✅ Tap tombol grid 2x → INSTAN STOP (tanpa delay)
- * ✅ Tap tombol beda saat alarm aktif → stop alarm lama, tidak play baru
- * ✅ Dismiss tidak lagi bergantung pada state.currentUser (bisa dipakai guest)
- * ✅ Auto-detect tombol grid di semua halaman
+ * File ini di-include oleh 14 file HTML (kecuali dashboard.html).
  *
- * FITUR UTAMA:
- * ✅ Audio system (preload, loop tanpa batas, auto-pause)
- * ✅ Dual mode detection (STANDBY vs AKTIF)
- * ✅ Full screen alarm + swipe 4 arah dismiss
- * ✅ Floating emergency + animasi tombol grid
- * ✅ Grid button tap → TESTING lokal (audio + animasi saja)
- * ✅ Trigger alarm setelah POSTING postingan khusus
- * ✅ Cross-tab sync (BroadcastChannel)
+ * FITUR UTAMA v3.0:
+ * ✅ State machine tombol grid (IDLE / TESTING_ACTIVE / EMERGENCY_ACTIVE)
+ * ✅ Auto-stop timer:
+ *    - Testing tombol grid: 20 detik
+ *    - Notif dari user lain: 60 detik (3×20s)
+ *    - Mode standby: TIDAK auto-stop (harus swipe)
+ * ✅ Toast "⏱️ Auto-Stop" saat alarm berhenti otomatis
+ * ✅ Cross-tab sync via BroadcastChannel (semua tab SALINK sinkron)
+ * ✅ Cross-app notification (via FCM saat tab hidden)
+ * ✅ Dual mode: Standby (full screen) vs Aktif (floating)
+ * ✅ Efek animasi tombol grid KONSISTEN di 3 skenario:
+ *    - Tap tombol grid (testing)
+ *    - Setelah POSTING postingan khusus
+ *    - Terima notif dari user lain
  *
  * CARA PAKAI:
  *   <script src="/salink-emergency.js"></script>
@@ -24,7 +26,7 @@
  *   - showAlarm(em)                   → tampilkan full screen alarm
  *   - dismissAlarm()                  → dismiss alarm
  *   - showFloating(em)                → tampilkan floating notif
- *   - handleGridButtonTap(type)       → TESTING tombol grid
+ *   - handleGridButtonTap(type)       → TESTING tombol grid (audio+animasi)
  *   - dismissGridButtonAlarm()        → dismiss alarm testing
  *   - triggerGridAlarmFromPost(type)  → trigger animasi setelah POSTING
  *   - playRegular()                   → audio notif regular
@@ -41,11 +43,17 @@
     // ================================================================
     const CONFIG = {
         API_URL: 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec',
-        POLL_INTERVAL: 15000,
-        IDLE_THRESHOLD_MS: 30000,
-        EMERGENCY_DURATION: 24 * 60 * 60 * 1000,
-        VIBRATE_INTERVAL_MS: 2000,
-        SWIPE_MIN_DISTANCE: 50,
+        POLL_INTERVAL: 15000,                       // 15 detik polling
+        IDLE_THRESHOLD_MS: 30000,                   // 30 detik → standby
+        EMERGENCY_DURATION: 24 * 60 * 60 * 1000,    // 24 jam data emergency
+
+        // ✅ v3.0: DURASI AUTO-STOP
+        TESTING_AUTO_STOP_MS: 20000,                // 20 detik — untuk testing tombol grid
+        EMERGENCY_AUTO_STOP_MS: 60000,              // 60 detik (3×20s) — untuk notif dari user lain
+
+        VIBRATE_INTERVAL_MS: 2000,                  // 2 detik vibrate interval
+        SWIPE_MIN_DISTANCE: 50,                     // 50 px minimum swipe
+
         AUDIO: {
             'fire':     '/Music/Kebakaran.mp3',
             'medical':  '/Music/kematian.mp3',
@@ -53,38 +61,80 @@
             'disaster': '/Music/bencana_tsunami.mp3'
         },
         REGULAR_AUDIO: '/Music/smsblackber_4a537f155087133.mp3',
-        LABELS: { 'fire': '🔥 Kebakaran', 'medical': '🚑 Medis & Kematian', 'crime': '🚓 Kriminal', 'disaster': '🌪️ Bencana Alam' },
-        ICONS: { 'fire': '🔥', 'medical': '🚑', 'crime': '🚓', 'disaster': '🌪️' },
-        CSS_CLASS: { 'fire': 'fire', 'medical': 'medical', 'crime': 'crime', 'disaster': 'disaster' },
-        SHORT_LABELS: { 'fire': 'KEBAKARAN', 'medical': 'MEDIS', 'crime': 'KRIMINAL', 'disaster': 'BENCANA' },
-        COLOR: { 'fire': '#f85149', 'medical': '#4fc3f7', 'crime': '#f0d080', 'disaster': '#c792ea' }
+
+        LABELS: {
+            'fire': '🔥 Kebakaran',
+            'medical': '🚑 Medis & Kematian',
+            'crime': '🚓 Kriminal',
+            'disaster': '🌪️ Bencana Alam'
+        },
+        ICONS: {
+            'fire': '🔥',
+            'medical': '🚑',
+            'crime': '🚓',
+            'disaster': '🌪️'
+        },
+        CSS_CLASS: {
+            'fire': 'fire',
+            'medical': 'medical',
+            'crime': 'crime',
+            'disaster': 'disaster'
+        },
+        SHORT_LABELS: {
+            'fire': 'KEBAKARAN',
+            'medical': 'MEDIS',
+            'crime': 'KRIMINAL',
+            'disaster': 'BENCANA'
+        },
+        COLOR: {
+            'fire': '#f85149',
+            'medical': '#4fc3f7',
+            'crime': '#f0d080',
+            'disaster': '#c792ea'
+        }
     };
 
     // ================================================================
     // STATE
     // ================================================================
     const state = {
+        // Init
         initialized: false,
         currentUser: null,
+
+        // Notifications
         readNotifs: {},
         dismissedEmergencies: {},
         emergencyPollTimer: null,
-        emergencyVibrateTimer: null,
-        emergencyAudioLoop: null,
-        gridButtonAlarmActive: false,
-        gridButtonAlarmType: null,
-        gridButtonVibrateTimer: null,
+        lastNotifCheck: 0,
+
+        // Idle
         idleTimer: null,
         isIdleStandby: false,
-        fullScreenAlarmActive: false,
-        fullScreenAlarmEmergency: null,
-        fullScreenAlarmVibrateTimer: null,
+
+        // Audio
         audioCache: {},
         audioContext: null,
         audioUnlocked: false,
-        lastNotifCheck: 0,
-        // ✅ v2.1: Handler tracking untuk hindari double setup
-        _buttonsSetup: false
+        emergencyAudioLoop: null,
+
+        // Vibrate
+        emergencyVibrateTimer: null,
+
+        // Full screen alarm
+        fullScreenAlarmActive: false,
+        fullScreenAlarmEmergency: null,
+
+        // ✅ v3.0: Grid button state machine
+        gridButtonState: 'IDLE',                    // IDLE | TESTING_ACTIVE | EMERGENCY_ACTIVE
+        gridButtonAlarmType: null,
+        gridButtonAlarmStartTime: 0,
+        gridButtonAutoStopTimer: null,
+        gridButtonMode: null,                       // 'testing' | 'emergency'
+
+        // Cross-tab
+        syncChannel: null,
+        broadcastLock: false                        // Prevent loop
     };
 
     // ================================================================
@@ -92,50 +142,105 @@
     // ================================================================
     function escapeHTML(str) {
         if (!str) return '';
-        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
     }
+
+    function escapeAttr(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+    }
+
     function formatDate(ts) {
+        if (!ts) return '-';
         const d = new Date(ts);
+        if (isNaN(d.getTime())) return '-';
         const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
         const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-        return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} • ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        return days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear() + ' • ' +
+               String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
     }
-    function log(...args) { console.log('🚨 [SalinkEmergency]', ...args); }
-    function logWarn(...args) { console.warn('⚠️ [SalinkEmergency]', ...args); }
-    function logError(...args) { console.error('❌ [SalinkEmergency]', ...args); }
+
+    function log() {
+        const args = Array.prototype.slice.call(arguments);
+        console.log.apply(console, ['🚨 [SalinkEmergency]'].concat(args));
+    }
+    function logWarn() {
+        const args = Array.prototype.slice.call(arguments);
+        console.warn.apply(console, ['⚠️ [SalinkEmergency]'].concat(args));
+    }
+    function logError() {
+        const args = Array.prototype.slice.call(arguments);
+        console.error.apply(console, ['❌ [SalinkEmergency]'].concat(args));
+    }
 
     // ================================================================
     // STORAGE
     // ================================================================
     function loadReadNotifs() {
-        try { state.readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); } catch(e) { state.readNotifs = {}; }
+        try {
+            state.readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}');
+        } catch(e) {
+            state.readNotifs = {};
+        }
     }
+
     function saveReadNotifs() {
-        try { localStorage.setItem('salink_read_notifs', JSON.stringify(state.readNotifs)); } catch(e) {}
+        try {
+            localStorage.setItem('salink_read_notifs', JSON.stringify(state.readNotifs));
+        } catch(e) {}
     }
+
     function loadDismissed() {
-        try { state.dismissedEmergencies = JSON.parse(localStorage.getItem('salink_dismissed_emergencies') || '{}'); } catch(e) { state.dismissedEmergencies = {}; }
+        try {
+            state.dismissedEmergencies = JSON.parse(localStorage.getItem('salink_dismissed_emergencies') || '{}');
+        } catch(e) {
+            state.dismissedEmergencies = {};
+        }
+        // Cleanup expired
         const now = Date.now();
         let cleaned = false;
         Object.keys(state.dismissedEmergencies).forEach(id => {
             if (now - state.dismissedEmergencies[id] > CONFIG.EMERGENCY_DURATION) {
-                delete state.dismissedEmergencies[id]; cleaned = true;
+                delete state.dismissedEmergencies[id];
+                cleaned = true;
             }
         });
         if (cleaned) saveDismissed();
     }
+
     function saveDismissed() {
-        try { localStorage.setItem('salink_dismissed_emergencies', JSON.stringify(state.dismissedEmergencies)); } catch(e) {}
+        try {
+            localStorage.setItem('salink_dismissed_emergencies', JSON.stringify(state.dismissedEmergencies));
+        } catch(e) {}
     }
-    function isDismissed(id) { return state.dismissedEmergencies[id] !== undefined; }
+
+    function isDismissed(id) {
+        return state.dismissedEmergencies[id] !== undefined;
+    }
+
     function dismissEmergency(id) {
         if (!id) return;
         state.dismissedEmergencies[id] = Date.now();
         saveDismissed();
     }
+
     function getAllEmergencies() {
-        try { return JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) { return []; }
+        try {
+            return JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+        } catch(e) {
+            return [];
+        }
     }
+
     function getActiveEmergencies() {
         const all = getAllEmergencies();
         return all.filter(e => {
@@ -161,9 +266,12 @@
             }
             state.audioUnlocked = true;
             log('Audio unlocked');
-        } catch(e) { logWarn('Unlock failed:', e.message); }
+        } catch(e) {
+            logWarn('Unlock failed:', e.message);
+        }
     }
 
+    // Unlock pada interaksi pertama
     ['click', 'touchstart', 'keydown'].forEach(evt => {
         document.addEventListener(evt, unlockAudio, { once: true, passive: true });
     });
@@ -178,7 +286,9 @@
                 audio.volume = 1.0;
                 audio.load();
                 state.audioCache[type] = audio;
-            } catch(e) { logWarn('Preload ' + type + ':', e.message); }
+            } catch(e) {
+                logWarn('Preload ' + type + ':', e.message);
+            }
         });
         try {
             const regAudio = new Audio();
@@ -187,7 +297,9 @@
             regAudio.volume = 1.0;
             regAudio.load();
             state.audioCache['regular'] = regAudio;
-        } catch(e) { logWarn('Preload regular:', e.message); }
+        } catch(e) {
+            logWarn('Preload regular:', e.message);
+        }
         log('Audio preloaded');
     }
 
@@ -199,23 +311,27 @@
                 cached.currentTime = 0;
                 cached.volume = 1.0;
                 const p = cached.play();
-                if (p !== undefined) p.catch(() => {
-                    try { new Audio(CONFIG.REGULAR_AUDIO).play().catch(() => {}); } catch(e) {}
-                });
+                if (p !== undefined) {
+                    p.catch(() => {
+                        try {
+                            new Audio(CONFIG.REGULAR_AUDIO).play().catch(() => {});
+                        } catch(e) {}
+                    });
+                }
             } else {
                 new Audio(CONFIG.REGULAR_AUDIO).play().catch(() => {});
             }
-        } catch(e) { logWarn('playRegularSound:', e.message); }
+        } catch(e) {
+            logWarn('playRegularSound:', e.message);
+        }
     }
 
-    // ✅ v2.1: Emergency loop — dengan flag untuk stop instan
     function playEmergencyLoop(type) {
         try {
             unlockAudio();
             const url = CONFIG.AUDIO[type];
             if (!url) return null;
 
-            // Stop yang lama dulu
             stopEmergencyLoop();
 
             const cached = state.audioCache[type];
@@ -230,6 +346,7 @@
                 p.then(() => log('Emergency loop playing:', type))
                  .catch(err => {
                     logWarn('Emergency play failed:', err.message);
+                    // Fallback: buat baru
                     try {
                         const fb = new Audio(url);
                         fb.volume = 1.0;
@@ -246,54 +363,36 @@
         }
     }
 
-    // ✅ v2.1: Stop yang benar-benar instan
     function stopEmergencyLoop() {
         if (state.emergencyAudioLoop) {
             try {
                 state.emergencyAudioLoop.pause();
                 state.emergencyAudioLoop.currentTime = 0;
                 state.emergencyAudioLoop.loop = false;
-                state.emergencyAudioLoop.src = state.emergencyAudioLoop.src; // Force stop
             } catch(e) {}
             state.emergencyAudioLoop = null;
         }
-    }
-
-    // ✅ v2.1: Stop semua audio sekaligus (untuk fix tap kedua)
-    function stopAllAudio() {
-        // Stop emergency loop
-        stopEmergencyLoop();
-
-        // Stop regular audio kalau ada
-        try {
-            const reg = state.audioCache['regular'];
-            if (reg) {
-                reg.pause();
-                reg.currentTime = 0;
-            }
-        } catch(e) {}
-
-        // Stop semua audio di cache
-        Object.keys(state.audioCache).forEach(k => {
-            try {
-                const a = state.audioCache[k];
-                if (a && !a.paused) {
-                    a.pause();
-                    a.currentTime = 0;
-                }
-            } catch(e) {}
-        });
-    }
-
-    function startVibrateLoop(callback) {
-        stopVibrateLoop();
-        if (navigator.vibrate) {
-            navigator.vibrate([500, 200, 500, 200, 500, 200]);
-            state.emergencyVibrateTimer = setInterval(() => {
-                if (callback()) navigator.vibrate([500, 200, 500, 200, 500, 200]);
-            }, CONFIG.VIBRATE_INTERVAL_MS);
+        // Clear auto-stop timer
+        if (state.gridButtonAutoStopTimer) {
+            clearTimeout(state.gridButtonAutoStopTimer);
+            state.gridButtonAutoStopTimer = null;
         }
     }
+
+    // ================================================================
+    // VIBRATE SYSTEM
+    // ================================================================
+    function startVibrateLoop(callback) {
+        stopVibrateLoop();
+        if (!navigator.vibrate) return;
+        navigator.vibrate([500, 200, 500, 200, 500, 200]);
+        state.emergencyVibrateTimer = setInterval(() => {
+            if (typeof callback === 'function' && callback()) {
+                navigator.vibrate([500, 200, 500, 200, 500, 200]);
+            }
+        }, CONFIG.VIBRATE_INTERVAL_MS);
+    }
+
     function stopVibrateLoop() {
         if (state.emergencyVibrateTimer) {
             clearInterval(state.emergencyVibrateTimer);
@@ -302,15 +401,21 @@
         if (navigator.vibrate) navigator.vibrate(0);
     }
 
-    // Auto-pause saat tab hidden
+    // ================================================================
+    // AUTO-PAUSE AUDIO SAAT TAB HIDDEN
+    // ================================================================
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
+            // Pause audio (hemat baterai)
             if (state.emergencyAudioLoop && !state.emergencyAudioLoop.paused) {
                 try { state.emergencyAudioLoop.pause(); } catch(e) {}
             }
         } else {
-            if (state.emergencyAudioLoop && state.emergencyAudioLoop.paused &&
-                (state.fullScreenAlarmActive || state.gridButtonAlarmActive)) {
+            // Resume jika alarm masih aktif
+            const isAlarmActive = state.fullScreenAlarmActive ||
+                (state.gridButtonState === 'TESTING_ACTIVE') ||
+                (state.gridButtonState === 'EMERGENCY_ACTIVE');
+            if (state.emergencyAudioLoop && state.emergencyAudioLoop.paused && isAlarmActive) {
                 try { state.emergencyAudioLoop.play().catch(() => {}); } catch(e) {}
             }
         }
@@ -328,7 +433,9 @@
     function resetIdleTimer() {
         state.isIdleStandby = false;
         if (state.idleTimer) clearTimeout(state.idleTimer);
-        state.idleTimer = setTimeout(() => { state.isIdleStandby = true; }, CONFIG.IDLE_THRESHOLD_MS);
+        state.idleTimer = setTimeout(() => {
+            state.isIdleStandby = true;
+        }, CONFIG.IDLE_THRESHOLD_MS);
     }
 
     function setupIdleDetection() {
@@ -341,15 +448,96 @@
     }
 
     // ================================================================
-    // CSS INJECTION
+    // CROSS-TAB SYNC VIA BROADCASTCHANNEL
+    // ================================================================
+    function setupCrossTabSync() {
+        try {
+            state.syncChannel = new BroadcastChannel('salink_emergency_sync');
+            state.syncChannel.onmessage = (event) => {
+                handleCrossTabMessage(event.data);
+            };
+            log('Cross-tab sync ready');
+        } catch(e) {
+            logWarn('BroadcastChannel not supported:', e.message);
+        }
+    }
+
+    function handleCrossTabMessage(data) {
+        if (!data || !data.type) return;
+        if (state.broadcastLock) return; // Prevent loop
+        log('Cross-tab message:', data.type);
+
+        switch(data.type) {
+            case 'grid_alarm_start':
+                // Tab lain mulai alarm → ikut nyalakan
+                if (state.gridButtonState === 'IDLE') {
+                    _startGridButtonAlarm(data.alarmType, data.mode, true);
+                }
+                break;
+
+            case 'grid_alarm_stop':
+                // Tab lain stop alarm → ikut stop
+                if (state.gridButtonState !== 'IDLE') {
+                    _stopGridButtonAlarmInternal();
+                }
+                break;
+
+            case 'full_screen_dismiss':
+                // Tab lain dismiss full screen → ikut dismiss
+                if (state.fullScreenAlarmActive) {
+                    _dismissFullScreenAlarmInternal();
+                }
+                break;
+
+            case 'emergency_notification':
+                // Tab lain terima notif → trigger di sini juga
+                if (data.emergency) {
+                    triggerEmergencyFromNotification(data.emergency);
+                }
+                break;
+        }
+    }
+
+    function broadcastEmergency(type, data) {
+        if (!state.syncChannel) return;
+        try {
+            state.broadcastLock = true;
+            state.syncChannel.postMessage(Object.assign({ type: type }, data || {}));
+            setTimeout(() => { state.broadcastLock = false; }, 100);
+        } catch(e) {
+            state.broadcastLock = false;
+        }
+    }
+
+    // ================================================================
+    // CSS INJECTION (v3.0 — dengan animasi lengkap)
     // ================================================================
     function injectStyles() {
         if (document.getElementById('salink-emergency-styles')) return;
+
         const style = document.createElement('style');
         style.id = 'salink-emergency-styles';
         style.textContent = `
-            /* ============ ANIMATIONS ============ */
-            @keyframes salinkFlash {
+            /* ============ FULL SCREEN ALARM ============ */
+            .salink-full-screen-alarm {
+                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                width: 100vw; height: 100vh; height: 100dvh;
+                background: #0d1117; z-index: 999999;
+                display: none; flex-direction: column; align-items: center; justify-content: center;
+                padding: 30px 20px; text-align: center;
+                user-select: none; -webkit-user-select: none;
+                touch-action: none; overflow: hidden;
+            }
+            .salink-full-screen-alarm.active {
+                display: flex;
+                animation: salinkFullScreenFlash 1s ease-in-out infinite;
+            }
+            .salink-full-screen-alarm.fire { --alarm-color: #f85149; }
+            .salink-full-screen-alarm.medical { --alarm-color: #4fc3f7; }
+            .salink-full-screen-alarm.crime { --alarm-color: #f0d080; }
+            .salink-full-screen-alarm.disaster { --alarm-color: #c792ea; }
+
+            @keyframes salinkFullScreenFlash {
                 0%, 100% { background-color: #0d1117; }
                 50% { background-color: #4a0000; }
             }
@@ -380,6 +568,8 @@
                 50% { transform: scale(1.15) rotate(-15deg); }
                 75% { transform: scale(1.1) rotate(15deg); }
             }
+
+            /* ============ GRID BUTTON ANIMATIONS ============ */
             @keyframes salinkGridFloat {
                 0%, 100% { transform: translateY(0); }
                 50% { transform: translateY(-12px); }
@@ -414,18 +604,20 @@
                 75% { transform: rotate(-3deg); }
             }
 
-            /* ============ GRID BUTTON ALARM ============ */
+            /* ============ GRID BUTTON ACTIVE STATE ============ */
             .emergency-btn.grid-alarm-active {
                 border-color: var(--alarm-color, #f85149) !important;
                 box-shadow: 0 0 40px rgba(248, 81, 73, 0.6) !important;
-                animation: salinkGridFloat 2s ease-in-out infinite,
-                           salinkGridZoom 1.2s ease-in-out infinite !important;
+                animation:
+                    salinkGridFloat 2s ease-in-out infinite,
+                    salinkGridZoom 1.2s ease-in-out infinite !important;
                 z-index: 10 !important;
             }
             .emergency-btn.grid-alarm-active .btn-content {
-                animation: salinkGridShake 0.6s ease-in-out infinite,
-                           salinkGridRing 0.5s ease-in-out infinite,
-                           salinkGridBlink 1s ease-in-out infinite !important;
+                animation:
+                    salinkGridShake 0.6s ease-in-out infinite,
+                    salinkGridRing 0.5s ease-in-out infinite,
+                    salinkGridBlink 1s ease-in-out infinite !important;
                 border-color: var(--alarm-color, #f85149) !important;
             }
             .emergency-btn.grid-alarm-active .play-status {
@@ -453,21 +645,7 @@
                 animation: salinkRingIcon 1s ease-in-out infinite;
             }
 
-            /* ============ FULL SCREEN ALARM ============ */
-            .salink-full-screen-alarm {
-                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                width: 100vw; height: 100vh; height: 100dvh;
-                background: #0d1117; z-index: 999999;
-                display: none; flex-direction: column; align-items: center; justify-content: center;
-                padding: 30px 20px; text-align: center;
-                user-select: none; -webkit-user-select: none;
-                touch-action: none; overflow: hidden;
-            }
-            .salink-full-screen-alarm.active { display: flex; animation: salinkFlash 1s ease-in-out infinite; }
-            .salink-full-screen-alarm.fire { --alarm-color: #f85149; }
-            .salink-full-screen-alarm.medical { --alarm-color: #4fc3f7; }
-            .salink-full-screen-alarm.crime { --alarm-color: #f0d080; }
-            .salink-full-screen-alarm.disaster { --alarm-color: #c792ea; }
+            /* ============ FULL SCREEN ALARM ELEMENTS ============ */
             .salink-full-screen-alarm .salink-alarm-badge {
                 position: absolute; top: 30px; left: 50%; transform: translateX(-50%);
                 padding: 6px 20px; background: rgba(248,81,73,0.25);
@@ -658,6 +836,242 @@
         document.head.appendChild(style);
     }
 
+     // ================================================================
+    // ✅ v3.0: GRID BUTTON STATE MACHINE
+    // ================================================================
+    // State: IDLE | TESTING_ACTIVE | EMERGENCY_ACTIVE
+    //
+    // Transisi:
+    // IDLE → TESTING_ACTIVE       (user tap tombol, mode testing)
+    // IDLE → EMERGENCY_ACTIVE     (notif emergency / setelah POSTING)
+    // TESTING_ACTIVE → IDLE       (user tap lagi / auto-stop 20s)
+    // EMERGENCY_ACTIVE → IDLE     (user tap lagi / auto-stop 60s)
+    // TESTING_ACTIVE → EMERGENCY_ACTIVE (upgrade ke emergency mode)
+    // EMERGENCY_ACTIVE → TESTING_ACTIVE (downgrade, tipe berbeda)
+    // ================================================================
+
+    function _startGridButtonAlarm(type, mode, fromBroadcast) {
+        // mode: 'testing' | 'emergency'
+        // fromBroadcast: true kalau dari tab lain (jangan broadcast ulang)
+
+        if (!type || !CONFIG.AUDIO[type]) {
+            logWarn('Invalid type:', type);
+            return;
+        }
+
+        log('START grid button alarm:', type, 'mode:', mode, 'fromBroadcast:', fromBroadcast);
+
+        // Set state
+        state.gridButtonState = (mode === 'emergency') ? 'EMERGENCY_ACTIVE' : 'TESTING_ACTIVE';
+        state.gridButtonAlarmType = type;
+        state.gridButtonAlarmStartTime = Date.now();
+        state.gridButtonMode = mode;
+
+        // Clear timer lama
+        if (state.gridButtonAutoStopTimer) {
+            clearTimeout(state.gridButtonAutoStopTimer);
+            state.gridButtonAutoStopTimer = null;
+        }
+
+        // Set CSS variable untuk warna
+        const color = CONFIG.COLOR[type] || '#f85149';
+        document.documentElement.style.setProperty('--alarm-color', color);
+
+        // Cari tombol grid
+        const btnMap = { fire: 'fireBtn', medical: 'medicalBtn', crime: 'securityBtn', disaster: 'disasterBtn' };
+        const btn = document.getElementById(btnMap[type]);
+
+        if (btn) {
+            btn.classList.add('grid-alarm-active');
+            const st = btn.querySelector('.play-status');
+            if (st) st.textContent = '🔊 Alarm Berbunyi — Tap untuk matikan';
+        } else {
+            log('Button tidak ditemukan untuk type:', type, '(mungkin di halaman tanpa grid)');
+        }
+
+        // Play audio loop
+        playEmergencyLoop(type);
+
+        // Start vibrate loop
+        startVibrateLoop(() => {
+            return state.gridButtonState === 'TESTING_ACTIVE' || state.gridButtonState === 'EMERGENCY_ACTIVE';
+        });
+
+        // ✅ Auto-stop timer
+        // - Testing: 20 detik
+        // - Emergency: 60 detik (3×20s)
+        const autoStopMs = (mode === 'testing')
+            ? CONFIG.TESTING_AUTO_STOP_MS
+            : CONFIG.EMERGENCY_AUTO_STOP_MS;
+
+        state.gridButtonAutoStopTimer = setTimeout(() => {
+            log('AUTO-STOP triggered after', autoStopMs / 1000, 's');
+            dismissGridButtonAlarm(false); // false = auto (bukan user tap)
+        }, autoStopMs);
+
+        // Broadcast ke tab lain
+        if (!fromBroadcast) {
+            broadcastEmergency('grid_alarm_start', { alarmType: type, mode: mode });
+        }
+
+        // Toast
+        if (!fromBroadcast) {
+            if (mode === 'testing') {
+                showToast('🧪 Mode Testing', 'Tap tombol lagi untuk stop — auto-stop ' + (autoStopMs / 1000) + 's', 'fa-flask');
+            }
+            // Emergency mode: tidak ada toast karena sudah ada notif sendiri
+        }
+    }
+
+    function _stopGridButtonAlarmInternal() {
+        if (state.gridButtonState === 'IDLE') return;
+
+        const type = state.gridButtonAlarmType;
+        const btnMap = { fire: 'fireBtn', medical: 'medicalBtn', crime: 'securityBtn', disaster: 'disasterBtn' };
+        const btn = type ? document.getElementById(btnMap[type]) : null;
+
+        if (btn) {
+            btn.classList.remove('grid-alarm-active');
+            const st = btn.querySelector('.play-status');
+            if (st) {
+                // Update status text berdasarkan jumlah emergency aktif
+                const ems = getActiveEmergencies();
+                const count = ems.filter(e => e.type === type).length;
+                st.textContent = count > 0 ? '🔔 ' + count + ' Notifikasi' : '▶ Tap untuk Alarm';
+            }
+        }
+
+        // Stop audio
+        stopEmergencyLoop();
+
+        // Stop vibrate
+        stopVibrateLoop();
+
+        // Clear auto-stop timer
+        if (state.gridButtonAutoStopTimer) {
+            clearTimeout(state.gridButtonAutoStopTimer);
+            state.gridButtonAutoStopTimer = null;
+        }
+
+        // Reset state
+        state.gridButtonState = 'IDLE';
+        state.gridButtonAlarmType = null;
+        state.gridButtonAlarmStartTime = 0;
+        state.gridButtonMode = null;
+    }
+
+    /**
+     * Handle tap tombol grid (dipanggil dari dashboard.html / halaman lain)
+     * - Tap 1x → mulai alarm testing
+     * - Tap 2x → stop alarm
+     * - Tap tipe beda → ganti tipe
+     */
+    function handleGridButtonTap(type) {
+        log('handleGridButtonTap:', type, 'current state:', state.gridButtonState, 'active type:', state.gridButtonAlarmType);
+
+        // CASE 1: IDLE → mulai testing
+        if (state.gridButtonState === 'IDLE') {
+            _startGridButtonAlarm(type, 'testing', false);
+            return;
+        }
+
+        // CASE 2: Aktif dengan TIPE SAMA → dismiss (user tap 2x)
+        if (state.gridButtonState !== 'IDLE' && state.gridButtonAlarmType === type) {
+            log('Same type → dismiss');
+            dismissGridButtonAlarm(true); // true = manual tap
+            return;
+        }
+
+        // CASE 3: Aktif dengan TIPE BEDA → ganti tipe
+        if (state.gridButtonState !== 'IDLE' && state.gridButtonAlarmType !== type) {
+            log('Different type → switch from', state.gridButtonAlarmType, 'to', type);
+            // Stop yang lama
+            _stopGridButtonAlarmInternal();
+            // Mulai yang baru (mode mengikuti state sebelumnya)
+            setTimeout(() => {
+                const newMode = (state.gridButtonMode === 'emergency') ? 'emergency' : 'testing';
+                _startGridButtonAlarm(type, newMode, false);
+            }, 100);
+            return;
+        }
+    }
+
+    /**
+     * Dismiss alarm grid
+     * @param {boolean} userAction - true kalau user tap, false kalau auto-stop
+     */
+    function dismissGridButtonAlarm(userAction) {
+        if (state.gridButtonState === 'IDLE') return;
+
+        log('dismissGridButtonAlarm - userAction:', userAction, 'type:', state.gridButtonAlarmType);
+
+        const type = state.gridButtonAlarmType;
+
+        // Stop internal
+        _stopGridButtonAlarmInternal();
+
+        // Broadcast ke tab lain
+        broadcastEmergency('grid_alarm_stop', { alarmType: type });
+
+        // Toast
+        if (userAction === true) {
+            showToast('✅ Alarm Dimatikan', 'Alarm berhasil dihentikan', 'fa-check-circle');
+        } else if (userAction === false) {
+            // Auto-stop
+            showToast('⏱️ Auto-Stop', 'Alarm berhenti otomatis setelah durasi selesai', 'fa-clock');
+        }
+
+        // Play regular sound sebagai feedback
+        if (userAction === true) {
+            setTimeout(() => playRegularSound(), 200);
+        }
+    }
+
+    /**
+     * Trigger alarm grid setelah POSTING postingan khusus
+     * Mode: emergency (60 detik)
+     */
+    function triggerGridAlarmFromPost(type, isSender) {
+        log('triggerGridAlarmFromPost:', type, 'isSender:', isSender);
+
+        if (!type || !CONFIG.AUDIO[type]) {
+            logWarn('Invalid type for post trigger:', type);
+            return;
+        }
+
+        // Kalau mode standby → full screen alarm (skip grid button)
+        if (isStandbyMode() && !state.fullScreenAlarmActive) {
+            const em = {
+                id: 'post-' + Date.now(),
+                type: type,
+                sender: (state.currentUser && state.currentUser.fullName) || 'Anda',
+                location: isSender ? 'Postingan Anda' : 'Lokasi tidak diketahui',
+                address: '',
+                coords: '',
+                timestamp: Date.now()
+            };
+            showFullScreenAlarm(em);
+            return;
+        }
+
+        // Mode aktif → grid button alarm dengan mode 'emergency'
+        // Kalau ada alarm testing aktif → stop dulu
+        if (state.gridButtonState !== 'IDLE') {
+            _stopGridButtonAlarmInternal();
+        }
+
+        // Start emergency mode
+        _startGridButtonAlarm(type, 'emergency', false);
+
+        // Toast
+        const label = CONFIG.LABELS[type] || 'Darurat';
+        if (isSender) {
+            showToast('✅ ' + label + ' Terkirim', 'Postingan Anda tersebar ke semua user', 'fa-check-circle');
+        } else {
+            showToast('🚨 ' + label, 'Emergency baru terdeteksi', 'fa-exclamation-triangle');
+        }
+    }
+
     // ================================================================
     // FULL SCREEN ALARM
     // ================================================================
@@ -724,14 +1138,18 @@
         if (em.address && em.address !== em.location) {
             addrRow.style.display = 'flex';
             addrEl.textContent = em.address;
-        } else addrRow.style.display = 'none';
+        } else {
+            addrRow.style.display = 'none';
+        }
 
         const coordsRow = document.getElementById('salinkAlarmCoordsRow');
         const coordsEl = document.getElementById('salinkAlarmCoords');
         if (em.coords) {
             coordsRow.style.display = 'flex';
             coordsEl.textContent = em.coords;
-        } else coordsRow.style.display = 'none';
+        } else {
+            coordsRow.style.display = 'none';
+        }
 
         alarm.className = 'salink-full-screen-alarm active ' + cssClass;
         state.fullScreenAlarmActive = true;
@@ -743,26 +1161,65 @@
         startVibrateLoop(() => state.fullScreenAlarmActive);
 
         setupFullScreenAlarmSwipe();
-        if (em.id) { state.readNotifs[em.id] = true; saveReadNotifs(); }
-        log('Full screen alarm ACTIVE:', type);
+
+        if (em.id) {
+            state.readNotifs[em.id] = true;
+            saveReadNotifs();
+        }
+
+        log('Full screen alarm ACTIVE:', type, em.id);
     }
 
     function dismissFullScreenAlarm(userAction) {
+        if (!state.fullScreenAlarmActive) return;
+
         const alarm = document.getElementById('salinkFullScreenAlarm');
-        if (!alarm) return;
-        const emergencyId = alarm.dataset.emergencyId;
+        const emergencyId = alarm ? alarm.dataset.emergencyId : null;
+
         if (emergencyId) dismissEmergency(emergencyId);
-        alarm.classList.remove('active', 'fire', 'medical', 'crime', 'disaster');
-        alarm.dataset.emergencyId = '';
+
+        if (alarm) {
+            alarm.classList.remove('active', 'fire', 'medical', 'crime', 'disaster');
+            alarm.dataset.emergencyId = '';
+        }
+
         document.body.style.overflow = '';
         stopVibrateLoop();
-        stopAllAudio();
+        stopEmergencyLoop();
+        hideFloatingNotification();
+
+        state.fullScreenAlarmActive = false;
+        state.fullScreenAlarmEmergency = null;
+
+        // Broadcast ke tab lain
+        broadcastEmergency('full_screen_dismiss', { id: emergencyId });
+
+        if (userAction !== false) {
+            showToast('✅ Alarm Dimatikan', 'Anda telah mengonfirmasi notifikasi darurat', 'fa-check-circle');
+            setTimeout(() => playRegularSound(), 200);
+        }
+
+        log('Full screen alarm dismissed');
+    }
+
+    function _dismissFullScreenAlarmInternal() {
+        // Internal dismiss tanpa broadcast (untuk terima broadcast dari tab lain)
+        if (!state.fullScreenAlarmActive) return;
+
+        const alarm = document.getElementById('salinkFullScreenAlarm');
+        const emergencyId = alarm ? alarm.dataset.emergencyId : null;
+        if (emergencyId) dismissEmergency(emergencyId);
+
+        if (alarm) {
+            alarm.classList.remove('active', 'fire', 'medical', 'crime', 'disaster');
+            alarm.dataset.emergencyId = '';
+        }
+        document.body.style.overflow = '';
+        stopVibrateLoop();
+        stopEmergencyLoop();
         hideFloatingNotification();
         state.fullScreenAlarmActive = false;
         state.fullScreenAlarmEmergency = null;
-        if (navigator.vibrate) navigator.vibrate(0);
-        if (userAction) showToast('✅ Alarm Dimatikan', 'Anda telah mengonfirmasi notifikasi darurat', 'fa-check-circle');
-        log('Full screen alarm dismissed');
     }
 
     function setupFullScreenAlarmSwipe() {
@@ -784,7 +1241,9 @@
         alarm.addEventListener('touchstart', (e) => {
             if (!state.fullScreenAlarmActive) return;
             const t = e.touches[0];
-            startX = t.clientX; startY = t.clientY; moving = true;
+            startX = t.clientX;
+            startY = t.clientY;
+            moving = true;
         }, { passive: true });
 
         alarm.addEventListener('touchmove', (e) => {
@@ -799,6 +1258,7 @@
             const dx = t.clientX - startX;
             const dy = t.clientY - startY;
             const distance = Math.sqrt(dx * dx + dy * dy);
+
             if (distance < CONFIG.SWIPE_MIN_DISTANCE) return;
 
             let dir = 'up';
@@ -810,6 +1270,7 @@
             setTimeout(() => dismissFullScreenAlarm(true), 150);
         }, { passive: true });
 
+        // Mouse (desktop)
         let md = false, mx = 0, my = 0;
         alarm.addEventListener('mousedown', (e) => {
             if (!state.fullScreenAlarmActive) return;
@@ -828,10 +1289,14 @@
             setTimeout(() => dismissFullScreenAlarm(true), 150);
         });
 
-        document.querySelector('#salinkFullScreenAlarm .salink-alarm-icon-wrapper')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (state.fullScreenAlarmActive) dismissFullScreenAlarm(true);
-        });
+        // Tap icon wrapper juga dismiss
+        const iconWrapper = document.querySelector('#salinkFullScreenAlarm .salink-alarm-icon-wrapper');
+        if (iconWrapper) {
+            iconWrapper.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (state.fullScreenAlarmActive) dismissFullScreenAlarm(true);
+            });
+        }
     }
 
     // ================================================================
@@ -856,60 +1321,49 @@
         document.body.appendChild(div);
     }
 
-    function showFloatingEmergency(em) {
-        ensureFloatingNotificationDOM();
-        const type = em.type || 'fire';
-        const icon = CONFIG.ICONS[type] || '🚨';
-        const label = CONFIG.LABELS[type] || 'DARURAT';
-
-        showFloatingNotification('emergency',
-            `${icon} ${label}`,
-            `${em.sender || 'User'} melaporkan darurat`,
-            `📍 ${em.location || 'Lokasi tidak diketahui'}`,
-            'Lihat',
-            () => {
-                if (em.id) {
-                    window.location.href = 'detail-emergency.html?id=' + encodeURIComponent(em.id);
-                }
-            }
-        );
-
-        animateEmergencyButton(type);
-        startButtonLoop(type);
-
-        if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 1000]);
-        showToast(`🚨 ${label}`, `${em.sender} melaporkan darurat!`, 'fa-exclamation-triangle');
-    }
-
-    function dismissFloatingEmergency() {
-        stopButtonLoop();
-        stopEmergencyButtonAnimation();
-        hideFloatingNotification();
-        if (navigator.vibrate) navigator.vibrate(0);
-    }
-
     function showFloatingNotification(type, title, message, subtitle, actionText, actionCallback) {
         ensureFloatingNotificationDOM();
         const notif = document.getElementById('salinkFloatingNotification');
         const icon = document.getElementById('salinkFloatingIcon');
         if (!notif) return;
+
         icon.className = 'salink-notif-icon ' + type;
         if (type === 'emergency') icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
         else if (type === 'install') icon.innerHTML = '<i class="fas fa-download"></i>';
         else icon.innerHTML = '<i class="fas fa-bell"></i>';
+
         document.getElementById('salinkFloatingTitle').textContent = title;
         document.getElementById('salinkFloatingMessage').textContent = message;
-        document.getElementById('salinkFloatingSubtitle').textContent = subtitle || new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+        document.getElementById('salinkFloatingSubtitle').textContent = subtitle ||
+            new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
         const actionBtn = document.getElementById('salinkFloatingAction');
         if (actionText && actionCallback) {
             actionBtn.style.display = 'block';
             actionBtn.textContent = actionText;
-            actionBtn.onclick = (e) => { e.stopPropagation(); actionCallback(); };
-        } else actionBtn.style.display = 'none';
-        document.getElementById('salinkFloatingClose').onclick = (e) => { e.stopPropagation(); hideFloatingNotification(); };
-        if (type === 'emergency') notif.classList.add('emergency-notif');
-        else notif.classList.remove('emergency-notif');
-        notif.onclick = () => { if (actionCallback) actionCallback(); };
+            actionBtn.onclick = (e) => {
+                e.stopPropagation();
+                actionCallback();
+            };
+        } else {
+            actionBtn.style.display = 'none';
+        }
+
+        document.getElementById('salinkFloatingClose').onclick = (e) => {
+            e.stopPropagation();
+            hideFloatingNotification();
+        };
+
+        if (type === 'emergency') {
+            notif.classList.add('emergency-notif');
+        } else {
+            notif.classList.remove('emergency-notif');
+        }
+
+        notif.onclick = () => {
+            if (actionCallback) actionCallback();
+        };
+
         notif.classList.add('active');
     }
 
@@ -922,207 +1376,46 @@
         }
     }
 
-    // ================================================================
-    // BUTTON LOOP (untuk tombol grid yang aktif)
-    // ================================================================
-    function startButtonLoop(type) {
-        stopButtonLoop();
-        const url = CONFIG.AUDIO[type];
-        if (!url) return;
-        try {
-            unlockAudio();
-            const cached = state.audioCache[type];
-            const audio = cached || new Audio(url);
-            audio.currentTime = 0;
-            audio.volume = 1.0;
-            audio.loop = true;
-            state.emergencyAudioLoop = audio;
-            audio.play().catch(() => {});
-        } catch(e) {}
-    }
+    function showFloatingEmergency(em) {
+        const type = em.type || 'fire';
+        const icon = CONFIG.ICONS[type] || '🚨';
+        const label = CONFIG.LABELS[type] || 'DARURAT';
 
-    function stopButtonLoop() {
-        stopEmergencyLoop();
-    }
-
-    // ================================================================
-    // GRID BUTTON ALARM — v2.1 dengan FIX #1
-    // ================================================================
-
-    // ✅ v2.1: Tap tombol → START/STOP alarm testing (INSTAN)
-    function handleGridButtonTap(type) {
-        log('handleGridButtonTap:', type, '| active:', state.gridButtonAlarmActive, '| type:', state.gridButtonAlarmType);
-
-        // ================================================================
-        // FIX #1: Kalau ada alarm aktif (apapun tipenya) → STOP INSTAN
-        // ================================================================
-        if (state.gridButtonAlarmActive) {
-            // Tap apapun → langsung stop. User harus tap lagi untuk play tipe baru.
-            dismissGridButtonAlarm();
-            return;
-        }
-
-        // ================================================================
-        // START alarm baru
-        // ================================================================
-        state.gridButtonAlarmActive = true;
-        state.gridButtonAlarmType = type;
-
-        // Set CSS variable untuk warna
-        const color = CONFIG.COLOR[type] || '#f85149';
-        document.documentElement.style.setProperty('--alarm-color', color);
-
-        // Cari tombol grid yang sesuai
-        const btnMap = {
-            fire: 'fireBtn',
-            medical: 'medicalBtn',
-            crime: 'securityBtn',
-            disaster: 'disasterBtn'
-        };
-        const btnId = btnMap[type];
-        const btn = document.getElementById(btnId);
-
-        if (btn) {
-            btn.classList.add('grid-alarm-active');
-            const st = btn.querySelector('.play-status');
-            if (st) st.textContent = '🔊 Alarm Berbunyi — Tap untuk matikan';
-        }
-
-        // ✅ v2.1: Stop semua audio yang mungkin masih jalan dulu
-        stopAllAudio();
-
-        // Loop audio
-        playEmergencyLoop(type);
-
-        // Loop vibrate
-        startVibrateLoop(() => state.gridButtonAlarmActive);
-
-        // Toast info
-        showToast('🧪 Mode Testing', 'Tap tombol lagi untuk mematikan alarm', 'fa-flask');
-
-        log('Grid alarm STARTED:', type);
-    }
-
-    // ✅ v2.1: Dismiss alarm testing — INSTAN STOP
-    function dismissGridButtonAlarm() {
-        if (!state.gridButtonAlarmActive) return;
-        log('dismissGridButtonAlarm:', state.gridButtonAlarmType);
-
-        const type = state.gridButtonAlarmType;
-        const btnMap = {
-            fire: 'fireBtn',
-            medical: 'medicalBtn',
-            crime: 'securityBtn',
-            disaster: 'disasterBtn'
-        };
-        const btnId = btnMap[type];
-        const btn = document.getElementById(btnId);
-
-        if (btn) {
-            btn.classList.remove('grid-alarm-active');
-            const st = btn.querySelector('.play-status');
-            if (st) st.textContent = '▶ Tap untuk Alarm';
-        }
-
-        // ✅ v2.1: Stop SEMUA audio + vibrate SEKALIGUS
-        stopAllAudio();
-        stopVibrateLoop();
-
-        state.gridButtonAlarmActive = false;
-        state.gridButtonAlarmType = null;
-
-        if (navigator.vibrate) navigator.vibrate(0);
-
-        showToast('✅ Alarm Dimatikan', 'Mode testing dihentikan', 'fa-check-circle');
-
-        log('Grid alarm STOPPED');
-    }
-
-    // ✅ v2.1: Trigger animasi tombol grid setelah POSTING postingan khusus
-    function triggerGridAlarmFromPost(type, isSender) {
-        log('triggerGridAlarmFromPost:', type, 'isSender:', isSender);
-
-        const color = CONFIG.COLOR[type] || '#f85149';
-        document.documentElement.style.setProperty('--alarm-color', color);
-
-        const btnMap = {
-            fire: 'fireBtn',
-            medical: 'medicalBtn',
-            crime: 'securityBtn',
-            disaster: 'disasterBtn'
-        };
-        const btnId = btnMap[type];
-        const btn = document.getElementById(btnId);
-
-        // Kalau mode standby → full screen alarm
-        if (isStandbyMode() && !state.fullScreenAlarmActive) {
-            const em = {
-                id: 'post-' + Date.now(),
-                type: type,
-                sender: (state.currentUser && state.currentUser.fullName) || 'Anda',
-                location: 'Postingan Anda',
-                address: '',
-                coords: '',
-                timestamp: Date.now()
-            };
-            showFullScreenAlarm(em);
-            return;
-        }
-
-        // Mode aktif → tombol grid animasi + audio + vibrate
-        if (btn) {
-            // ✅ v2.1: Kalau sudah aktif → stop dulu
-            if (state.gridButtonAlarmActive) {
-                dismissGridButtonAlarm();
+        showFloatingNotification('emergency',
+            icon + ' ' + label,
+            (em.sender || 'User') + ' melaporkan darurat',
+            '📍 ' + (em.location || 'Lokasi tidak diketahui'),
+            'Lihat',
+            () => {
+                if (em.id) {
+                    window.location.href = 'detail-emergency.html?id=' + encodeURIComponent(em.id);
+                }
             }
+        );
 
-            state.gridButtonAlarmActive = true;
-            state.gridButtonAlarmType = type;
+        if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 1000]);
+        showToast('🚨 ' + label, (em.sender || 'User') + ' melaporkan darurat!', 'fa-exclamation-triangle');
+    }
 
-            btn.classList.add('grid-alarm-active');
-            const st = btn.querySelector('.play-status');
-            if (st) st.textContent = '🔊 Alarm Berbunyi — Tap untuk matikan';
+    function dismissFloatingEmergency() {
+        stopButtonLoopInternal();
+        hideFloatingNotification();
+        if (navigator.vibrate) navigator.vibrate(0);
+    }
 
-            stopAllAudio();
-            playEmergencyLoop(type);
-            startVibrateLoop(() => state.gridButtonAlarmActive);
-
-            const label = CONFIG.LABELS[type] || 'Darurat';
-            showToast(
-                isSender ? `✅ ${label} Terkirim` : `🚨 ${label}`,
-                isSender ? 'Postingan Anda tersebar ke semua user' : 'Emergency baru terdeteksi',
-                isSender ? 'fa-check-circle' : 'fa-exclamation-triangle'
-            );
+    // Helper: cleanup button loop (legacy compat)
+    function stopButtonLoopInternal() {
+        if (state.gridButtonState !== 'IDLE') {
+            _stopGridButtonAlarmInternal();
         }
-    }
-
-    // ================================================================
-    // BUTTON ANIMATION
-    // ================================================================
-    function animateEmergencyButton(type) {
-        const btnMap = {
-            fire: 'fireBtn',
-            medical: 'medicalBtn',
-            crime: 'securityBtn',
-            disaster: 'disasterBtn'
-        };
-        const btn = document.getElementById(btnMap[type]);
-        if (!btn) return;
-        btn.classList.add('new-emergency', 'has-notification');
-        const st = btn.querySelector('.play-status');
-        if (st) st.textContent = '🔔 Ada Darurat! Tap untuk matikan';
-    }
-
-    function stopEmergencyButtonAnimation() {
-        document.querySelectorAll('.emergency-btn').forEach(btn => {
-            btn.classList.remove('new-emergency', 'playing', 'grid-alarm-active');
-        });
     }
 
     // ================================================================
     // TOAST
     // ================================================================
-    function showToast(title, message, icon = 'fa-info-circle') {
+    function showToast(title, message, icon) {
+        icon = icon || 'fa-info-circle';
+
         let container = document.getElementById('toastContainer');
         if (!container) {
             container = document.createElement('div');
@@ -1130,31 +1423,44 @@
             container.className = 'toast-container';
             document.body.appendChild(container);
         }
+
+        // Remove existing toasts
         container.querySelectorAll('.toast').forEach(t => t.remove());
+
         const toast = document.createElement('div');
         toast.className = 'toast active';
-        toast.innerHTML = `
-            <div class="toast-icon"><i class="fas ${icon}"></i></div>
-            <div class="toast-content">
-                <div class="toast-title">${escapeHTML(title)}</div>
-                <div class="toast-message">${escapeHTML(message)}</div>
-            </div>
-            <button class="toast-close"><i class="fas fa-times"></i></button>
-        `;
-        toast.querySelector('.toast-close').onclick = () => { toast.classList.remove('active'); setTimeout(() => toast.remove(), 400); };
+        toast.innerHTML =
+            '<div class="toast-icon"><i class="fas ' + icon + '"></i></div>' +
+            '<div class="toast-content">' +
+                '<div class="toast-title">' + escapeHTML(title) + '</div>' +
+                '<div class="toast-message">' + escapeHTML(message) + '</div>' +
+            '</div>' +
+            '<button class="toast-close"><i class="fas fa-times"></i></button>';
+
+        toast.querySelector('.toast-close').onclick = () => {
+            toast.classList.remove('active');
+            setTimeout(() => toast.remove(), 400);
+        };
+
         container.appendChild(toast);
-        setTimeout(() => { toast.classList.remove('active'); setTimeout(() => toast.remove(), 400); }, 5000);
+        setTimeout(() => {
+            toast.classList.remove('active');
+            setTimeout(() => toast.remove(), 400);
+        }, 5000);
     }
 
     // ================================================================
     // API CALL
     // ================================================================
-    async function apiCall(action, data = {}) {
+    async function apiCall(action, data) {
+        data = data || {};
         try {
             if (action.indexOf('get_') === 0) {
                 const params = new URLSearchParams(Object.assign({ action: action, timestamp: Date.now() }, data));
                 const response = await fetch(CONFIG.API_URL + '?' + params.toString(), {
-                    method: 'GET', headers: { 'Accept': 'application/json' }, cache: 'no-store'
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-store'
                 });
                 if (!response.ok) throw new Error('HTTP ' + response.status);
                 return await response.json();
@@ -1179,10 +1485,14 @@
 
     function adaptNotification(n) {
         return {
-            id: n.id || 'notif-' + Date.now(), type: n.type || 'info',
-            title: n.title || 'Notifikasi', message: n.message || n.text || '',
-            sender: n.sender || 'Sistem', senderUsername: n.senderUsername || '',
-            link: n.link || '', postId: n.postId || '',
+            id: n.id || 'notif-' + Date.now(),
+            type: n.type || 'info',
+            title: n.title || 'Notifikasi',
+            message: n.message || n.text || '',
+            sender: n.sender || 'Sistem',
+            senderUsername: n.senderUsername || '',
+            link: n.link || '',
+            postId: n.postId || '',
             timestamp: n.timestamp ? new Date(n.timestamp).getTime() : Date.now(),
             read: n.read === 'TRUE' || n.read === true || n.read === 'true',
             soundKey: n.soundKey || ''
@@ -1190,9 +1500,10 @@
     }
 
     // ================================================================
-    // TRIGGER EMERGENCY (PILIH MODE)
+    // TRIGGER EMERGENCY FROM NOTIFICATION
     // ================================================================
     function triggerEmergencyFromNotification(notif) {
+        if (!notif) return;
         if (isDismissed(notif.id)) return;
 
         const em = {
@@ -1203,31 +1514,40 @@
             location: notif.message || 'Lokasi tidak diketahui',
             address: notif.message || '',
             text: notif.message || '',
-            mapsURL: '', coords: '',
+            mapsURL: '',
+            coords: '',
             timestamp: notif.timestamp,
             expiresAt: notif.timestamp + CONFIG.EMERGENCY_DURATION
         };
 
+        // Simpan ke localStorage
         let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
         if (!ems.find(e => e.id === em.id)) {
             ems.unshift(em);
-            try { localStorage.setItem('salink_emergencies', JSON.stringify(ems)); } catch(e) {}
+            try {
+                localStorage.setItem('salink_emergencies', JSON.stringify(ems));
+            } catch(e) {}
         }
 
+        // ✅ PILIH MODE
         if (isStandbyMode()) {
             log('STANDBY → full screen alarm');
             showFullScreenAlarm(em);
         } else {
             log('AKTIF → floating + grid alarm');
+            // Tampilkan floating notif
             showFloatingEmergency(em);
+            // Trigger grid alarm mode emergency (60 detik)
             triggerGridAlarmFromPost(notif.type, false);
         }
     }
 
     function detectNewEmergencyNotifications(notifs) {
         if (!notifs || notifs.length === 0) return null;
-        const lastCheck = parseInt(localStorage.getItem('salink_last_emergency_check') || '0');
+
+        const lastCheck = parseInt(localStorage.getItem('salink_last_emergency_check_global') || '0');
         const now = Date.now();
+
         const newEmergencyNotifs = notifs.filter(n => {
             const isEmergencyType = ['fire', 'medical', 'crime', 'disaster'].indexOf(n.type) !== -1;
             if (!isEmergencyType) return false;
@@ -1235,19 +1555,24 @@
             if (isDismissed(n.id)) return false;
             return (n.timestamp || 0) > lastCheck;
         });
+
         if (newEmergencyNotifs.length === 0) {
-            localStorage.setItem('salink_last_emergency_check', String(now));
+            localStorage.setItem('salink_last_emergency_check_global', String(now));
             return null;
         }
+
         newEmergencyNotifs.sort((a, b) => b.timestamp - a.timestamp);
         const latest = newEmergencyNotifs[0];
+
+        // Skip kalau user sendiri yang posting
         if (state.currentUser && latest.senderUsername === state.currentUser.username) {
             state.readNotifs[latest.id] = true;
             saveReadNotifs();
-            localStorage.setItem('salink_last_emergency_check', String(now));
+            localStorage.setItem('salink_last_emergency_check_global', String(now));
             return null;
         }
-        localStorage.setItem('salink_last_emergency_check', String(now));
+
+        localStorage.setItem('salink_last_emergency_check_global', String(now));
         return latest;
     }
 
@@ -1256,12 +1581,19 @@
     // ================================================================
     function startEmergencyPolling() {
         if (state.emergencyPollTimer) clearInterval(state.emergencyPollTimer);
+
+        // Cek langsung saat init
         checkEmergencyNow();
+
         state.emergencyPollTimer = setInterval(() => {
+            // Skip saat alarm aktif
             if (state.fullScreenAlarmActive) return;
+            if (state.gridButtonState === 'EMERGENCY_ACTIVE') return;
             if (document.hidden) return;
             checkEmergencyNow();
         }, CONFIG.POLL_INTERVAL);
+
+        log('Emergency polling started (' + (CONFIG.POLL_INTERVAL / 1000) + 's)');
     }
 
     async function checkEmergencyNow() {
@@ -1269,9 +1601,14 @@
             const notifs = await apiGetNotifications();
             if (notifs && notifs.length > 0) {
                 const newEmergency = detectNewEmergencyNotifications(notifs);
-                if (newEmergency) triggerEmergencyFromNotification(newEmergency);
+                if (newEmergency) {
+                    log('New emergency detected:', newEmergency.type, newEmergency.id);
+                    triggerEmergencyFromNotification(newEmergency);
+                }
             }
-        } catch(e) {}
+        } catch(e) {
+            logWarn('Polling error:', e.message);
+        }
     }
 
     // ================================================================
@@ -1281,6 +1618,8 @@
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) {
                 resetIdleTimer();
+
+                // Cek emergency yang belum di-dismiss saat tab kembali visible
                 const ems = getActiveEmergencies();
                 const undismissed = ems.find(e => !isDismissed(e.id) && !state.readNotifs[e.id]);
                 if (undismissed && !state.fullScreenAlarmActive) {
@@ -1293,7 +1632,7 @@
     }
 
     // ================================================================
-    // EMERGENCY BUTTON HANDLER
+    // EMERGENCY BUTTONS SETUP
     // ================================================================
     function setupEmergencyButtons() {
         const btnMap = {
@@ -1303,10 +1642,12 @@
             'disasterBtn': 'disaster'
         };
 
+        let count = 0;
         Object.keys(btnMap).forEach(btnId => {
             const btn = document.getElementById(btnId);
             if (!btn) return;
-            // Skip kalau sudah ada handler
+
+            // Skip kalau sudah ada handler dari dashboard.html
             if (btn._salinkEmergencySetup) return;
             btn._salinkEmergencySetup = true;
 
@@ -1314,6 +1655,7 @@
                 e.preventDefault();
                 e.stopPropagation();
 
+                // Cek login
                 if (localStorage.getItem('salink_logged_in') !== 'true') {
                     showToast('🔒 Login Diperlukan', 'Silakan login dulu untuk mengakses alarm', 'fa-lock');
                     return;
@@ -1327,12 +1669,14 @@
                     return;
                 }
 
-                // ✅ v2.1: Tap apapun → handleGridButtonTap yang nge-cek aktif/tidak
+                // Handle tap grid button (state machine)
                 handleGridButtonTap(type);
             });
+
+            count++;
         });
 
-        log('Emergency buttons setup:', Object.keys(btnMap).filter(id => document.getElementById(id)).length);
+        log('Emergency buttons setup:', count);
     }
 
     // ================================================================
@@ -1344,38 +1688,57 @@
 
         log('Initializing...');
 
+        // Load user
         try {
             const userData = localStorage.getItem('salink_user');
             if (userData) state.currentUser = JSON.parse(userData);
         } catch(e) {}
 
+        // Cek login
         const isLoggedIn = localStorage.getItem('salink_logged_in') === 'true';
         if (!isLoggedIn || !state.currentUser) {
-            log('User belum login, skip emergency polling');
+            log('User belum login — skip emergency polling');
             return;
         }
 
+        // Inject styles
         injectStyles();
+
+        // Load storage
         loadReadNotifs();
         loadDismissed();
+
+        // Preload audio
         preloadAllAudio();
+
+        // Setup detection
         setupIdleDetection();
         setupVisibilityDetection();
+
+        // Setup cross-tab sync
+        setupCrossTabSync();
+
+        // Setup emergency buttons
         setupEmergencyButtons();
+
+        // Start polling
         startEmergencyPolling();
 
-        state.lastNotifCheck = parseInt(localStorage.getItem('salink_last_emergency_check') || '0');
+        state.lastNotifCheck = parseInt(localStorage.getItem('salink_last_emergency_check_global') || '0');
 
-        log('✅ Initialized — polling every', CONFIG.POLL_INTERVAL / 1000, 's');
+        log('✅ Initialized — polling every ' + (CONFIG.POLL_INTERVAL / 1000) + 's');
+        log('   Testing auto-stop: ' + (CONFIG.TESTING_AUTO_STOP_MS / 1000) + 's');
+        log('   Emergency auto-stop: ' + (CONFIG.EMERGENCY_AUTO_STOP_MS / 1000) + 's');
     }
 
+    // Auto-init saat DOM ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
         init();
     }
 
-    // Re-setup saat DOM berubah (untuk SPA)
+    // Re-setup saat DOM berubah (untuk SPA / dynamic content)
     let setupTimeout = null;
     const observer = new MutationObserver(() => {
         if (setupTimeout) clearTimeout(setupTimeout);
@@ -1393,23 +1756,31 @@
     // EXPOSE PUBLIC API
     // ================================================================
     window.SalinkEmergency = {
+        // Core
         init: init,
         showAlarm: showFullScreenAlarm,
         dismissAlarm: dismissFullScreenAlarm,
         showFloating: showFloatingEmergency,
         dismissFloating: dismissFloatingEmergency,
+
+        // Grid button
         handleGridButtonTap: handleGridButtonTap,
         dismissGridButtonAlarm: dismissGridButtonAlarm,
         triggerGridAlarmFromPost: triggerGridAlarmFromPost,
+
+        // Audio
         playRegular: playRegularSound,
         playEmergency: playEmergencyLoop,
-        stopEmergency: stopAllAudio,
+        stopEmergency: stopEmergencyLoop,
+
+        // Utils
         isStandbyMode: isStandbyMode,
         config: CONFIG,
         state: state
     };
 
-    log('Script loaded. Public API: window.SalinkEmergency');
-    log('Grid alarm: window.SalinkEmergency.handleGridButtonTap(type)');
-    log('Trigger post: window.SalinkEmergency.triggerGridAlarmFromPost(type)');
+    log('✅ Script loaded — Public API: window.SalinkEmergency');
+    log('   Grid tap: SalinkEmergency.handleGridButtonTap(type)');
+    log('   Post trigger: SalinkEmergency.triggerGridAlarmFromPost(type, isSender)');
+    log('   Dismiss: SalinkEmergency.dismissGridButtonAlarm(true)');
 })();
