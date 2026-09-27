@@ -15,6 +15,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <!-- Google Drive API -->
+    <script src="https://apis.google.com/js/api.js" async defer></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
 
     <style>
         /* SALINK DASHBOARD v4.6 — CSS UNCHANGED */
@@ -1193,16 +1196,15 @@
 
         <script>
 /* ====================================================================
- * SALINK DASHBOARD v5.0 — FINAL (5 PATCH FIX)
+ * SALINK DASHBOARD v6.0 — GOOGLE DRIVE INTEGRATION
  * ====================================================================
- * PATCH YANG DITERAPKAN:
- * ✅ PATCH 1: Tambah safeSavePosts() + getMediaFromStore() (yang HILANG)
- * ✅ PATCH 2: Replace setupPostInput() — tanpa cloneNode()
- * ✅ PATCH 3: Replace applyPreviewMode() — force validatePost()
- * ✅ PATCH 4: Replace getStorageUsage() — limit 5 MB (bukan 500 MB)
- * ✅ PATCH 5: Tambah auto-cleanup 30 detik
+ * FITUR:
+ * ✅ 5 PATCH LAMA (safeSavePosts, setupPostInput, applyPreviewMode,
+ *    getStorageUsage, auto-cleanup)
+ * ✅ 8 PATCH BARU (Google Drive upload & view-only)
  *
- * SISANYA TIDAK DIUBAH — semua fitur tetap utuh.
+ * Client ID : 477566648959-te3eq95b300121kuleuesbiqqdqkfc8v.apps.googleusercontent.com
+ * Folder ID : 1XIfWFwO20ehK6_R3SG2echVkevugpm9w
  * ==================================================================== */
 
 // ====================================================================
@@ -1276,6 +1278,21 @@ const audioCache = {};
 let _audioContext = null;
 let _audioUnlocked = false;
 let sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}');
+
+// ====================================================================
+// 🌐 GOOGLE DRIVE CONFIG
+// ====================================================================
+const GDRIVE_CONFIG = {
+    CLIENT_ID: '477566648959-te3eq95b300121kuleuesbiqqdqkfc8v.apps.googleusercontent.com',
+    FOLDER_ID: '1XIfWFwO20ehK6_R3SG2echVkevugpm9w',
+    SCOPES: 'https://www.googleapis.com/auth/drive.file',
+    DISCOVERY_DOCS: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest']
+};
+
+let gdriveTokenClient = null;
+let gdriveAccessToken = null;
+let gdriveTokenExpiresAt = 0;
+let gdriveReady = false;
 
 // ====================================================================
 // 3. AUDIO SYSTEM
@@ -1467,6 +1484,11 @@ function adaptPost(p) {
         userGender: p.userGender || 'male', userProfilePic: p.userProfilePic || '',
         text: p.text || '', mediaType: p.mediaType || '', mediaData: p.mediaData || '',
         mediaId: p.mediaId || '', mediaThumbnail: p.mediaThumbnail || '',
+        // ✅ Google Drive fields
+        gdriveId: p.gdriveId || '',
+        gdriveImageUrl: p.gdriveImageUrl || '',
+        gdriveVideoEmbed: p.gdriveVideoEmbed || '',
+        gdriveThumbnail: p.gdriveThumbnail || '',
         timestamp: ts, likes: p.likes || '[]', comments: p.comments || '[]',
         viewerCount: parseInt(p.viewerCount || 0, 10) || 0,
         isSpecial: p.isSpecial === 'TRUE' || p.isSpecial === true || p.isSpecial === 'true',
@@ -1740,7 +1762,7 @@ async function ambilLokasiSaya() {
             const nominatimUrl = `${NOMINATIM_URL}?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=id`;
             const response = await fetch(nominatimUrl, {
                 method: 'GET',
-                headers: { 'User-Agent': 'SALINK-Emergency-App/5.0' }
+                headers: { 'User-Agent': 'SALINK-Emergency-App/6.0' }
             });
             if (response.ok) {
                 const data = await response.json();
@@ -1782,7 +1804,190 @@ async function ambilLokasiSaya() {
 }
 
 // ====================================================================
-// 13. API CALLS
+// 13. GOOGLE DRIVE MODULE
+// ====================================================================
+function initGoogleDrive() {
+    return new Promise((resolve, reject) => {
+        if (typeof gapi === 'undefined' || typeof google === 'undefined') {
+            console.warn('⚠️ [GDrive] Google API belum loaded');
+            reject(new Error('Google API not loaded'));
+            return;
+        }
+
+        gapi.load('client', async () => {
+            try {
+                await gapi.client.init({
+                    discoveryDocs: GDRIVE_CONFIG.DISCOVERY_DOCS
+                });
+
+                gdriveTokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: GDRIVE_CONFIG.CLIENT_ID,
+                    scope: GDRIVE_CONFIG.SCOPES,
+                    callback: (tokenResponse) => {
+                        if (tokenResponse && tokenResponse.access_token) {
+                            gdriveAccessToken = tokenResponse.access_token;
+                            gdriveTokenExpiresAt = Date.now() + (tokenResponse.expires_in * 1000);
+                            console.log('✅ [GDrive] Token acquired');
+                        }
+                    },
+                    error_callback: (err) => {
+                        console.error('❌ [GDrive] Token error:', err);
+                    }
+                });
+
+                gdriveReady = true;
+                console.log('✅ [GDrive] Initialized');
+                resolve(true);
+            } catch (err) {
+                console.error('❌ [GDrive] Init error:', err);
+                reject(err);
+            }
+        });
+    });
+}
+
+function requestGDriveToken() {
+    return new Promise((resolve, reject) => {
+        if (gdriveAccessToken && Date.now() < gdriveTokenExpiresAt - 60000) {
+            resolve(gdriveAccessToken);
+            return;
+        }
+
+        if (!gdriveTokenClient) {
+            reject(new Error('Token client belum siap'));
+            return;
+        }
+
+        gdriveTokenClient.callback = (tokenResponse) => {
+            if (tokenResponse && tokenResponse.access_token) {
+                gdriveAccessToken = tokenResponse.access_token;
+                gdriveTokenExpiresAt = Date.now() + (tokenResponse.expires_in * 1000);
+                console.log('✅ [GDrive] Token granted');
+                resolve(gdriveAccessToken);
+            } else {
+                reject(new Error('Token tidak diterima'));
+            }
+        };
+
+        try {
+            gdriveTokenClient.requestAccessToken({ prompt: '' });
+        } catch (err) {
+            reject(err);
+        }
+    });
+}
+
+async function uploadToGDrive(file) {
+    try {
+        const token = await requestGDriveToken();
+
+        const metadata = {
+            name: 'SALINK_' + Date.now() + '_' + file.name,
+            mimeType: file.type,
+            parents: [GDRIVE_CONFIG.FOLDER_ID]
+        };
+
+        const boundary = '-------314159265358979323846';
+        const delimiter = "\r\n--" + boundary + "\r\n";
+        const close_delim = "\r\n--" + boundary + "--";
+
+        const metadataStr = JSON.stringify(metadata);
+        const fileBuffer = await file.arrayBuffer();
+
+        const bodyParts = [
+            delimiter,
+            'Content-Type: application/json\r\n\r\n',
+            metadataStr,
+            delimiter,
+            'Content-Type: ' + file.type + '\r\n\r\n'
+        ];
+
+        const bodyHead = new Blob(bodyParts, { type: 'text/plain' });
+        const bodyTail = new Blob([close_delim], { type: 'text/plain' });
+        const body = new Blob([bodyHead, fileBuffer, bodyTail]);
+
+        const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink,thumbnailLink', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'multipart/related; boundary="' + boundary + '"'
+            },
+            body: body
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error('Upload failed: ' + response.status + ' — ' + errText);
+        }
+
+        const result = await response.json();
+        console.log('✅ [GDrive] Upload success:', result.id);
+
+        await setViewOnlyPermission(result.id, token);
+
+        return {
+            id: result.id,
+            name: result.name,
+            viewLink: result.webViewLink,
+            directLink: 'https://lh3.googleusercontent.com/d/' + result.id,
+            thumbnail: result.thumbnailLink || '',
+            imageUrl: 'https://lh3.googleusercontent.com/d/' + result.id + '=w1000',
+            videoUrl: 'https://drive.google.com/file/d/' + result.id + '/preview',
+            videoEmbed: 'https://drive.google.com/file/d/' + result.id + '/preview'
+        };
+    } catch (err) {
+        console.error('❌ [GDrive] Upload error:', err);
+        throw err;
+    }
+}
+
+async function setViewOnlyPermission(fileId, token) {
+    try {
+        const response = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '/permissions', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                role: 'reader',
+                type: 'anyone',
+                allowFileDiscovery: false
+            })
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            console.warn('⚠️ [GDrive] Permission warning:', errText);
+        } else {
+            console.log('✅ [GDrive] Permission set: viewer only');
+        }
+    } catch (err) {
+        console.warn('⚠️ [GDrive] Permission error:', err.message);
+    }
+}
+
+async function deleteFromGDrive(fileId) {
+    if (!fileId) return false;
+    try {
+        const token = await requestGDriveToken();
+        const response = await fetch('https://www.googleapis.com/drive/v3/files/' + fileId, {
+            method: 'DELETE',
+            headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (response.ok || response.status === 204) {
+            console.log('✅ [GDrive] File deleted:', fileId);
+            return true;
+        }
+        return false;
+    } catch (err) {
+        console.warn('⚠️ [GDrive] Delete error:', err.message);
+        return false;
+    }
+}
+
+// ====================================================================
+// 14. API CALLS
 // ====================================================================
 async function apiCall(action, data) {
     data = data || {};
@@ -1841,6 +2046,10 @@ async function apiSavePost(postData) {
         text: postData.text || '',
         mediaType: postData.mediaType || '',
         mediaData: postData.mediaData || '',
+        gdriveId: postData.gdriveId || '',
+        gdriveImageUrl: postData.gdriveImageUrl || '',
+        gdriveVideoEmbed: postData.gdriveVideoEmbed || '',
+        gdriveThumbnail: postData.gdriveThumbnail || '',
         timestamp: new Date(postData.timestamp).toISOString(),
         likes: '[]',
         comments: '[]',
@@ -1915,7 +2124,7 @@ async function incrementViewerCount(postId) {
 }
 
 // ====================================================================
-// 14. CROSS-TAB SYNC
+// 15. CROSS-TAB SYNC
 // ====================================================================
 let syncChannel = null;
 try {
@@ -1977,15 +2186,13 @@ function loadPostsFromStorage() {
 }
 
 // ====================================================================
-// ✅ PATCH 1: HELPER YANG HILANG — WAJIB ADA!
+// 16. ✅ HELPER: safeSavePosts + getMediaFromStore
 // ====================================================================
 function safeSavePosts(postsArray) {
     try {
-        // Buat versi RINGAN: buang base64 dari salink_posts
         const lightPosts = postsArray.map(p => {
             if (!p) return p;
             const copy = Object.assign({}, p);
-            // Kalau punya mediaId, base64 sudah ada di salink_post_media
             if (copy.mediaId) {
                 copy.mediaData = '';
             }
@@ -2023,8 +2230,26 @@ function getMediaFromStore(mediaId, fallbackData) {
     return fallbackData || '';
 }
 
+// Helper: get media URL dari post (GDrive prioritas, fallback lokal)
+function getMediaUrlFromPost(post) {
+    if (!post) return '';
+    // Prioritas 1: Google Drive
+    if (post.gdriveId) {
+        if (post.mediaType === 'image') {
+            return post.gdriveImageUrl || ('https://lh3.googleusercontent.com/d/' + post.gdriveId + '=w1000');
+        } else if (post.mediaType === 'video') {
+            return post.gdriveVideoEmbed || ('https://drive.google.com/file/d/' + post.gdriveId + '/preview');
+        }
+    }
+    // Prioritas 2: local media store
+    if (post.mediaId) {
+        return getMediaFromStore(post.mediaId, post.mediaData);
+    }
+    return post.mediaData || '';
+}
+
 // ====================================================================
-// 15. CENTRAL DELETE
+// 17. CENTRAL DELETE
 // ====================================================================
 let pendingDelete = null;
 function requestDelete(type, id, description) {
@@ -2052,6 +2277,12 @@ async function confirmDeleteNow() {
     showSyncIndicator();
     try {
         if (type === 'post' || type === 'emergency') {
+            // Cari post untuk dapat gdriveId
+            const postToDelete = posts.find(p => p.id === id);
+            if (postToDelete && postToDelete.gdriveId) {
+                try { await deleteFromGDrive(postToDelete.gdriveId); } catch(e) {}
+            }
+
             let allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
             allPosts = allPosts.filter(p => p.id !== id);
             safeSavePosts(allPosts);
@@ -2088,7 +2319,7 @@ async function confirmDeleteNow() {
 }
 
 // ====================================================================
-// 16. CALCULATE STATS
+// 18. CALCULATE STATS
 // ====================================================================
 function calculateRealStatistics() {
     const allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
@@ -2128,7 +2359,7 @@ function calculateRealStatistics() {
 }
 
 // ====================================================================
-// 17. UPDATE STATS CARDS
+// 19. UPDATE STATS CARDS
 // ====================================================================
 function updateStatsCards() {
     const allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
@@ -2139,7 +2370,6 @@ function updateStatsCards() {
 
     allEms.forEach(e => {
         if (!e) return;
-
         let ts;
         if (typeof e.timestamp === 'number') ts = e.timestamp;
         else if (e.timestamp) ts = new Date(e.timestamp).getTime();
@@ -2148,17 +2378,12 @@ function updateStatsCards() {
 
         const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
         const status = String(e.status || 'active').toLowerCase();
-
         const isManuallyResolved = ['resolved', 'selesai', 'ditangani', 'completed', 'closed'].indexOf(status) !== -1;
         const isExpired = exp <= now;
 
-        if (isManuallyResolved) {
-            resolvedCount++;
-        } else if (isExpired) {
-            resolvedCount++;
-        } else {
-            activeCount++;
-        }
+        if (isManuallyResolved) resolvedCount++;
+        else if (isExpired) resolvedCount++;
+        else activeCount++;
     });
 
     let teamsDisplay = 0;
@@ -2186,7 +2411,7 @@ function updateStatsCards() {
 }
 
 // ====================================================================
-// 18. RENDER HOLOGRAM
+// 20. RENDER HOLOGRAM
 // ====================================================================
 function renderHologram() {
     const list = document.getElementById('hologramList');
@@ -2245,7 +2470,7 @@ function openEmergencyDetail(id) {
 }
 
 // ====================================================================
-// 19. RENDER POSTS
+// 21. RENDER POSTS
 // ====================================================================
 function renderPosts() {
     const feed = document.getElementById('postFeed');
@@ -2270,14 +2495,31 @@ function renderPosts() {
         const profilePic = post.userProfilePic ? '<img src="' + escapeAttr(post.userProfilePic) + '" alt="">' : (post.userGender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>');
         const specialBadge = post.isSpecial && post.specialType ? '<span style="background:rgba(88,166,255,0.15);padding:2px 8px;border-radius:10px;font-size:0.5rem;color:var(--accent-blue);margin-left:6px;">' + EMERGENCY_ICONS[post.specialType] + ' ' + EMERGENCY_LABELS[post.specialType] + '</span>' : '';
 
-        // ✅ PATCH 1: Ambil media via helper getMediaFromStore
+        // ✅ Google Drive media (prioritas) atau lokal (fallback)
         let mediaHTML = '';
         if (post.mediaType) {
-            const mediaSource = getMediaFromStore(post.mediaId, post.mediaData);
-            if (post.mediaType === 'image' && mediaSource) {
-                mediaHTML = '<div class="post-media"><img src="' + escapeAttr(mediaSource) + '" alt="" loading="lazy" onerror="this.parentElement.innerHTML=\'<div style=\\\'padding:20px;text-align:center;color:var(--text-muted);font-size:0.7rem;\\\'>🖼️ Media tidak tersedia</div>\';"></div>';
-            } else if (post.mediaType === 'video' && mediaSource) {
-                mediaHTML = '<div class="post-media"><video controls preload="metadata"><source src="' + escapeAttr(mediaSource) + '"></video></div>';
+            const isGDrive = !!post.gdriveId;
+            const mediaSource = getMediaUrlFromPost(post);
+
+            if (mediaSource) {
+                if (post.mediaType === 'image') {
+                    if (isGDrive) {
+                        mediaHTML = '<div class="post-media" style="position:relative;">' +
+                            '<img src="' + escapeAttr(mediaSource) + '" alt="" loading="lazy" draggable="false" oncontextmenu="return false;" style="user-select:none;-webkit-user-drag:none;" onerror="this.parentElement.innerHTML=\'<div style=\\\'padding:20px;text-align:center;color:var(--text-muted);font-size:0.7rem;\\\'>🖼️ Media tidak tersedia</div>\';">' +
+                            '<div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.7);color:#fff;padding:2px 8px;border-radius:8px;font-size:0.5rem;font-weight:600;pointer-events:none;">📸 View Only</div>' +
+                        '</div>';
+                    } else {
+                        mediaHTML = '<div class="post-media"><img src="' + escapeAttr(mediaSource) + '" alt="" loading="lazy" draggable="false" oncontextmenu="return false;" onerror="this.parentElement.innerHTML=\'<div style=\\\'padding:20px;text-align:center;color:var(--text-muted);font-size:0.7rem;\\\'>🖼️ Media tidak tersedia</div>\';"></div>';
+                    }
+                } else if (post.mediaType === 'video') {
+                    if (isGDrive) {
+                        mediaHTML = '<div class="post-media" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;">' +
+                            '<iframe src="' + escapeAttr(mediaSource) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" allow="autoplay" allowfullscreen loading="lazy"></iframe>' +
+                        '</div>';
+                    } else {
+                        mediaHTML = '<div class="post-media"><video controls preload="metadata" controlsList="nodownload" oncontextmenu="return false;"><source src="' + escapeAttr(mediaSource) + '"></video></div>';
+                    }
+                }
             }
         }
 
@@ -2339,7 +2581,7 @@ function renderPosts() {
 }
 
 // ====================================================================
-// 20. RENDER POSTS STATS
+// 22. RENDER POSTS STATS
 // ====================================================================
 function renderPostsStats() {
     const container = document.getElementById('postsList');
@@ -2399,15 +2641,29 @@ function renderFullPostCard(p, isExpired) {
     const detailLink = 'detail-emergency.html?id=' + encodeURIComponent(p.id);
     const isOwner = currentUser && p.userId === currentUser.username;
 
-    // ✅ PATCH 1: Ambil media via helper getMediaFromStore
+    // ✅ Google Drive media (prioritas) atau lokal (fallback)
     let mediaBlock = '';
     if (p.mediaType) {
-        const src = getMediaFromStore(p.mediaId, p.mediaData);
+        const isGDrive = !!p.gdriveId;
+        const src = getMediaUrlFromPost(p);
         if (src) {
             if (p.mediaType === 'image') {
-                mediaBlock = '<div style="width:100%;max-height:280px;border-radius:10px;overflow:hidden;margin:10px 0;border:1px solid var(--border-color);"><img src="' + escapeAttr(src) + '" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy"></div>';
+                if (isGDrive) {
+                    mediaBlock = '<div style="width:100%;max-height:280px;border-radius:10px;overflow:hidden;margin:10px 0;border:1px solid var(--border-color);position:relative;">' +
+                        '<img src="' + escapeAttr(src) + '" style="width:100%;height:100%;object-fit:cover;display:block;user-select:none;-webkit-user-drag:none;" loading="lazy" draggable="false" oncontextmenu="return false;">' +
+                        '<div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,0.7);color:#fff;padding:2px 8px;border-radius:8px;font-size:0.5rem;font-weight:600;pointer-events:none;">📸 View Only</div>' +
+                    '</div>';
+                } else {
+                    mediaBlock = '<div style="width:100%;max-height:280px;border-radius:10px;overflow:hidden;margin:10px 0;border:1px solid var(--border-color);"><img src="' + escapeAttr(src) + '" style="width:100%;height:100%;object-fit:cover;display:block;" loading="lazy" draggable="false" oncontextmenu="return false;"></div>';
+                }
             } else if (p.mediaType === 'video') {
-                mediaBlock = '<div style="width:100%;border-radius:10px;overflow:hidden;margin:10px 0;border:1px solid var(--border-color);"><video controls preload="metadata" style="width:100%;max-height:280px;display:block;"><source src="' + escapeAttr(src) + '"></video></div>';
+                if (isGDrive) {
+                    mediaBlock = '<div style="width:100%;position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:10px;margin:10px 0;border:1px solid var(--border-color);">' +
+                        '<iframe src="' + escapeAttr(src) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" allow="autoplay" allowfullscreen loading="lazy"></iframe>' +
+                    '</div>';
+                } else {
+                    mediaBlock = '<div style="width:100%;border-radius:10px;overflow:hidden;margin:10px 0;border:1px solid var(--border-color);"><video controls preload="metadata" controlsList="nodownload" style="width:100%;max-height:280px;display:block;"><source src="' + escapeAttr(src) + '"></video></div>';
+                }
             }
         }
     }
@@ -2548,7 +2804,7 @@ function sharePost(postId) {
 }
 
 // ====================================================================
-// 21. CREATE POST
+// 23. CREATE POST — WITH GOOGLE DRIVE UPLOAD
 // ====================================================================
 async function createPost(text, mediaFile, isSpecial, specialData) {
     if (isPreviewMode) { showPreviewOverlay(); return; }
@@ -2570,153 +2826,172 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
     const mediaId = 'media-' + uniqueId;
 
     let mediaType = '';
-    let mediaDataRef = '';
-    let mediaDataFull = '';
-    let mediaThumbnail = '';
+    let gdriveData = null;
+    let mediaDataLocal = '';
+    let mediaIdLocal = '';
 
-    const finish = async () => {
-        if (mediaDataFull) {
+    // ============================================================
+    // STEP 1: UPLOAD KE GOOGLE DRIVE (kalau ada media)
+    // ============================================================
+    if (hasMedia) {
+        const isImage = mediaFile.type.indexOf('image/') === 0;
+        const isVideo = mediaFile.type.indexOf('video/') === 0;
+        mediaType = isImage ? 'image' : (isVideo ? 'video' : '');
+
+        showToast('📤 Upload...', 'Mengirim media ke Google Drive', 'fa-cloud-upload-alt');
+
+        try {
+            console.log('📤 [createPost] Uploading to Google Drive...', mediaFile.name, mediaFile.size, 'bytes');
+            gdriveData = await uploadToGDrive(mediaFile);
+            console.log('✅ [createPost] GDrive upload success:', gdriveData.id);
+            showToast('✅ Upload Berhasil', 'Media tersimpan di Google Drive', 'fa-check-circle');
+        } catch (err) {
+            console.warn('⚠️ [createPost] GDrive upload gagal, fallback ke lokal:', err.message);
+            showToast('⚠️ GDrive gagal', 'Menyimpan media di perangkat...', 'fa-exclamation-triangle');
+
+            // Fallback: simpan ke localStorage
+            mediaDataLocal = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.readAsDataURL(mediaFile);
+            });
+            mediaIdLocal = 'media-' + uniqueId;
+
             try {
                 let mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}');
-                mediaStore[mediaId] = {
+                mediaStore[mediaIdLocal] = {
                     type: mediaType,
-                    data: mediaDataFull,
-                    fullData: mediaDataFull,
+                    data: mediaDataLocal,
                     timestamp: Date.now(),
-                    size: mediaDataFull.length
+                    size: mediaDataLocal.length
                 };
                 localStorage.setItem('salink_post_media', JSON.stringify(mediaStore));
-                console.log('💾 [createPost] Media saved. ID:', mediaId, '| Size:', mediaDataFull.length);
             } catch(e) {
-                console.error('❌ [createPost] Gagal simpan media:', e.message);
-                showToast('⚠️ Error', 'Gagal menyimpan media (storage penuh?)', 'fa-exclamation-triangle');
+                console.warn('⚠️ Gagal simpan media lokal:', e.message);
             }
         }
+    }
 
-        const post = {
-            id: postId,
-            userId: currentUser.username,
-            userFullName: currentUser.fullName,
-            userGender: currentUser.gender || 'male',
-            userProfilePic: currentUser.profilePicture || '',
-            text: text || '',
-            mediaType: mediaType,
-            mediaData: mediaDataRef,
-            mediaId: mediaId,
-            mediaThumbnail: mediaThumbnail,
-            timestamp: Date.now(),
-            likes: '[]',
-            comments: '[]',
-            viewerCount: 0,
-            isSpecial: isSpecial || false,
-            specialType: isSpecial && specialData ? specialData.type : '',
-            specialLocation: isSpecial && specialData ? specialData.location : '',
-            specialAddress: isSpecial && specialData ? specialData.address : '',
-            latitude: isSpecial && specialData ? specialData.latitude : '',
-            longitude: isSpecial && specialData ? specialData.longitude : '',
-            mapsURL: isSpecial && specialData ? specialData.mapsURL : '',
-            postType: isSpecial ? 'khusus' : 'biasa',
-            country: currentUser.country || '',
+    // ============================================================
+    // STEP 2: SIMPAN METADATA KE SALINK_POSTS
+    // ============================================================
+    const post = {
+        id: postId,
+        userId: currentUser.username,
+        userFullName: currentUser.fullName,
+        userGender: currentUser.gender || 'male',
+        userProfilePic: currentUser.profilePicture || '',
+        text: text || '',
+        mediaType: mediaType,
+        gdriveId: gdriveData ? gdriveData.id : '',
+        gdriveImageUrl: gdriveData ? gdriveData.imageUrl : '',
+        gdriveVideoEmbed: gdriveData ? gdriveData.videoEmbed : '',
+        gdriveThumbnail: gdriveData ? gdriveData.thumbnail : '',
+        mediaId: mediaIdLocal,
+        mediaData: '',
+        timestamp: Date.now(),
+        likes: '[]',
+        comments: '[]',
+        viewerCount: 0,
+        isSpecial: isSpecial || false,
+        specialType: isSpecial && specialData ? specialData.type : '',
+        specialLocation: isSpecial && specialData ? specialData.location : '',
+        specialAddress: isSpecial && specialData ? specialData.address : '',
+        latitude: isSpecial && specialData ? specialData.latitude : '',
+        longitude: isSpecial && specialData ? specialData.longitude : '',
+        mapsURL: isSpecial && specialData ? specialData.mapsURL : '',
+        postType: isSpecial ? 'khusus' : 'biasa',
+        country: currentUser.country || '',
+        province: currentUser.province || '',
+        city: currentUser.city || '',
+        district: currentUser.district || '',
+        village: currentUser.village || '',
+        address: currentUser.address || ''
+    };
+
+    posts.unshift(post);
+    safeSavePosts(posts);
+    renderPosts();
+
+    apiSavePost(post).then(ok => { if (ok) console.log('✅ [createPost] Post saved:', postId); });
+
+    // ============================================================
+    // STEP 3: KALAU EMERGENCY, SIMPAN JUGA KE EMERGENCY & NOTIF
+    // ============================================================
+    if (isSpecial && specialData) {
+        const emPayload = {
+            id: emergencyId,
+            type: specialData.type,
+            title: EMERGENCY_LABELS[specialData.type],
+            sender: currentUser.fullName,
+            senderUsername: currentUser.username,
+            senderPhone: currentUser.phone || '',
+            location: specialData.location,
+            address: specialData.address,
+            latitude: specialData.latitude,
+            longitude: specialData.longitude,
+            mapsURL: specialData.mapsURL,
+            description: text,
+            status: 'active',
             province: currentUser.province || '',
             city: currentUser.city || '',
             district: currentUser.district || '',
-            village: currentUser.village || '',
-            address: currentUser.address || ''
+            village: currentUser.village || ''
         };
+        apiSaveEmergency(emPayload).then(ok => {
+            if (ok) console.log('✅ [createPost] Emergency saved:', emergencyId);
+        });
 
-        posts.unshift(post);
-        safeSavePosts(posts);
-        renderPosts();
-
-        apiSavePost(post).then(ok => { if (ok) console.log('✅ [createPost] Post saved:', postId); });
-
-        if (isSpecial && specialData) {
-            const emPayload = {
-                id: emergencyId,
-                type: specialData.type,
-                title: EMERGENCY_LABELS[specialData.type],
-                sender: currentUser.fullName,
-                senderUsername: currentUser.username,
-                senderPhone: currentUser.phone || '',
-                location: specialData.location,
-                address: specialData.address,
-                latitude: specialData.latitude,
-                longitude: specialData.longitude,
-                mapsURL: specialData.mapsURL,
-                description: text,
-                status: 'active',
-                province: currentUser.province || '',
-                city: currentUser.city || '',
-                district: currentUser.district || '',
-                village: currentUser.village || ''
-            };
-            apiSaveEmergency(emPayload).then(ok => {
-                if (ok) console.log('✅ [createPost] Emergency saved:', emergencyId);
-            });
-
-            const notifPayload = {
-                id: notifId,
-                type: specialData.type,
-                title: EMERGENCY_LABELS[specialData.type] + ' — ' + (text.substring(0, 50)),
-                message: text.substring(0, 200),
-                sender: currentUser.fullName,
-                senderUsername: currentUser.username,
-                link: DETAIL_URL + '?id=' + encodeURIComponent(emergencyId),
-                postId: postId,
-                timestamp: new Date().toISOString(),
-                read: 'FALSE',
-                soundKey: specialData.type
-            };
-            apiCall('save_notification', notifPayload).catch(e => console.warn('⚠️ Notification save failed:', e));
-
-            triggerLocalEmergencyVisual(emergencyId, specialData.type, currentUser.fullName, specialData.location, text);
-
-            if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency &&
-                typeof SalinkEmergency.triggerGridAlarmFromPost === 'function') {
-                setTimeout(() => {
-                    SalinkEmergency.triggerGridAlarmFromPost(specialData.type, true);
-                }, 500);
-            }
-        } else {
-            playRegularSound();
-            showToast('📝', 'Postingan baru berhasil', 'fa-check-circle');
-        }
-
-        broadcastSync('new_post', { id: postId });
-
-        // Reset form
-        const pi = document.getElementById('postInput'); if (pi) pi.value = '';
-        const pst = document.getElementById('postSpecialText'); if (pst) pst.value = '';
-        const mu = document.getElementById('mediaUpload'); if (mu) mu.value = '';
-        const mp = document.getElementById('mediaPreview'); if (mp) mp.style.display = 'none';
-        const ps = document.getElementById('postSubmit'); if (ps) ps.disabled = true;
-        const sel = document.getElementById('postTypeSelect');
-        if (sel) sel.value = 'biasa';
-        currentPostType = 'biasa';
-        const psf = document.getElementById('postSpecialFields'); if (psf) psf.classList.remove('active');
-        const pbf = document.getElementById('postBiasaForm'); if (pbf) pbf.style.display = 'block';
-        currentGpsData = null;
-        const gpsResult = document.getElementById('gpsLocationResult');
-        if (gpsResult) gpsResult.classList.remove('active');
-        const gpsBtn = document.getElementById('gpsLocationBtn');
-        if (gpsBtn) {
-            gpsBtn.style.background = '';
-            const txt = document.getElementById('gpsLocationBtnText');
-            if (txt) txt.textContent = '📍 Ambil Lokasi Saya';
-        }
-    };
-
-    if (mediaFile) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            mediaDataFull = e.target.result;
-            mediaType = mediaFile.type.indexOf('image/') === 0 ? 'image' : 'video';
-            mediaDataRef = mediaId;
-            mediaThumbnail = mediaDataFull.substring(0, 2000);
-            finish();
+        const notifPayload = {
+            id: notifId,
+            type: specialData.type,
+            title: EMERGENCY_LABELS[specialData.type] + ' — ' + (text.substring(0, 50)),
+            message: text.substring(0, 200),
+            sender: currentUser.fullName,
+            senderUsername: currentUser.username,
+            link: DETAIL_URL + '?id=' + encodeURIComponent(emergencyId),
+            postId: postId,
+            timestamp: new Date().toISOString(),
+            read: 'FALSE',
+            soundKey: specialData.type
         };
-        reader.readAsDataURL(mediaFile);
-    } else finish();
+        apiCall('save_notification', notifPayload).catch(e => console.warn('⚠️ Notification save failed:', e));
+
+        triggerLocalEmergencyVisual(emergencyId, specialData.type, currentUser.fullName, specialData.location, text);
+
+        if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency &&
+            typeof SalinkEmergency.triggerGridAlarmFromPost === 'function') {
+            setTimeout(() => {
+                SalinkEmergency.triggerGridAlarmFromPost(specialData.type, true);
+            }, 500);
+        }
+    } else {
+        playRegularSound();
+        showToast('📝', 'Postingan baru berhasil', 'fa-check-circle');
+    }
+
+    broadcastSync('new_post', { id: postId });
+
+    // Reset form
+    const pi = document.getElementById('postInput'); if (pi) pi.value = '';
+    const pst = document.getElementById('postSpecialText'); if (pst) pst.value = '';
+    const mu = document.getElementById('mediaUpload'); if (mu) mu.value = '';
+    const mp = document.getElementById('mediaPreview'); if (mp) mp.style.display = 'none';
+    const ps = document.getElementById('postSubmit'); if (ps) ps.disabled = true;
+    const sel = document.getElementById('postTypeSelect');
+    if (sel) sel.value = 'biasa';
+    currentPostType = 'biasa';
+    const psf = document.getElementById('postSpecialFields'); if (psf) psf.classList.remove('active');
+    const pbf = document.getElementById('postBiasaForm'); if (pbf) pbf.style.display = 'block';
+    currentGpsData = null;
+    const gpsResult = document.getElementById('gpsLocationResult');
+    if (gpsResult) gpsResult.classList.remove('active');
+    const gpsBtn = document.getElementById('gpsLocationBtn');
+    if (gpsBtn) {
+        gpsBtn.style.background = '';
+        const txt = document.getElementById('gpsLocationBtnText');
+        if (txt) txt.textContent = '📍 Ambil Lokasi Saya';
+    }
 }
 
 // ✅ Helper: Cleanup media lama
@@ -2735,7 +3010,7 @@ function cleanupOldMedia() {
 }
 
 // ====================================================================
-// 22. TRIGGER LOCAL EMERGENCY VISUAL
+// 24. TRIGGER LOCAL EMERGENCY VISUAL
 // ====================================================================
 function triggerLocalEmergencyVisual(emergencyId, type, sender, location, text) {
     const em = {
@@ -2782,7 +3057,7 @@ function triggerLocalEmergencyVisual(emergencyId, type, sender, location, text) 
 }
 
 // ====================================================================
-// 23. NOTIF MODAL
+// 25. NOTIF MODAL
 // ====================================================================
 function getAllNotifications() {
     const list = [];
@@ -2895,7 +3170,7 @@ function goToLocation(location) {
 }
 
 // ====================================================================
-// 24. INVITE MODAL
+// 26. INVITE MODAL
 // ====================================================================
 function openInviteModal() {
     if (isPreviewMode) { showPreviewOverlay(); return; }
@@ -2974,7 +3249,7 @@ async function sendInvite(username, btnEl) {
 }
 
 // ====================================================================
-// 25. CHARTS
+// 27. CHARTS
 // ====================================================================
 function getChartColors() {
     const isDark = currentTheme === 'dark';
@@ -3222,7 +3497,7 @@ function updateMap() {
 }
 
 // ====================================================================
-// 26. HANDLE EMERGENCY CLICK
+// 28. HANDLE EMERGENCY CLICK
 // ====================================================================
 function handleEmergencyClick(e) {
     e.preventDefault(); e.stopPropagation();
@@ -3261,7 +3536,7 @@ function setupChartNavigation() {
 }
 
 // ====================================================================
-// 27. USER & PREVIEW MODE
+// 29. USER & PREVIEW MODE
 // ====================================================================
 function loadUser() {
     const s = localStorage.getItem('salink_user');
@@ -3321,8 +3596,6 @@ function hidePreviewOverlay() {
     if (o) { o.classList.remove('active'); document.body.style.overflow = ''; }
 }
 function redirectToLogin() { window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(DASHBOARD_URL); }
-
-// ✅ PATCH 3: applyPreviewMode dengan force validatePost()
 function applyPreviewMode() {
     if (isPreviewMode) {
         const pb = document.getElementById('previewBadge'); if (pb) pb.classList.add('active');
@@ -3339,7 +3612,6 @@ function applyPreviewMode() {
         const pts = document.getElementById('postTypeSelect'); if (pts) pts.disabled = false;
         const gps = document.getElementById('gpsLocationBtn'); if (gps) gps.disabled = false;
         document.querySelectorAll('.emergency-btn').forEach(b => b.style.opacity = '1');
-        // ✅ PATCH 3: Force validate setelah login
         setTimeout(() => { try { validatePost(); } catch(e) { console.warn('validatePost error:', e); } }, 100);
     }
 }
@@ -3369,7 +3641,7 @@ function setupLoginGuard() {
 }
 
 // ====================================================================
-// 28. LOAD DATA
+// 30. LOAD DATA
 // ====================================================================
 async function loadData() {
     console.log('📊 [loadData] Step 1: Load from localStorage (instant)');
@@ -3431,7 +3703,7 @@ async function loadData() {
         apiPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
         posts = Array.from(postMap.values())
             .filter(p => p && p.id && p.userId && p.userFullName &&
-                ((p.text && p.text.trim() !== '') || (p.mediaData && p.mediaData !== '') || p.mediaId))
+                ((p.text && p.text.trim() !== '') || (p.mediaData && p.mediaData !== '') || p.mediaId || p.gdriveId))
             .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         safeSavePosts(posts);
 
@@ -3496,7 +3768,7 @@ async function loadData() {
 }
 
 // ====================================================================
-// 29. THEME
+// 31. THEME
 // ====================================================================
 function loadTheme() {
     const t = localStorage.getItem('salink_theme');
@@ -3529,7 +3801,7 @@ function toggleTheme() {
 }
 
 // ====================================================================
-// 30. SIDEBAR & MODAL
+// 32. SIDEBAR & MODAL
 // ====================================================================
 function openSidebar() { const s = document.getElementById('sidebar'); const so = document.getElementById('sidebarOverlay'); if (s) s.classList.add('active'); if (so) so.classList.add('active'); }
 function closeSidebar() { const s = document.getElementById('sidebar'); const so = document.getElementById('sidebarOverlay'); if (s) s.classList.remove('active'); if (so) so.classList.remove('active'); }
@@ -3542,7 +3814,7 @@ function openModal(id) { const m = document.getElementById(id); if (m) m.classLi
 function closeModal(id) { const m = document.getElementById(id); if (m) m.classList.remove('active'); document.body.style.overflow = ''; }
 
 // ====================================================================
-// 31. SEARCH
+// 33. SEARCH
 // ====================================================================
 function openSearchModal() {
     if (isPreviewMode) { showPreviewOverlay(); return; }
@@ -3779,7 +4051,7 @@ function setupSearchInput() {
 }
 
 // ====================================================================
-// 32. URL PARAMS & VISIBILITY
+// 34. URL PARAMS & VISIBILITY
 // ====================================================================
 function checkURLParams() {
     const params = new URLSearchParams(window.location.search);
@@ -3819,7 +4091,7 @@ function setupVisibilityDetection() {
 }
 
 // ====================================================================
-// 33. BOTTOM NAV
+// 35. BOTTOM NAV
 // ====================================================================
 function initBottomNav() {
     document.querySelectorAll('.nav-item-bottom').forEach(item => {
@@ -3839,7 +4111,7 @@ function initBottomNav() {
 }
 
 // ====================================================================
-// ✅ PATCH 2: setupPostInput() — TANPA cloneNode()
+// 36. SETUP POST INPUT
 // ====================================================================
 function setupPostInput() {
     const select = document.getElementById('postTypeSelect');
@@ -3886,9 +4158,10 @@ function setupPostInput() {
                 const f = this.files[0];
                 const isVideo = f.type.indexOf('video/') === 0;
                 const isImage = f.type.indexOf('image/') === 0;
-                let maxSize = isVideo ? 500 * 1024 : (isImage ? 200 * 1024 : 0);
+                // ✅ Limit lebih besar (GDrive upload, tidak terbatas localStorage)
+                let maxSize = isVideo ? 100 * 1024 * 1024 : (isImage ? 20 * 1024 * 1024 : 0);
                 if (!maxSize) { showToast('⚠️ Format tidak didukung', 'Hanya foto/video', 'fa-exclamation-triangle'); this.value = ''; validatePost(); return; }
-                if (f.size > maxSize) { showToast('⚠️ File terlalu besar', 'Max ' + (maxSize/1024).toFixed(0) + 'KB', 'fa-exclamation-triangle'); this.value = ''; validatePost(); return; }
+                if (f.size > maxSize) { showToast('⚠️ File terlalu besar', 'Max ' + (maxSize/1024/1024).toFixed(0) + 'MB', 'fa-exclamation-triangle'); this.value = ''; validatePost(); return; }
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const p = document.getElementById('mediaPreview');
@@ -3904,7 +4177,6 @@ function setupPostInput() {
         });
     }
 
-    // ✅ PATCH 2: Tanpa cloneNode(), pakai flag anti-dobel
     if (submitBtn && !submitBtn._salinkPostSetup) {
         submitBtn._salinkPostSetup = true;
         submitBtn.addEventListener('click', async function(e) {
@@ -3955,7 +4227,7 @@ function validatePost() {
 }
 
 // ====================================================================
-// 34. PWA
+// 37. PWA
 // ====================================================================
 function setupPWA() {
     if ('serviceWorker' in navigator) {
@@ -3995,10 +4267,48 @@ function showInstallPrompt() {
 }
 
 // ====================================================================
-// 35. INIT
+// 38. VIEW-ONLY PROTECTION
+// ====================================================================
+function setupViewOnlyProtection() {
+    // Disable right-click pada gambar & video
+    document.addEventListener('contextmenu', function(e) {
+        if (e.target.tagName === 'IMG' || e.target.tagName === 'VIDEO' || e.target.tagName === 'IFRAME') {
+            e.preventDefault();
+            showToast('🔒 View Only', 'Media tidak dapat di-download', 'fa-lock');
+            return false;
+        }
+    });
+
+    // Disable drag pada gambar
+    document.addEventListener('dragstart', function(e) {
+        if (e.target.tagName === 'IMG') {
+            e.preventDefault();
+            return false;
+        }
+    });
+
+    // Disable Ctrl+S / Ctrl+P / Ctrl+U saat ada media
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey || e.metaKey) {
+            if (['s', 'p', 'u'].indexOf(e.key.toLowerCase()) !== -1) {
+                const hasMedia = document.querySelector('img[src*="googleusercontent"], iframe[src*="drive.google.com"]');
+                if (hasMedia) {
+                    e.preventDefault();
+                    showToast('🔒 View Only', 'Aksi ini dinonaktifkan', 'fa-lock');
+                    return false;
+                }
+            }
+        }
+    });
+
+    console.log('✅ [View-Only] Protection activated');
+}
+
+// ====================================================================
+// 39. INIT
 // ====================================================================
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 SALINK Dashboard v5.0 — FINAL (5 PATCH)');
+    console.log('🚀 SALINK Dashboard v6.0 — Google Drive Integration');
 
     preloadAllAudio();
     setupIdleDetection();
@@ -4057,6 +4367,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initBottomNav();
     setupPostInput();
     setupSearchInput();
+    setupViewOnlyProtection();
 
     document.addEventListener('keydown', function(e) {
         if (e.key === '/' && !e.target.matches('input, textarea, select')) { e.preventDefault(); openSearchModal(); }
@@ -4078,6 +4389,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             updateNotifBadge(); updateAllCharts(); updateStatsCards();
         }
     });
+
+    // ✅ Init Google Drive
+    try {
+        await initGoogleDrive();
+        console.log('✅ [Init] Google Drive ready');
+    } catch (err) {
+        console.warn('⚠️ [Init] Google Drive tidak tersedia:', err.message);
+    }
 
     initAllCharts();
     await loadData();
@@ -4115,7 +4434,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (nm && nm.classList.contains('active')) renderNotifList();
     }, 15000);
 
-    // ✅ PATCH 5: AUTO-CLEANUP 30 detik (kalau storage >80%)
+    // Auto-cleanup 30 detik
     setInterval(() => {
         try {
             const usage = getStorageUsage();
@@ -4140,9 +4459,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch(e) {}
     }, 30000);
 
-    console.log('✅ SALINK Dashboard v5.0 Ready! (5 PATCH applied)');
+    console.log('✅ SALINK Dashboard v6.0 Ready!');
 
-    // Cleanup media yatim (orphan)
+    // Cleanup media orphan
     setTimeout(() => {
         try {
             const mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}');
@@ -4163,14 +4482,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 localStorage.setItem('salink_post_media', JSON.stringify(mediaStore));
                 console.log('🧹 [Media Cleanup] Deleted', deleted, 'orphan/old media');
             }
-        } catch(e) {
-            console.warn('⚠️ Media cleanup error:', e);
-        }
+        } catch(e) {}
     }, 5000);
 });
 
 // ====================================================================
-// 36. CLEAR CACHE SYSTEM
+// 40. CLEAR CACHE SYSTEM
 // ====================================================================
 function formatBytes(bytes) {
     if (!bytes || bytes < 0) return '0 B';
@@ -4179,7 +4496,6 @@ function formatBytes(bytes) {
     return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
 }
 
-// ✅ PATCH 4: getStorageUsage() — limit 5 MB yang BENAR
 function getStorageUsage() {
     let total = 0;
     const breakdown = {};
@@ -4191,7 +4507,6 @@ function getStorageUsage() {
             breakdown[key] = size;
         });
     } catch(e) {}
-    // ✅ PATCH 4: localStorage realistic limit = 5 MB
     const MAX = 5 * 1024 * 1024;
     const percent = Math.min(100, Math.round((total / MAX) * 100));
     return { total, breakdown, percent, max: MAX };
@@ -4254,7 +4569,6 @@ function updateClearCacheInfo() {
 
     if (bar) bar.style.width = usage.percent + '%';
     if (pct) pct.textContent = usage.percent + '%';
-    // ✅ PATCH 4: Teks lebih jelas
     if (totalEl) totalEl.textContent = 'Terpakai: ' + formatBytes(usage.total) + ' dari ~5 MB';
     if (mediaEl) mediaEl.textContent = '📦 ' + formatBytes(mediaSize);
     if (oldEl) oldEl.textContent = '📦 ' + formatBytes(oldSize);
@@ -4414,7 +4728,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ====================================================================
-// 37. DETECT NEW EMERGENCY NOTIFICATIONS
+// 41. DETECT NEW EMERGENCY NOTIFICATIONS
 // ====================================================================
 function detectNewEmergencyNotifications(notifs) {
     if (!notifs || !notifs.length) return null;
@@ -4428,7 +4742,7 @@ function detectNewEmergencyNotifications(notifs) {
 }
 
 // ====================================================================
-// 38. EXPOSE GLOBAL
+// 42. EXPOSE GLOBAL
 // ====================================================================
 window.openProfileUser = openProfileUser;
 window.requestDelete = requestDelete;
@@ -4465,8 +4779,10 @@ window.goToPost = goToPost;
 window.goToEmergency = goToEmergency;
 window.openEmergencyDetail = openEmergencyDetail;
 window.ambilLokasiSaya = ambilLokasiSaya;
+window.uploadToGDrive = uploadToGDrive;
+window.deleteFromGDrive = deleteFromGDrive;
 
-console.log('✅ SALINK Dashboard v5.0 Script Loaded — 5 PATCH APPLIED');
+console.log('✅ SALINK Dashboard v6.0 Script Loaded — Google Drive Integrated');
     </script>
 
     <!-- ============================================================ -->
