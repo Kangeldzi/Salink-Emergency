@@ -1074,6 +1074,104 @@
             padding-left: 42px;
         }
 
+                /* ============ GPS LOCATION BUTTON ============ */
+        .gps-location-btn {
+            width: 100%;
+            padding: 14px 18px;
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            box-shadow: 0 4px 15px rgba(230,0,18,0.35);
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s ease;
+            -webkit-appearance: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .gps-location-btn:active {
+            transform: scale(0.97);
+        }
+        .gps-location-btn:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+        .gps-location-btn.loading {
+            pointer-events: none;
+        }
+        .gps-location-btn .fa-location-arrow {
+            font-size: 1.1rem;
+        }
+
+        .gps-location-result {
+            margin-top: 10px;
+            padding: 12px 14px;
+            background: rgba(63,185,80,0.1);
+            border: 1px solid rgba(63,185,80,0.35);
+            border-radius: 10px;
+            font-size: 0.7rem;
+            color: var(--text-primary);
+            display: none;
+            line-height: 1.5;
+        }
+        .gps-location-result.active {
+            display: block;
+            animation: slideUp 0.3s ease;
+        }
+        .gps-location-result .gps-address {
+            font-weight: 700;
+            color: var(--accent-green);
+            margin-bottom: 4px;
+        }
+        .gps-location-result .gps-coords {
+            font-family: 'Courier New', monospace;
+            font-size: 0.65rem;
+            color: var(--primary);
+        }
+        .gps-location-result .gps-maps-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 6px;
+            padding: 4px 10px;
+            background: rgba(230,0,18,0.15);
+            border-radius: 6px;
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 0.62rem;
+            font-weight: 700;
+        }
+
+        .gps-location-error {
+            margin-top: 10px;
+            padding: 10px 14px;
+            background: rgba(248,81,73,0.1);
+            border: 1px solid rgba(248,81,73,0.35);
+            border-radius: 10px;
+            font-size: 0.7rem;
+            color: var(--accent-red);
+            display: none;
+        }
+        .gps-location-error.active {
+            display: block;
+        }
+
+        .gps-location-loading {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
         /* ============ MAP UPLOAD ============ */
         .map-upload-container {
             border: 1.5px solid var(--border-color);
@@ -1711,32 +1809,25 @@
                 </div>
             </div>
 
-            <div class="form-group">
-                <label>📍 Link Google Maps <span class="required">*</span></label>
-                <div class="map-upload-container">
-                    <div class="input-group">
-                        <span class="map-icon"><i class="fas fa-map-marker-alt"></i></span>
-                        <input type="url" id="signupMapLink" placeholder="https://maps.app.goo.gl/..." autocapitalize="none" autocorrect="off" spellcheck="false">
-                        <button type="button" class="clear-btn" id="clearMapBtn">
-                            <i class="fas fa-times"></i>
-                        </button>
-                    </div>
-                    <div class="map-preview" id="mapPreview">
-                        <div class="map-info">
-                            <i class="fas fa-check-circle"></i>
-                            <span>✅ Link valid</span>
-                        </div>
-                        <a href="#" target="_blank" rel="noopener" class="map-link" id="mapLinkDisplay">Buka di Google Maps</a>
-                    </div>
+                <div class="form-group">
+                <label>📍 Lokasi Kejadian <span class="required">*</span></label>
+                <button type="button" class="gps-location-btn" id="registerGpsBtn">
+                    <i class="fas fa-location-arrow"></i>
+                    <span id="registerGpsBtnText">📍 Gunakan Lokasi Saya</span>
+                </button>
+                <div class="gps-location-result" id="registerGpsResult">
+                    <div class="gps-address" id="registerGpsAddress">📍 Alamat</div>
+                    <div class="gps-coords" id="registerGpsCoords">-6.2000, 106.8166</div>
+                    <a href="#" class="gps-maps-link" id="registerGpsMapsLink" target="_blank" rel="noopener">
+                        <i class="fas fa-external-link-alt"></i> Buka di Google Maps
+                    </a>
                 </div>
-                <div class="map-hint">
-                    <i class="fas fa-lightbulb"></i> Cara dapat link:
-                    <ol>
-                        <li>Buka <a href="https://maps.google.com" target="_blank" rel="noopener">Google Maps</a></li>
-                        <li>Cari lokasi → "Bagikan" → "Salin link"</li>
-                        <li>Paste di kolom atas</li>
-                    </ol>
+                <div class="gps-location-error" id="registerGpsError"></div>
+                <div class="map-hint" style="margin-top:6px;">
+                    <i class="fas fa-info-circle"></i> Klik tombol di atas untuk mengambil lokasi GPS Anda secara otomatis
                 </div>
+                <!-- Hidden input untuk kompatibilitas dengan JS lama -->
+                <input type="hidden" id="signupMapLink" value="">
             </div>
 
             <div class="form-row">
@@ -1909,45 +2000,167 @@
         }
 
         // ================================================================
-        // 📍 MAP LINK
+        // 📍 MAP LINK — Digantikan oleh GPS button (tidak dipakai)
         // ================================================================
-        var mapLinkInput = document.getElementById('signupMapLink');
-        var mapPreview = document.getElementById('mapPreview');
-        var mapLinkDisplay = document.getElementById('mapLinkDisplay');
-        var clearMapBtn = document.getElementById('clearMapBtn');
+        // Kode lama dihapus karena field mapLink sekarang di-handle oleh
+        // tombol "📍 Gunakan Lokasi Saya" (lihat ambilLokasiRegister di atas)
 
-        function isValidGoogleMapsLink(url) {
-            if (!url || url.trim() === '') return false;
-            return /maps\.google\.com|maps\.app\.goo\.gl|google\.com\/maps|goo\.gl\/maps/i.test(url);
-        }
+        // ================================================================
+        // 📍 GPS STATE — untuk form register
+        // ================================================================
+        var currentGpsData = null;
+        var NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
 
-        function updateMapPreview() {
-            var url = mapLinkInput.value.trim();
-            if (url === '') {
-                mapPreview.classList.remove('show');
-                clearMapBtn.classList.remove('show');
+        // ================================================================
+        // 📍 AMBIL LOKASI SAYA — untuk form register
+        // ================================================================
+        async function ambilLokasiRegister() {
+            var btn = document.getElementById('registerGpsBtn');
+            var btnText = document.getElementById('registerGpsBtnText');
+            var resultBox = document.getElementById('registerGpsResult');
+            var errorBox = document.getElementById('registerGpsError');
+            var addrEl = document.getElementById('registerGpsAddress');
+            var coordsEl = document.getElementById('registerGpsCoords');
+            var mapsLink = document.getElementById('registerGpsMapsLink');
+
+            if (!navigator.geolocation) {
+                if (errorBox) {
+                    errorBox.textContent = '❌ Browser Anda tidak mendukung GPS.';
+                    errorBox.classList.add('active');
+                }
                 return;
             }
-            clearMapBtn.classList.add('show');
-            if (isValidGoogleMapsLink(url)) {
-                mapPreview.classList.add('show');
-                mapLinkDisplay.href = url;
-                mapLinkDisplay.textContent = url.length > 50 ? url.substring(0, 50) + '...' : url;
-            } else {
-                mapPreview.classList.remove('show');
+
+            if (btn) btn.classList.add('loading');
+            if (btnText) btnText.innerHTML = '<span class="gps-location-loading"></span> Mengambil lokasi...';
+            if (resultBox) resultBox.classList.remove('active');
+            if (errorBox) errorBox.classList.remove('active');
+
+            try {
+                var position = await new Promise(function(resolve, reject) {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 15000,
+                        maximumAge: 0
+                    });
+                });
+
+                var lat = position.coords.latitude.toFixed(6);
+                var lng = position.coords.longitude.toFixed(6);
+                var accuracy = Math.round(position.coords.accuracy || 0);
+                var mapsURL = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+
+                console.log('📍 GPS OK:', lat, lng, '±', accuracy, 'm');
+
+                // Tampilkan koordinat dulu
+                if (coordsEl) coordsEl.textContent = lat + ', ' + lng + ' (±' + accuracy + 'm)';
+                if (addrEl) addrEl.textContent = '🔄 Mengambil alamat...';
+                if (resultBox) resultBox.classList.add('active');
+                if (mapsLink) mapsLink.href = mapsURL;
+
+                // Simpan data
+                currentGpsData = {
+                    lat: parseFloat(lat),
+                    lng: parseFloat(lng),
+                    accuracy: accuracy,
+                    address: lat + ', ' + lng,
+                    mapsURL: mapsURL
+                };
+
+                // Reverse geocoding via Nominatim
+                try {
+                    var nominatimUrl = NOMINATIM_URL + '?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id';
+                    var response = await fetch(nominatimUrl, {
+                        method: 'GET',
+                        headers: { 'User-Agent': 'SALINK-Register-App/1.0' }
+                    });
+
+                    if (response.ok) {
+                        var data = await response.json();
+                        if (data && data.display_name) {
+                            var address = data.display_name;
+                            if (addrEl) addrEl.textContent = '📍 ' + address;
+                            currentGpsData.address = address;
+                            console.log('📍 Reverse geocoding OK:', address);
+                        } else {
+                            if (addrEl) addrEl.textContent = '📍 Koordinat: ' + lat + ', ' + lng;
+                        }
+                    } else {
+                        if (addrEl) addrEl.textContent = '📍 Koordinat: ' + lat + ', ' + lng;
+                    }
+                } catch(e) {
+                    console.warn('⚠️ Nominatim error:', e.message);
+                    if (addrEl) addrEl.textContent = '📍 Koordinat: ' + lat + ', ' + lng;
+                }
+
+                // Update tombol
+                if (btn) btn.classList.remove('loading');
+                if (btnText) btnText.textContent = '✅ Lokasi Ditemukan — Tap untuk Ambil Ulang';
+                if (btn) btn.style.background = 'linear-gradient(135deg, #3fb950, #2ea44f)';
+
+                // Isi hidden input mapLink untuk kompatibilitas
+                var hiddenMapLink = document.getElementById('signupMapLink');
+                if (hiddenMapLink) hiddenMapLink.value = mapsURL;
+
+                // Auto-fill field alamat jika kosong
+                autoFillAddressFromGps(currentGpsData);
+
+                showMessage('📍 Lokasi Ditemukan! Akurasi ±' + accuracy + 'm', 'success', true);
+
+            } catch(error) {
+                console.error('❌ GPS error:', error);
+                if (btn) btn.classList.remove('loading');
+                if (btnText) btnText.textContent = '📍 Gunakan Lokasi Saya';
+                if (btn) btn.style.background = '';
+
+                var errMsg = 'Gagal mengambil lokasi. ';
+                switch(error.code) {
+                    case 1: errMsg += 'Izin lokasi ditolak. Aktifkan di Settings browser.'; break;
+                    case 2: errMsg += 'Lokasi tidak tersedia.'; break;
+                    case 3: errMsg += 'Timeout. Coba lagi.'; break;
+                    default: errMsg += error.message || 'Coba lagi.';
+                }
+                if (errorBox) {
+                    errorBox.textContent = '❌ ' + errMsg;
+                    errorBox.classList.add('active');
+                }
+                showMessage('⚠️ ' + errMsg, 'error');
             }
         }
 
-        mapLinkInput.addEventListener('input', updateMapPreview);
-        mapLinkInput.addEventListener('change', updateMapPreview);
-        mapLinkInput.addEventListener('paste', function() { setTimeout(updateMapPreview, 100); });
+        // ================================================================
+        // 📍 AUTO-FILL ALAMAT DARI GPS (opsional)
+        // ================================================================
+        function autoFillAddressFromGps(gpsData) {
+            // Coba fill field alamat jika kosong
+            // Nominatim display_name biasanya: "Jalan, Kecamatan, Kota, Provinsi, Kode Pos, Negara"
+            if (!gpsData || !gpsData.address) return;
 
-        clearMapBtn.addEventListener('click', function() {
-            mapLinkInput.value = '';
-            mapPreview.classList.remove('show');
-            clearMapBtn.classList.remove('show');
-        });
+            var provinceField = document.getElementById('signupProvince');
+            var cityField = document.getElementById('signupCity');
+            var districtField = document.getElementById('signupDistrict');
+            var villageField = document.getElementById('signupVillage');
 
+            // Hanya auto-fill jika field masih kosong
+            // (biar tidak nimpa input user)
+            // Note: Parsing alamat Nominatim tidak selalu akurat,
+            // jadi kita hanya kasih hint di bio atau kosongkan saja.
+            // Ini placeholder untuk future enhancement.
+            console.log('📍 Auto-fill address ready (manual entry recommended)');
+        }
+               
+        // ================================================================
+        // 📍 ATTACH GPS BUTTON LISTENER
+        // ================================================================
+        (function() {
+            var gpsBtn = document.getElementById('registerGpsBtn');
+            if (gpsBtn) {
+                gpsBtn.addEventListener('click', ambilLokasiRegister);
+                console.log('✅ GPS button listener attached');
+            }
+        })();
+
+        
         // ================================================================
         // 📸 PROFILE PICTURE UPLOAD (dengan kompresi)
         // ================================================================
@@ -2111,9 +2324,7 @@
             else if (!district) errorMsg = 'Kecamatan harus diisi!';
             else if (!village) errorMsg = 'Kelurahan/Desa harus diisi!';
             else if (!detailAddress) errorMsg = 'Detail alamat harus diisi!';
-            else if (!mapLink) errorMsg = 'Link Google Maps harus diisi!';
-            else if (!isValidGoogleMapsLink(mapLink)) errorMsg = 'Link Google Maps tidak valid!';
-
+            else if (!currentGpsData || !currentGpsData.mapsURL) errorMsg = 'Klik tombol "📍 Gunakan Lokasi Saya" terlebih dahulu!';
             if (errorMsg) {
                 showMessage('⚠️ ' + errorMsg, 'error');
                 return;
@@ -2132,7 +2343,11 @@
                 village: village,
                 postalCode: postalCode,
                 address: detailAddress,
-                mapLink: mapLink,
+                mapLink: currentGpsData ? currentGpsData.mapsURL : '',
+                latitude: currentGpsData ? currentGpsData.lat : '',
+                longitude: currentGpsData ? currentGpsData.lng : '',
+                mapsURL: currentGpsData ? currentGpsData.mapsURL : '',
+                gpsAddress: currentGpsData ? currentGpsData.address : '',
                 bio: bio,
                 profilePicture: profilePicture,
                 password: password,
@@ -2142,7 +2357,7 @@
                 }),
                 joinedTimestamp: Date.now()
             };
-
+            
             var btn = this;
             btn.disabled = true;
             btn.innerHTML = '<span class="loading-spinner"></span> Mendaftar...';
