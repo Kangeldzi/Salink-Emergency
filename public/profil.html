@@ -350,24 +350,28 @@
         }
         .sidebar-overlay-bg.active { display: block; }
 
-        .sidebar {
-    position: fixed;
-    top: var(--header-height);
-    left: 0;
-    transform: translateX(-100%);
-    width: 290px;
-    max-width: 85%;
-    max-height: calc(100vh - var(--header-height));
-    background: var(--bg-secondary);
-    z-index: 1100;
-    overflow-y: auto;
-    box-shadow: 15px 0 30px rgba(0,0,0,0.3);
-    border-right: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    transition: transform 0.3s ease;
-}
-.sidebar.active { transform: translateX(0); }
+                .sidebar {
+            position: fixed;
+            top: var(--header-height);
+            left: 0;
+            transform: translateX(-100%);
+            width: 290px;
+            max-width: 85%;
+            height: calc(100vh - var(--header-height));
+            max-height: calc(100vh - var(--header-height));
+            background: var(--bg-secondary);
+            z-index: 1100;
+            overflow-y: auto;
+            overflow-x: hidden;
+            box-shadow: 15px 0 30px rgba(0,0,0,0.3);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.3s ease;
+            padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+            -webkit-overflow-scrolling: touch;
+        }
+        .sidebar.active { transform: translateX(0); }
 
         .sidebar-close {
             position: absolute;
@@ -409,7 +413,13 @@
         .sidebar-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .sidebar-user-name { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); text-align: center; }
         .sidebar-user-email { font-size: 0.6rem; color: var(--text-muted); text-align: center; }
-        .nav-menu { list-style: none; padding: 6px 12px 12px; flex: 1; }
+        .nav-menu {
+            list-style: none;
+            padding: 6px 12px calc(40px + env(safe-area-inset-bottom, 0px));
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
         .nav-section-title {
             font-size: 0.55rem;
             color: var(--text-muted);
@@ -446,9 +456,10 @@
             border: 1px dashed var(--primary);
         }
         .nav-logout {
-            margin-top: 8px;
+            margin-top: 12px;
+            margin-bottom: 16px;
             border-top: 1px solid var(--border-color);
-            padding-top: 8px;
+            padding-top: 12px;
         }
         .nav-logout .nav-link,
         .nav-logout .nav-link i { color: var(--accent-red); }
@@ -2169,6 +2180,113 @@
             font-family: monospace;
         }
 
+        /* ============ FLOATING NOTIFICATION (PWA Install dll) ============ */
+        .floating-notification {
+            position: fixed;
+            top: calc(var(--header-height) + 8px);
+            left: 50%;
+            transform: translateX(-50%);
+            width: calc(100% - 20px);
+            max-width: 410px;
+            background: var(--bg-card);
+            border: 1px solid var(--primary);
+            border-radius: 12px;
+            padding: 12px 14px;
+            z-index: 9998;
+            display: none;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            cursor: pointer;
+            color: #ffffff;
+            transition: all 0.3s ease;
+        }
+        .floating-notification.active {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: floatingNotifIn 0.5s ease;
+        }
+        @keyframes floatingNotifIn {
+            from { transform: translateX(-50%) translateY(-100px) scale(0.8); opacity: 0; }
+            to { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes floatingNotifOut {
+            from { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+            to { transform: translateX(-50%) translateY(-100px) scale(0.8); opacity: 0; }
+        }
+        .floating-notification.hide {
+            animation: floatingNotifOut 0.5s ease;
+        }
+        .floating-notification.emergency-notif {
+            border-color: var(--accent-red);
+            box-shadow: 0 0 30px rgba(248,81,73,0.5);
+        }
+        .floating-notification .notif-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 1rem;
+        }
+        .floating-notification .notif-icon.emergency {
+            background: rgba(248, 81, 73, 0.2);
+            color: var(--accent-red);
+        }
+        .floating-notification .notif-icon.install {
+            background: rgba(230, 0, 18, 0.2);
+            color: var(--primary);
+        }
+        .floating-notification .notif-icon.regular {
+            background: rgba(230, 0, 18, 0.15);
+            color: var(--primary);
+        }
+        .floating-notification .notif-content {
+            flex: 1;
+            min-width: 0;
+        }
+        .floating-notification .notif-content .notif-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        .floating-notification .notif-content .notif-message {
+            font-size: 0.65rem;
+            color: #a8b2c1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .floating-notification .notif-content .notif-subtitle {
+            font-size: 0.58rem;
+            color: #6b7688;
+        }
+        .floating-notification .notif-action {
+            padding: 5px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--primary);
+            background: rgba(230, 0, 18, 0.15);
+            color: var(--primary);
+            font-size: 0.68rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            flex-shrink: 0;
+        }
+        .floating-notification .notif-action:active {
+            transform: scale(0.95);
+        }
+        .floating-notification .notif-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.85rem;
+            padding: 4px;
+            flex-shrink: 0;
+        }
+
         /* ============ BOTTOM NAV ============ */
         .bottom-nav {
             position: fixed;
@@ -2601,7 +2719,21 @@
 <body>
 
     <!-- APP SHELL (Max 430px, centered) -->
-    <div class="app-shell">
+        <div class="app-shell">
+
+    <!-- ============================================================ -->
+    <!-- FLOATING NOTIFICATION (PWA Install, Emergency, dll)          -->
+    <!-- ============================================================ -->
+    <div class="floating-notification" id="floatingNotification">
+        <div class="notif-icon" id="floatingIcon"><i class="fas fa-bell"></i></div>
+        <div class="notif-content">
+            <div class="notif-title" id="floatingTitle">SALINK</div>
+            <div class="notif-message" id="floatingMessage">Emergency Alert System</div>
+            <div class="notif-subtitle" id="floatingSubtitle"></div>
+        </div>
+        <button class="notif-action" id="floatingAction">Lihat</button>
+        <button class="notif-close" id="floatingClose"><i class="fas fa-times"></i></button>
+    </div>
 
     <!-- SYNC INDICATOR -->
     <div class="sync-indicator" id="syncIndicator"><i class="fas fa-sync-alt fa-spin"></i> Sync...</div>
@@ -5203,6 +5335,122 @@ function lightboxShare() {
 }
 
 /* ================================================================
+ * FLOATING NOTIFICATION (untuk PWA Install & Emergency Alert)
+ * ================================================================ */
+let floatingNotificationTimeout = null;
+let deferredPrompt = null;
+
+function showFloatingNotification(type, title, message, subtitle, actionText, actionCallback) {
+    const notif = document.getElementById('floatingNotification');
+    const icon = document.getElementById('floatingIcon');
+    if (!notif) return;
+    clearTimeout(floatingNotificationTimeout);
+
+    icon.className = 'notif-icon ' + type;
+    if (type === 'emergency') {
+        icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+    } else if (type === 'install') {
+        icon.innerHTML = '<i class="fas fa-download"></i>';
+    } else {
+        icon.innerHTML = '<i class="fas fa-bell"></i>';
+    }
+
+    document.getElementById('floatingTitle').textContent = title;
+    document.getElementById('floatingMessage').textContent = message;
+    document.getElementById('floatingSubtitle').textContent = subtitle || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+    const actionBtn = document.getElementById('floatingAction');
+    if (actionText && actionCallback) {
+        actionBtn.style.display = 'block';
+        actionBtn.textContent = actionText;
+        actionBtn.onclick = (e) => {
+            e.stopPropagation();
+            actionCallback();
+        };
+    } else {
+        actionBtn.style.display = 'none';
+    }
+
+    document.getElementById('floatingClose').onclick = (e) => {
+        e.stopPropagation();
+        hideFloatingNotification();
+    };
+
+    if (type === 'emergency') {
+        notif.classList.add('emergency-notif');
+    } else {
+        notif.classList.remove('emergency-notif');
+    }
+
+    notif.onclick = () => {
+        if (actionCallback) actionCallback();
+    };
+
+    notif.classList.add('active');
+    floatingNotificationTimeout = setTimeout(() => hideFloatingNotification(), 10000);
+}
+
+function hideFloatingNotification() {
+    const notif = document.getElementById('floatingNotification');
+    if (notif) {
+        notif.classList.remove('active');
+        notif.classList.add('hide');
+        setTimeout(() => notif.classList.remove('hide'), 500);
+    }
+    clearTimeout(floatingNotificationTimeout);
+}
+
+/* ================================================================
+ * PWA INSTALL PROMPT
+ * ================================================================ */
+function setupPWA() {
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
+        });
+    }
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        setTimeout(() => {
+            if (deferredPrompt && !localStorage.getItem('salink_installed')) {
+                showFloatingNotification(
+                    'install',
+                    '📱 Install SALINK',
+                    'Akses lebih cepat & offline',
+                    'Tap untuk install aplikasi',
+                    'Install',
+                    () => showInstallPrompt()
+                );
+            }
+        }, 10000);
+    });
+
+    window.addEventListener('appinstalled', () => {
+        localStorage.setItem('salink_installed', 'true');
+        deferredPrompt = null;
+        showToast('🎉 Selamat!', 'Aplikasi SALINK berhasil diinstall!', 'fa-rocket', 'success');
+    });
+}
+
+function showInstallPrompt() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((r) => {
+            if (r.outcome === 'accepted') {
+                localStorage.setItem('salink_installed', 'true');
+                showToast('✅ Berhasil', 'Aplikasi SALINK diinstall!', 'fa-check-circle', 'success');
+            }
+            deferredPrompt = null;
+        });
+    } else {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        showToast('📱 Install', isIOS ? 'Bagikan → Tambahkan ke Layar Utama' : 'Menu browser → Install Aplikasi', 'fa-mobile-alt', 'success');
+    }
+}
+
+/* ================================================================
  * MODAL SEARCH (SAMA DENGAN DASHBOARD)
  * ================================================================ */
 let searchTab = 'all';
@@ -5679,6 +5927,9 @@ document.getElementById('headerSearchBtn')?.addEventListener('click', function(e
     // Init FAB modal
     initFabModal();
 
+    // ✅ Setup PWA Install
+    setupPWA();
+
     // Setup post input
     setupPostInput();
 
@@ -5761,6 +6012,9 @@ window.openModal = openModal;
 window.ambilLokasiSaya = ambilLokasiSaya;
 window.openFabModal = openFabModal;
 window.closeFabModal = closeFabModal;
+window.showFloatingNotification = showFloatingNotification;
+window.hideFloatingNotification = hideFloatingNotification;
+window.showInstallPrompt = showInstallPrompt;
 window.openSearchModal = openSearchModal;
 window.closeSearchModal = closeSearchModal;
 window.clearSearch = clearSearch;
