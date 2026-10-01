@@ -593,19 +593,30 @@
             z-index: 2;
         }
 
-        /* ==================================================================
-           HOLOGRAM — NAVY → PURPLE
+          /* ==================================================================
+           HOLOGRAM — GLOBAL EMERGENCY CAROUSEL v2.0 (ADVANCED)
+           ==================================================================
+           Fitur:
+           - Slide Summary (slide 1) dengan ringkasan global
+           - Slide Detail dengan counter [1/3] per jenis
+           - Animasi Fade + Scale + Parallax
+           - Pagination dots scrollable (100+ slide)
+           - Support Global (Negara → Desa)
            ================================================================== */
+
+        /* ============ CONTAINER ============ */
         .hologram-display {
             width: 100%;
             margin: 0 auto 14px;
-            background: var(--grad-hologram);
+            background: linear-gradient(160deg, #141b2e 0%, #2d1b4e 100%);
             border: 1px solid rgba(199,146,234,0.2);
             border-radius: 14px;
             position: relative;
             overflow: hidden;
             box-shadow: 0 8px 24px rgba(45,27,78,0.4);
         }
+
+        /* ============ HEADER ============ */
         .hologram-header-title {
             background: rgba(10,14,26,0.5);
             padding: 11px 14px;
@@ -616,163 +627,608 @@
             font-size: 0.82rem;
             font-weight: 700;
             color: #ffffff;
+            gap: 8px;
         }
-        .hologram-header-title .title-left { display: flex; align-items: center; gap: 6px; }
+        .hologram-header-title .title-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex: 1;
+            min-width: 0;
+        }
+        .hologram-header-title .title-left .pulse-icon {
+            animation: pulse-dot 2s ease-in-out infinite;
+            font-size: 1rem;
+            flex-shrink: 0;
+        }
+        .hologram-header-title .title-left .title-text {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 800;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         .hologram-header-title .hologram-count {
             background: var(--primary);
             color: #fff;
-            padding: 2px 10px;
+            padding: 3px 12px;
             border-radius: 12px;
-            font-size: 0.62rem;
+            font-size: 0.65rem;
             font-weight: 800;
             font-family: 'Poppins', sans-serif;
             box-shadow: 0 2px 8px rgba(230,0,18,0.4);
+            white-space: nowrap;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 5px;
         }
-        .hologram-header-title .hologram-count.zero { background: rgba(255,255,255,0.1); color: var(--text-muted); box-shadow: none; }
+        .hologram-header-title .hologram-count.zero {
+            background: rgba(255,255,255,0.1);
+            color: var(--text-muted);
+            box-shadow: none;
+        }
+        .hologram-header-title .hologram-count i {
+            font-size: 0.6rem;
+        }
 
+        /* ============ CAROUSEL WRAPPER ============ */
         .hologram-carousel {
             position: relative;
             overflow: hidden;
-            min-height: 220px;
+            min-height: 260px;
+            perspective: 1000px;
         }
         .hologram-track {
             display: flex;
             transition: transform 0.5s cubic-bezier(.25,.8,.25,1);
             will-change: transform;
+            transform-style: preserve-3d;
         }
         .hologram-slide {
             min-width: 100%;
-            padding: 10px;
+            padding: 12px;
             box-sizing: border-box;
+            transition: opacity 0.4s ease, transform 0.5s ease;
+            opacity: 0;
+            transform: scale(0.95) translateX(20px);
         }
-        .hologram-list { padding: 0; }
-        #hologramList { display: none; }
+        .hologram-slide.active {
+            opacity: 1;
+            transform: scale(1) translateX(0);
+        }
 
+        /* ============ SLIDE SUMMARY (Slide 1) ============ */
+        .hologram-summary {
+            background: linear-gradient(135deg, rgba(45,27,78,0.6) 0%, rgba(20,27,46,0.8) 100%);
+            border: 1px solid rgba(199,146,234,0.25);
+            border-radius: 14px;
+            padding: 16px;
+            color: #ffffff;
+            position: relative;
+            overflow: hidden;
+        }
+        .hologram-summary::before {
+            content: '';
+            position: absolute;
+            top: -40px;
+            right: -40px;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(199,146,234,0.2), transparent 70%);
+            filter: blur(20px);
+            pointer-events: none;
+        }
+
+        .hologram-summary-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+            position: relative;
+            z-index: 1;
+        }
+        .hologram-summary-header .summary-globe {
+            font-size: 1.8rem;
+            line-height: 1;
+            filter: drop-shadow(0 0 12px rgba(199,146,234,0.6));
+            animation: floatGlow 4s ease-in-out infinite;
+        }
+        .hologram-summary-header .summary-title {
+            flex: 1;
+            min-width: 0;
+        }
+        .hologram-summary-header h3 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            color: #ffffff;
+            margin-bottom: 2px;
+        }
+        .hologram-summary-header .summary-subtitle {
+            font-size: 0.6rem;
+            color: rgba(255,255,255,0.6);
+            font-weight: 500;
+        }
+
+        /* Grid stats per jenis */
+        .hologram-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 14px;
+            position: relative;
+            z-index: 1;
+        }
+        .summary-stat-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(10,14,26,0.5);
+            border: 1px solid rgba(255,255,255,0.08);
+            transition: transform 0.2s;
+        }
+        .summary-stat-item:active {
+            transform: scale(0.97);
+        }
+        .summary-stat-item .stat-icon-wrap {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            flex-shrink: 0;
+            position: relative;
+        }
+        .summary-stat-item.fire .stat-icon-wrap {
+            background: rgba(248,81,73,0.15);
+            border: 1px solid rgba(248,81,73,0.3);
+        }
+        .summary-stat-item.medical .stat-icon-wrap {
+            background: rgba(79,195,247,0.15);
+            border: 1px solid rgba(79,195,247,0.3);
+        }
+        .summary-stat-item.crime .stat-icon-wrap {
+            background: rgba(240,208,128,0.15);
+            border: 1px solid rgba(240,208,128,0.3);
+        }
+        .summary-stat-item.disaster .stat-icon-wrap {
+            background: rgba(199,146,234,0.15);
+            border: 1px solid rgba(199,146,234,0.3);
+        }
+        .summary-stat-item .stat-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .summary-stat-item .stat-info .stat-name {
+            font-size: 0.68rem;
+            font-weight: 700;
+            color: rgba(255,255,255,0.9);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .summary-stat-item .stat-info .stat-count {
+            font-size: 1.1rem;
+            font-weight: 800;
+            font-family: 'Poppins', sans-serif;
+            line-height: 1;
+            margin-top: 2px;
+        }
+        .summary-stat-item.fire .stat-info .stat-count { color: var(--accent-red); }
+        .summary-stat-item.medical .stat-info .stat-count { color: #4fc3f7; }
+        .summary-stat-item.crime .stat-info .stat-count { color: var(--accent-gold); }
+        .summary-stat-item.disaster .stat-info .stat-count { color: var(--accent-purple); }
+
+        /* Footer summary */
+        .hologram-summary-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 12px;
+            border-top: 1px dashed rgba(255,255,255,0.15);
+            position: relative;
+            z-index: 1;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .hologram-summary-footer .total-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .hologram-summary-footer .total-label {
+            font-size: 0.55rem;
+            color: rgba(255,255,255,0.55);
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .hologram-summary-footer .total-value {
+            font-size: 0.95rem;
+            font-weight: 800;
+            font-family: 'Poppins', sans-serif;
+            color: #ffffff;
+        }
+        .hologram-summary-footer .total-value .highlight {
+            color: var(--accent-red);
+        }
+        .hologram-summary-footer .region-info {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.62rem;
+            color: rgba(255,255,255,0.7);
+            font-weight: 600;
+        }
+        .hologram-summary-footer .region-info i {
+            color: #c792ea;
+        }
+
+        /* ============ SLIDE DETAIL ============ */
         .hologram-item {
             background: rgba(10,14,26,0.6);
             border: 1px solid rgba(199,146,234,0.2);
             border-radius: 12px;
             padding: 12px 14px;
             color: #ffffff;
+            position: relative;
         }
         .hologram-item.fire { border-left: 3px solid var(--accent-red); }
         .hologram-item.medical { border-left: 3px solid #4fc3f7; }
         .hologram-item.crime { border-left: 3px solid var(--accent-gold); }
         .hologram-item.disaster { border-left: 3px solid var(--accent-purple); }
-        .hologram-item-header { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
-        .hologram-item-icon { font-size: 1.35rem; line-height: 1; }
-        .hologram-item-type { font-size: 0.65rem; font-weight: 800; padding: 2px 8px; border-radius: 10px; }
+
+        /* Header */
+        .hologram-item-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .hologram-item-icon {
+            font-size: 1.5rem;
+            line-height: 1;
+        }
+        .hologram-item-type {
+            font-size: 0.68rem;
+            font-weight: 800;
+            padding: 3px 10px;
+            border-radius: 10px;
+            letter-spacing: 0.3px;
+        }
         .hologram-item-type.fire { color: var(--accent-red); background: rgba(248,81,73,0.15); }
         .hologram-item-type.medical { color: #4fc3f7; background: rgba(79,195,247,0.15); }
         .hologram-item-type.crime { color: var(--accent-gold); background: rgba(240,208,128,0.15); }
         .hologram-item-type.disaster { color: var(--accent-purple); background: rgba(199,146,234,0.15); }
-        .hologram-item-time { font-size: 0.55rem; color: rgba(255,255,255,0.6); margin-left: auto; font-weight: 600; }
+
+        /* Counter per-slide [1/3] */
+        .hologram-item-counter {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #ffffff;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 0.6rem;
+            font-weight: 800;
+            font-family: 'Poppins', sans-serif;
+            letter-spacing: 0.5px;
+        }
+
+        /* Status Live */
+        .hologram-item-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 3px 9px;
+            border-radius: 10px;
+            margin-left: auto;
+        }
+        .hologram-item-status.live {
+            color: #3fb950;
+            background: rgba(63,185,80,0.15);
+            border: 1px solid rgba(63,185,80,0.3);
+        }
+        .hologram-item-status.live::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #3fb950;
+            animation: pulse-dot 1.5s ease-in-out infinite;
+        }
+        .hologram-item-status.expired {
+            color: var(--text-muted);
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        /* Delete button */
         .hologram-item-delete {
             background: rgba(248,81,73,0.15);
             color: var(--accent-red);
             border: 1px solid rgba(248,81,73,0.3);
-            width: 22px; height: 22px;
+            width: 26px;
+            height: 26px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            font-size: 0.6rem;
+            font-size: 0.65rem;
+            flex-shrink: 0;
         }
-        .hologram-item-sender { font-size: 0.72rem; color: rgba(255,255,255,0.85); margin-bottom: 6px; }
-        .hologram-item-sender strong { color: #c792ea; cursor: pointer; font-weight: 700; }
+        .hologram-item-delete:active {
+            transform: scale(0.9);
+        }
+
+        /* Sender */
+        .hologram-item-sender {
+            font-size: 0.72rem;
+            color: rgba(255,255,255,0.85);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .hologram-item-sender i {
+            color: #c792ea;
+            font-size: 0.7rem;
+        }
+        .hologram-item-sender strong {
+            color: #c792ea;
+            cursor: pointer;
+            font-weight: 700;
+        }
+        .hologram-item-sender .time-ago {
+            color: rgba(255,255,255,0.55);
+            font-size: 0.6rem;
+            font-weight: 500;
+            margin-left: auto;
+        }
+
+        /* Text content */
         .hologram-item-text {
             font-size: 0.72rem;
             line-height: 1.5;
-            margin-bottom: 8px;
-            padding: 8px 10px;
+            margin-bottom: 10px;
+            padding: 9px 12px;
             background: rgba(199,146,234,0.08);
             border-radius: 8px;
             border-left: 3px solid #c792ea;
             color: #ffffff;
+            font-style: italic;
         }
-        .hologram-item-location {
+
+        /* Location — Hierarki Global */
+        .hologram-item-location-hierarchy {
             font-size: 0.68rem;
-            color: rgba(255,255,255,0.75);
+            color: rgba(255,255,255,0.85);
             display: flex;
             align-items: flex-start;
             gap: 6px;
             margin-bottom: 6px;
+            line-height: 1.5;
+            word-break: break-word;
         }
-        .hologram-item-location i { color: #c792ea; font-size: 0.75rem; margin-top: 2px; }
+        .hologram-item-location-hierarchy i {
+            color: #c792ea;
+            font-size: 0.75rem;
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+        .hologram-item-location-hierarchy .hierarchy {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+        }
+        .hologram-item-location-hierarchy .hierarchy .sep {
+            color: rgba(255,255,255,0.3);
+            margin: 0 2px;
+        }
+
+        /* Coordinates */
         .hologram-item-coords {
             font-size: 0.6rem;
-            font-family: monospace;
+            font-family: 'Courier New', monospace;
             color: #c792ea;
-            padding: 3px 10px;
+            padding: 4px 10px;
             background: rgba(199,146,234,0.1);
             border-radius: 6px;
-            display: inline-block;
-            margin-bottom: 8px;
-        }
-        .hologram-item-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-        .hologram-item-actions .btn-map-item {
             display: inline-flex;
             align-items: center;
             gap: 5px;
-            padding: 5px 12px;
-            border-radius: 8px;
-            font-size: 0.6rem;
+            margin-bottom: 10px;
+        }
+
+        /* Actions */
+        .hologram-item-actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 8px;
+            padding-top: 10px;
+            border-top: 1px dashed rgba(255,255,255,0.1);
+        }
+        .hologram-item-actions .btn-action {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 0.65rem;
             font-weight: 700;
             text-decoration: none;
             cursor: pointer;
             border: none;
-            background: var(--accent-blue-gradient);
-            color: #fff;
             font-family: inherit;
+            transition: transform 0.2s, opacity 0.2s;
+            flex: 1;
+            min-width: 100px;
+        }
+        .hologram-item-actions .btn-action:active {
+            transform: scale(0.95);
+        }
+        .hologram-item-actions .btn-map {
+            background: linear-gradient(135deg, #ff6b35, #ff4500);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(255,107,53,0.35);
         }
         .hologram-item-actions .btn-detail {
             background: rgba(255,255,255,0.1);
             color: #c792ea;
             border: 1px solid #c792ea;
         }
+
+        /* Expiry */
         .hologram-item-expiry {
             font-size: 0.55rem;
             color: var(--accent-gold);
             display: flex;
             align-items: center;
             gap: 4px;
-            margin-top: 6px;
-            padding-top: 6px;
+            margin-top: 8px;
+            padding-top: 8px;
             border-top: 1px dashed rgba(255,255,255,0.1);
+            font-weight: 600;
         }
+
+        /* ============ EMPTY STATE ============ */
         .hologram-empty {
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 40px 20px;
+            padding: 50px 20px;
             text-align: center;
             color: rgba(255,255,255,0.6);
-            min-height: 220px;
+            min-height: 240px;
         }
-        .hologram-empty .empty-icon { font-size: 2.2rem; opacity: 0.4; margin-bottom: 10px; animation: pulse-dot 2s ease-in-out infinite; }
-        .hologram-empty .empty-title { font-size: 0.85rem; font-weight: 600; color: rgba(255,255,255,0.9); }
-        .hologram-empty .empty-desc { font-size: 0.68rem; max-width: 260px; line-height: 1.5; }
+        .hologram-empty .empty-icon {
+            font-size: 2.5rem;
+            opacity: 0.4;
+            margin-bottom: 12px;
+            animation: pulse-dot 2s ease-in-out infinite;
+        }
+        .hologram-empty .empty-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 4px;
+            font-family: 'Poppins', sans-serif;
+        }
+        .hologram-empty .empty-desc {
+            font-size: 0.68rem;
+            max-width: 260px;
+            line-height: 1.5;
+        }
 
+        /* ============ PAGINATION (Scrollable untuk 100+ slide) ============ */
+        .hologram-pagination-wrapper {
+            position: relative;
+            padding: 10px 0 12px;
+            overflow: hidden;
+        }
         .hologram-pagination {
             display: flex;
-            justify-content: center;
-            gap: 5px;
-            padding: 10px 0 12px;
+            justify-content: flex-start;
+            align-items: center;
+            gap: 6px;
+            padding: 0 16px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            scroll-behavior: smooth;
+        }
+        .hologram-pagination::-webkit-scrollbar {
+            display: none;
         }
         .hologram-dot {
-            width: 6px; height: 6px;
+            width: 6px;
+            height: 6px;
             border-radius: 3px;
-            background: rgba(255,255,255,0.3);
-            opacity: 0.6;
+            background: rgba(255,255,255,0.25);
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.3s ease;
             border: none;
             padding: 0;
+            flex-shrink: 0;
+            position: relative;
         }
-        .hologram-dot.active { width: 18px; background: #c792ea; opacity: 1; box-shadow: 0 0 8px rgba(199,146,234,0.6); }
+        .hologram-dot.active {
+            width: 20px;
+            background: #c792ea;
+            box-shadow: 0 0 8px rgba(199,146,234,0.6);
+        }
 
+        /* Progress bar (untuk banyak slide) */
+        .hologram-progress-bar {
+            height: 2px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 1px;
+            margin: 0 16px 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        .hologram-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #c792ea, #e57373);
+            border-radius: 1px;
+            transition: width 0.5s ease;
+            width: 0%;
+        }
+
+        /* ============ ANIMATIONS ============ */
+        @keyframes hologramSlideIn {
+            from {
+                opacity: 0;
+                transform: scale(0.92) translateX(30px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateX(0);
+            }
+        }
+        @keyframes hologramSlideOut {
+            from {
+                opacity: 1;
+                transform: scale(1) translateX(0);
+            }
+            to {
+                opacity: 0;
+                transform: scale(0.92) translateX(-30px);
+            }
+        }
+
+        /* ============ RESPONSIVE ============ */
+        @media (max-width: 360px) {
+            .hologram-summary-grid {
+                grid-template-columns: 1fr;
+            }
+            .hologram-item-actions .btn-action {
+                min-width: 80px;
+                font-size: 0.6rem;
+                padding: 7px 10px;
+            }
+            .hologram-header-title {
+                font-size: 0.75rem;
+            }
+            .hologram-header-title .hologram-count {
+                font-size: 0.6rem;
+                padding: 2px 9px;
+            }
+        }
+        
         /* ==================================================================
            EMERGENCY GRID 2x2
            ================================================================== */
@@ -3003,28 +3459,50 @@
             </div>
         </div>
 
-        <!-- HOLOGRAM DISPLAY -->
+        <!-- ============================================================ -->
+        <!-- HOLOGRAM DISPLAY — GLOBAL EMERGENCY CAROUSEL v2.0            -->
+        <!-- ============================================================ -->
         <div class="hologram-display" id="hologramDisplay">
+            <!-- HEADER -->
             <div class="hologram-header-title">
                 <div class="title-left">
-                    <span>📡</span>
-                    <span>Hologram Darurat</span>
-                    <span style="font-size:0.55rem;color:rgba(255,255,255,0.6);font-weight:500;">(24 Jam)</span>
+                    <span class="pulse-icon">📡</span>
+                    <span class="title-text">Hologram Darurat</span>
+                    <span style="font-size:0.55rem;color:rgba(255,255,255,0.6);font-weight:500;">(24 Jam Global)</span>
                 </div>
-                <span class="hologram-count zero" id="hologramCount">0</span>
+                <span class="hologram-count zero" id="hologramCount">
+                    <i class="fas fa-bolt"></i>
+                    <span id="hologramCountText">0</span>
+                </span>
             </div>
+
+            <!-- CAROUSEL -->
             <div class="hologram-carousel" id="hologramCarousel">
                 <div class="hologram-track" id="hologramTrack">
-                    <div class="hologram-list" id="hologramList">
+                    <!-- SLIDE akan dirender oleh JS -->
+                    <!-- Placeholder untuk initial render -->
+                    <div class="hologram-slide active">
                         <div class="hologram-empty">
                             <div class="empty-icon">📡</div>
-                            <div class="empty-title">Menunggu Laporan Darurat</div>
-                            <div class="empty-desc">Belum ada laporan emergency aktif. Sistem akan menampilkan notifikasi darurat secara real-time di sini.</div>
+                            <div class="empty-title">Memuat Data Emergency...</div>
+                            <div class="empty-desc">Mengambil laporan darurat dari server...</div>
                         </div>
                     </div>
                 </div>
+
+                <!-- HIDDEN: Source data untuk JS lama (compatibility) -->
+                <div class="hologram-list" id="hologramList" style="display:none;"></div>
             </div>
-            <div class="hologram-pagination" id="hologramPagination"></div>
+
+            <!-- PROGRESS BAR (untuk 100+ slide) -->
+            <div class="hologram-progress-bar" id="hologramProgressBar">
+                <div class="hologram-progress-fill" id="hologramProgressFill"></div>
+            </div>
+
+            <!-- PAGINATION (scrollable) -->
+            <div class="hologram-pagination-wrapper">
+                <div class="hologram-pagination" id="hologramPagination"></div>
+            </div>
         </div>
 
         <!-- EMERGENCY GRID 2x2 -->
@@ -4483,94 +4961,371 @@ function updateStatsCards() {
 }
 
 // ====================================================================
-// 20. RENDER HOLOGRAM
+// 20. RENDER HOLOGRAM — v2.0 GLOBAL (Summary + Detail)
 // ====================================================================
 function renderHologram() {
     const list = document.getElementById('hologramList');
     if (!list) return;
+
     const ems = getActiveEmergencies();
+
+    // Update counter global di header
+    const countEl = document.getElementById('hologramCount');
+    const countTextEl = document.getElementById('hologramCountText');
+    if (countEl) {
+        countEl.classList.toggle('zero', ems.length === 0);
+    }
+    if (countTextEl) {
+        countTextEl.textContent = ems.length;
+    }
+
+    // Simpan data ke list (hidden) untuk compatibility
     if (ems.length === 0) {
         list.innerHTML = '<div class="hologram-empty"><div class="empty-icon">📡</div><div class="empty-title">Menunggu Laporan Darurat</div><div class="empty-desc">Belum ada laporan emergency aktif.</div></div>';
     } else {
-        ems.sort((a,b) => b.timestamp - a.timestamp);
-        list.innerHTML = ems.map(em => {
-            const type = em.type || 'fire';
-            const icon = EMERGENCY_ICONS[type] || '🚨';
-            const label = EMERGENCY_LABELS[type] || 'DARURAT';
-            const cssClass = EMERGENCY_CSS_CLASS[type] || 'fire';
-            const mapLink = em.mapsURL || (em.coords ? 'https://www.google.com/maps?q=' + em.coords : '');
-            let embedUrl = em.mapEmbedURL || '';
-            if (!embedUrl && em.coords && em.coords.indexOf(',') !== -1) {
-                const parts = em.coords.split(',');
-                embedUrl = 'https://www.google.com/maps?q=' + parts[0].trim() + ',' + parts[1].trim() + '&output=embed';
-            }
-            return '<div class="hologram-item ' + cssClass + '" data-id="' + escapeAttr(em.id) + '">' +
-                '<div class="hologram-item-header">' +
-                    '<span class="hologram-item-icon">' + icon + '</span>' +
-                    '<span class="hologram-item-type ' + cssClass + '">' + label + '</span>' +
-                    '<span class="hologram-item-time">' + getTimeAgo(em.timestamp) + '</span>' +
-                    '<button class="hologram-item-delete" onclick="requestDelete(\'emergency\', \'' + escapeAttr(em.id) + '\', \'' + label + '\')"><i class="fas fa-times"></i></button>' +
-                '</div>' +
-                '<div class="hologram-item-sender">📤 Dilaporkan oleh: <strong onclick="handleProfileClick(\'' + escapeAttr(em.senderUsername || 'sistem') + '\')">' + escapeHTML(em.sender) + '</strong></div>' +
-                (em.text ? '<div class="hologram-item-text">' + escapeHTML(em.text) + '</div>' : '') +
-                '<div class="hologram-item-location"><i class="fas fa-map-marker-alt"></i><span>' + escapeHTML(em.location || '-') + '</span></div>' +
-                (em.coords ? '<div class="hologram-item-coords"><i class="fas fa-crosshairs"></i> ' + escapeHTML(em.coords) + '</div>' : '') +
-                (embedUrl ? '<div style="width:100%;margin:8px 0;border-radius:10px;overflow:hidden;border:1px solid rgba(255,255,255,0.1);"><iframe src="' + escapeAttr(embedUrl) + '" style="display:block;width:100%;height:160px;border:none;" loading="lazy" allowfullscreen></iframe></div>' : '') +
-                '<div class="hologram-item-actions">' +
-                    (mapLink ? '<a href="' + escapeAttr(mapLink) + '" target="_blank" class="btn-map-item"><i class="fas fa-external-link-alt"></i> Lihat Peta</a>' : '') +
-                    '<a href="detail-emergency.html?id=' + encodeURIComponent(em.id) + '" class="btn-map-item btn-detail"><i class="fas fa-info-circle"></i> Detail</a>' +
-                '</div>' +
-                '<div class="hologram-item-expiry"><i class="fas fa-clock"></i> ' + getRemainingTime(em.expiresAt) + '</div>' +
-            '</div>';
-        }).join('');
+        list.innerHTML = ems.map(em => '<div data-id="' + escapeAttr(em.id) + '"></div>').join('');
     }
+
+    // Build slides baru
     setTimeout(transformHologramToSlides, 50);
     updateEmergencyBadges();
 }
 
+// ====================================================================
+// 20b. TRANSFORM → SLIDES (Summary + Detail)
+// ====================================================================
 function transformHologramToSlides() {
     const hologramTrack = document.getElementById('hologramTrack');
     if (!hologramTrack) return;
-    const listEl = document.getElementById('hologramList');
-    if (!listEl) return;
-    const items = listEl.querySelectorAll('.hologram-item');
-    const isEmptyState = listEl.querySelector('.hologram-empty');
-    listEl.style.display = 'none';
-    let slidesHTML = '';
-    let slidesCount = 0;
-    if (isEmptyState || items.length === 0) {
-        slidesHTML = '<div class="hologram-slide"><div class="hologram-empty"><div class="empty-icon">📡</div><div class="empty-title">Menunggu Laporan Darurat</div><div class="empty-desc">Belum ada laporan emergency aktif. Sistem akan menampilkan notifikasi darurat secara real-time di sini.</div></div></div>';
-        slidesCount = 1;
-    } else {
-        items.forEach(item => {
-            slidesHTML += '<div class="hologram-slide">' + item.outerHTML + '</div>';
+
+    const ems = getActiveEmergencies();
+
+    // Empty state
+    if (ems.length === 0) {
+        hologramTrack.innerHTML = '<div class="hologram-slide active">' +
+            '<div class="hologram-empty">' +
+                '<div class="empty-icon">📡</div>' +
+                '<div class="empty-title">Menunggu Laporan Darurat</div>' +
+                '<div class="empty-desc">Belum ada laporan emergency aktif. Sistem akan menampilkan notifikasi darurat secara real-time di sini.</div>' +
+            '</div>' +
+        '</div>';
+        buildHologramPagination(1);
+        window.hologramSlidesCount = 1;
+        window.hologramIndex = 0;
+        updateProgressBar(0, 1);
+        return;
+    }
+
+    // Sort: terbaru dulu
+    const sortedEms = ems.slice().sort((a, b) => b.timestamp - a.timestamp);
+
+    // Group by type untuk counter [1/3]
+    const typeGroups = { fire: [], medical: [], crime: [], disaster: [] };
+    sortedEms.forEach(em => {
+        const t = em.type || 'fire';
+        if (typeGroups[t]) typeGroups[t].push(em);
+    });
+
+    // Build counter map: setiap emergency tahu dia ke-berapa dari total jenisnya
+    const counterMap = {};
+    Object.keys(typeGroups).forEach(type => {
+        typeGroups[type].forEach((em, idx) => {
+            counterMap[em.id] = {
+                current: idx + 1,
+                total: typeGroups[type].length,
+                type: type
+            };
         });
-        slidesCount = items.length;
-    }
+    });
+
+    // Build slides HTML
+    let slidesHTML = '';
+
+    // SLIDE 1: SUMMARY GLOBAL
+    slidesHTML += buildSummarySlide(typeGroups, sortedEms);
+
+    // SLIDE 2+: DETAIL
+    sortedEms.forEach((em, idx) => {
+        const counter = counterMap[em.id] || { current: idx + 1, total: sortedEms.length, type: em.type };
+        slidesHTML += buildDetailSlide(em, counter);
+    });
+
     hologramTrack.innerHTML = slidesHTML;
-    const pagination = document.getElementById('hologramPagination');
-    if (pagination) {
-        pagination.innerHTML = '';
-        if (slidesCount <= 1) {
-            pagination.style.display = 'none';
-        } else {
-            pagination.style.display = 'flex';
-            for (let i = 0; i < slidesCount; i++) {
-                const dot = document.createElement('button');
-                dot.className = 'hologram-dot' + (i === 0 ? ' active' : '');
-                dot.setAttribute('aria-label', 'Slide ' + (i + 1));
-                dot.addEventListener('click', () => {
-                    window.hologramPaused = true;
-                    goToHologramSlide(i);
-                    setTimeout(() => { window.hologramPaused = false; }, 8000);
-                });
-                pagination.appendChild(dot);
-            }
-        }
-    }
+
+    const totalSlides = 1 + sortedEms.length;
+    window.hologramSlidesCount = totalSlides;
     window.hologramIndex = 0;
+
+    // Build pagination
+    buildHologramPagination(totalSlides);
+
+    // Activate slide pertama
     goToHologramSlide(0);
-    startHologramAuto(slidesCount);
+    startHologramAuto(totalSlides);
+}
+
+// ====================================================================
+// 20c. BUILD SLIDE SUMMARY (Slide 1)
+// ====================================================================
+function buildSummarySlide(typeGroups, allEms) {
+    const totalFire = typeGroups.fire.length;
+    const totalMedical = typeGroups.medical.length;
+    const totalCrime = typeGroups.crime.length;
+    const totalDisaster = typeGroups.disaster.length;
+    const totalAll = allEms.length;
+
+    // Hitung jumlah wilayah unik (country)
+    const regions = new Set();
+    allEms.forEach(em => {
+        const country = (em.country || '').trim() || 'Indonesia';
+        regions.add(country);
+    });
+    const regionCount = regions.size;
+
+    return '<div class="hologram-slide active">' +
+        '<div class="hologram-summary">' +
+            '<div class="hologram-summary-header">' +
+                '<div class="summary-globe">🌍</div>' +
+                '<div class="summary-title">' +
+                    '<h3>Ringkasan Emergency Global</h3>' +
+                    '<div class="summary-subtitle">24 Jam Terakhir · Real-time</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="hologram-summary-grid">' +
+                '<div class="summary-stat-item fire">' +
+                    '<div class="stat-icon-wrap">🔥</div>' +
+                    '<div class="stat-info">' +
+                        '<div class="stat-name">Kebakaran</div>' +
+                        '<div class="stat-count">' + totalFire + '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="summary-stat-item medical">' +
+                    '<div class="stat-icon-wrap">🚑</div>' +
+                    '<div class="stat-info">' +
+                        '<div class="stat-name">Medis & Kematian</div>' +
+                        '<div class="stat-count">' + totalMedical + '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="summary-stat-item crime">' +
+                    '<div class="stat-icon-wrap">🚓</div>' +
+                    '<div class="stat-info">' +
+                        '<div class="stat-name">Kriminal</div>' +
+                        '<div class="stat-count">' + totalCrime + '</div>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="summary-stat-item disaster">' +
+                    '<div class="stat-icon-wrap">🌪️</div>' +
+                    '<div class="stat-info">' +
+                        '<div class="stat-name">Bencana Alam</div>' +
+                        '<div class="stat-count">' + totalDisaster + '</div>' +
+                    '</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="hologram-summary-footer">' +
+                '<div class="total-info">' +
+                    '<div class="total-label">📊 Total Aktif</div>' +
+                    '<div class="total-value"><span class="highlight">' + totalAll + '</span> Emergency</div>' +
+                '</div>' +
+                '<div class="region-info">' +
+                    '<i class="fas fa-globe"></i>' +
+                    '<span>Tersebar di ' + regionCount + ' Wilayah</span>' +
+                '</div>' +
+            '</div>' +
+        '</div>' +
+    '</div>';
+}
+
+// ====================================================================
+// 20d. BUILD SLIDE DETAIL
+// ====================================================================
+function buildDetailSlide(em, counter) {
+    const type = em.type || 'fire';
+    const icon = EMERGENCY_ICONS[type] || '🚨';
+    const label = EMERGENCY_LABELS[type] || 'DARURAT';
+    const cssClass = EMERGENCY_CSS_CLASS[type] || 'fire';
+
+    const counterText = '[' + counter.current + '/' + counter.total + ']';
+
+    // Hierarchy alamat
+    const hierarchyHTML = buildLocationHierarchy(em);
+
+    // Coords
+    const coords = em.coords || (em.latitude && em.longitude ? em.latitude + ', ' + em.longitude : '');
+
+    // Maps URL
+    const mapLink = em.mapsURL || em.mapsurl || (coords ? 'https://www.google.com/maps?q=' + coords : '');
+
+    // Time
+    const timeAgo = getTimeAgo(em.timestamp);
+
+    // Sender
+    const senderName = em.sender || 'User';
+    const senderUsername = em.senderUsername || 'sistem';
+
+    // Status
+    const expiresAt = em.expiresAt || (em.timestamp + EMERGENCY_DURATION);
+    const isExpired = expiresAt < Date.now();
+    const statusHTML = isExpired
+        ? '<span class="hologram-item-status expired"><i class="fas fa-clock"></i> Kadaluarsa</span>'
+        : '<span class="hologram-item-status live">Live</span>';
+
+    // Text
+    const textContent = em.text || em.description || '';
+
+    return '<div class="hologram-slide">' +
+        '<div class="hologram-item ' + cssClass + '" data-id="' + escapeAttr(em.id) + '">' +
+            // HEADER
+            '<div class="hologram-item-header">' +
+                '<span class="hologram-item-icon">' + icon + '</span>' +
+                '<span class="hologram-item-type ' + cssClass + '">' + label + '</span>' +
+                '<span class="hologram-item-counter">' + counterText + '</span>' +
+                statusHTML +
+                '<button class="hologram-item-delete" onclick="requestDelete(\'emergency\', \'' + escapeAttr(em.id) + '\', \'' + label + '\')" title="Hapus"><i class="fas fa-times"></i></button>' +
+            '</div>' +
+            // SENDER + TIME
+            '<div class="hologram-item-sender">' +
+                '<i class="fas fa-user"></i>' +
+                '<strong onclick="handleProfileClick(\'' + escapeAttr(senderUsername) + '\')">' + escapeHTML(senderName) + '</strong>' +
+                '<span class="time-ago">🕐 ' + timeAgo + '</span>' +
+            '</div>' +
+            // TEXT
+            (textContent ? '<div class="hologram-item-text">"' + escapeHTML(textContent) + '"</div>' : '') +
+            // LOCATION HIERARCHY
+            hierarchyHTML +
+            // COORDS
+            (coords ? '<div class="hologram-item-coords"><i class="fas fa-crosshairs"></i> ' + escapeHTML(coords) + '</div>' : '') +
+            // ACTIONS
+            '<div class="hologram-item-actions">' +
+                (mapLink ? '<a href="' + escapeAttr(mapLink) + '" target="_blank" class="btn-action btn-map"><i class="fas fa-external-link-alt"></i> Lihat Peta</a>' : '') +
+                '<a href="detail-emergency.html?id=' + encodeURIComponent(em.id) + '" class="btn-action btn-detail"><i class="fas fa-info-circle"></i> Detail</a>' +
+            '</div>' +
+            // EXPIRY
+            '<div class="hologram-item-expiry">' +
+                '<i class="fas fa-clock"></i> ' + getRemainingTime(expiresAt) +
+            '</div>' +
+        '</div>' +
+    '</div>';
+}
+
+// ====================================================================
+// 20e. BUILD LOCATION HIERARCHY — 🇮🇩 Indonesia › Jawa Barat › Bandung
+// ====================================================================
+function buildLocationHierarchy(em) {
+    const country = (em.country || '').trim();
+    const province = (em.province || '').trim();
+    const city = (em.city || '').trim();
+    const district = (em.district || '').trim();
+    const village = (em.village || '').trim();
+    const address = (em.specialLocation || em.location || em.address || '').trim();
+
+    // Build hierarki parts
+    const parts = [];
+
+    // Flag emoji berdasarkan country
+    let flag = '📍';
+    if (country) {
+        const countryUpper = country.toUpperCase();
+        if (countryUpper.includes('INDONESIA')) flag = '🇮🇩';
+        else if (countryUpper.includes('MALAYSIA')) flag = '🇲🇾';
+        else if (countryUpper.includes('SINGAPORE')) flag = '🇸🇬';
+        else if (countryUpper.includes('PHILIPPINES')) flag = '🇵🇭';
+        else if (countryUpper.includes('THAILAND')) flag = '🇹🇭';
+        else if (countryUpper.includes('VIETNAM')) flag = '🇻🇳';
+        else if (countryUpper.includes('BRUNEI')) flag = '🇧🇳';
+        else if (countryUpper.includes('TIMOR')) flag = '🇹🇱';
+        else if (countryUpper.includes('AUSTRALIA')) flag = '🇦🇺';
+        else if (countryUpper.includes('JAPAN')) flag = '🇯🇵';
+        else if (countryUpper.includes('CHINA')) flag = '🇨🇳';
+        else if (countryUpper.includes('INDIA')) flag = '🇮🇳';
+        else if (countryUpper.includes('USA') || countryUpper.includes('AMERIKA')) flag = '🇺🇸';
+        else if (countryUpper.includes('ENGLAND') || countryUpper.includes('UK')) flag = '🇬🇧';
+        else if (countryUpper.includes('SAUDI')) flag = '🇸🇦';
+        else if (countryUpper.includes('UAE') || countryUpper.includes('EMIRAT')) flag = '🇦🇪';
+        else if (countryUpper.includes('QATAR')) flag = '🇶🇦';
+        else if (countryUpper.includes('EGYPT') || countryUpper.includes('MESIR')) flag = '🇪🇬';
+        else if (countryUpper.includes('TURKEY') || countryUpper.includes('TURKI')) flag = '🇹🇷';
+        else flag = '🌐';
+    }
+
+    // Build display parts (country → province → city → district → village)
+    if (country) parts.push(country);
+    if (province) parts.push(province);
+    if (city) parts.push(city);
+    if (district) parts.push(district);
+    if (village) parts.push(village);
+
+    // Kalau tidak ada hierarki sama sekali, pakai address
+    if (parts.length === 0 && address) {
+        parts.push(address);
+    } else if (parts.length === 0) {
+        parts.push('Lokasi tidak diketahui');
+    }
+
+    // Build HTML dengan separator
+    let hierarchyHTML = '';
+    parts.forEach((part, idx) => {
+        hierarchyHTML += escapeHTML(part);
+        if (idx < parts.length - 1) {
+            hierarchyHTML += '<span class="sep">›</span>';
+        }
+    });
+
+    // Tambah detail address kalau ada
+    let addressHTML = '';
+    if (address && parts.length > 0 && address !== parts[parts.length - 1]) {
+        addressHTML = '<div style="font-size:0.6rem;color:rgba(255,255,255,0.6);margin-top:3px;padding-left:18px;line-height:1.4;">' + escapeHTML(address) + '</div>';
+    }
+
+    return '<div>' +
+        '<div class="hologram-item-location-hierarchy">' +
+            '<i class="fas fa-map-marker-alt"></i>' +
+            '<div class="hierarchy">' +
+                '<span style="font-size:0.85rem;">' + flag + '</span> ' +
+                hierarchyHTML +
+            '</div>' +
+        '</div>' +
+        addressHTML +
+    '</div>';
+}
+
+// ====================================================================
+// 20f. BUILD PAGINATION (Scrollable untuk 100+ slide)
+// ====================================================================
+function buildHologramPagination(totalSlides) {
+    const pagination = document.getElementById('hologramPagination');
+    if (!pagination) return;
+
+    if (totalSlides <= 1) {
+        pagination.innerHTML = '';
+        pagination.style.display = 'none';
+        return;
+    }
+
+    pagination.style.display = 'flex';
+
+    // Limit dots untuk performa kalau > 50 slide
+    const dotsToRender = Math.min(totalSlides, 50);
+    let dotsHTML = '';
+
+    for (let i = 0; i < dotsToRender; i++) {
+        dotsHTML += '<button class="hologram-dot' + (i === 0 ? ' active' : '') + '" data-index="' + i + '" aria-label="Slide ' + (i + 1) + '"></button>';
+    }
+
+    pagination.innerHTML = dotsHTML;
+
+    // Event delegation untuk dots
+    pagination.onclick = function(e) {
+        const dot = e.target.closest('.hologram-dot');
+        if (!dot) return;
+        const idx = parseInt(dot.dataset.index);
+        if (isNaN(idx)) return;
+        window.hologramPaused = true;
+        goToHologramSlide(idx);
+        setTimeout(() => { window.hologramPaused = false; }, 8000);
+    };
+
+    // Update progress bar
+    updateProgressBar(0, totalSlides);
 }
 
 // ====================================================================
@@ -5727,7 +6482,29 @@ async function loadData() {
                 ((p.text && p.text.trim() !== '') || (p.mediaData && p.mediaData !== '') || p.mediaId || p.gdriveId))
             .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         safeSavePosts(posts);
-        let apiEms = (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) ? results[1].value : [];
+                let apiEms = (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) ? results[1].value : [];
+        
+        // ✅ v2.0: Normalize API emergencies (handle country, timestamp format)
+        apiEms = apiEms.map(em => {
+            // Parse timestamp format "2024-01-01 12:00:00"
+            let ts = em.timestamp;
+            if (typeof ts === 'string') {
+                // Ganti spasi jadi T untuk ISO compatible
+                const parsed = new Date(ts.replace(' ', 'T'));
+                ts = isNaN(parsed.getTime()) ? Date.now() : parsed.getTime();
+            } else if (typeof ts === 'number') {
+                ts = ts;
+            } else {
+                ts = Date.now();
+            }
+            
+            return Object.assign({}, em, {
+                timestamp: ts,
+                country: em.country || 'Indonesia',  // ✅ Default country
+                mapsURL: em.mapsURL || em.mapsurl || '',  // ✅ Compat
+                coords: (em.latitude && em.longitude) ? (em.latitude + ', ' + em.longitude) : ''
+            });
+        });
         const emMap = new Map();
         validLocalEms.forEach(e => { if (e && e.id) emMap.set(e.id, e); });
         apiEms.forEach(e => { if (e && e.id) emMap.set(e.id, e); });
@@ -6456,58 +7233,151 @@ function initHeroCarousel() {
 }
 
 // ====================================================================
-// 41. HOLOGRAM CAROUSEL AUTO-SLIDE
+// 41. HOLOGRAM CAROUSEL AUTO-SLIDE v2.0 (3 DETIK + PROGRESS BAR)
 // ====================================================================
 let hologramAutoTimer = null;
 window.hologramPaused = false;
 window.hologramIndex = 0;
+window.hologramSlidesCount = 0;
+
+// Durasi auto-slide (3 detik)
+const HOLOGRAM_AUTO_INTERVAL = 3000;
+
 function goToHologramSlide(index) {
     const hologramTrack = document.getElementById('hologramTrack');
-    const hologramPagination = document.getElementById('hologramPagination');
     if (!hologramTrack) return;
+
+    const totalSlides = window.hologramSlidesCount || hologramTrack.querySelectorAll('.hologram-slide').length;
+    if (totalSlides === 0) return;
+
+    // Clamp index
+    if (index < 0) index = 0;
+    if (index >= totalSlides) index = totalSlides - 1;
+
     window.hologramIndex = index;
+
+    // Update track position
     hologramTrack.style.transform = 'translateX(-' + (index * 100) + '%)';
-    const dots = hologramPagination ? hologramPagination.querySelectorAll('.hologram-dot') : [];
-    dots.forEach((dot, i) => dot.classList.toggle('active', i === index));
+
+    // Update active state untuk fade+scale animation
+    const slides = hologramTrack.querySelectorAll('.hologram-slide');
+    slides.forEach((slide, i) => {
+        slide.classList.toggle('active', i === index);
+    });
+
+    // Update pagination dots
+    const hologramPagination = document.getElementById('hologramPagination');
+    if (hologramPagination) {
+        const dots = hologramPagination.querySelectorAll('.hologram-dot');
+        dots.forEach((dot, i) => {
+            const isActive = i === index;
+            dot.classList.toggle('active', isActive);
+            // Auto-scroll dot ke view
+            if (isActive && dots.length > 10) {
+                const dotRect = dot.getBoundingClientRect();
+                const containerRect = hologramPagination.getBoundingClientRect();
+                if (dotRect.left < containerRect.left || dotRect.right > containerRect.right) {
+                    dot.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                }
+            }
+        });
+    }
+
+    // Update progress bar
+    updateProgressBar(index, totalSlides);
 }
-function nextHologramSlide(slidesCount) {
-    if (slidesCount <= 1) return;
-    goToHologramSlide((window.hologramIndex + 1) % slidesCount);
+
+function nextHologramSlide() {
+    const totalSlides = window.hologramSlidesCount || 0;
+    if (totalSlides <= 1) return;
+    goToHologramSlide((window.hologramIndex + 1) % totalSlides);
 }
+
 function startHologramAuto(slidesCount) {
     stopHologramAuto();
     if (slidesCount <= 1) return;
     hologramAutoTimer = setInterval(() => {
-        if (!window.hologramPaused && !document.hidden) nextHologramSlide(slidesCount);
-    }, 5500);
+        if (!window.hologramPaused && !document.hidden) nextHologramSlide();
+    }, HOLOGRAM_AUTO_INTERVAL);
 }
+
 function stopHologramAuto() {
     if (hologramAutoTimer) clearInterval(hologramAutoTimer);
     hologramAutoTimer = null;
 }
+
+// Update progress bar
+function updateProgressBar(current, total) {
+    const fill = document.getElementById('hologramProgressFill');
+    if (!fill) return;
+    if (total <= 1) {
+        fill.style.width = '100%';
+        return;
+    }
+    const percent = ((current + 1) / total) * 100;
+    fill.style.width = percent + '%';
+}
+
+// Swipe gesture
 function initHologramSwipe() {
     const hologramCarousel = document.getElementById('hologramCarousel');
     const hologramTrack = document.getElementById('hologramTrack');
     if (!hologramCarousel || !hologramTrack) return;
+
     let hStartX = 0, hStartY = 0, hDragging = false;
+
     hologramCarousel.addEventListener('touchstart', (e) => {
         hStartX = e.touches[0].clientX;
         hStartY = e.touches[0].clientY;
         hDragging = true;
         window.hologramPaused = true;
     }, { passive: true });
+
     hologramCarousel.addEventListener('touchend', (e) => {
         if (!hDragging) return;
         hDragging = false;
         const dx = e.changedTouches[0].clientX - hStartX;
         const dy = e.changedTouches[0].clientY - hStartY;
-        const slidesCount = hologramTrack.querySelectorAll('.hologram-slide').length;
+        const slidesCount = window.hologramSlidesCount || hologramTrack.querySelectorAll('.hologram-slide').length;
+
         if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-            if (dx < 0 && window.hologramIndex < slidesCount - 1) goToHologramSlide(window.hologramIndex + 1);
-            else if (dx > 0 && window.hologramIndex > 0) goToHologramSlide(window.hologramIndex - 1);
+            if (dx < 0 && window.hologramIndex < slidesCount - 1) {
+                goToHologramSlide(window.hologramIndex + 1);
+            } else if (dx > 0 && window.hologramIndex > 0) {
+                goToHologramSlide(window.hologramIndex - 1);
+            }
         }
-        setTimeout(() => { window.hologramPaused = false; }, 6000);
+        setTimeout(() => { window.hologramPaused = false; }, 5000);
     }, { passive: true });
+
+    // Mouse drag (desktop)
+    hologramCarousel.addEventListener('mousedown', (e) => {
+        hStartX = e.clientX;
+        hDragging = true;
+        window.hologramPaused = true;
+    });
+
+    hologramCarousel.addEventListener('mouseup', (e) => {
+        if (!hDragging) return;
+        hDragging = false;
+        const dx = e.clientX - hStartX;
+        const slidesCount = window.hologramSlidesCount || 0;
+        if (Math.abs(dx) > 60) {
+            if (dx < 0 && window.hologramIndex < slidesCount - 1) {
+                goToHologramSlide(window.hologramIndex + 1);
+            } else if (dx > 0 && window.hologramIndex > 0) {
+                goToHologramSlide(window.hologramIndex - 1);
+            }
+        }
+        setTimeout(() => { window.hologramPaused = false; }, 5000);
+    });
+
+    hologramCarousel.addEventListener('mouseleave', () => {
+        hDragging = false;
+        window.hologramPaused = false;
+    });
+
+    // Pause saat hover
     hologramCarousel.addEventListener('mouseenter', () => { window.hologramPaused = true; });
     hologramCarousel.addEventListener('mouseleave', () => { window.hologramPaused = false; });
 }
@@ -6811,6 +7681,11 @@ window.renderNotifList = renderNotifList;
 window.setupNotifFilters = setupNotifFilters;
 window.transformHologramToSlides = transformHologramToSlides;
 window.goToHologramSlide = goToHologramSlide;
+window.buildSummarySlide = buildSummarySlide;
+window.buildDetailSlide = buildDetailSlide;
+window.buildLocationHierarchy = buildLocationHierarchy;
+window.buildHologramPagination = buildHologramPagination;
+window.updateProgressBar = updateProgressBar;
 window.openFabModal = openFabModal;
 window.closeFabModal = closeFabModal;
 
