@@ -46,7 +46,6 @@
             --shadow-sm: 0 4px 12px rgba(0,0,0,0.2);
             --shadow-md: 0 10px 30px rgba(0,0,0,0.3);
             --shadow-lg: 0 20px 50px rgba(0,0,0,0.4);
-            --shadow-glow: 0 8px 32px rgba(230,0,18,0.35);
 
             --primary: #e60012;
             --primary-dark: #b8000d;
@@ -135,6 +134,7 @@
         ::-webkit-scrollbar-track { background: rgba(0,0,0,0.15); }
         ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 3px; }
 
+        /* ============ APP SHELL ============ */
         .app-shell {
             width: 100%;
             max-width: 430px;
@@ -161,6 +161,7 @@
         @keyframes rippleAnim { to { transform: scale(4); opacity: 0; } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
         @keyframes floatingNotifIn { from { transform: translateX(-50%) translateY(-100px) scale(0.8); opacity: 0; } to { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; } }
+        @keyframes floatingNotifOut { from { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; } to { transform: translateX(-50%) translateY(-100px) scale(0.8); opacity: 0; } }
 
         /* ============ LOGO BLINK ============ */
         .siren-icon-header {
@@ -191,7 +192,7 @@
             box-shadow: 0 2px 20px rgba(0,0,0,0.25);
             gap: 4px;
         }
-        .header-left { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+        .header-left { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
         .header-center { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center; }
         .header-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 
@@ -214,7 +215,7 @@
             letter-spacing: 1px;
         }
 
-        .user-btn, .search-btn, .menu-btn {
+        .user-btn, .search-btn, .menu-btn, .back-btn {
             width: 38px;
             height: 38px;
             border-radius: 50%;
@@ -232,7 +233,7 @@
             font-family: inherit;
             padding: 0;
         }
-        .user-btn:active, .search-btn:active, .menu-btn:active {
+        .user-btn:active, .search-btn:active, .menu-btn:active, .back-btn:active {
             transform: scale(0.9);
             border-color: var(--primary);
             background: rgba(230,0,18,0.2);
@@ -299,8 +300,10 @@
             z-index: 1099;
             display: none;
             backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
         }
         .sidebar-overlay-bg.active { display: block; }
+
         .sidebar {
             position: fixed;
             top: 0;
@@ -324,6 +327,7 @@
             -webkit-overflow-scrolling: touch;
         }
         .sidebar.active { transform: translateX(-50%) translateX(0); }
+
         .sidebar-close {
             position: absolute;
             top: calc(14px + env(safe-area-inset-top, 0px));
@@ -342,6 +346,7 @@
             z-index: 10;
         }
         .sidebar-close:active { transform: scale(0.9); }
+
         .sidebar-header {
             display: flex;
             flex-direction: column;
@@ -353,8 +358,8 @@
             position: relative;
         }
         .sidebar-user-avatar {
-            width: 44px;
-            height: 44px;
+            width: 64px;
+            height: 64px;
             border-radius: 50%;
             background: var(--accent-blue-gradient);
             display: flex;
@@ -362,13 +367,28 @@
             justify-content: center;
             color: #fff;
             font-weight: bold;
-            font-size: 1.1rem;
+            font-size: 1.5rem;
             overflow: hidden;
-            border: 2px solid var(--primary);
+            border: 3px solid var(--primary);
+            box-shadow: 0 4px 16px rgba(230,0,18,0.3);
         }
         .sidebar-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .sidebar-user-name { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); text-align: center; }
-        .sidebar-user-email { font-size: 0.6rem; color: var(--text-muted); text-align: center; }
+        .sidebar-user-name {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-align: center;
+            margin-top: 4px;
+            font-family: 'Poppins', sans-serif;
+        }
+        .sidebar-user-email {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-align: center;
+            word-break: break-all;
+            padding: 0 8px;
+        }
+
         .nav-menu {
             list-style: none;
             padding: 6px 12px calc(40px + env(safe-area-inset-bottom, 0px));
@@ -376,40 +396,60 @@
             overflow-y: auto;
         }
         .nav-section-title {
-            font-size: 0.55rem;
+            font-size: 0.58rem;
             color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 1px;
-            padding: 10px 14px 4px;
+            letter-spacing: 1.2px;
+            padding: 14px 14px 6px;
             font-weight: 700;
         }
-        .nav-item { margin-bottom: 2px; }
+        .nav-item { margin-bottom: 3px; }
         .nav-link {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 10px 14px;
+            gap: 14px;
+            padding: 11px 14px;
             color: var(--text-primary);
             text-decoration: none;
-            border-radius: 8px;
-            font-size: 0.78rem;
-            background: var(--bg-input);
+            border-radius: 10px;
+            font-size: 0.82rem;
+            background: transparent;
             border: 1px solid transparent;
             cursor: pointer;
             font-weight: 500;
             transition: all 0.2s;
+            font-family: inherit;
         }
-        .nav-link:active { transform: scale(0.98); border-color: var(--primary); }
-        .nav-link.active { background: rgba(230,0,18,0.15); color: var(--primary); border: 1px solid var(--primary); }
-        .nav-link i { width: 22px; text-align: center; font-size: 0.9rem; color: var(--primary); }
-        .nav-link.special { background: rgba(230,0,18,0.1); border: 1px dashed var(--primary); }
+        .nav-link:active { transform: scale(0.98); background: var(--bg-input); }
+        .nav-link.active {
+            background: rgba(230,0,18,0.15);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            font-weight: 700;
+        }
+        .nav-link i {
+            width: 24px;
+            text-align: center;
+            font-size: 1.05rem;
+            color: var(--accent-gold);
+            flex-shrink: 0;
+        }
+        .nav-link.active i { color: var(--primary); }
+        .nav-link.special {
+            background: rgba(230,0,18,0.1);
+            border: 1px dashed var(--primary);
+        }
         .nav-logout {
-            margin-top: 12px;
+            margin-top: 14px;
             margin-bottom: 16px;
             border-top: 1px solid var(--border-color);
-            padding-top: 12px;
+            padding-top: 14px;
         }
-        .nav-logout .nav-link, .nav-logout .nav-link i { color: var(--accent-red); }
+        .nav-logout .nav-link,
+        .nav-logout .nav-link i {
+            color: var(--accent-red);
+            font-weight: 700;
+        }
 
         /* ============ MAIN CONTENT ============ */
         .main-content {
@@ -418,7 +458,7 @@
             min-height: 100vh;
         }
 
-        /* ============ SKELETON ============ */
+        /* ============ SKELETON LOADING ============ */
         .skeleton-card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
@@ -446,9 +486,25 @@
             border-radius: 14px;
             border: 1px solid var(--border-color);
         }
-        .error-state .error-icon { font-size: 4rem; display: block; margin-bottom: 16px; opacity: 0.4; }
-        .error-state h2 { font-size: 1.1rem; color: var(--text-primary); margin-bottom: 8px; font-family: 'Poppins', sans-serif; }
-        .error-state p { font-size: 0.75rem; color: var(--text-muted); line-height: 1.6; max-width: 300px; margin: 0 auto 20px; }
+        .error-state .error-icon {
+            font-size: 4rem;
+            display: block;
+            margin-bottom: 16px;
+            opacity: 0.4;
+        }
+        .error-state h2 {
+            font-size: 1.1rem;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            font-family: 'Poppins', sans-serif;
+        }
+        .error-state p {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+            max-width: 300px;
+            margin: 0 auto 20px;
+        }
         .error-state .back-home-btn {
             display: inline-flex;
             align-items: center;
@@ -463,7 +519,9 @@
             box-shadow: 0 4px 15px rgba(230,0,18,0.3);
             border: none;
             cursor: pointer;
+            font-family: inherit;
         }
+        .error-state .back-home-btn:active { transform: scale(0.97); }
 
         /* ============ EMERGENCY HEADER ============ */
         .emergency-header {
@@ -477,21 +535,65 @@
             border-left-width: 4px;
             background: var(--bg-card);
         }
-        .emergency-header.fire { background: linear-gradient(135deg, rgba(248,81,73,0.12), rgba(248,81,73,0.03)); border-left-color: var(--emergency-fire); }
-        .emergency-header.medical { background: linear-gradient(135deg, rgba(79,195,247,0.12), rgba(79,195,247,0.03)); border-left-color: var(--emergency-medical); }
-        .emergency-header.crime { background: linear-gradient(135deg, rgba(240,208,128,0.12), rgba(240,208,128,0.03)); border-left-color: var(--emergency-crime); }
-        .emergency-header.disaster { background: linear-gradient(135deg, rgba(199,146,234,0.12), rgba(199,146,234,0.03)); border-left-color: var(--emergency-disaster); }
-        .emergency-icon-big { font-size: 2.5rem; line-height: 1; margin-bottom: 8px; display: inline-block; }
-        .emergency-header.fire .emergency-icon-big { animation: pulse-red 2s ease-in-out infinite; border-radius: 50%; }
-        .emergency-type-label { font-size: 0.65rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }
+        .emergency-header.fire {
+            background: linear-gradient(135deg, rgba(248,81,73,0.12), rgba(248,81,73,0.03));
+            border-left-color: var(--emergency-fire);
+        }
+        .emergency-header.medical {
+            background: linear-gradient(135deg, rgba(79,195,247,0.12), rgba(79,195,247,0.03));
+            border-left-color: var(--emergency-medical);
+        }
+        .emergency-header.crime {
+            background: linear-gradient(135deg, rgba(240,208,128,0.12), rgba(240,208,128,0.03));
+            border-left-color: var(--emergency-crime);
+        }
+        .emergency-header.disaster {
+            background: linear-gradient(135deg, rgba(199,146,234,0.12), rgba(199,146,234,0.03));
+            border-left-color: var(--emergency-disaster);
+        }
+        .emergency-icon-big {
+            font-size: 2.5rem;
+            line-height: 1;
+            margin-bottom: 8px;
+            display: inline-block;
+        }
+        .emergency-header.fire .emergency-icon-big {
+            animation: pulse-red 2s ease-in-out infinite;
+            border-radius: 50%;
+        }
+        .emergency-type-label {
+            font-size: 0.65rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 6px;
+        }
         .emergency-header.fire .emergency-type-label { color: var(--emergency-fire); }
         .emergency-header.medical .emergency-type-label { color: var(--emergency-medical); }
         .emergency-header.crime .emergency-type-label { color: var(--emergency-crime); }
         .emergency-header.disaster .emergency-type-label { color: var(--emergency-disaster); }
-        .emergency-title { font-size: 1.1rem; font-weight: 800; color: var(--text-primary); margin-bottom: 8px; line-height: 1.3; font-family: 'Poppins', sans-serif; }
-        .emergency-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 0.7rem; color: var(--text-secondary); }
-        .emergency-meta span { display: inline-flex; align-items: center; gap: 5px; }
+        .emergency-title {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            line-height: 1.3;
+            font-family: 'Poppins', sans-serif;
+        }
+        .emergency-meta {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+        .emergency-meta span {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
         .emergency-meta i { font-size: 0.7rem; }
+
         .live-badge {
             position: absolute;
             top: 14px;
@@ -508,8 +610,18 @@
             box-shadow: 0 0 15px rgba(248,81,73,0.5);
             animation: notifPulse 1s ease-in-out infinite;
         }
-        .live-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #fff; }
-        .live-badge.resolved { background: var(--success); box-shadow: 0 0 15px rgba(63,185,80,0.5); animation: none; }
+        .live-badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #fff;
+        }
+        .live-badge.resolved {
+            background: var(--success);
+            box-shadow: 0 0 15px rgba(63,185,80,0.5);
+            animation: none;
+        }
 
         /* ============ SECTION CARD ============ */
         .section-card {
@@ -531,11 +643,25 @@
             gap: 8px;
             font-family: 'Poppins', sans-serif;
         }
-        .section-card .section-title i { color: var(--primary); font-size: 0.85rem; }
-        .section-card .section-text { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+        .section-card .section-title i {
+            color: var(--primary);
+            font-size: 0.9rem;
+        }
+        .section-card .section-text {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.65;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
 
         /* ============ MEDIA GALLERY ============ */
-        .media-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 8px; margin-top: 4px; }
+        .media-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+            gap: 8px;
+            margin-top: 4px;
+        }
         .media-thumb {
             position: relative;
             border-radius: 10px;
@@ -546,8 +672,16 @@
             cursor: pointer;
             transition: all 0.3s;
         }
-        .media-thumb:hover { border-color: var(--primary); transform: scale(1.02); }
-        .media-thumb img, .media-thumb video { width: 100%; height: 100%; object-fit: cover; }
+        .media-thumb:hover {
+            border-color: var(--primary);
+            transform: scale(1.02);
+        }
+        .media-thumb img,
+        .media-thumb video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
         .media-thumb .zoom-hint {
             position: absolute;
             inset: 0;
@@ -564,17 +698,67 @@
             pointer-events: none;
         }
         .media-thumb:hover .zoom-hint { opacity: 1; }
-        .video-container { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; border: 1px solid var(--border-color); }
-        .video-container video { width: 100%; max-height: 300px; display: block; }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #000;
+            border: 1px solid var(--border-color);
+        }
+        .video-container video {
+            width: 100%;
+            max-height: 300px;
+            display: block;
+        }
 
         /* ============ MAP ============ */
-        .map-wrapper { width: 100%; height: 220px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); background: var(--bg-input); }
-        .map-wrapper iframe { width: 100%; height: 100%; border: none; display: block; }
-        .location-info { padding: 10px 12px; background: var(--bg-input); border-radius: 10px; margin-top: 10px; border: 1px solid var(--border-color); }
-        .location-info .loc-row { display: flex; align-items: flex-start; gap: 8px; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 8px; }
+        .map-wrapper {
+            width: 100%;
+            height: 220px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            background: var(--bg-input);
+        }
+        .map-wrapper iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+        .location-info {
+            padding: 12px;
+            background: var(--bg-input);
+            border-radius: 10px;
+            margin-top: 10px;
+            border: 1px solid var(--border-color);
+        }
+        .location-info .loc-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 10px;
+        }
         .location-info .loc-row:last-child { margin-bottom: 0; }
-        .location-info .loc-row i { color: var(--primary); margin-top: 3px; flex-shrink: 0; font-size: 0.7rem; }
-        .location-info .coords-value { font-family: 'Courier New', monospace; color: var(--primary); font-weight: 600; font-size: 0.7rem; }
+        .location-info .loc-row i {
+            color: var(--primary);
+            margin-top: 3px;
+            flex-shrink: 0;
+            font-size: 0.75rem;
+            width: 14px;
+            text-align: center;
+        }
+        .location-info .coords-value {
+            font-family: 'Courier New', monospace;
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.72rem;
+        }
 
         /* ============ REPORTER ============ */
         .reporter-card {
@@ -588,7 +772,10 @@
             cursor: pointer;
             transition: all 0.3s;
         }
-        .reporter-card:hover { border-color: var(--primary); transform: translateX(3px); }
+        .reporter-card:hover {
+            border-color: var(--primary);
+            transform: translateX(3px);
+        }
         .reporter-avatar {
             width: 48px;
             height: 48px;
@@ -604,14 +791,37 @@
             overflow: hidden;
             border: 2px solid var(--primary);
         }
-        .reporter-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .reporter-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
         .reporter-info { flex: 1; min-width: 0; }
-        .reporter-name { font-size: 0.9rem; font-weight: 700; color: var(--text-primary); }
-        .reporter-username { font-size: 0.65rem; color: var(--text-muted); margin-top: 2px; }
-        .reporter-location { font-size: 0.6rem; color: var(--text-secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .reporter-name {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .reporter-username {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .reporter-location {
+            font-size: 0.62rem;
+            color: var(--text-secondary);
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
 
         /* ============ ACTION ROWS ============ */
-        .action-row { display: flex; gap: 8px; margin-top: 12px; }
+        .action-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
         .action-btn {
             flex: 1;
             padding: 12px;
@@ -630,13 +840,31 @@
             text-decoration: none;
             font-family: inherit;
         }
-        .action-btn:hover { border-color: var(--primary); transform: translateY(-2px); }
+        .action-btn:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
         .action-btn:active { transform: scale(0.97); }
         .action-btn i { pointer-events: none; }
-        .action-btn.primary { background: var(--accent-blue-gradient); color: #fff; border-color: transparent; }
-        .action-btn.primary:hover { box-shadow: 0 8px 25px rgba(230,0,18,0.4); }
-        .action-btn.wa-btn { background: var(--whatsapp); color: #fff; border-color: var(--whatsapp); font-weight: 700; }
-        .action-btn.wa-btn:hover { background: #20b859; border-color: #20b859; box-shadow: 0 8px 25px rgba(37,211,102,0.3); }
+        .action-btn.primary {
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            border-color: transparent;
+        }
+        .action-btn.primary:hover {
+            box-shadow: 0 8px 25px rgba(230,0,18,0.4);
+        }
+        .action-btn.wa-btn {
+            background: var(--whatsapp);
+            color: #fff;
+            border-color: var(--whatsapp);
+            font-weight: 700;
+        }
+        .action-btn.wa-btn:hover {
+            background: #20b859;
+            border-color: #20b859;
+            box-shadow: 0 8px 25px rgba(37,211,102,0.3);
+        }
         .guest-info {
             text-align: center;
             font-size: 0.7rem;
@@ -647,9 +875,12 @@
             border-radius: 10px;
             margin-top: 10px;
         }
-        .guest-info i { color: var(--accent-gold); margin-right: 4px; }
+        .guest-info i {
+            color: var(--accent-gold);
+            margin-right: 4px;
+        }
 
-        /* ============ NEARBY ============ */
+        /* ============ NEARBY CONTACTS ============ */
         .contact-item {
             display: flex;
             align-items: center;
@@ -676,9 +907,21 @@
             flex-shrink: 0;
         }
         .contact-info { flex: 1; min-width: 0; }
-        .contact-name { font-size: 0.8rem; font-weight: 700; color: var(--text-primary); }
-        .contact-sub { font-size: 0.6rem; color: var(--text-muted); margin-top: 2px; }
-        .contact-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .contact-name {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .contact-sub {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .contact-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
         .contact-action-btn {
             width: 32px;
             height: 32px;
@@ -696,7 +939,10 @@
         }
         .contact-action-btn.call { color: var(--primary); }
         .contact-action-btn.wa { color: var(--accent-green); }
-        .contact-action-btn:hover { border-color: var(--primary); transform: scale(1.05); }
+        .contact-action-btn:hover {
+            border-color: var(--primary);
+            transform: scale(1.05);
+        }
 
         /* ============ BOTTOM NAV ============ */
         .bottom-nav {
@@ -739,10 +985,25 @@
             font-family: inherit;
         }
         .nav-item-bottom:active { transform: scale(0.92); }
-        .nav-item-bottom .nav-icon { font-size: 1.35rem; line-height: 1.2; transition: all 0.2s; }
-        .nav-item-bottom .nav-label { font-size: 0.58rem; font-weight: 700; white-space: nowrap; letter-spacing: 0.1px; }
-        .nav-item-bottom.active .nav-icon { transform: scale(1.08); filter: drop-shadow(0 0 6px var(--primary)); }
-        .nav-item-bottom.active .nav-label { color: var(--primary); font-weight: 800; }
+        .nav-item-bottom .nav-icon {
+            font-size: 1.35rem;
+            line-height: 1.2;
+            transition: all 0.2s;
+        }
+        .nav-item-bottom .nav-label {
+            font-size: 0.58rem;
+            font-weight: 700;
+            white-space: nowrap;
+            letter-spacing: 0.1px;
+        }
+        .nav-item-bottom.active .nav-icon {
+            transform: scale(1.08);
+            filter: drop-shadow(0 0 6px var(--primary));
+        }
+        .nav-item-bottom.active .nav-label {
+            color: var(--primary);
+            font-weight: 800;
+        }
         .nav-item-bottom.active::before {
             content: '';
             position: absolute;
@@ -773,7 +1034,13 @@
         .nav-item-bottom .badge.show { display: flex !important; }
 
         /* ============ CENTER FAB ============ */
-        .nav-fab-wrap { flex: 1; display: flex; justify-content: center; position: relative; max-width: 80px; }
+        .nav-fab-wrap {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            position: relative;
+            max-width: 80px;
+        }
         .nav-fab {
             position: absolute;
             top: -36px;
@@ -814,124 +1081,7 @@
             line-height: 1;
         }
 
-        /* ============ LIGHTBOX ============ */
-        .lightbox-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.98);
-            z-index: 9999;
-            display: none;
-            flex-direction: column;
-            overflow: hidden;
-            touch-action: none;
-        }
-        .lightbox-overlay.active { display: flex; animation: fadeIn 0.3s ease; }
-        .lightbox-header {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            padding: 12px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 10;
-            background: linear-gradient(180deg, rgba(0,0,0,0.8), transparent);
-            color: #fff;
-        }
-        .lightbox-counter { font-size: 0.75rem; font-weight: 600; background: rgba(0,0,0,0.5); padding: 4px 12px; border-radius: 20px; }
-        .lightbox-actions { display: flex; gap: 8px; }
-        .lightbox-btn {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            color: #fff;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1rem;
-            transition: 0.3s;
-        }
-        .lightbox-btn:hover { background: rgba(255,255,255,0.2); }
-        .lightbox-stage { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; padding: 60px 20px 80px; }
-        .lightbox-img { max-width: 100%; max-height: 100%; object-fit: contain; user-select: none; -webkit-user-drag: none; transition: transform 0.2s; }
-        .lightbox-nav {
-            position: absolute;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            color: #fff;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-            z-index: 5;
-        }
-        .lightbox-nav.prev { left: 12px; }
-        .lightbox-nav.next { right: 12px; }
-        .lightbox-nav:disabled { opacity: 0.3; cursor: not-allowed; }
-        .lightbox-info {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 12px 16px;
-            background: linear-gradient(0deg, rgba(0,0,0,0.8), transparent);
-            color: #fff;
-            text-align: center;
-            font-size: 0.7rem;
-            z-index: 10;
-        }
-
-        /* ============ TOAST ============ */
-        .toast-container {
-            position: fixed;
-            bottom: calc(var(--footer-height) + 20px + var(--safe-bottom));
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 10000;
-            max-width: 400px;
-            width: calc(100% - 24px);
-        }
-        .toast {
-            background: var(--modal-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 12px 14px;
-            box-shadow: var(--shadow-lg);
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            animation: toastIn 0.4s ease;
-            margin-bottom: 8px;
-            color: var(--text-primary);
-        }
-        .toast.hide { animation: toastOut 0.4s ease forwards; }
-        .toast .toast-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-            background: rgba(230,0,18,0.15);
-            color: var(--primary);
-        }
-        .toast .toast-content { flex: 1; }
-        .toast .toast-title { font-size: 0.72rem; font-weight: 700; color: var(--text-primary); }
-        .toast .toast-message { font-size: 0.68rem; color: var(--text-secondary); }
-        .toast .toast-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; padding: 4px; }
-
-        /* ============ MODAL ============ */
+        /* ============ MODALS ============ */
         .modal-overlay {
             position: fixed;
             inset: 0;
@@ -970,7 +1120,14 @@
             background: var(--modal-bg);
             z-index: 2;
         }
-        .modal-title { font-size: 0.9rem; font-weight: 700; display: flex; align-items: center; gap: 8px; font-family: 'Poppins', sans-serif; }
+        .modal-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'Poppins', sans-serif;
+        }
         .modal-title .badge-count {
             background: var(--bg-input);
             padding: 2px 10px;
@@ -1018,8 +1175,13 @@
             font-weight: 700;
             font-family: inherit;
         }
+
+        /* ============ SEARCH MODAL ============ */
         .search-modal-content { max-width: 500px; max-height: 90vh; }
-        .search-input-wrapper { position: relative; margin-bottom: 12px; }
+        .search-input-wrapper {
+            position: relative;
+            margin-bottom: 12px;
+        }
         .search-input-wrapper i.search-icon {
             position: absolute;
             left: 14px;
@@ -1058,9 +1220,18 @@
             font-weight: 500;
             font-family: inherit;
         }
-        #searchInput:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(230,0,18,0.1); }
+        #searchInput:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(230,0,18,0.1);
+        }
         #searchInput::placeholder { color: var(--text-muted); }
-        .search-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+        .search-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
         .search-tab {
             flex: 1;
             min-width: 80px;
@@ -1079,7 +1250,12 @@
             font-family: inherit;
             transition: all 0.2s;
         }
-        .search-tab.active { background: var(--accent-blue-gradient); color: #fff; border-color: var(--primary); box-shadow: 0 4px 12px rgba(230,0,18,0.3); }
+        .search-tab.active {
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(230,0,18,0.3);
+        }
         .search-section-title {
             font-size: 0.68rem;
             font-weight: 800;
@@ -1091,7 +1267,14 @@
             align-items: center;
             justify-content: space-between;
         }
-        .search-section-title .count-pill { background: var(--bg-input); color: var(--primary); padding: 2px 10px; border-radius: 10px; font-size: 0.6rem; font-weight: 800; }
+        .search-section-title .count-pill {
+            background: var(--bg-input);
+            color: var(--primary);
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 0.6rem;
+            font-weight: 800;
+        }
         .search-result-item {
             display: flex;
             align-items: center;
@@ -1104,7 +1287,10 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        .search-result-item:active { transform: scale(0.98); border-color: var(--primary); }
+        .search-result-item:active {
+            transform: scale(0.98);
+            border-color: var(--primary);
+        }
         .search-result-item .result-icon {
             width: 40px;
             height: 40px;
@@ -1137,17 +1323,67 @@
             overflow: hidden;
             border: 2px solid var(--primary);
         }
-        .search-result-item .result-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .search-result-item .result-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
         .search-result-item .result-info { flex: 1; min-width: 0; }
-        .search-result-item .result-title { font-size: 0.78rem; font-weight: 700; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
-        .search-result-item .result-sub { font-size: 0.6rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .search-result-item .result-time { font-size: 0.55rem; color: var(--text-muted); flex-shrink: 0; margin-left: 6px; }
-        .search-result-item .result-arrow { color: var(--text-muted); font-size: 0.75rem; flex-shrink: 0; }
-        .search-empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
-        .search-empty-state .empty-big-icon { font-size: 3rem; opacity: 0.3; margin-bottom: 12px; }
-        .search-empty-state h4 { font-size: 0.88rem; margin-bottom: 6px; font-weight: 700; color: var(--text-secondary); }
-        .search-empty-state p { font-size: 0.72rem; line-height: 1.5; max-width: 280px; margin: 0 auto; }
-        .search-filter-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+        .search-result-item .result-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-primary);
+        }
+        .search-result-item .result-sub {
+            font-size: 0.6rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .search-result-item .result-time {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            flex-shrink: 0;
+            margin-left: 6px;
+        }
+        .search-result-item .result-arrow {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+        .search-empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+        }
+        .search-empty-state .empty-big-icon {
+            font-size: 3rem;
+            opacity: 0.3;
+            margin-bottom: 12px;
+        }
+        .search-empty-state h4 {
+            font-size: 0.88rem;
+            margin-bottom: 6px;
+            font-weight: 700;
+            color: var(--text-secondary);
+        }
+        .search-empty-state p {
+            font-size: 0.72rem;
+            line-height: 1.5;
+            max-width: 280px;
+            margin: 0 auto;
+        }
+        .search-filter-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
         .search-filter-chip {
             padding: 5px 12px;
             background: var(--bg-input);
@@ -1159,9 +1395,25 @@
             cursor: pointer;
             font-family: inherit;
         }
-        .search-filter-chip.active { background: rgba(230,0,18,0.15); border-color: var(--primary); color: var(--primary); }
-        .keyboard-hint { font-size: 0.55rem; color: var(--text-muted); text-align: center; margin-top: 8px; }
-        .keyboard-hint kbd { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 4px; padding: 1px 5px; font-size: 0.55rem; font-family: monospace; }
+        .search-filter-chip.active {
+            background: rgba(230,0,18,0.15);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        .keyboard-hint {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 8px;
+        }
+        .keyboard-hint kbd {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 1px 5px;
+            font-size: 0.55rem;
+            font-family: monospace;
+        }
 
         /* ============ NOTIF MODAL ============ */
         .notif-item {
@@ -1176,7 +1428,10 @@
             transition: all 0.2s;
         }
         .notif-item:active { transform: scale(0.98); }
-        .notif-item.unread { background: rgba(230,0,18,0.1); border-left: 3px solid var(--primary); }
+        .notif-item.unread {
+            background: rgba(230,0,18,0.1);
+            border-left: 3px solid var(--primary);
+        }
         .notif-item.emergency { border-left: 3px solid var(--accent-red); }
         .notif-item-icon {
             width: 36px;
@@ -1188,12 +1443,31 @@
             flex-shrink: 0;
             font-size: 1rem;
         }
-        .notif-item-icon.emergency { background: rgba(248,81,73,0.2); color: var(--accent-red); }
-        .notif-item-icon.regular { background: rgba(230,0,18,0.15); color: var(--primary); }
+        .notif-item-icon.emergency {
+            background: rgba(248,81,73,0.2);
+            color: var(--accent-red);
+        }
+        .notif-item-icon.regular {
+            background: rgba(230,0,18,0.15);
+            color: var(--primary);
+        }
         .notif-item-content { flex: 1; min-width: 0; }
-        .notif-item-title { font-size: 0.75rem; font-weight: 700; margin-bottom: 3px; color: var(--text-primary); }
-        .notif-item-message { font-size: 0.65rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 4px; }
-        .notif-item-time { font-size: 0.55rem; color: var(--text-muted); }
+        .notif-item-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-bottom: 3px;
+            color: var(--text-primary);
+        }
+        .notif-item-message {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin-bottom: 4px;
+        }
+        .notif-item-time {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+        }
 
         /* ============ FAB MODAL ============ */
         .fab-modal-overlay {
@@ -1232,9 +1506,26 @@
             border-bottom: 1px solid var(--border-color);
             position: relative;
         }
-        .fab-modal-header .fab-modal-siren { font-size: 2.8rem; display: inline-block; animation: blink 1s ease-in-out infinite; filter: drop-shadow(0 0 16px currentColor); margin-bottom: 8px; line-height: 1; }
-        .fab-modal-header h3 { font-size: 1.05rem; font-weight: 800; color: var(--text-primary); letter-spacing: 0.3px; margin-bottom: 4px; }
-        .fab-modal-header p { font-size: 0.68rem; color: var(--text-muted); line-height: 1.5; }
+        .fab-modal-header .fab-modal-siren {
+            font-size: 2.8rem;
+            display: inline-block;
+            animation: blink 1s ease-in-out infinite;
+            filter: drop-shadow(0 0 16px currentColor);
+            margin-bottom: 8px;
+            line-height: 1;
+        }
+        .fab-modal-header h3 {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            letter-spacing: 0.3px;
+            margin-bottom: 4px;
+        }
+        .fab-modal-header p {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
         .fab-modal-close {
             position: absolute;
             top: 4px;
@@ -1254,7 +1545,12 @@
             font-family: inherit;
         }
         .fab-modal-close:active { transform: scale(0.9); }
-        .fab-emergency-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
+        .fab-emergency-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 14px;
+        }
         .fab-emergency-card {
             aspect-ratio: 1/1;
             border-radius: 16px;
@@ -1273,20 +1569,47 @@
             font-family: inherit;
         }
         .fab-emergency-card:active { transform: scale(0.95); }
-        .fab-emergency-card .fab-card-icon { font-size: 2.2rem; line-height: 1; filter: drop-shadow(0 4px 12px currentColor); }
-        .fab-emergency-card .fab-card-label { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.3px; text-align: center; line-height: 1.2; }
-        .fab-emergency-card .fab-card-desc { font-size: 0.55rem; color: var(--text-muted); text-align: center; font-weight: 500; }
+        .fab-emergency-card .fab-card-icon {
+            font-size: 2.2rem;
+            line-height: 1;
+            filter: drop-shadow(0 4px 12px currentColor);
+        }
+        .fab-emergency-card .fab-card-label {
+            font-size: 0.7rem;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            text-align: center;
+            line-height: 1.2;
+        }
+        .fab-emergency-card .fab-card-desc {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            text-align: center;
+            font-weight: 500;
+        }
         .fab-emergency-card.fire { border-color: rgba(248,81,73,0.4); }
-        .fab-emergency-card.fire:active { background: rgba(248,81,73,0.15); border-color: var(--emergency-fire); }
+        .fab-emergency-card.fire:active {
+            background: rgba(248,81,73,0.15);
+            border-color: var(--emergency-fire);
+        }
         .fab-emergency-card.fire .fab-card-label { color: var(--emergency-fire); }
         .fab-emergency-card.medical { border-color: rgba(79,195,247,0.4); }
-        .fab-emergency-card.medical:active { background: rgba(79,195,247,0.15); border-color: var(--emergency-medical); }
+        .fab-emergency-card.medical:active {
+            background: rgba(79,195,247,0.15);
+            border-color: var(--emergency-medical);
+        }
         .fab-emergency-card.medical .fab-card-label { color: var(--emergency-medical); }
         .fab-emergency-card.crime { border-color: rgba(240,208,128,0.4); }
-        .fab-emergency-card.crime:active { background: rgba(240,208,128,0.15); border-color: var(--emergency-crime); }
+        .fab-emergency-card.crime:active {
+            background: rgba(240,208,128,0.15);
+            border-color: var(--emergency-crime);
+        }
         .fab-emergency-card.crime .fab-card-label { color: var(--emergency-crime); }
         .fab-emergency-card.disaster { border-color: rgba(199,146,234,0.4); }
-        .fab-emergency-card.disaster:active { background: rgba(199,146,234,0.15); border-color: var(--emergency-disaster); }
+        .fab-emergency-card.disaster:active {
+            background: rgba(199,146,234,0.15);
+            border-color: var(--emergency-disaster);
+        }
         .fab-emergency-card.disaster .fab-card-label { color: var(--emergency-disaster); }
         .fab-modal-footer {
             text-align: center;
@@ -1303,6 +1626,7 @@
             inset: 0;
             background: rgba(0,0,0,0.85);
             backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
             z-index: 1500;
             display: none;
             align-items: center;
@@ -1331,10 +1655,28 @@
             background: var(--accent-blue-gradient);
             box-shadow: 0 8px 24px rgba(230,0,18,0.4);
         }
-        .preview-overlay-content .overlay-icon i { font-size: 1.8rem; color: #fff; }
-        .preview-overlay-content h2 { font-size: 1.1rem; margin-bottom: 8px; font-weight: 800; color: var(--text-primary); }
-        .preview-overlay-content p { font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6; }
-        .preview-overlay-content .overlay-buttons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        .preview-overlay-content .overlay-icon i {
+            font-size: 1.8rem;
+            color: #fff;
+        }
+        .preview-overlay-content h2 {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+        .preview-overlay-content p {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        .preview-overlay-content .overlay-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
         .preview-overlay-content .overlay-buttons button {
             padding: 10px 20px;
             border-radius: 12px;
@@ -1346,8 +1688,16 @@
             max-width: 160px;
             font-family: inherit;
         }
-        .preview-overlay-content .overlay-buttons .btn-login { background: var(--accent-blue-gradient); color: #fff; box-shadow: 0 6px 18px rgba(230,0,18,0.4); }
-        .preview-overlay-content .overlay-buttons .btn-cancel { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .preview-overlay-content .overlay-buttons .btn-login {
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            box-shadow: 0 6px 18px rgba(230,0,18,0.4);
+        }
+        .preview-overlay-content .overlay-buttons .btn-cancel {
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
 
         /* ============ FLOATING NOTIFICATION ============ */
         .floating-notification {
@@ -1367,8 +1717,17 @@
             cursor: pointer;
             color: #ffffff;
         }
-        .floating-notification.active { display: flex; align-items: center; gap: 12px; animation: floatingNotifIn 0.5s ease; }
-        .floating-notification.emergency-notif { border-color: var(--accent-red); box-shadow: 0 0 30px rgba(248,81,73,0.5); }
+        .floating-notification.active {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: floatingNotifIn 0.5s ease;
+        }
+        .floating-notification.hide { animation: floatingNotifOut 0.5s ease; }
+        .floating-notification.emergency-notif {
+            border-color: var(--accent-red);
+            box-shadow: 0 0 30px rgba(248,81,73,0.5);
+        }
         .floating-notification .notif-icon {
             width: 36px;
             height: 36px;
@@ -1379,13 +1738,35 @@
             flex-shrink: 0;
             font-size: 1rem;
         }
-        .floating-notification .notif-icon.emergency { background: rgba(248,81,73,0.2); color: var(--accent-red); }
-        .floating-notification .notif-icon.install { background: rgba(230,0,18,0.2); color: var(--primary); }
-        .floating-notification .notif-icon.regular { background: rgba(230,0,18,0.15); color: var(--primary); }
+        .floating-notification .notif-icon.emergency {
+            background: rgba(248,81,73,0.2);
+            color: var(--accent-red);
+        }
+        .floating-notification .notif-icon.install {
+            background: rgba(230,0,18,0.2);
+            color: var(--primary);
+        }
+        .floating-notification .notif-icon.regular {
+            background: rgba(230,0,18,0.15);
+            color: var(--primary);
+        }
         .floating-notification .notif-content { flex: 1; min-width: 0; }
-        .floating-notification .notif-content .notif-title { font-size: 0.78rem; font-weight: 700; color: #ffffff; }
-        .floating-notification .notif-content .notif-message { font-size: 0.65rem; color: #a8b2c1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .floating-notification .notif-content .notif-subtitle { font-size: 0.58rem; color: #6b7688; }
+        .floating-notification .notif-content .notif-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+        .floating-notification .notif-content .notif-message {
+            font-size: 0.65rem;
+            color: #a8b2c1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .floating-notification .notif-content .notif-subtitle {
+            font-size: 0.58rem;
+            color: #6b7688;
+        }
         .floating-notification .notif-action {
             padding: 5px 14px;
             border-radius: 8px;
@@ -1398,7 +1779,69 @@
             font-family: inherit;
             flex-shrink: 0;
         }
-        .floating-notification .notif-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85rem; padding: 4px; flex-shrink: 0; }
+        .floating-notification .notif-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.85rem;
+            padding: 4px;
+            flex-shrink: 0;
+        }
+
+        /* ============ TOAST ============ */
+        .toast-container {
+            position: fixed;
+            bottom: calc(var(--footer-height) + 20px + var(--safe-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10000;
+            max-width: 400px;
+            width: calc(100% - 24px);
+        }
+        .toast {
+            background: var(--modal-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 14px;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: toastIn 0.4s ease;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+        .toast.hide { animation: toastOut 0.4s ease forwards; }
+        .toast .toast-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            background: rgba(230,0,18,0.15);
+            color: var(--primary);
+        }
+        .toast .toast-content { flex: 1; }
+        .toast .toast-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .toast .toast-message {
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+        }
+        .toast .toast-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.8rem;
+            padding: 4px;
+        }
 
         /* ============ UTILITIES ============ */
         .ripple { position: relative; overflow: hidden; }
@@ -1411,9 +1854,13 @@
             pointer-events: none;
         }
 
-        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+        :focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
         button:focus:not(:focus-visible) { outline: none; }
 
+        /* ============ RESPONSIVE ============ */
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
                 animation-duration: .01ms !important;
@@ -1423,20 +1870,34 @@
         }
 
         @media (max-width: 480px) {
-            .main-content { padding: calc(var(--header-height) + 10px) 10px calc(var(--footer-height) + 20px); }
+            .main-content {
+                padding: calc(var(--header-height) + 10px) 10px calc(var(--footer-height) + 20px);
+            }
             .emergency-icon-big { font-size: 2.2rem; }
             .emergency-title { font-size: 1rem; }
             .sidebar { width: 85%; }
-            .media-gallery { grid-template-columns: repeat(auto-fill, minmax(75px, 1fr)); }
+            .media-gallery {
+                grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
+            }
+            .header-center { gap: 4px; }
+            .header-left { gap: 4px; }
+            .header-right { gap: 4px; }
         }
 
         @media (max-width: 360px) {
             .emergency-title { font-size: 0.95rem; }
             .section-card { padding: 14px; }
-            .media-gallery { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); }
+            .media-gallery {
+                grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+            }
             .nav-fab { width: 64px; height: 64px; }
             .nav-fab .fab-emoji { font-size: 1.7rem; }
-            .user-btn, .search-btn, .menu-btn { width: 34px; height: 34px; }
+            .user-btn, .search-btn, .menu-btn, .back-btn {
+                width: 34px;
+                height: 34px;
+            }
+            .app-title .title-text { font-size: 0.8rem; }
+            .header-center { gap: 3px; }
         }
     </style>
 </head>
@@ -1448,7 +1909,7 @@
     <div class="app-shell">
 
     <!-- ============================================================ -->
-    <!-- FLOATING NOTIFICATION (PWA Install, Emergency)                -->
+    <!-- FLOATING NOTIFICATION                                         -->
     <!-- ============================================================ -->
     <div class="floating-notification" id="floatingNotification">
         <div class="notif-icon" id="floatingIcon"><i class="fas fa-bell"></i></div>
@@ -1457,28 +1918,34 @@
             <div class="notif-message" id="floatingMessage">Emergency Alert System</div>
             <div class="notif-subtitle" id="floatingSubtitle"></div>
         </div>
-        <button class="notif-action" id="floatingAction">Lihat</button>
-        <button class="notif-close" id="floatingClose"><i class="fas fa-times"></i></button>
+        <button class="notif-action" id="floatingAction" type="button">Lihat</button>
+        <button class="notif-close" id="floatingClose" type="button" aria-label="Tutup">
+            <i class="fas fa-times"></i>
+        </button>
     </div>
 
     <!-- ============================================================ -->
-    <!-- PREVIEW OVERLAY                                               -->
+    <!-- PREVIEW OVERLAY (kalau guest — tapi page ini butuh login)     -->
     <!-- ============================================================ -->
     <div class="preview-overlay" id="previewOverlay">
         <div class="preview-overlay-content">
             <div class="overlay-icon"><i class="fas fa-lock"></i></div>
-            <h2>🔒 Mode Preview</h2>
-            <p>Anda sedang melihat halaman dalam mode baca. Untuk dapat berinteraksi penuh, silakan masuk atau daftar terlebih dahulu.</p>
+            <h2>🔒 Login Diperlukan</h2>
+            <p>Halaman Detail Emergency hanya dapat diakses setelah Anda login. Silakan masuk atau daftar terlebih dahulu.</p>
             <div class="overlay-buttons">
-                <button class="btn-login" id="overlayLoginBtn" type="button"><i class="fas fa-sign-in-alt"></i> Masuk Sekarang</button>
-                <button class="btn-cancel" id="overlayCancelBtn" type="button"><i class="fas fa-times"></i> Tutup</button>
+                <button class="btn-login" id="overlayLoginBtn" type="button">
+                    <i class="fas fa-sign-in-alt"></i> Masuk Sekarang
+                </button>
+                <button class="btn-cancel" id="overlayCancelBtn" type="button">
+                    <i class="fas fa-times"></i> Kembali
+                </button>
             </div>
         </div>
     </div>
 
     <!-- ============================================================ -->
     <!-- HEADER — KONSISTEN DASHBOARD                                  -->
-    <!-- Menu ☰ + Logo 🚨 + Search 🔍 + Notif 🔔 + Theme 🌙 + Avatar   -->
+    <!-- [☰ Menu] [🚨 SALINK] [🔍] [🔔] [🌙] [← Back]                  -->
     <!-- ============================================================ -->
     <header class="app-bar" id="appBar">
         <!-- KIRI: Menu ☰ + Logo 🚨 -->
@@ -1486,7 +1953,7 @@
             <button class="menu-btn" id="menuBtn" type="button" title="Menu" aria-label="Menu">
                 <i class="fas fa-bars"></i>
             </button>
-            <a href="dashboard.html" class="app-title" id="appTitle" style="text-decoration: none;">
+            <a href="dashboard.html" class="app-title" id="appTitle" aria-label="Ke Dashboard">
                 <span class="siren-icon-header">🚨</span>
                 <span class="title-text">SALINK</span>
             </a>
@@ -1503,54 +1970,111 @@
             </button>
         </div>
 
-        <!-- KANAN: Theme Toggle + Avatar -->
+        <!-- KANAN: Theme Toggle + Back Button -->
         <div class="header-right">
-            <div class="theme-toggle" id="themeToggle" role="button" aria-label="Ganti tema">
-                <div class="toggle-thumb" id="toggleThumb"><i class="fas fa-moon" id="toggleIcon"></i></div>
+            <div class="theme-toggle" id="themeToggle" role="button" aria-label="Ganti tema" tabindex="0">
+                <div class="toggle-thumb" id="toggleThumb">
+                    <i class="fas fa-moon" id="toggleIcon"></i>
+                </div>
             </div>
-            <a href="profil.html" class="user-btn" id="userBtn" data-action="profile" aria-label="Profil" style="text-decoration: none;">
-                <i class="fas fa-user"></i>
-            </a>
+            <button class="back-btn" id="backBtn" type="button" title="Kembali" aria-label="Kembali">
+                <i class="fas fa-arrow-left"></i>
+            </button>
         </div>
     </header>
 
     <!-- ============================================================ -->
-    <!-- SIDEBAR                                                       -->
+    <!-- SIDEBAR HAMBURGER                                             -->
     <!-- ============================================================ -->
     <div class="sidebar-overlay-bg" id="sidebarOverlay"></div>
-    <div class="sidebar" id="sidebar">
-        <button class="sidebar-close" id="sidebarClose" type="button"><i class="fas fa-times"></i></button>
+    <div class="sidebar" id="sidebar" role="navigation" aria-label="Menu Utama">
+        <button class="sidebar-close" id="sidebarClose" type="button" aria-label="Tutup Menu">
+            <i class="fas fa-times"></i>
+        </button>
+
         <div class="sidebar-header">
-            <div class="sidebar-user-avatar" id="sidebarUserAvatar"><i class="fas fa-user"></i></div>
+            <div class="sidebar-user-avatar" id="sidebarUserAvatar">
+                <i class="fas fa-user"></i>
+            </div>
             <div class="sidebar-user-name" id="sidebarUserName">Guest</div>
             <div class="sidebar-user-email" id="sidebarUserEmail">guest@salink.id</div>
         </div>
+
         <ul class="nav-menu">
-            <li class="nav-item"><a href="dashboard.html" class="nav-link"><i class="fas fa-home"></i><span>Home</span></a></li>
-            <li class="nav-item"><a href="profil.html" class="nav-link"><i class="fas fa-user-circle"></i><span>Profil Saya</span></a></li>
+            <!-- MENU UTAMA -->
+            <li class="nav-item">
+                <a href="dashboard.html" class="nav-link" id="navHome">
+                    <i class="fas fa-home"></i>
+                    <span>Home</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="profil.html" class="nav-link" id="navProfil">
+                    <i class="fas fa-user-circle"></i>
+                    <span>Profil Saya</span>
+                </a>
+            </li>
 
+            <!-- MENU DARURAT -->
             <div class="nav-section-title">🚨 MENU DARURAT</div>
-            <li class="nav-item"><a href="kontak-darurat.html" class="nav-link"><i class="fas fa-phone-alt"></i><span>Kontak Darurat</span></a></li>
-            <li class="nav-item"><a href="laporan-darurat.html" class="nav-link"><i class="fas fa-exclamation-circle"></i><span>Laporan Darurat</span></a></li>
-            <li class="nav-item"><a href="lokasi-bantuan.html" class="nav-link"><i class="fas fa-hospital"></i><span>Lokasi Bantuan</span></a></li>
-            <li class="nav-item"><a href="alert-sekitar.html" class="nav-link"><i class="fas fa-bell"></i><span>Alert Sekitar</span></a></li>
+            <li class="nav-item">
+                <a href="kontak-darurat.html" class="nav-link">
+                    <i class="fas fa-phone-alt"></i>
+                    <span>Kontak Darurat</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="laporan-darurat.html" class="nav-link">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>Laporan Darurat</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="lokasi-bantuan.html" class="nav-link">
+                    <i class="fas fa-hospital"></i>
+                    <span>Lokasi Bantuan</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="alert-sekitar.html" class="nav-link">
+                    <i class="fas fa-bell"></i>
+                    <span>Alert Sekitar</span>
+                </a>
+            </li>
 
+            <!-- STATISTIK -->
             <div class="nav-section-title">📊 STATISTIK</div>
-            <li class="nav-item"><a href="statistik.html" class="nav-link"><i class="fas fa-chart-pie"></i><span>Statistik</span></a></li>
-            <li class="nav-item"><a href="laporan-saya.html" class="nav-link"><i class="fas fa-clipboard-list"></i><span>Laporan Saya</span></a></li>
+            <li class="nav-item">
+                <a href="statistik.html" class="nav-link">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>Statistik</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="laporan-saya.html" class="nav-link">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Laporan Saya</span>
+                </a>
+            </li>
 
+            <!-- LOGOUT -->
             <li class="nav-item nav-logout" id="logoutNavItem" style="display:none;">
-                <a href="#" class="nav-link" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Keluar</span></a>
+                <a href="#" class="nav-link" id="logoutBtn" type="button">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Keluar</span>
+                </a>
             </li>
         </ul>
     </div>
 
     <!-- ============================================================ -->
-    <!-- MAIN CONTENT — TIDAK DIUBAH KONTENNYA                         -->
+    <!-- MAIN CONTENT                                                  -->
     <!-- ============================================================ -->
     <main class="main-content" id="mainContent">
 
-        <!-- SKELETON LOADING -->
+        <!-- ======================================================== -->
+        <!-- SKELETON LOADING (tampil saat data belum siap)            -->
+        <!-- ======================================================== -->
         <div id="loadingSkeleton">
             <div class="skeleton-card">
                 <div class="skeleton skeleton-img"></div>
@@ -1562,9 +2086,15 @@
                 <div class="skeleton skeleton-text"></div>
                 <div class="skeleton skeleton-text short"></div>
             </div>
+            <div class="skeleton-card">
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text short"></div>
+            </div>
         </div>
 
-        <!-- ERROR STATE -->
+        <!-- ======================================================== -->
+        <!-- ERROR STATE (kalau data tidak ditemukan)                  -->
+        <!-- ======================================================== -->
         <div class="error-state" id="errorState" style="display:none;">
             <div class="error-icon">🔍</div>
             <h2>Data Tidak Ditemukan</h2>
@@ -1574,8 +2104,11 @@
             </a>
         </div>
 
-        <!-- DETAIL CONTENT -->
+        <!-- ======================================================== -->
+        <!-- DETAIL CONTENT (tampil kalau data ada)                    -->
+        <!-- ======================================================== -->
         <div id="detailContent" style="display:none;">
+
             <!-- EMERGENCY HEADER -->
             <div class="emergency-header" id="emergencyHeader">
                 <div class="live-badge" id="liveBadge">LIVE</div>
@@ -1585,35 +2118,52 @@
                 <div class="emergency-meta" id="emergencyMeta"></div>
             </div>
 
-            <!-- MEDIA SECTION -->
+            <!-- MEDIA SECTION (Foto & Video) -->
             <div class="section-card" id="mediaSection" style="display:none;">
-                <div class="section-title"><i class="fas fa-camera"></i> <span>Foto & Video Kejadian</span></div>
+                <div class="section-title">
+                    <i class="fas fa-camera"></i>
+                    <span>Foto & Video Kejadian</span>
+                </div>
                 <div id="mediaContent"></div>
             </div>
 
             <!-- DESCRIPTION SECTION -->
             <div class="section-card" id="descSection" style="display:none;">
-                <div class="section-title"><i class="fas fa-align-left"></i> <span>Deskripsi Kejadian</span></div>
+                <div class="section-title">
+                    <i class="fas fa-align-left"></i>
+                    <span>Deskripsi Kejadian</span>
+                </div>
                 <div class="section-text" id="descText"></div>
             </div>
 
-            <!-- LOCATION SECTION -->
+            <!-- LOCATION SECTION (Map + Alamat + Koordinat) -->
             <div class="section-card" id="locationSection" style="display:none;">
-                <div class="section-title"><i class="fas fa-map-marker-alt"></i> <span>Lokasi Kejadian</span></div>
+                <div class="section-title">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>Lokasi Kejadian</span>
+                </div>
+
                 <div class="map-wrapper" id="mapWrapper">
                     <iframe id="mapFrame" src="about:blank" loading="lazy" allowfullscreen></iframe>
                 </div>
+
                 <div class="location-info" id="locationInfo"></div>
+
                 <div class="action-row">
                     <a href="#" class="action-btn primary" id="openGmapsBtn" target="_blank" rel="noopener">
-                        <i class="fas fa-external-link-alt"></i> Buka di Google Maps
+                        <i class="fas fa-external-link-alt"></i>
+                        <span>Buka di Google Maps</span>
                     </a>
                 </div>
             </div>
 
-            <!-- REPORTER SECTION -->
+            <!-- REPORTER SECTION (Pelapor) -->
             <div class="section-card" id="reporterSection" style="display:none;">
-                <div class="section-title"><i class="fas fa-user"></i> <span>Dilaporkan Oleh</span></div>
+                <div class="section-title">
+                    <i class="fas fa-user"></i>
+                    <span>Dilaporkan Oleh</span>
+                </div>
+
                 <div class="reporter-card" id="reporterCard">
                     <div class="reporter-avatar" id="reporterAvatar">U</div>
                     <div class="reporter-info">
@@ -1623,31 +2173,42 @@
                     </div>
                     <i class="fas fa-chevron-right" style="color:var(--text-muted);"></i>
                 </div>
+
+                <!-- Tombol WhatsApp (kalau login) -->
                 <div class="action-row" id="contactReporterRow" style="display:none;">
                     <a href="#" class="action-btn wa-btn" id="waReporterBtn" target="_blank" rel="noopener">
-                        <i class="fab fa-whatsapp"></i> <span>Hubungi Pelapor</span>
+                        <i class="fab fa-whatsapp"></i>
+                        <span>Hubungi Pelapor</span>
                     </a>
                 </div>
+
+                <!-- Info login (kalau guest) -->
                 <div class="guest-info" id="guestInfo" style="display:none;">
                     <i class="fas fa-lock"></i> Login untuk menghubungi pelapor
                 </div>
             </div>
 
-            <!-- NEARBY SECTION -->
+            <!-- NEARBY SECTION (Bantuan Terdekat) -->
             <div class="section-card" id="nearbySection" style="display:none;">
-                <div class="section-title"><i class="fas fa-phone-volume"></i> <span>Bantuan Terdekat</span></div>
+                <div class="section-title">
+                    <i class="fas fa-phone-volume"></i>
+                    <span>Bantuan Terdekat</span>
+                </div>
                 <div id="nearbyContent"></div>
             </div>
 
-            <!-- SHARE / COPY -->
+            <!-- SHARE / COPY LINK -->
             <div class="action-row" style="margin-top:14px;">
                 <button class="action-btn" id="shareBtn" type="button">
-                    <i class="fas fa-share-alt"></i> Bagikan
+                    <i class="fas fa-share-alt"></i>
+                    <span>Bagikan</span>
                 </button>
                 <button class="action-btn" id="copyBtn" type="button">
-                    <i class="fas fa-copy"></i> Copy Link
+                    <i class="fas fa-copy"></i>
+                    <span>Copy Link</span>
                 </button>
             </div>
+
         </div>
 
     </main>
@@ -1688,20 +2249,35 @@
     <div class="modal-overlay" id="searchModal">
         <div class="modal-content search-modal-content">
             <div class="modal-header">
-                <div class="modal-title"><i class="fas fa-search"></i><span>Cari di SALINK</span></div>
-                <button class="modal-close" id="searchModalCloseBtn" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
+                <div class="modal-title">
+                    <i class="fas fa-search"></i>
+                    <span>Cari di SALINK</span>
+                </div>
+                <button class="modal-close" id="searchModalCloseBtn" type="button" aria-label="Tutup">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
             <div class="modal-body">
                 <div class="search-input-wrapper">
                     <i class="fas fa-search search-icon"></i>
                     <input type="text" id="searchInput" placeholder="Ketik nama, postingan, lokasi, atau emergency..." autocomplete="off">
-                    <button class="clear-search-btn" id="clearSearchBtn" type="button" aria-label="Bersihkan"><i class="fas fa-times"></i></button>
+                    <button class="clear-search-btn" id="clearSearchBtn" type="button" aria-label="Bersihkan">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
                 <div class="search-tabs">
-                    <button class="search-tab active" data-tab="all" type="button"><i class="fas fa-globe"></i> Semua</button>
-                    <button class="search-tab" data-tab="users" type="button"><i class="fas fa-users"></i> Pengguna</button>
-                    <button class="search-tab" data-tab="posts" type="button"><i class="fas fa-file-alt"></i> Postingan</button>
-                    <button class="search-tab" data-tab="emergency" type="button"><i class="fas fa-exclamation-triangle"></i> Emergency</button>
+                    <button class="search-tab active" data-tab="all" type="button">
+                        <i class="fas fa-globe"></i> Semua
+                    </button>
+                    <button class="search-tab" data-tab="users" type="button">
+                        <i class="fas fa-users"></i> Pengguna
+                    </button>
+                    <button class="search-tab" data-tab="posts" type="button">
+                        <i class="fas fa-file-alt"></i> Postingan
+                    </button>
+                    <button class="search-tab" data-tab="emergency" type="button">
+                        <i class="fas fa-exclamation-triangle"></i> Emergency
+                    </button>
                 </div>
                 <div class="search-filter-row" id="emergencyFilters" style="display:none;">
                     <button class="search-filter-chip active" data-filter="all" type="button">🎯 Semua</button>
@@ -1722,7 +2298,9 @@
                 </div>
                 <div class="keyboard-hint">Tekan <kbd>/</kbd> untuk buka pencarian • <kbd>Esc</kbd> untuk tutup</div>
             </div>
-            <div class="modal-footer"><button class="btn-close-modal" id="searchModalFooterBtn" type="button">Tutup</button></div>
+            <div class="modal-footer">
+                <button class="btn-close-modal" id="searchModalFooterBtn" type="button">Tutup</button>
+            </div>
         </div>
     </div>
 
@@ -1737,12 +2315,16 @@
                     <span>Notifikasi</span>
                     <span class="badge-count" id="notifModalBadge">0</span>
                 </div>
-                <button class="modal-close" id="notifModalCloseBtn" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
+                <button class="modal-close" id="notifModalCloseBtn" type="button" aria-label="Tutup">
+                    <i class="fas fa-times"></i>
+                </button>
             </div>
             <div class="modal-body">
                 <div id="notifList" style="max-height:380px;overflow-y:auto;"></div>
             </div>
-            <div class="modal-footer"><button class="btn-close-modal" id="notifModalFooterBtn" type="button">Tutup</button></div>
+            <div class="modal-footer">
+                <button class="btn-close-modal" id="notifModalFooterBtn" type="button">Tutup</button>
+            </div>
         </div>
     </div>
 
@@ -1751,14 +2333,16 @@
     <!-- ============================================================ -->
     <div class="fab-modal-overlay" id="fabModalOverlay">
         <div class="fab-modal-content" id="fabModalContent">
-            <button class="fab-modal-close" id="fabModalClose" aria-label="Tutup" type="button">
+            <button class="fab-modal-close" id="fabModalClose" type="button" aria-label="Tutup">
                 <i class="fas fa-times"></i>
             </button>
+
             <div class="fab-modal-header">
                 <span class="fab-modal-siren">🚨</span>
                 <h3>Emergency Alert System</h3>
                 <p>Pilih jenis darurat untuk membuat postingan khusus. Informasi akan diteruskan ke seluruh pengguna SALINK.</p>
             </div>
+
             <div class="fab-emergency-grid">
                 <button class="fab-emergency-card fire" data-fab-type="fire" type="button">
                     <span class="fab-card-icon">🔥</span>
@@ -1781,6 +2365,7 @@
                     <span class="fab-card-desc">Lapor bencana alam</span>
                 </button>
             </div>
+
             <div class="fab-modal-footer">
                 <i class="fas fa-info-circle"></i>
                 Tombol ini adalah shortcut untuk membuat <strong>Postingan Khusus Emergency Alert System</strong>. Anda akan diarahkan ke form postingan di halaman Dashboard.
@@ -1789,58 +2374,26 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- LIGHTBOX — TIDAK DIUBAH                                       -->
-    <!-- ============================================================ -->
-    <div class="lightbox-overlay" id="lightboxOverlay">
-        <div class="lightbox-header">
-            <div class="lightbox-counter" id="lightboxCounter">1 / 1</div>
-            <div class="lightbox-actions">
-                <button class="lightbox-btn" id="lightboxDownloadBtn" type="button" title="Download"><i class="fas fa-download"></i></button>
-                <button class="lightbox-btn" id="lightboxShareBtn" type="button" title="Bagikan"><i class="fas fa-share-alt"></i></button>
-                <button class="lightbox-btn" id="lightboxCloseBtn" type="button" title="Tutup"><i class="fas fa-times"></i></button>
-            </div>
-        </div>
-        <div class="lightbox-stage" id="lightboxStage">
-            <button class="lightbox-nav prev" id="lightboxPrevBtn" type="button"><i class="fas fa-chevron-left"></i></button>
-            <img id="lightboxImage" class="lightbox-img" src="" alt="Preview">
-            <button class="lightbox-nav next" id="lightboxNextBtn" type="button"><i class="fas fa-chevron-right"></i></button>
-        </div>
-        <div class="lightbox-info" id="lightboxInfo">-</div>
-    </div>
-
-    <!-- ============================================================ -->
     <!-- TOAST CONTAINER                                               -->
     <!-- ============================================================ -->
     <div class="toast-container" id="toastContainer"></div>
+
+        <!-- ============================================================ -->
+    <!-- SCRIPT UTAMA — DETAIL EMERGENCY JS                            -->
+    <!-- ============================================================ -->
     <script>
-/* ====================================================================
- * SALINK DETAIL-EMERGENCY v10.0 — PATCH JS (SAFE MODE)
- * ====================================================================
- * Script ini HANYA menambahkan fungsi baru:
- * - Notif 🔔 header  (buka modal notifikasi)
- * - Search 🔍 header (buka modal pencarian)
- * - Menu ☰ sidebar   (buka sidebar)
- * - FAB 🚨 modal     (grid 2x2 emergency)
- * - Preview Overlay
- * - PWA Install Toast
- * - Theme Toggle
- * - Ripple effect
- * - Modal close handlers
- * 
- * ⚠️ TIDAK mengubah JS lama v4.3 — hanya TAMBAH
- * ⚠️ Menggunakan flag _patchSetup untuk anti-duplikasi
- * ==================================================================== */
 (function() {
     'use strict';
 
-    console.log('🚀 [PATCH v10.0] Loading SALINK Detail-Emergency patches...');
+    console.log('🚀 [Detail Emergency] Initializing...');
 
-    // ====================================================================
-    // CONSTANTS
-    // ====================================================================
+    // ================================================================
+    // KONSTANTA
+    // ================================================================
     var DASHBOARD_URL = 'dashboard.html';
     var LOGIN_URL = 'login-register.html';
     var DETAIL_URL = 'detail-emergency.html';
+    var EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
 
     var EMERGENCY_LABELS = {
         fire: '🔥 Kebakaran',
@@ -1851,32 +2404,27 @@
     var EMERGENCY_ICONS = {
         fire: '🔥', medical: '🚑', crime: '🚓', disaster: '🌪️'
     };
+    var EMERGENCY_CLASS = {
+        fire: 'fire', medical: 'medical', crime: 'crime', disaster: 'disaster'
+    };
 
-    // ====================================================================
+    // ================================================================
     // STATE
-    // ====================================================================
-    var isPreviewMode = false;
+    // ================================================================
+    var currentUser = null;
+    var isPreviewMode = true;
+    var currentTheme = 'dark';
+    var currentEmergency = null;
     var deferredPrompt = null;
-    var floatingNotifTimeout = null;
+    var notifBadgeInterval = null;
     var searchTab = 'all';
     var searchEmergencyFilter = 'all';
     var searchDebounceTimer = null;
+    var floatingNotifTimeout = null;
 
-    // ====================================================================
-    // DETECT PREVIEW MODE
-    // ====================================================================
-    function checkPreviewMode() {
-        try {
-            var user = JSON.parse(localStorage.getItem('salink_user') || 'null');
-            isPreviewMode = !user || !user.username;
-        } catch(e) {
-            isPreviewMode = true;
-        }
-    }
-
-    // ====================================================================
-    // HELPER
-    // ====================================================================
+    // ================================================================
+    // HELPER FUNCTIONS
+    // ================================================================
     function escapeHTML(str) {
         if (!str) return '';
         return String(str)
@@ -1896,6 +2444,22 @@
             .replace(/>/g, '&gt;');
     }
 
+    function formatDate(ts) {
+        var d = new Date(ts);
+        var days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+        var months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+        return days[d.getDay()] + ', ' + d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear() + ' • ' +
+            String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+
+    function getRemainingTime(expiresAt) {
+        var r = expiresAt - Date.now();
+        if (r <= 0) return 'Kadaluarsa';
+        var h = Math.floor(r / 3600000);
+        var m = Math.floor((r % 3600000) / 60000);
+        return h + 'j ' + m + 'm tersisa';
+    }
+
     function getTimeAgo(ts) {
         var diff = Date.now() - ts;
         var sec = Math.floor(diff / 1000);
@@ -1909,39 +2473,173 @@
         return new Date(ts).toLocaleDateString('id-ID');
     }
 
-    // ====================================================================
-    // SAFE TOAST (fallback kalau window.showToast tidak ada)
-    // ====================================================================
-    function safeToast(title, message, icon) {
-        if (typeof window.showToast === 'function') {
-            try {
-                window.showToast(title, message, icon || 'fa-info-circle');
-                return;
-            } catch(e) {}
-        }
-        // Fallback: manual render
+    // ================================================================
+    // TOAST
+    // ================================================================
+    function showToast(title, message, icon) {
+        icon = icon || 'fa-info-circle';
         var container = document.getElementById('toastContainer');
         if (!container) return;
+
         document.querySelectorAll('.toast').forEach(function(t) { t.remove(); });
+
         var toast = document.createElement('div');
         toast.className = 'toast';
-        toast.innerHTML = '<div class="toast-icon"><i class="fas ' + (icon || 'fa-info-circle') + '"></i></div>' +
+        toast.innerHTML =
+            '<div class="toast-icon"><i class="fas ' + icon + '"></i></div>' +
             '<div class="toast-content">' +
                 '<div class="toast-title">' + escapeHTML(title) + '</div>' +
                 '<div class="toast-message">' + escapeHTML(message) + '</div>' +
             '</div>' +
-            '<button class="toast-close" type="button"><i class="fas fa-times"></i></button>';
-        toast.querySelector('.toast-close').onclick = function() { toast.remove(); };
+            '<button class="toast-close" type="button" aria-label="Tutup">' +
+                '<i class="fas fa-times"></i>' +
+            '</button>';
+
+        toast.querySelector('.toast-close').addEventListener('click', function() {
+            toast.classList.add('hide');
+            setTimeout(function() { toast.remove(); }, 400);
+        });
+
         container.appendChild(toast);
+
         setTimeout(function() {
             toast.classList.add('hide');
             setTimeout(function() { toast.remove(); }, 400);
         }, 4500);
     }
 
-    // ====================================================================
+    // ================================================================
+    // PREVIEW OVERLAY
+    // ================================================================
+    function showPreviewOverlay() {
+        var o = document.getElementById('previewOverlay');
+        if (o) {
+            o.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    function hidePreviewOverlay() {
+        var o = document.getElementById('previewOverlay');
+        if (o) {
+            o.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    }
+
+    // ================================================================
+    // USER & LOGIN
+    // ================================================================
+    function loadUser() {
+        try {
+            var s = localStorage.getItem('salink_user');
+            if (s) {
+                currentUser = JSON.parse(s);
+                if (currentUser && currentUser.username && currentUser.fullName) {
+                    isPreviewMode = false;
+                    return true;
+                }
+            }
+        } catch (e) {}
+        isPreviewMode = true;
+        return false;
+    }
+
+    function redirectToLogin() {
+        var currentUrl = window.location.pathname + window.location.search;
+        window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(currentUrl);
+    }
+
+    function updateUserUI() {
+        var sidebarAvatar = document.getElementById('sidebarUserAvatar');
+        var sidebarName = document.getElementById('sidebarUserName');
+        var sidebarEmail = document.getElementById('sidebarUserEmail');
+        var logoutItem = document.getElementById('logoutNavItem');
+
+        if (!currentUser) {
+            if (sidebarAvatar) sidebarAvatar.innerHTML = '<i class="fas fa-user"></i>';
+            if (sidebarName) sidebarName.textContent = 'Guest';
+            if (sidebarEmail) sidebarEmail.textContent = 'guest@salink.id';
+            if (logoutItem) logoutItem.style.display = 'none';
+            return;
+        }
+
+        if (sidebarAvatar) {
+            if (currentUser.profilePicture) {
+                sidebarAvatar.innerHTML = '<img src="' + escapeAttr(currentUser.profilePicture) + '" alt="Avatar">';
+            } else {
+                sidebarAvatar.innerHTML = '<i class="fas fa-user"></i>';
+            }
+        }
+        if (sidebarName) sidebarName.textContent = currentUser.fullName || currentUser.username || 'User';
+        if (sidebarEmail) sidebarEmail.textContent = currentUser.email || currentUser.username || '-';
+        if (logoutItem) logoutItem.style.display = 'block';
+    }
+
+    // ================================================================
+    // THEME TOGGLE
+    // ================================================================
+    function loadTheme() {
+        var t = localStorage.getItem('salink_theme');
+        if (t === 'light') {
+            currentTheme = 'light';
+            document.documentElement.setAttribute('data-theme', 'light');
+            var tt = document.getElementById('themeToggle');
+            if (tt) tt.classList.add('active');
+            var ti = document.getElementById('toggleIcon');
+            if (ti) ti.className = 'fas fa-sun';
+        } else {
+            currentTheme = 'dark';
+            document.documentElement.removeAttribute('data-theme');
+            var tt2 = document.getElementById('themeToggle');
+            if (tt2) tt2.classList.remove('active');
+            var ti2 = document.getElementById('toggleIcon');
+            if (ti2) ti2.className = 'fas fa-moon';
+        }
+    }
+
+    function toggleTheme() {
+        var html = document.documentElement;
+        var tt = document.getElementById('themeToggle');
+        var ti = document.getElementById('toggleIcon');
+
+        if (currentTheme === 'dark') {
+            currentTheme = 'light';
+            html.setAttribute('data-theme', 'light');
+            if (tt) tt.classList.add('active');
+            if (ti) ti.className = 'fas fa-sun';
+            localStorage.setItem('salink_theme', 'light');
+        } else {
+            currentTheme = 'dark';
+            html.removeAttribute('data-theme');
+            if (tt) tt.classList.remove('active');
+            if (ti) ti.className = 'fas fa-moon';
+            localStorage.setItem('salink_theme', 'dark');
+        }
+    }
+
+    // ================================================================
+    // SIDEBAR
+    // ================================================================
+    function openSidebar() {
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.getElementById('sidebarOverlay');
+        if (sidebar) sidebar.classList.add('active');
+        if (overlay) overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeSidebar() {
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.getElementById('sidebarOverlay');
+        if (sidebar) sidebar.classList.remove('active');
+        if (overlay) overlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    // ================================================================
     // MODAL HELPERS
-    // ====================================================================
+    // ================================================================
     function openModalById(id) {
         var m = document.getElementById(id);
         if (m) {
@@ -1958,53 +2656,29 @@
         }
     }
 
-    // ====================================================================
-    // PREVIEW OVERLAY
-    // ====================================================================
-    function showPreviewOverlay() {
-        var o = document.getElementById('previewOverlay');
-        if (o) {
-            o.classList.add('active');
-            document.body.style.overflow = 'hidden';
-        }
-        safeToast('🔒 Mode Preview', 'Login untuk mengakses fitur ini', 'fa-lock');
-    }
-
-    function hidePreviewOverlay() {
-        var o = document.getElementById('previewOverlay');
-        if (o) {
-            o.classList.remove('active');
-            document.body.style.overflow = '';
-        }
-    }
-
-    // ====================================================================
-    // NOTIF MODAL
-    // ====================================================================
+    // ================================================================
+    // NOTIF BADGE
+    // ================================================================
     function getAllNotifications() {
         var list = [];
 
-        // Emergency dari localStorage
-        var allEmergencies = [];
         try {
-            allEmergencies = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+            var allEmergencies = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+            allEmergencies.forEach(function(em) {
+                var ts = em.timestamp ? new Date(em.timestamp).getTime() : Date.now();
+                list.push({
+                    id: em.id,
+                    type: 'emergency',
+                    emergencyType: em.type,
+                    title: (EMERGENCY_ICONS[em.type] || '🚨') + ' ' + (EMERGENCY_LABELS[em.type] || 'Emergency'),
+                    message: em.text || em.description || (em.sender + ' melaporkan darurat di ' + (em.location || '-')),
+                    sender: em.sender || 'Sistem',
+                    timestamp: ts,
+                    read: false
+                });
+            });
         } catch(e) {}
 
-        allEmergencies.forEach(function(em) {
-            var ts = em.timestamp ? new Date(em.timestamp).getTime() : Date.now();
-            list.push({
-                id: em.id,
-                type: 'emergency',
-                emergencyType: em.type,
-                title: (EMERGENCY_ICONS[em.type] || '🚨') + ' ' + (EMERGENCY_LABELS[em.type] || 'Emergency'),
-                message: em.text || em.description || (em.sender + ' melaporkan darurat di ' + (em.location || '-')),
-                sender: em.sender || 'Sistem',
-                timestamp: ts,
-                read: false
-            });
-        });
-
-        // Regular notif dari localStorage
         try {
             var notifs = JSON.parse(localStorage.getItem('salink_notifications') || '[]');
             notifs.forEach(function(n) {
@@ -2041,24 +2715,32 @@
         var listEl = document.getElementById('notifList');
         if (!listEl) return;
         var all = getAllNotifications();
+
         if (all.length === 0) {
-            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">' +
-                '<i class="fas fa-bell-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i>' +
-                '<p style="font-size:0.75rem;">Tidak ada notifikasi</p></div>';
+            listEl.innerHTML =
+                '<div style="text-align:center;padding:30px;color:var(--text-muted);">' +
+                    '<i class="fas fa-bell-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i>' +
+                    '<p style="font-size:0.75rem;">Tidak ada notifikasi</p>' +
+                '</div>';
             return;
         }
+
         listEl.innerHTML = all.slice(0, 30).map(function(n) {
             var iconHtml = n.type === 'emergency'
                 ? '<div class="notif-item-icon emergency">' + (EMERGENCY_ICONS[n.emergencyType] || '🚨') + '</div>'
                 : '<div class="notif-item-icon regular"><i class="fas fa-bell"></i></div>';
             var unreadClass = n.read ? '' : 'unread';
             var typeClass = n.type === 'emergency' ? 'emergency' : '';
+
             return '<div class="notif-item ' + unreadClass + ' ' + typeClass + '" data-notif-id="' + escapeAttr(n.id) + '" data-notif-type="' + escapeAttr(n.type) + '">' +
                 iconHtml +
                 '<div class="notif-item-content">' +
                     '<div class="notif-item-title">' + escapeHTML(n.title) + '</div>' +
                     '<div class="notif-item-message">' + escapeHTML(n.message) + '</div>' +
-                    '<div class="notif-item-time"><i class="fas fa-clock"></i> ' + getTimeAgo(n.timestamp) + (n.sender ? ' • ' + escapeHTML(n.sender) : '') + '</div>' +
+                    '<div class="notif-item-time">' +
+                        '<i class="fas fa-clock"></i> ' + getTimeAgo(n.timestamp) +
+                        (n.sender ? ' • ' + escapeHTML(n.sender) : '') +
+                    '</div>' +
                 '</div>' +
             '</div>';
         }).join('');
@@ -2074,9 +2756,9 @@
         closeModalById('notifModal');
     }
 
-    // ====================================================================
+    // ================================================================
     // SEARCH MODAL
-    // ====================================================================
+    // ================================================================
     function openSearchModal() {
         if (isPreviewMode) { showPreviewOverlay(); return; }
         openModalById('searchModal');
@@ -2126,8 +2808,10 @@
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         var activeTab = document.querySelector('.search-tab[data-tab="' + tab + '"]');
         if (activeTab) activeTab.classList.add('active');
+
         var ef = document.getElementById('emergencyFilters');
         if (ef) ef.style.display = (tab === 'emergency') ? 'flex' : 'none';
+
         var input = document.getElementById('searchInput');
         if (input && input.value.trim()) performSearch(input.value.trim());
     }
@@ -2137,6 +2821,7 @@
         document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
         var activeChip = document.querySelector('.search-filter-chip[data-filter="' + filter + '"]');
         if (activeChip) activeChip.classList.add('active');
+
         var input = document.getElementById('searchInput');
         if (input && input.value.trim()) performSearch(input.value.trim());
     }
@@ -2150,6 +2835,7 @@
             if (sdv) sdv.style.display = 'block';
             return;
         }
+
         var sdv = document.getElementById('searchDefaultView');
         if (sdv) sdv.style.display = 'none';
         var sar = document.getElementById('searchActiveResults');
@@ -2157,7 +2843,6 @@
         var cb = document.getElementById('clearSearchBtn');
         if (cb) cb.classList.add('visible');
 
-        // Search users
         var allUsers = [];
         try { allUsers = JSON.parse(localStorage.getItem('salink_users') || '[]'); } catch(e) {}
         var matchedUsers = allUsers.filter(function(u) {
@@ -2165,7 +2850,6 @@
                    (u.username || '').toLowerCase().indexOf(q) !== -1;
         });
 
-        // Search posts
         var allPosts = [];
         try { allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]'); } catch(e) {}
         var matchedPosts = allPosts.filter(function(p) {
@@ -2173,7 +2857,6 @@
                    (p.userFullName || '').toLowerCase().indexOf(q) !== -1;
         });
 
-        // Search emergencies
         var allEms = [];
         try { allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) {}
         var matchedEm = allEms.filter(function(e) {
@@ -2240,38 +2923,40 @@
         }
 
         if (totalCount === 0) {
-            html = '<div class="search-empty-state">' +
-                '<div class="empty-big-icon">🔍</div>' +
-                '<h4>Tidak ditemukan hasil</h4>' +
-                '<p>Coba kata kunci lain.</p>' +
-            '</div>';
+            html =
+                '<div class="search-empty-state">' +
+                    '<div class="empty-big-icon">🔍</div>' +
+                    '<h4>Tidak ditemukan hasil</h4>' +
+                    '<p>Coba kata kunci lain.</p>' +
+                '</div>';
         }
         if (sar) sar.innerHTML = html;
 
-        // Attach click events
-        sar.querySelectorAll('[data-user]').forEach(function(el) {
-            el.addEventListener('click', function() {
-                var username = this.getAttribute('data-user');
-                closeSearchModal();
-                setTimeout(function() {
-                    window.open('profile-user.html?username=' + encodeURIComponent(username), '_blank');
-                }, 200);
+        if (sar) {
+            sar.querySelectorAll('[data-user]').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    var username = this.getAttribute('data-user');
+                    closeSearchModal();
+                    setTimeout(function() {
+                        window.open('profile-user.html?username=' + encodeURIComponent(username), '_blank');
+                    }, 200);
+                });
             });
-        });
-        sar.querySelectorAll('[data-emergency-id]').forEach(function(el) {
-            el.addEventListener('click', function() {
-                var eid = this.getAttribute('data-emergency-id');
-                closeSearchModal();
-                setTimeout(function() {
-                    window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(eid);
-                }, 200);
+            sar.querySelectorAll('[data-emergency-id]').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    var eid = this.getAttribute('data-emergency-id');
+                    closeSearchModal();
+                    setTimeout(function() {
+                        window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(eid);
+                    }, 200);
+                });
             });
-        });
+        }
     }
 
-    // ====================================================================
+    // ================================================================
     // FAB MODAL
-    // ====================================================================
+    // ================================================================
     function openFabModal() {
         if (isPreviewMode) { showPreviewOverlay(); return; }
         var overlay = document.getElementById('fabModalOverlay');
@@ -2288,13 +2973,14 @@
         document.body.style.overflow = '';
     }
 
-    // ====================================================================
-    // FLOATING NOTIFICATION (PWA)
-    // ====================================================================
+    // ================================================================
+    // FLOATING NOTIFICATION
+    // ================================================================
     function showFloatingNotification(type, title, message, subtitle, actionText, actionCallback) {
         var notif = document.getElementById('floatingNotification');
         var icon = document.getElementById('floatingIcon');
         if (!notif) return;
+
         clearTimeout(floatingNotifTimeout);
         icon.className = 'notif-icon ' + type;
         if (type === 'emergency') icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
@@ -2317,10 +3003,13 @@
             actionBtn.style.display = 'none';
         }
 
-        document.getElementById('floatingClose').onclick = function(e) {
-            e.stopPropagation();
-            hideFloatingNotification();
-        };
+        var closeBtn = document.getElementById('floatingClose');
+        if (closeBtn) {
+            closeBtn.onclick = function(e) {
+                e.stopPropagation();
+                hideFloatingNotification();
+            };
+        }
 
         if (type === 'emergency') notif.classList.add('emergency-notif');
         else notif.classList.remove('emergency-notif');
@@ -2332,31 +3021,438 @@
 
     function hideFloatingNotification() {
         var notif = document.getElementById('floatingNotification');
-        if (notif) notif.classList.remove('active');
+        if (notif) {
+            notif.classList.remove('active');
+            notif.classList.add('hide');
+            setTimeout(function() { notif.classList.remove('hide'); }, 500);
+        }
         clearTimeout(floatingNotifTimeout);
     }
 
-    function showInstallPrompt() {
-        if (deferredPrompt) {
-            deferredPrompt.prompt();
-            deferredPrompt.userChoice.then(function(r) {
-                if (r.outcome === 'accepted') {
-                    localStorage.setItem('salink_installed', 'true');
+    // ================================================================
+    // LOAD EMERGENCY DATA
+    // ================================================================
+    function getEmergencyIdFromURL() {
+        var params = new URLSearchParams(window.location.search);
+        return params.get('id');
+    }
+
+    function loadEmergencyData() {
+        var id = getEmergencyIdFromURL();
+        if (!id) {
+            showError('ID emergency tidak ditemukan di URL.');
+            return;
+        }
+
+        var allEms = [];
+        try {
+            allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+        } catch(e) {}
+
+        var emergency = allEms.find(function(e) { return e.id === id; });
+
+        if (!emergency) {
+            try {
+                var posts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
+                var post = posts.find(function(p) { return p.id === id && p.isSpecial; });
+                if (post) {
+                    emergency = {
+                        id: post.id,
+                        type: post.specialType,
+                        sender: post.userFullName,
+                        senderUsername: post.userId,
+                        location: post.specialLocation || post.specialAddress,
+                        address: post.specialAddress,
+                        text: post.text,
+                        description: post.text,
+                        latitude: post.latitude,
+                        longitude: post.longitude,
+                        mapsURL: post.mapsURL,
+                        timestamp: post.timestamp,
+                        expiresAt: post.timestamp + EMERGENCY_DURATION,
+                        status: 'active'
+                    };
                 }
-                deferredPrompt = null;
-            });
+            } catch(e) {}
+        }
+
+        if (!emergency) {
+            showError('Laporan emergency tidak ditemukan atau sudah kadaluarsa.');
+            return;
+        }
+
+        currentEmergency = emergency;
+        renderEmergencyDetail(emergency);
+    }
+
+    function showError(message) {
+        var sk = document.getElementById('loadingSkeleton');
+        if (sk) sk.style.display = 'none';
+        var dc = document.getElementById('detailContent');
+        if (dc) dc.style.display = 'none';
+        var es = document.getElementById('errorState');
+        if (es) es.style.display = 'block';
+        var em = document.getElementById('errorMessage');
+        if (em) em.textContent = message;
+    }
+
+    // ================================================================
+    // RENDER EMERGENCY DETAIL
+    // ================================================================
+    function renderEmergencyDetail(em) {
+        var sk = document.getElementById('loadingSkeleton');
+        if (sk) sk.style.display = 'none';
+        var es = document.getElementById('errorState');
+        if (es) es.style.display = 'none';
+        var dc = document.getElementById('detailContent');
+        if (dc) dc.style.display = 'block';
+
+        var type = em.type || 'fire';
+        var icon = EMERGENCY_ICONS[type] || '🚨';
+        var label = EMERGENCY_LABELS[type] || 'Emergency';
+        var cssClass = EMERGENCY_CLASS[type] || 'fire';
+
+        var ts = typeof em.timestamp === 'number' ? em.timestamp : new Date(em.timestamp).getTime();
+        if (isNaN(ts)) ts = Date.now();
+        var expiresAt = em.expiresAt || (ts + EMERGENCY_DURATION);
+        var isExpired = expiresAt <= Date.now();
+
+        var emergencyHeader = document.getElementById('emergencyHeader');
+        if (emergencyHeader) {
+            emergencyHeader.className = 'emergency-header ' + cssClass;
+        }
+
+        var iconBig = document.getElementById('emergencyIconBig');
+        if (iconBig) iconBig.textContent = icon;
+
+        var typeLabel = document.getElementById('emergencyTypeLabel');
+        if (typeLabel) typeLabel.textContent = label;
+
+        var title = document.getElementById('emergencyTitle');
+        if (title) title.textContent = label.replace(/^[^\s]+\s/, '') || 'Emergency';
+
+        var meta = document.getElementById('emergencyMeta');
+        if (meta) {
+            var metaHtml = '';
+            metaHtml += '<span><i class="fas fa-calendar"></i> ' + formatDate(ts) + '</span>';
+            if (!isExpired) {
+                metaHtml += '<span><i class="fas fa-hourglass-half"></i> ' + getRemainingTime(expiresAt) + '</span>';
+            } else {
+                metaHtml += '<span><i class="fas fa-clock"></i> Kadaluarsa</span>';
+            }
+            meta.innerHTML = metaHtml;
+        }
+
+        var liveBadge = document.getElementById('liveBadge');
+        if (liveBadge) {
+            if (isExpired) {
+                liveBadge.textContent = 'RESOLVED';
+                liveBadge.classList.add('resolved');
+            } else {
+                liveBadge.textContent = 'LIVE';
+                liveBadge.classList.remove('resolved');
+            }
+        }
+
+        var descText = em.text || em.description || '';
+        var descSection = document.getElementById('descSection');
+        var descTextEl = document.getElementById('descText');
+        if (descText && descText.trim()) {
+            if (descSection) descSection.style.display = 'block';
+            if (descTextEl) descTextEl.textContent = descText;
         } else {
-            var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-            safeToast('📱 Install', isIOS ? 'Bagikan → Tambahkan ke Layar Utama' : 'Menu browser → Install Aplikasi', 'fa-mobile-alt');
+            if (descSection) descSection.style.display = 'none';
+        }
+
+        renderMediaSection(em);
+        renderLocationSection(em);
+        renderReporterSection(em);
+        renderNearbySection(em);
+
+        document.title = label + ' - SALINK Detail';
+
+        console.log('✅ [Detail Emergency] Rendered:', em.id);
+    }
+
+    // ================================================================
+    // RENDER MEDIA SECTION
+    // ================================================================
+    function renderMediaSection(em) {
+        var mediaContent = document.getElementById('mediaContent');
+        var mediaSection = document.getElementById('mediaSection');
+        if (!mediaContent || !mediaSection) return;
+
+        var mediaHtml = '';
+        var mediaUrl = '';
+        var mediaType = em.mediaType || '';
+        var gdriveId = em.gdriveId || '';
+
+        if (em.gdriveImageUrl) {
+            mediaUrl = em.gdriveImageUrl;
+        } else if (em.mediaData) {
+            mediaUrl = em.mediaData;
+        }
+
+        if (!mediaUrl && !gdriveId) {
+            mediaSection.style.display = 'none';
+            return;
+        }
+
+        mediaSection.style.display = 'block';
+
+        if (mediaType === 'video') {
+            var videoSrc = em.gdriveVideoEmbed || mediaUrl;
+            if (gdriveId && !em.gdriveVideoEmbed) {
+                videoSrc = 'https://drive.google.com/file/d/' + gdriveId + '/preview';
+            }
+            mediaHtml =
+                '<div class="video-container">' +
+                    '<iframe src="' + escapeAttr(videoSrc) + '" style="width:100%;height:280px;border:0;" allow="autoplay" allowfullscreen loading="lazy"></iframe>' +
+                '</div>';
+        } else {
+            mediaHtml =
+                '<div class="media-gallery">' +
+                    '<div class="media-thumb" data-media-url="' + escapeAttr(mediaUrl) + '">' +
+                        '<img src="' + escapeAttr(mediaUrl) + '" alt="Foto Kejadian" loading="lazy" onerror="this.style.display=\'none\';this.parentElement.innerHTML=\'<div style=&quot;padding:20px;text-align:center;color:var(--text-muted);font-size:0.7rem;&quot;>🖼️ Foto tidak tersedia</div>\'">' +
+                        '<div class="zoom-hint">🔍 Tap untuk lihat</div>' +
+                    '</div>' +
+                '</div>';
+        }
+
+        mediaContent.innerHTML = mediaHtml;
+
+        mediaContent.querySelectorAll('.media-thumb').forEach(function(el) {
+            el.addEventListener('click', function() {
+                var url = this.getAttribute('data-media-url');
+                if (url) window.open(url, '_blank');
+            });
+        });
+    }
+
+    // ================================================================
+    // RENDER LOCATION SECTION
+    // ================================================================
+    function renderLocationSection(em) {
+        var locationSection = document.getElementById('locationSection');
+        var mapFrame = document.getElementById('mapFrame');
+        var locationInfo = document.getElementById('locationInfo');
+        var openGmapsBtn = document.getElementById('openGmapsBtn');
+        if (!locationSection) return;
+
+        var address = em.address || em.location || '';
+        var latitude = em.latitude || '';
+        var longitude = em.longitude || '';
+        var mapsURL = em.mapsURL || '';
+
+        if (!address && !latitude && !longitude && !mapsURL) {
+            locationSection.style.display = 'none';
+            return;
+        }
+
+        locationSection.style.display = 'block';
+
+        if (mapFrame) {
+            var embedUrl = '';
+            if (latitude && longitude) {
+                embedUrl = 'https://www.google.com/maps?q=' + latitude + ',' + longitude + '&output=embed';
+            } else if (address) {
+                embedUrl = 'https://www.google.com/maps?q=' + encodeURIComponent(address) + '&output=embed';
+            } else if (mapsURL && mapsURL.indexOf('google.com/maps') !== -1) {
+                embedUrl = mapsURL.replace('/maps?', '/maps?output=embed&').replace('&output=embed&', '&');
+            }
+            if (embedUrl) {
+                mapFrame.src = embedUrl;
+            }
+        }
+
+        if (locationInfo) {
+            var locHtml = '';
+            if (address) {
+                locHtml += '<div class="loc-row"><i class="fas fa-map-marker-alt"></i><span>' + escapeHTML(address) + '</span></div>';
+            }
+            if (latitude && longitude) {
+                locHtml += '<div class="loc-row"><i class="fas fa-crosshairs"></i><span class="coords-value">' + escapeHTML(latitude) + ', ' + escapeHTML(longitude) + '</span></div>';
+            }
+            if (em.specialLocation && em.specialLocation !== address) {
+                locHtml += '<div class="loc-row"><i class="fas fa-compass"></i><span>' + escapeHTML(em.specialLocation) + '</span></div>';
+            }
+            locationInfo.innerHTML = locHtml || '<div class="loc-row"><i class="fas fa-info-circle"></i><span>Lokasi tidak spesifik</span></div>';
+        }
+
+        if (openGmapsBtn) {
+            var finalUrl = '';
+            if (mapsURL) {
+                finalUrl = mapsURL;
+            } else if (latitude && longitude) {
+                finalUrl = 'https://www.google.com/maps?q=' + latitude + ',' + longitude;
+            } else if (address) {
+                finalUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(address);
+            }
+            if (finalUrl) {
+                openGmapsBtn.href = finalUrl;
+                openGmapsBtn.style.display = 'flex';
+            } else {
+                openGmapsBtn.style.display = 'none';
+            }
         }
     }
 
-    // ====================================================================
+    // ================================================================
+    // RENDER REPORTER SECTION
+    // ================================================================
+    function renderReporterSection(em) {
+        var reporterSection = document.getElementById('reporterSection');
+        var reporterAvatar = document.getElementById('reporterAvatar');
+        var reporterName = document.getElementById('reporterName');
+        var reporterUsername = document.getElementById('reporterUsername');
+        var reporterLocation = document.getElementById('reporterLocation');
+        var reporterCard = document.getElementById('reporterCard');
+        var contactRow = document.getElementById('contactReporterRow');
+        var waBtn = document.getElementById('waReporterBtn');
+        var guestInfo = document.getElementById('guestInfo');
+
+        if (!reporterSection) return;
+
+        var senderName = em.sender || em.senderUsername || 'Pelapor';
+        var senderUsername = em.senderUsername || em.sender || '';
+        var senderLocation = em.address || em.location || 'Lokasi tidak diketahui';
+
+        if (!senderName) {
+            reporterSection.style.display = 'none';
+            return;
+        }
+
+        reporterSection.style.display = 'block';
+
+        if (reporterAvatar) {
+            var initial = senderName.charAt(0).toUpperCase();
+            reporterAvatar.textContent = initial;
+        }
+
+        if (reporterName) reporterName.textContent = senderName;
+        if (reporterUsername) reporterUsername.textContent = senderUsername ? '@' + senderUsername : '';
+        if (reporterLocation) reporterLocation.innerHTML = '📍 ' + escapeHTML(senderLocation);
+
+        if (reporterCard) {
+            reporterCard.onclick = function() {
+                if (!senderUsername) return;
+                if (isPreviewMode) { showPreviewOverlay(); return; }
+                window.open('profile-user.html?username=' + encodeURIComponent(senderUsername), '_blank');
+            };
+        }
+
+        if (waBtn) {
+            var senderPhone = em.senderPhone || '';
+            if (senderPhone && !isPreviewMode) {
+                var waMessage = encodeURIComponent('Halo, saya menghubungi Anda terkait laporan ' + EMERGENCY_LABELS[em.type] + ' di ' + senderLocation);
+                waBtn.href = 'https://wa.me/' + senderPhone.replace(/\D/g, '') + '?text=' + waMessage;
+                waBtn.target = '_blank';
+                waBtn.rel = 'noopener';
+                if (contactRow) contactRow.style.display = 'flex';
+                if (guestInfo) guestInfo.style.display = 'none';
+            } else {
+                if (contactRow) contactRow.style.display = 'none';
+                if (guestInfo) guestInfo.style.display = 'block';
+            }
+        }
+    }
+
+    // ================================================================
+    // RENDER NEARBY SECTION
+    // ================================================================
+    function renderNearbySection(em) {
+        var nearbySection = document.getElementById('nearbySection');
+        var nearbyContent = document.getElementById('nearbyContent');
+        if (!nearbySection || !nearbyContent) return;
+
+        var nearbyContacts = [];
+        try {
+            if (em.nearbyContacts) {
+                nearbyContacts = typeof em.nearbyContacts === 'string'
+                    ? JSON.parse(em.nearbyContacts)
+                    : em.nearbyContacts;
+            }
+        } catch(e) {}
+
+        if (!Array.isArray(nearbyContacts) || nearbyContacts.length === 0) {
+            nearbySection.style.display = 'none';
+            return;
+        }
+
+        nearbySection.style.display = 'block';
+
+        nearbyContent.innerHTML = nearbyContacts.map(function(c) {
+            var name = c.name || 'Kontak';
+            var type = c.type || 'Bantuan';
+            var phone = c.phone || '';
+            var whatsapp = c.whatsapp || phone;
+
+            return '<div class="contact-item">' +
+                '<div class="contact-icon"><i class="fas fa-phone"></i></div>' +
+                '<div class="contact-info">' +
+                    '<div class="contact-name">' + escapeHTML(name) + '</div>' +
+                    '<div class="contact-sub">' + escapeHTML(type) + '</div>' +
+                '</div>' +
+                '<div class="contact-actions">' +
+                    (phone ? '<a href="tel:' + escapeAttr(phone) + '" class="contact-action-btn call" title="Telepon"><i class="fas fa-phone"></i></a>' : '') +
+                    (whatsapp ? '<a href="https://wa.me/' + escapeAttr(whatsapp.replace(/\D/g, '')) + '" target="_blank" rel="noopener" class="contact-action-btn wa" title="WhatsApp"><i class="fab fa-whatsapp"></i></a>' : '') +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    // ================================================================
+    // SHARE & COPY LINK
+    // ================================================================
+    function shareEmergency() {
+        var url = window.location.href;
+        var title = currentEmergency
+            ? EMERGENCY_LABELS[currentEmergency.type] + ' — SALINK'
+            : 'SALINK Detail Emergency';
+
+        if (navigator.share) {
+            navigator.share({
+                title: title,
+                text: 'Lihat laporan emergency di SALINK',
+                url: url
+            }).catch(function() {});
+        } else {
+            copyToClipboard(url);
+            showToast('📋 Link disalin', 'Bagikan ke orang lain', 'fa-copy');
+        }
+    }
+
+    function copyEmergencyLink() {
+        var url = window.location.href;
+        copyToClipboard(url);
+        showToast('📋 Link disalin', 'Berhasil disalin ke clipboard', 'fa-copy');
+    }
+
+    function copyToClipboard(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).catch(function() {
+                fallbackCopy(text);
+            });
+        } else {
+            fallbackCopy(text);
+        }
+    }
+
+    function fallbackCopy(text) {
+        var textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try { document.execCommand('copy'); } catch(e) {}
+        document.body.removeChild(textarea);
+    }
+
+    // ================================================================
     // RIPPLE EFFECT
-    // ====================================================================
+    // ================================================================
     function initRipple() {
-        if (document._rippleSetup) return;
-        document._rippleSetup = true;
         document.addEventListener('click', function(e) {
             var rippleEl = e.target.closest('.ripple');
             if (!rippleEl) return;
@@ -2374,271 +3470,16 @@
         });
     }
 
-    // ====================================================================
-    // MENU BUTTON (Sidebar)
-    // ====================================================================
-    function initMenuBtn() {
-        var menuBtn = document.getElementById('menuBtn');
-        if (!menuBtn || menuBtn._patchSetup) return;
-        menuBtn._patchSetup = true;
-        menuBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (navigator.vibrate) navigator.vibrate(10);
-            // Panggil fungsi openSidebar dari JS lama
-            if (typeof window.openSidebar === 'function') {
-                window.openSidebar();
-            } else {
-                // Fallback: manual open
-                var sidebar = document.getElementById('sidebar');
-                var overlay = document.getElementById('sidebarOverlay');
-                if (sidebar) sidebar.classList.add('active');
-                if (overlay) overlay.classList.add('active');
-                document.body.style.overflow = 'hidden';
-            }
-        });
-    }
-
-    // ====================================================================
-    // HEADER NOTIF
-    // ====================================================================
-    function initHeaderNotif() {
-        var headerNotifBtn = document.getElementById('headerNotifBtn');
-        if (!headerNotifBtn || headerNotifBtn._patchSetup) return;
-        headerNotifBtn._patchSetup = true;
-        headerNotifBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            openNotifModal();
-        });
-    }
-
-    // ====================================================================
-    // HEADER SEARCH
-    // ====================================================================
-    function initHeaderSearch() {
-        var headerSearchBtn = document.getElementById('headerSearchBtn');
-        if (!headerSearchBtn || headerSearchBtn._patchSetup) return;
-        headerSearchBtn._patchSetup = true;
-        headerSearchBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            openSearchModal();
-        });
-    }
-
-    // ====================================================================
-    // THEME TOGGLE
-    // ====================================================================
-    function initThemeToggle() {
-        var themeToggle = document.getElementById('themeToggle');
-        if (!themeToggle || themeToggle._patchSetup) return;
-        themeToggle._patchSetup = true;
-
-        // Sync state awal dari localStorage
-        var savedTheme = localStorage.getItem('salink_theme');
-        if (savedTheme === 'light') {
-            themeToggle.classList.add('active');
-            var icon = document.getElementById('toggleIcon');
-            if (icon) icon.className = 'fas fa-sun';
-        }
-
-        themeToggle.addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            var html = document.documentElement;
-            var currentTheme = html.getAttribute('data-theme') || 'dark';
-            var icon = document.getElementById('toggleIcon');
-
-            if (currentTheme === 'dark') {
-                html.setAttribute('data-theme', 'light');
-                themeToggle.classList.add('active');
-                if (icon) icon.className = 'fas fa-sun';
-                localStorage.setItem('salink_theme', 'light');
-            } else {
-                html.removeAttribute('data-theme');
-                themeToggle.classList.remove('active');
-                if (icon) icon.className = 'fas fa-moon';
-                localStorage.setItem('salink_theme', 'dark');
-            }
-        });
-    }
-
-    // ====================================================================
-    // PREVIEW OVERLAY BUTTONS
-    // ====================================================================
-    function initPreviewButtons() {
-        var loginBtn = document.getElementById('overlayLoginBtn');
-        if (loginBtn && !loginBtn._patchSetup) {
-            loginBtn._patchSetup = true;
-            loginBtn.addEventListener('click', function() {
-                window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(window.location.pathname + window.location.search);
-            });
-        }
-        var cancelBtn = document.getElementById('overlayCancelBtn');
-        if (cancelBtn && !cancelBtn._patchSetup) {
-            cancelBtn._patchSetup = true;
-            cancelBtn.addEventListener('click', hidePreviewOverlay);
-        }
-        var overlay = document.getElementById('previewOverlay');
-        if (overlay && !overlay._patchSetup) {
-            overlay._patchSetup = true;
-            overlay.addEventListener('click', function(e) {
-                if (e.target === overlay) hidePreviewOverlay();
-            });
-        }
-    }
-
-    // ====================================================================
-    // MODAL CLOSE BUTTONS
-    // ====================================================================
-    function initModalCloseButtons() {
-        // Search modal
-        var smc = document.getElementById('searchModalCloseBtn');
-        if (smc && !smc._patchSetup) { smc._patchSetup = true; smc.addEventListener('click', closeSearchModal); }
-        var smf = document.getElementById('searchModalFooterBtn');
-        if (smf && !smf._patchSetup) { smf._patchSetup = true; smf.addEventListener('click', closeSearchModal); }
-
-        // Notif modal
-        var nmc = document.getElementById('notifModalCloseBtn');
-        if (nmc && !nmc._patchSetup) { nmc._patchSetup = true; nmc.addEventListener('click', closeNotifModal); }
-        var nmf = document.getElementById('notifModalFooterBtn');
-        if (nmf && !nmf._patchSetup) { nmf._patchSetup = true; nmf.addEventListener('click', closeNotifModal); }
-
-        // Search input
-        var csi = document.getElementById('clearSearchBtn');
-        if (csi && !csi._patchSetup) { csi._patchSetup = true; csi.addEventListener('click', clearSearch); }
-
-        // Search tabs
-        document.querySelectorAll('.search-tab').forEach(function(t) {
-            if (t._patchSetup) return;
-            t._patchSetup = true;
-            t.addEventListener('click', function() { switchSearchTab(this.getAttribute('data-tab')); });
-        });
-        document.querySelectorAll('.search-filter-chip').forEach(function(c) {
-            if (c._patchSetup) return;
-            c._patchSetup = true;
-            c.addEventListener('click', function() { setSearchEmergencyFilter(this.getAttribute('data-filter')); });
-        });
-
-        // FAB modal
-        var fmc = document.getElementById('fabModalClose');
-        if (fmc && !fmc._patchSetup) { fmc._patchSetup = true; fmc.addEventListener('click', closeFabModal); }
-
-        // FAB overlay click
-        var fmo = document.getElementById('fabModalOverlay');
-        if (fmo && !fmo._patchSetup) {
-            fmo._patchSetup = true;
-            fmo.addEventListener('click', function(e) {
-                if (e.target === fmo) closeFabModal();
-            });
-        }
-
-        // FAB cards
-        document.querySelectorAll('.fab-emergency-card').forEach(function(card) {
-            if (card._patchSetup) return;
-            card._patchSetup = true;
-            card.addEventListener('click', function() {
-                var type = this.getAttribute('data-fab-type');
-                if (!type) return;
-                closeFabModal();
-                if (isPreviewMode) {
-                    setTimeout(function() { showPreviewOverlay(); }, 200);
-                    return;
-                }
-                setTimeout(function() {
-                    window.location.href = DASHBOARD_URL + '?emergency=' + encodeURIComponent(type);
-                }, 250);
-            });
-        });
-
-        // Search modal overlay click
-        var smo = document.getElementById('searchModal');
-        if (smo && !smo._patchSetup) {
-            smo._patchSetup = true;
-            smo.addEventListener('click', function(e) {
-                if (e.target === smo) closeSearchModal();
-            });
-        }
-
-        // Notif modal overlay click
-        var nmo = document.getElementById('notifModal');
-        if (nmo && !nmo._patchSetup) {
-            nmo._patchSetup = true;
-            nmo.addEventListener('click', function(e) {
-                if (e.target === nmo) closeNotifModal();
-            });
-        }
-
-        // Notif item click (event delegation)
-        var nl = document.getElementById('notifList');
-        if (nl && !nl._patchSetup) {
-            nl._patchSetup = true;
-            nl.addEventListener('click', function(e) {
-                var item = e.target.closest('.notif-item');
-                if (!item) return;
-                var id = item.getAttribute('data-notif-id');
-                var type = item.getAttribute('data-notif-type');
-                closeNotifModal();
-                if (type === 'emergency' && id) {
-                    setTimeout(function() {
-                        window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(id);
-                    }, 200);
-                }
-            });
-        }
-    }
-
-    // ====================================================================
-    // SEARCH INPUT HANDLER
-    // ====================================================================
-    function initSearchInputHandler() {
-        var input = document.getElementById('searchInput');
-        if (!input || input._patchSetup) return;
-        input._patchSetup = true;
-
-        input.addEventListener('input', function() {
-            var val = this.value.trim();
-            var cb = document.getElementById('clearSearchBtn');
-            if (val) { if (cb) cb.classList.add('visible'); }
-            else { if (cb) cb.classList.remove('visible'); }
-            clearTimeout(searchDebounceTimer);
-            searchDebounceTimer = setTimeout(function() { performSearch(val); }, 250);
-        });
-
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape') closeSearchModal();
-        });
-    }
-
-    // ====================================================================
-    // KEYBOARD SHORTCUT
-    // ====================================================================
-    function initKeyboardShortcut() {
-        if (document._patchKeySetup) return;
-        document._patchKeySetup = true;
-        document.addEventListener('keydown', function(e) {
-            if (e.key === '/' && !e.target.matches('input, textarea, select')) {
-                e.preventDefault();
-                openSearchModal();
-            }
-            if (e.key === 'Escape') {
-                closeSearchModal();
-                closeNotifModal();
-                closeFabModal();
-            }
-        });
-    }
-
-    // ====================================================================
+    // ================================================================
     // PWA SETUP
-    // ====================================================================
+    // ================================================================
     function setupPWA() {
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(function() {});
             });
         }
+
         window.addEventListener('beforeinstallprompt', function(e) {
             e.preventDefault();
             deferredPrompt = e;
@@ -2655,125 +3496,331 @@
                 }
             }, 10000);
         });
+
         window.addEventListener('appinstalled', function() {
             localStorage.setItem('salink_installed', 'true');
             deferredPrompt = null;
+            showToast('🎉 Selamat!', 'Aplikasi SALINK berhasil diinstall!', 'fa-rocket');
         });
     }
 
-    // ====================================================================
-    // SIDEBAR LOGOUT (event delegation — pakai JS lama)
-    // ====================================================================
-    function initSidebarLogout() {
+    function showInstallPrompt() {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(function(r) {
+                if (r.outcome === 'accepted') {
+                    localStorage.setItem('salink_installed', 'true');
+                    showToast('✅ Berhasil', 'Aplikasi SALINK diinstall!', 'fa-check-circle');
+                }
+                deferredPrompt = null;
+            });
+        } else {
+            var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            showToast('📱 Install', isIOS
+                ? 'Bagikan → Tambahkan ke Layar Utama'
+                : 'Menu browser → Install Aplikasi', 'fa-mobile-alt');
+        }
+    }
+
+    // ================================================================
+    // EVENT LISTENERS SETUP
+    // ================================================================
+    function setupEventListeners() {
+        var menuBtn = document.getElementById('menuBtn');
+        if (menuBtn) {
+            menuBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (navigator.vibrate) navigator.vibrate(10);
+                openSidebar();
+            });
+        }
+
+        var sidebarClose = document.getElementById('sidebarClose');
+        if (sidebarClose) {
+            sidebarClose.addEventListener('click', closeSidebar);
+        }
+
+        var sidebarOverlay = document.getElementById('sidebarOverlay');
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', closeSidebar);
+        }
+
+        var backBtn = document.getElementById('backBtn');
+        if (backBtn) {
+            backBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (window.history.length > 1) {
+                    window.history.back();
+                } else {
+                    window.location.href = DASHBOARD_URL;
+                }
+            });
+        }
+
+        var headerSearchBtn = document.getElementById('headerSearchBtn');
+        if (headerSearchBtn) {
+            headerSearchBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                openSearchModal();
+            });
+        }
+
+        var headerNotifBtn = document.getElementById('headerNotifBtn');
+        if (headerNotifBtn) {
+            headerNotifBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                openNotifModal();
+            });
+        }
+
+        var themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            themeToggle.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleTheme();
+            });
+            themeToggle.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleTheme();
+                }
+            });
+        }
+
+        var overlayLoginBtn = document.getElementById('overlayLoginBtn');
+        if (overlayLoginBtn) {
+            overlayLoginBtn.addEventListener('click', redirectToLogin);
+        }
+        var overlayCancelBtn = document.getElementById('overlayCancelBtn');
+        if (overlayCancelBtn) {
+            overlayCancelBtn.addEventListener('click', function() {
+                hidePreviewOverlay();
+                window.location.href = DASHBOARD_URL;
+            });
+        }
+        var previewOverlay = document.getElementById('previewOverlay');
+        if (previewOverlay) {
+            previewOverlay.addEventListener('click', function(e) {
+                if (e.target === previewOverlay) hidePreviewOverlay();
+            });
+        }
+
+        var searchModalCloseBtn = document.getElementById('searchModalCloseBtn');
+        if (searchModalCloseBtn) searchModalCloseBtn.addEventListener('click', closeSearchModal);
+        var searchModalFooterBtn = document.getElementById('searchModalFooterBtn');
+        if (searchModalFooterBtn) searchModalFooterBtn.addEventListener('click', closeSearchModal);
+        var clearSearchBtn = document.getElementById('clearSearchBtn');
+        if (clearSearchBtn) clearSearchBtn.addEventListener('click', clearSearch);
+        var searchModal = document.getElementById('searchModal');
+        if (searchModal) {
+            searchModal.addEventListener('click', function(e) {
+                if (e.target === searchModal) closeSearchModal();
+            });
+        }
+
+        document.querySelectorAll('.search-tab').forEach(function(t) {
+            t.addEventListener('click', function() {
+                switchSearchTab(this.getAttribute('data-tab'));
+            });
+        });
+
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) {
+            c.addEventListener('click', function() {
+                setSearchEmergencyFilter(this.getAttribute('data-filter'));
+            });
+        });
+
+        var searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                var val = this.value.trim();
+                var cb = document.getElementById('clearSearchBtn');
+                if (val) { if (cb) cb.classList.add('visible'); }
+                else { if (cb) cb.classList.remove('visible'); }
+                clearTimeout(searchDebounceTimer);
+                searchDebounceTimer = setTimeout(function() { performSearch(val); }, 250);
+            });
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') closeSearchModal();
+            });
+        }
+
+        var notifModalCloseBtn = document.getElementById('notifModalCloseBtn');
+        if (notifModalCloseBtn) notifModalCloseBtn.addEventListener('click', closeNotifModal);
+        var notifModalFooterBtn = document.getElementById('notifModalFooterBtn');
+        if (notifModalFooterBtn) notifModalFooterBtn.addEventListener('click', closeNotifModal);
+        var notifModal = document.getElementById('notifModal');
+        if (notifModal) {
+            notifModal.addEventListener('click', function(e) {
+                if (e.target === notifModal) closeNotifModal();
+            });
+        }
+
+        var notifList = document.getElementById('notifList');
+        if (notifList) {
+            notifList.addEventListener('click', function(e) {
+                var item = e.target.closest('.notif-item');
+                if (!item) return;
+                var id = item.getAttribute('data-notif-id');
+                var type = item.getAttribute('data-notif-type');
+                closeNotifModal();
+                if (type === 'emergency' && id) {
+                    setTimeout(function() {
+                        window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(id);
+                    }, 200);
+                }
+            });
+        }
+
+        var scanFab = document.getElementById('scanFab');
+        if (scanFab) {
+            scanFab.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                openFabModal();
+            });
+        }
+
+        var fabModalClose = document.getElementById('fabModalClose');
+        if (fabModalClose) fabModalClose.addEventListener('click', closeFabModal);
+        var fabModalOverlay = document.getElementById('fabModalOverlay');
+        if (fabModalOverlay) {
+            fabModalOverlay.addEventListener('click', function(e) {
+                if (e.target === fabModalOverlay) closeFabModal();
+            });
+        }
+
+        document.querySelectorAll('.fab-emergency-card').forEach(function(card) {
+            card.addEventListener('click', function() {
+                var type = this.getAttribute('data-fab-type');
+                if (!type) return;
+                closeFabModal();
+                if (isPreviewMode) {
+                    setTimeout(showPreviewOverlay, 200);
+                    return;
+                }
+                setTimeout(function() {
+                    window.location.href = DASHBOARD_URL + '?emergency=' + encodeURIComponent(type);
+                }, 250);
+            });
+        });
+
+        var bottomInviteNav = document.getElementById('bottomInviteNav');
+        if (bottomInviteNav) {
+            bottomInviteNav.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (isPreviewMode) { showPreviewOverlay(); return; }
+                showToast('📨 Invite', 'Fitur invite ada di halaman lain', 'fa-user-plus');
+            });
+        }
+
         var logoutBtn = document.getElementById('logoutBtn');
-        if (!logoutBtn || logoutBtn._patchSetup) return;
-        logoutBtn._patchSetup = true;
-        logoutBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            if (confirm('Keluar dari akun?')) {
-                ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies'].forEach(function(k) {
-                    localStorage.removeItem(k);
-                });
-                window.location.href = DASHBOARD_URL + '?logout=1';
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (confirm('Keluar dari akun?')) {
+                    ['salink_user','salink_logged_in','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies'].forEach(function(k) {
+                        localStorage.removeItem(k);
+                    });
+                    window.location.href = DASHBOARD_URL + '?logout=1';
+                }
+            });
+        }
+
+        var shareBtn = document.getElementById('shareBtn');
+        if (shareBtn) {
+            shareBtn.addEventListener('click', function() {
+                if (isPreviewMode) { showPreviewOverlay(); return; }
+                shareEmergency();
+            });
+        }
+        var copyBtn = document.getElementById('copyBtn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', function() {
+                if (isPreviewMode) { showPreviewOverlay(); return; }
+                copyEmergencyLink();
+            });
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === '/' && !e.target.matches('input, textarea, select')) {
+                e.preventDefault();
+                openSearchModal();
+            }
+            if (e.key === 'Escape') {
+                closeSearchModal();
+                closeNotifModal();
+                closeFabModal();
+                closeSidebar();
             }
         });
     }
 
-    // ====================================================================
-    // SIDEBAR CLOSE (pakai JS lama)
-    // ====================================================================
-    function initSidebarClose() {
-        var sc = document.getElementById('sidebarClose');
-        if (sc && !sc._patchSetup) {
-            sc._patchSetup = true;
-            sc.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (typeof window.closeSidebar === 'function') {
-                    window.closeSidebar();
-                } else {
-                    var sidebar = document.getElementById('sidebar');
-                    var overlay = document.getElementById('sidebarOverlay');
-                    if (sidebar) sidebar.classList.remove('active');
-                    if (overlay) overlay.classList.remove('active');
-                    document.body.style.overflow = '';
-                }
-            });
-        }
-        var so = document.getElementById('sidebarOverlay');
-        if (so && !so._patchSetup) {
-            so._patchSetup = true;
-            so.addEventListener('click', function() {
-                if (typeof window.closeSidebar === 'function') window.closeSidebar();
-                else {
-                    var sidebar = document.getElementById('sidebar');
-                    var overlay = document.getElementById('sidebarOverlay');
-                    if (sidebar) sidebar.classList.remove('active');
-                    if (overlay) overlay.classList.remove('active');
-                    document.body.style.overflow = '';
-                }
-            });
-        }
-    }
+    // ================================================================
+    // INIT
+    // ================================================================
+    function init() {
+        console.log('🚀 [Detail Emergency] Init started');
 
-    // ====================================================================
-    // INIT ALL
-    // ====================================================================
-    function initPatch() {
-        console.log('🔧 [PATCH v10.0] Initializing...');
-        checkPreviewMode();
+        loadTheme();
 
-        initMenuBtn();
-        initHeaderNotif();
-        initHeaderSearch();
-        initThemeToggle();
-        initPreviewButtons();
-        initModalCloseButtons();
-        initSearchInputHandler();
-        initKeyboardShortcut();
+        var hasUser = loadUser();
+
+        updateUserUI();
+
+        setupEventListeners();
+
         initRipple();
-        initSidebarClose();
-        initSidebarLogout();
+
         setupPWA();
+
         updateNotifBadge();
+        notifBadgeInterval = setInterval(updateNotifBadge, 30000);
 
-        // Refresh notif badge tiap 30 detik
-        setInterval(updateNotifBadge, 30000);
+        if (!hasUser || isPreviewMode) {
+            console.warn('🔒 [Detail Emergency] Guest detected — showing login overlay');
+            setTimeout(function() {
+                showPreviewOverlay();
+            }, 800);
+        }
 
-        console.log('✅ [PATCH v10.0] Ready!');
-        console.log('   Preview Mode:', isPreviewMode ? '🔒 ON' : '✓ OFF');
+        loadEmergencyData();
+
+        console.log('✅ [Detail Emergency] Ready!');
+        console.log('   Preview Mode:', isPreviewMode ? '🔒 ON (guest)' : '✓ OFF (logged in)');
+        console.log('   Theme:', currentTheme);
     }
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initPatch);
+        document.addEventListener('DOMContentLoaded', init);
     } else {
-        initPatch();
+        init();
     }
 
-    // ====================================================================
-    // EXPOSE GLOBAL
-    // ====================================================================
-    if (!window.openSearchModal) window.openSearchModal = openSearchModal;
-    if (!window.closeSearchModal) window.closeSearchModal = closeSearchModal;
-    if (!window.clearSearch) window.clearSearch = clearSearch;
-    if (!window.switchSearchTab) window.switchSearchTab = switchSearchTab;
-    if (!window.setSearchEmergencyFilter) window.setSearchEmergencyFilter = setSearchEmergencyFilter;
-    if (!window.performSearch) window.performSearch = performSearch;
-    if (!window.openNotifModal) window.openNotifModal = openNotifModal;
-    if (!window.closeNotifModal) window.closeNotifModal = closeNotifModal;
-    if (!window.renderNotifList) window.renderNotifList = renderNotifList;
-    if (!window.updateNotifBadge) window.updateNotifBadge = updateNotifBadge;
-    if (!window.openFabModal) window.openFabModal = openFabModal;
-    if (!window.closeFabModal) window.closeFabModal = closeFabModal;
-    if (!window.showPreviewOverlay) window.showPreviewOverlay = showPreviewOverlay;
-    if (!window.hidePreviewOverlay) window.hidePreviewOverlay = hidePreviewOverlay;
-    if (!window.showFloatingNotification) window.showFloatingNotification = showFloatingNotification;
-    if (!window.hideFloatingNotification) window.hideFloatingNotification = hideFloatingNotification;
-    if (!window.showInstallPrompt) window.showInstallPrompt = showInstallPrompt;
+    window.openSidebar = openSidebar;
+    window.closeSidebar = closeSidebar;
+    window.openSearchModal = openSearchModal;
+    window.closeSearchModal = closeSearchModal;
+    window.openNotifModal = openNotifModal;
+    window.closeNotifModal = closeNotifModal;
+    window.openFabModal = openFabModal;
+    window.closeFabModal = closeFabModal;
+    window.showToast = showToast;
+    window.showPreviewOverlay = showPreviewOverlay;
+    window.hidePreviewOverlay = hidePreviewOverlay;
+    window.showFloatingNotification = showFloatingNotification;
+    window.hideFloatingNotification = hideFloatingNotification;
+    window.showInstallPrompt = showInstallPrompt;
+    window.toggleTheme = toggleTheme;
 
-    console.log('✅ [PATCH v10.0] Script Loaded');
+    console.log('✅ [Detail Emergency] Script Loaded');
 })();
-</script>
+    </script>
+
     <!-- ============================================================ -->
     <!-- FCM SETUP SALINK + EMERGENCY ALERT                            -->
     <!-- ============================================================ -->
@@ -2786,22 +3833,17 @@
 
       console.log('🔔 [FCM] Initializing...');
 
-      // ================================================================
-      // 1. FCM INIT (setelah user login)
-      // ================================================================
       window.addEventListener('load', async function() {
         console.log('🔔 [FCM] Page loaded');
 
         const isLoggedIn = localStorage.getItem('salink_logged_in');
         const userData = localStorage.getItem('salink_user');
 
-        // Skip kalau user belum login
         if (isLoggedIn !== 'true' || !userData) {
           console.log('ℹ️ [FCM] User belum login — FCM tidak diinisialisasi');
           return;
         }
 
-        // Parse user data
         let user;
         try {
           user = JSON.parse(userData);
@@ -2817,14 +3859,12 @@
 
         console.log('🚀 [FCM] Init untuk user:', user.username, '(' + (user.fullName || '') + ')');
 
-        // Cek SalinkFCM tersedia
         try {
           if (typeof SalinkFCM === 'undefined') {
             console.warn('⚠️ [FCM] SalinkFCM tidak tersedia — cek /fcm-client.js');
             return;
           }
 
-          // Init FCM
           const initResult = await SalinkFCM.init();
           if (!initResult.ok) {
             console.warn('⚠️ [FCM] init gagal:', initResult.reason);
@@ -2833,7 +3873,6 @@
 
           console.log('✅ [FCM] Siap. Token:', initResult.token.substring(0, 30) + '...');
 
-          // Simpan token ke backend
           const saveResult = await SalinkFCM.saveToken({
             userId: user.id,
             username: user.username,
@@ -2850,20 +3889,13 @@
         }
       });
 
-      // ================================================================
-      // 2. CEK SalinkEmergency (dual mode ACTIVE)
-      // ================================================================
       var checkEmergency = setInterval(function() {
         if (typeof SalinkEmergency !== 'undefined') {
           clearInterval(checkEmergency);
-          console.log('✅ [Emergency] SalinkEmergency ready — dual mode ACTIVE');
-          console.log('   - Grid alarm');
-          console.log('   - Auto-trigger post');
-          console.log('   - Polling 15s');
+          console.log('✅ [Emergency] SalinkEmergency ready');
         }
       }, 100);
 
-      // Timeout setelah 10 detik
       setTimeout(function() {
         clearInterval(checkEmergency);
         if (typeof SalinkEmergency === 'undefined') {
@@ -2871,21 +3903,14 @@
         }
       }, 10000);
 
-      // ================================================================
-      // 3. LISTENER visibilitychange (refresh FCM token saat kembali)
-      // ================================================================
       document.addEventListener('visibilitychange', function() {
         if (!document.hidden && typeof SalinkFCM !== 'undefined') {
-          // Refresh token saat user kembali ke halaman
           if (typeof SalinkFCM.refreshToken === 'function') {
             SalinkFCM.refreshToken().catch(function() {});
           }
         }
       });
 
-      // ================================================================
-      // 4. EXPOSE GLOBAL (untuk debug)
-      // ================================================================
       window.SALINK_FCM_DEBUG = {
         getStatus: function() {
           return {
@@ -2901,6 +3926,6 @@
 
     })();
     </script>
-    <!-- ============================================================ -->
+
 </body>
 </html>
