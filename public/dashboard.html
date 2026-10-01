@@ -7850,6 +7850,119 @@ console.log('✅ SALINK Dashboard v10.0 Script Loaded — Telkomsel Redesign');
     </script>
 
     <!-- ============================================================ -->
+    <!-- HERO CAROUSEL IMAGES LOADER                                   -->
+    <!-- Ganti path gambar di bawah ini sesuai kebutuhan admin         -->
+    <!-- ============================================================ -->
+    <script>
+    (function() {
+        'use strict';
+
+        // ═══════════════════════════════════════════════════════════
+        // 🖼️ KONFIGURASI GAMBAR HERO CAROUSEL
+        // ═══════════════════════════════════════════════════════════
+        // Ganti path gambar di bawah ini sesuai kebutuhan Anda:
+        //
+        // 1: Gambar untuk Slide 1 — "Laporkan Darurat"
+        // 2: Gambar untuk Slide 2 — "Bersama Peduli"
+        // 3: Gambar untuk Slide 3 — "Siaga 24/7"
+        //
+        // Rekomendasi ukuran gambar:
+        // - Rasio: 4:3 atau 16:9
+        // - Lebar: 860px (2x retina untuk max-width 430px)
+        // - Tinggi: 640px
+        // - Format: JPG / WebP
+        // - Ukuran: max 250 KB per gambar
+        // ═══════════════════════════════════════════════════════════
+        var heroImages = {
+            1: '/images/hero-1.jpg',
+            2: '/images/hero-2.jpg',
+            3: '/images/hero-3.jpg'
+        };
+
+        // ═══════════════════════════════════════════════════════════
+        // 🎨 OVERLAY GRADIENT
+        // ═══════════════════════════════════════════════════════════
+        // Overlay ini bikin gambar tetap bisa dibaca teks di atasnya.
+        // Format: linear-gradient(arah, warna1, warna2)
+        // - Warna pertama: overlay gelap kiri atas
+        // - Warna kedua: overlay gelap kanan bawah
+        // ═══════════════════════════════════════════════════════════
+        var heroOverlays = {
+            1: 'linear-gradient(150deg, rgba(10,14,26,0.78) 0%, rgba(74,10,21,0.55) 100%)',
+            2: 'linear-gradient(150deg, rgba(10,14,26,0.78) 0%, rgba(42,5,16,0.55) 100%)',
+            3: 'linear-gradient(150deg, rgba(10,14,26,0.78) 0%, rgba(42,21,5,0.55) 100%)'
+        };
+
+        // ═══════════════════════════════════════════════════════════
+        // 🚀 APPLY GAMBAR KE HERO SLIDES
+        // ═══════════════════════════════════════════════════════════
+        function applyHeroImages() {
+            console.log('🖼️ [Hero] Applying hero images...');
+
+            var applied = 0;
+            var failed = 0;
+
+            Object.keys(heroImages).forEach(function(num) {
+                var slide = document.querySelector('.hero-slide-' + num);
+                if (!slide) {
+                    console.warn('⚠️ [Hero] Slide ' + num + ' tidak ditemukan');
+                    failed++;
+                    return;
+                }
+
+                var imagePath = heroImages[num];
+                var overlay = heroOverlays[num] || 'linear-gradient(150deg, rgba(10,14,26,0.75), rgba(74,10,21,0.55))';
+
+                // Cek dulu apakah gambar bisa di-load
+                var testImg = new Image();
+                testImg.onload = function() {
+                    // Gambar berhasil load → apply sebagai background
+                    slide.style.backgroundImage = overlay + ', url("' + imagePath + '")';
+                    slide.style.backgroundSize = 'cover';
+                    slide.style.backgroundPosition = 'center';
+                    slide.style.backgroundRepeat = 'no-repeat';
+                    applied++;
+                    console.log('✅ [Hero] Slide ' + num + ' loaded:', imagePath);
+                };
+                testImg.onerror = function() {
+                    // Gambar gagal load → biarkan gradient CSS sebagai fallback
+                    console.warn('⚠️ [Hero] Gambar slide ' + num + ' gagal load:', imagePath);
+                    failed++;
+                };
+                testImg.src = imagePath;
+            });
+
+            setTimeout(function() {
+                console.log('📊 [Hero] Summary: ' + applied + ' gambar applied, ' + failed + ' failed');
+            }, 1000);
+        }
+
+        // ═══════════════════════════════════════════════════════════
+        // 🎬 RUN
+        // ═══════════════════════════════════════════════════════════
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', applyHeroImages);
+        } else {
+            applyHeroImages();
+        }
+
+        // Expose untuk debugging
+        window.salinkHeroImages = {
+            set: function(num, path) {
+                heroImages[num] = path;
+                applyHeroImages();
+            },
+            getAll: function() {
+                return heroImages;
+            },
+            reload: applyHeroImages
+        };
+
+        console.log('✅ [Hero Images Loader] Script Loaded');
+    })();
+    </script>
+    
+    <!-- ============================================================ -->
     <!-- FCM SETUP SALINK + EMERGENCY ALERT                            -->
     <!-- ============================================================ -->
     <script src="/firebase-config.js"></script>
