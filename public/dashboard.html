@@ -45,73 +45,112 @@
     console.log('✅ SALINK Supabase Client siap');
 </script>
     <!-- ================================================================
-     TES KONEKSI SUPABASE — SALINK
-     Hanya untuk pengujian dari HP
+     SALINK - TES KONEKSI SUPABASE v2
      ================================================================ -->
 
 <script>
-(async function testSalinkSupabase() {
+(function () {
 
-    console.log('🔄 Menguji koneksi Supabase SALINK...');
-    
-    try {
-    const { data, error } = await salinkSupabase.auth.getSession();
+    // TES 1: Pastikan script benar-benar dijalankan
+    alert('🧪 TES SUPABASE v2 DIMULAI');
 
-if (error) {
-    alert(
-        '🔴 SUPABASE GAGAL TERHUBUNG\n\n' +
-        error.message
-    );
+    // Pastikan object Supabase tersedia
+    if (typeof window.supabase === 'undefined') {
 
-    console.error('Supabase Error:', error);
-} else {
-    alert(
-        '🟢 SUPABASE BERHASIL TERHUBUNG!\n\n' +
-        'Koneksi ke Supabase Auth berhasil.'
-    );
-
-    console.log('Supabase Connection OK:', data);
-}
-        // Tes koneksi ke Supabase Auth
-        const { data, error } =
-            await salinkSupabase.auth.getSession();
-
-        if (error) {
-            console.error('❌ Supabase gagal terhubung:', error);
-
-            showSupabaseTestResult(
-                'error',
-                '❌ Supabase gagal terhubung<br><small>' +
-                escapeSupabaseText(error.message) +
-                '</small>'
-            );
-
-            return;
-        }
-
-        console.log('✅ Supabase berhasil terhubung!');
-        console.log('Session:', data.session);
-
-        showSupabaseTestResult(
-            'success',
-            '✅ <strong>SUPABASE TERHUBUNG</strong><br>' +
-            '<small>Connection & Auth endpoint berhasil diakses.</small>'
+        alert(
+            '🔴 SUPABASE LIBRARY TIDAK TERSEDIA\n\n' +
+            'Library Supabase belum berhasil dimuat.'
         );
 
-    } catch (err) {
-
-        console.error('❌ Error koneksi Supabase:', err);
-
-        showSupabaseTestResult(
-            'error',
-            '❌ Terjadi kesalahan koneksi<br><small>' +
-            escapeSupabaseText(err.message || String(err)) +
-            '</small>'
-        );
+        return;
     }
 
-})();
+    // Pastikan client SALINK tersedia
+    if (typeof salinkSupabase === 'undefined') {
 
+        alert(
+            '🔴 CLIENT SALINK TIDAK TERSEDIA\n\n' +
+            'Variabel salinkSupabase tidak ditemukan.'
+        );
+
+        return;
+    }
+
+    // Supabase client tersedia
+    alert(
+        '🟢 SUPABASE CLIENT TERSEDIA\n\n' +
+        'Sekarang kita akan menguji koneksi Auth...'
+    );
+
+    // Tes Auth dengan batas waktu 10 detik
+    const timeout = new Promise(function (_, reject) {
+
+        setTimeout(function () {
+
+            reject(
+                new Error(
+                    'Supabase tidak memberikan respons dalam 10 detik.'
+                )
+            );
+
+        }, 10000);
+
+    });
+
+    const authTest = salinkSupabase.auth.getSession();
+
+    Promise.race([authTest, timeout])
+        .then(function (result) {
+
+            const data = result.data;
+            const error = result.error;
+
+            if (error) {
+
+                alert(
+                    '🔴 SUPABASE AUTH ERROR\n\n' +
+                    error.message
+                );
+
+                console.error(
+                    'SALINK Supabase Error:',
+                    error
+                );
+
+                return;
+            }
+
+            alert(
+                '🟢 SUPABASE BERHASIL TERHUBUNG!\n\n' +
+                'Auth endpoint berhasil diakses.\n\n' +
+                'Session: ' +
+                (data && data.session
+                    ? 'Ada'
+                    : 'Belum login')
+            );
+
+            console.log(
+                '✅ SALINK SUPABASE CONNECTION OK',
+                data
+            );
+
+        })
+        .catch(function (error) {
+
+            alert(
+                '🔴 SUPABASE TIDAK MERESPONS\n\n' +
+                error.message
+            );
+
+            console.error(
+                'SALINK Supabase Connection Error:',
+                error
+            );
+
+        });
+
+})();
+</script>
 
 function escapeSupabaseText(text) {
     return String(text)
