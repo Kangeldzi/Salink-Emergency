@@ -3472,156 +3472,191 @@
     // ================================================================
     // PATCH v10.0 — 🗺️ MODAL PETA DARURAT
     // ================================================================
+    var mapCurrentLat = null;
+    var mapCurrentLng = null;
 
     function openMapModal() {
-        closeSidebar();
-        var m = document.getElementById('mapModal');
-        if (!m) return;
-        m.classList.add('active');
+        var modal = document.getElementById('mapModal');
+        if (!modal) {
+            console.warn('⚠️ [MapModal] #mapModal tidak ditemukan di DOM');
+            return;
+        }
+        modal.classList.add('active');
         document.body.style.overflow = 'hidden';
+        if (navigator.vibrate) navigator.vibrate(30);
         updateMapOwnerInfo();
-        try {
-            var savedLat = localStorage.getItem('salink_user_lat');
-            var savedLng = localStorage.getItem('salink_user_lng');
-            if (savedLat && savedLng) {
-                mapLat = parseFloat(savedLat);
-                mapLng = parseFloat(savedLng);
-                var coordsEl = document.getElementById('mapCoords');
-                if (coordsEl) coordsEl.textContent = mapLat.toFixed(6) + ', ' + mapLng.toFixed(6);
-                var st = document.getElementById('mapStatusTitle');
-                if (st) st.textContent = 'Lokasi Anda terdeteksi';
-                var sd = document.getElementById('mapStatusDesc');
-                if (sd) sd.textContent = 'Lokasi tersimpan dari sesi sebelumnya';
-                renderMapContent();
-            }
-        } catch (e) {}
-        if (mapLat && mapLng) {
-            renderMapContent();
-        }
-    }
-    function closeMapModal() {
-        var m = document.getElementById('mapModal');
-        if (m) m.classList.remove('active');
-        document.body.style.overflow = '';
-    }
-    function updateMapOwnerInfo() {
-        var ownerEl = document.getElementById('mapOwner');
-        var ownerLocEl = document.getElementById('mapOwnerLoc');
-        var ownerAvatar = document.getElementById('mapOwnerAvatar');
-        try {
-            var u = JSON.parse(localStorage.getItem('salink_user') || 'null');
-            if (u && u.fullName) {
-                if (ownerEl) ownerEl.textContent = u.fullName;
-                if (ownerLocEl) {
-                    var loc = [u.city, u.province, u.country].filter(Boolean).join(', ');
-                    ownerLocEl.textContent = loc || u.email || '-';
-                }
-                if (ownerAvatar) {
-                    if (u.profilePicture) {
-                        ownerAvatar.innerHTML = '<img src="' + escapeAttr(u.profilePicture) + '" alt="Avatar">';
-                    } else {
-                        var initial = (u.fullName || 'U').charAt(0).toUpperCase();
-                        ownerAvatar.textContent = initial;
-                    }
-                }
-            } else {
-                if (ownerEl) ownerEl.textContent = 'Guest';
-                if (ownerLocEl) ownerLocEl.textContent = 'Login untuk info lengkap';
-                if (ownerAvatar) ownerAvatar.innerHTML = '<i class="fas fa-user"></i>';
-            }
-        } catch (e) {}
-    }
-    function mapGetLocation() {
-        var btn = document.getElementById('mapLocationBtn');
-        var btnText = document.getElementById('mapLocationBtnText');
-        if (btn) {
-            btn.classList.add('loading');
-            if (btnText) btnText.textContent = 'Mengambil lokasi...';
-        }
-        if (!navigator.geolocation) {
-            showToast('❌ Error', 'Browser Anda tidak mendukung GPS', 'fa-exclamation-triangle');
-            if (btn) {
-                btn.classList.remove('loading');
-                if (btnText) btnText.textContent = 'Ambil Lokasi Saya';
-            }
-            return;
-        }
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                mapLat = position.coords.latitude;
-                mapLng = position.coords.longitude;
-                var accuracy = Math.round(position.coords.accuracy || 0);
-                try {
-                    localStorage.setItem('salink_user_lat', mapLat);
-                    localStorage.setItem('salink_user_lng', mapLng);
-                } catch(e) {}
-                if (btn) {
-                    btn.classList.remove('loading');
-                    btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-                    if (btnText) btnText.textContent = 'Lokasi Ditemukan';
-                    var icon = btn.querySelector('i');
-                    if (icon) icon.className = 'fas fa-check-circle';
-                }
-                var st = document.getElementById('mapStatusTitle');
-                var sd = document.getElementById('mapStatusDesc');
-                if (st) st.textContent = 'Lokasi Anda terdeteksi';
-                if (sd) sd.textContent = 'Akurasi ±' + accuracy + 'm';
-                var coordsEl = document.getElementById('mapCoords');
-                if (coordsEl) coordsEl.textContent = mapLat.toFixed(6) + ', ' + mapLng.toFixed(6);
-                mapReverseGeocode(mapLat, mapLng);
-                renderMapContent();
-                if (navigator.vibrate) navigator.vibrate(20);
-            },
-            function(error) {
-                var msg = 'Gagal mengambil lokasi';
-                if (error.code === 1) msg = 'Izin lokasi ditolak';
-                else if (error.code === 2) msg = 'Lokasi tidak tersedia';
-                else if (error.code === 3) msg = 'Timeout';
-                if (btn) {
-                    btn.classList.remove('loading');
-                    if (btnText) btnText.textContent = 'Coba Lagi';
-                }
-                showToast('⚠️ GPS Error', msg, 'fa-exclamation-triangle');
-            },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-        );
-    }
-    function mapReverseGeocode(lat, lng) {
-        try {
-            var url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id';
-            fetch(url, { method: 'GET', headers: { 'User-Agent': 'SALINK-Map/10.2' } })
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (data && data.display_name) {
-                        mapAddress = data.display_name;
-                        var regionEl = document.getElementById('mapRegion');
-                        if (regionEl) regionEl.textContent = data.display_name;
-                        var addrEl = document.getElementById('mapAddress');
-                        if (addrEl) addrEl.textContent = data.display_name;
-                    }
-                })
-                .catch(function() {});
-        } catch (e) {}
-    }
-    function renderMapContent() {
-        var iframe = document.getElementById('mapIframe');
-        if (iframe && mapLat && mapLng) {
-            iframe.src = 'https://www.google.com/maps?q=' + mapLat + ',' + mapLng + '&z=15&output=embed';
-        }
-        var gmapsBtn = document.getElementById('mapOpenGmaps');
-        if (gmapsBtn && mapLat && mapLng) {
-            gmapsBtn.href = 'https://www.google.com/maps?q=' + mapLat + ',' + mapLng;
-        }
-    }
-    function mapSearchService(keyword) {
-        if (!mapLat || !mapLng) {
-            showToast('⚠️ Perhatian', 'Ambil lokasi Anda terlebih dahulu', 'fa-exclamation-triangle');
-            return;
-        }
-        var url = 'https://www.google.com/maps/search/' + encodeURIComponent(keyword) + '/@' + mapLat + ',' + mapLng + ',14z';
-        window.open(url, '_blank');
     }
 
+    function closeMapModal() {
+        var modal = document.getElementById('mapModal');
+        if (!modal) return;
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    function updateMapOwnerInfo() {
+        // Pemilik akun
+        var ownerNameEl = document.getElementById('mapOwnerName');
+        var ownerLocEl = document.getElementById('mapOwnerLoc');
+        var ownerAvatarEl = document.getElementById('mapOwnerAvatar');
+
+        if (currentUser) {
+            var name = currentUser.fullName || currentUser.username || 'User';
+            var city = currentUser.city || '';
+            var province = currentUser.province || '';
+            var location = [city, province].filter(Boolean).join(', ') || 'Lokasi tidak diketahui';
+
+            if (ownerNameEl) ownerNameEl.textContent = name;
+            if (ownerLocEl) ownerLocEl.textContent = location;
+            if (ownerAvatarEl) {
+                if (currentUser.profilePicture) {
+                    ownerAvatarEl.innerHTML = '<img src="' + escapeAttr(currentUser.profilePicture) + '" alt="">';
+                } else {
+                    ownerAvatarEl.textContent = String(name).charAt(0).toUpperCase();
+                }
+            }
+        } else {
+            if (ownerNameEl) ownerNameEl.textContent = 'Guest';
+            if (ownerLocEl) ownerLocEl.textContent = 'Silakan login dulu';
+            if (ownerAvatarEl) ownerAvatarEl.innerHTML = '<i class="fas fa-user"></i>';
+        }
+
+        // Kalau sudah ada koordinat dari sebelumnya
+        var savedLat = localStorage.getItem('salink_user_lat');
+        var savedLng = localStorage.getItem('salink_user_lng');
+        if (savedLat && savedLng) {
+            mapCurrentLat = parseFloat(savedLat);
+            mapCurrentLng = parseFloat(savedLng);
+            applyMapCoords(mapCurrentLat, mapCurrentLng);
+        }
+    }
+
+    function applyMapCoords(lat, lng) {
+        var coordsEl = document.getElementById('mapCoords');
+        if (coordsEl) coordsEl.textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
+
+        var regionEl = document.getElementById('mapRegion');
+        if (regionEl && regionEl.textContent === '-') regionEl.textContent = '🔄 Mengambil...';
+
+        var addressEl = document.getElementById('mapAddressValue');
+        if (addressEl) addressEl.textContent = lat.toFixed(4) + ', ' + lng.toFixed(4);
+
+        var iframe = document.getElementById('mapIframe');
+        if (iframe) {
+            iframe.src = 'https://www.google.com/maps?q=' + lat + ',' + lng + '&z=15&output=embed';
+        }
+
+        var gmapsBtn = document.getElementById('mapOpenGmaps');
+        if (gmapsBtn) {
+            gmapsBtn.href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+        }
+
+        // Status
+        var statusCard = document.getElementById('mapStatusCard');
+        var statusTitle = document.getElementById('mapStatusTitle');
+        var statusDesc = document.getElementById('mapStatusDesc');
+        var statusIcon = document.getElementById('mapStatusIcon');
+        if (statusCard) statusCard.classList.add('detected');
+        if (statusTitle) statusTitle.textContent = '✅ Lokasi terdeteksi';
+        if (statusDesc) statusDesc.textContent = 'Koordinat: ' + lat.toFixed(6) + ', ' + lng.toFixed(6);
+        if (statusIcon) statusIcon.textContent = '✅';
+
+        // Reverse geocode
+        if (regionEl) {
+            fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id', {
+                headers: { 'User-Agent': 'SALINK-App/10.1' }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data && data.display_name) {
+                    regionEl.textContent = data.display_name;
+                    if (addressEl) addressEl.textContent = data.display_name;
+                } else {
+                    regionEl.textContent = lat.toFixed(4) + ', ' + lng.toFixed(4);
+                }
+            })
+            .catch(function() {
+                regionEl.textContent = lat.toFixed(4) + ', ' + lng.toFixed(4);
+            });
+        }
+    }
+
+    function activateMapGps() {
+        var btn = document.getElementById('mapLocationBtn');
+        var btnText = document.getElementById('mapLocationBtnText');
+
+        if (!navigator.geolocation) {
+            showToast('⚠️ GPS Tidak Tersedia', 'Browser tidak mendukung GPS', 'fa-exclamation-triangle');
+            return;
+        }
+
+        if (btn) {
+            btn.classList.add('loading');
+            btn.disabled = true;
+        }
+        if (btnText) btnText.textContent = '📍 Mengambil lokasi...';
+
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                var lat = position.coords.latitude;
+                var lng = position.coords.longitude;
+                var accuracy = Math.round(position.coords.accuracy || 0);
+
+                mapCurrentLat = lat;
+                mapCurrentLng = lng;
+
+                // Simpan ke localStorage
+                localStorage.setItem('salink_user_lat', lat);
+                localStorage.setItem('salink_user_lng', lng);
+
+                // Update button
+                if (btn) {
+                    btn.classList.remove('loading');
+                    btn.disabled = false;
+                }
+                if (btnText) btnText.textContent = '✅ Refresh Lokasi';
+
+                // Apply
+                applyMapCoords(lat, lng);
+
+                showToast('📍 Lokasi Ditemukan', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
+                if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+            },
+            function(error) {
+                var errMsg = 'Gagal mengambil lokasi. ';
+                switch(error.code) {
+                    case 1: errMsg += 'Izin lokasi ditolak.'; break;
+                    case 2: errMsg += 'Lokasi tidak tersedia.'; break;
+                    case 3: errMsg += 'Timeout. Coba lagi.'; break;
+                    default: errMsg += error.message || 'Coba lagi.';
+                }
+                if (btn) {
+                    btn.classList.remove('loading');
+                    btn.disabled = false;
+                }
+                if (btnText) btnText.textContent = '📍 Ambil Lokasi Saya';
+                showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle');
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0
+            }
+        );
+    }
+
+    // Search service via Google Maps
+    function mapSearchService(searchQuery) {
+        var lat = mapCurrentLat;
+        var lng = mapCurrentLng;
+        var url;
+        if (lat && lng) {
+            url = 'https://www.google.com/maps/search/' + encodeURIComponent(searchQuery) + '/@' + lat + ',' + lng + ',14z';
+        } else {
+            url = 'https://www.google.com/maps/search/' + encodeURIComponent(searchQuery);
+        }
+        window.open(url, '_blank');
+    }
 
     // ================================================================
     // PATCH v10.0 — RIPPLE
