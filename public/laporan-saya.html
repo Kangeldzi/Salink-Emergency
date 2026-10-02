@@ -1729,7 +1729,52 @@
         .map-service-card.disaster { border-color: rgba(199,146,234,0.4); }
         .map-service-card.disaster:active { background: rgba(199,146,234,0.15); border-color: var(--emergency-disaster); }
         .map-service-card.disaster .service-label { color: var(--emergency-disaster); }
-
+                /* Tambahan: map-emergency-btn (match dengan JS) */
+        .map-emergency-btn {
+            padding: 12px 8px;
+            border-radius: 12px;
+            background: var(--bg-input);
+            border: 2px solid var(--border-color);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: all 0.25s ease;
+            font-family: inherit;
+        }
+        .map-emergency-btn:active { transform: scale(0.95); }
+        .map-emergency-btn .map-em-icon {
+            font-size: 1.6rem;
+            line-height: 1;
+            filter: drop-shadow(0 3px 8px currentColor);
+        }
+        .map-emergency-btn .map-em-label {
+            font-size: 0.62rem;
+            font-weight: 800;
+            letter-spacing: 0.2px;
+            text-align: center;
+            line-height: 1.2;
+        }
+        .map-emergency-btn .map-em-sub {
+            font-size: 0.52rem;
+            color: var(--text-muted);
+            text-align: center;
+            font-weight: 500;
+        }
+        .map-emergency-btn.fire { border-color: rgba(248,81,73,0.4); }
+        .map-emergency-btn.fire:active { background: rgba(248,81,73,0.15); border-color: var(--emergency-fire); }
+        .map-emergency-btn.fire .map-em-label { color: var(--emergency-fire); }
+        .map-emergency-btn.medical { border-color: rgba(79,195,247,0.4); }
+        .map-emergency-btn.medical:active { background: rgba(79,195,247,0.15); border-color: var(--emergency-medical); }
+        .map-emergency-btn.medical .map-em-label { color: var(--emergency-medical); }
+        .map-emergency-btn.crime { border-color: rgba(240,208,128,0.4); }
+        .map-emergency-btn.crime:active { background: rgba(240,208,128,0.15); border-color: var(--emergency-crime); }
+        .map-emergency-btn.crime .map-em-label { color: var(--emergency-crime); }
+        .map-emergency-btn.disaster { border-color: rgba(199,146,234,0.4); }
+        .map-emergency-btn.disaster:active { background: rgba(199,146,234,0.15); border-color: var(--emergency-disaster); }
+        .map-emergency-btn.disaster .map-em-label { color: var(--emergency-disaster); }
         .map-actions-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -2471,6 +2516,10 @@
    <!-- ============================================================ -->
     <!-- MODAL PETA DARURAT                                            -->
     <!-- ============================================================ -->
+    
+        <!-- ============================================================ -->
+    <!-- MODAL PETA DARURAT (FIXED — ID MATCH JS)                     -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="mapModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -2485,15 +2534,15 @@
             <div class="modal-body">
 
                 <!-- Card 1: Status Lokasi -->
-                <div class="map-status-card">
+                <div class="map-status-card" id="mapLocStatus">
                     <span class="map-status-icon" id="mapStatusIcon">📍</span>
                     <div class="map-status-title" id="mapStatusTitle">Lokasi belum terdeteksi</div>
                     <div class="map-status-desc" id="mapStatusDesc">
                         Aktifkan GPS untuk mencari bantuan terdekat
                     </div>
-                    <button type="button" class="map-btn-location" id="mapLocationBtn">
+                    <button type="button" class="map-btn-location" id="mapGpsBtn">
                         <i class="fas fa-map-marker-alt"></i>
-                        <span id="mapLocationBtnText">Ambil Lokasi Saya</span>
+                        <span id="mapGpsBtnText">Ambil Lokasi Saya</span>
                     </button>
                 </div>
 
@@ -2538,35 +2587,35 @@
                 <!-- Grid 2x2 Bantuan -->
                 <div class="map-services-label">🚨 Bantuan Terdekat</div>
                 <div class="map-services-grid">
-                    <button type="button" class="map-service-card fire" onclick="mapSearchService('DAMKAR terdekat')">
-                        <span class="service-icon">🔥</span>
-                        <span class="service-label">DAMKAR Terdekat</span>
-                        <span class="service-desc">Pemadam kebakaran</span>
+                    <button type="button" class="map-emergency-btn fire" data-search="DAMKAR terdekat">
+                        <span class="map-em-icon">🔥</span>
+                        <span class="map-em-label">DAMKAR</span>
+                        <span class="map-em-sub">Terdekat</span>
                     </button>
-                    <button type="button" class="map-service-card medical" onclick="mapSearchService('rumah sakit terdekat')">
-                        <span class="service-icon">🚑</span>
-                        <span class="service-label">RS Terdekat</span>
-                        <span class="service-desc">Rumah sakit</span>
+                    <button type="button" class="map-emergency-btn medical" data-search="rumah sakit terdekat">
+                        <span class="map-em-icon">🚑</span>
+                        <span class="map-em-label">RUMAH SAKIT</span>
+                        <span class="map-em-sub">Terdekat</span>
                     </button>
-                    <button type="button" class="map-service-card crime" onclick="mapSearchService('polsek terdekat')">
-                        <span class="service-icon">🚓</span>
-                        <span class="service-label">Polsek Terdekat</span>
-                        <span class="service-desc">Kantor polisi</span>
+                    <button type="button" class="map-emergency-btn crime" data-search="polsek terdekat">
+                        <span class="map-em-icon">🚓</span>
+                        <span class="map-em-label">POLSEK</span>
+                        <span class="map-em-sub">Terdekat</span>
                     </button>
-                    <button type="button" class="map-service-card disaster" onclick="mapSearchService('BNPB terdekat')">
-                        <span class="service-icon">🌪️</span>
-                        <span class="service-label">BNPB Terdekat</span>
-                        <span class="service-desc">Badan bencana</span>
+                    <button type="button" class="map-emergency-btn disaster" data-search="BNPB terdekat">
+                        <span class="map-em-icon">🌪️</span>
+                        <span class="map-em-label">BNPB</span>
+                        <span class="map-em-sub">Terdekat</span>
                     </button>
                 </div>
 
                 <!-- Tombol Action -->
                 <div class="map-actions-row">
-                    <a href="#" class="map-action-btn primary" id="mapOpenGmaps" target="_blank" rel="noopener">
+                    <a href="#" class="map-action-btn primary" id="mapOpenGmapsBtn" target="_blank" rel="noopener">
                         <i class="fas fa-external-link-alt"></i>
                         <span>Buka di Google Maps</span>
                     </a>
-                    <button type="button" class="map-action-btn secondary" onclick="closeMapModal()">
+                    <button type="button" class="map-action-btn secondary" id="mapModalCloseBtn">
                         <i class="fas fa-times"></i>
                         <span>Tutup</span>
                     </button>
@@ -3972,7 +4021,257 @@ if (sidebarMapBtn) {
     console.log('✅ Laporan Saya v10.0 Script Loaded');
 })();
     </script>
+    <!-- ============================================================ -->
+    <!-- PATCH: FIX MODAL PETA DARURAT — TOMBOL BERFUNGSI             -->
+    <!-- ============================================================ -->
+    <script>
+    (function() {
+        'use strict';
 
+        // Variabel global untuk koordinat
+        window.mapLat = null;
+        window.mapLng = null;
+        window.mapAddress = '';
+
+        // ============================================================
+        // 1. TOMBOL AMBIL LOKASI SAYA
+        // ============================================================
+        function initGpsButton() {
+            var btn = document.getElementById('mapGpsBtn');
+            if (!btn || btn._gpsSetup) return;
+            btn._gpsSetup = true;
+
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                activateGps();
+            });
+
+            console.log('✅ [Patch] GPS button ready');
+        }
+
+        function activateGps() {
+            var btn = document.getElementById('mapGpsBtn');
+            var btnText = document.getElementById('mapGpsBtnText');
+            if (!navigator.geolocation) {
+                showToastPatch('❌ Error', 'Browser tidak mendukung GPS', 'fa-exclamation-triangle');
+                return;
+            }
+
+            btn.classList.add('loading');
+            if (btnText) btnText.textContent = 'Mengambil lokasi...';
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    var lat = position.coords.latitude;
+                    var lng = position.coords.longitude;
+                    var accuracy = Math.round(position.coords.accuracy || 0);
+                    window.mapLat = lat;
+                    window.mapLng = lng;
+
+                    // Simpan ke localStorage
+                    try {
+                        localStorage.setItem('salink_user_lat', lat);
+                        localStorage.setItem('salink_user_lng', lng);
+                    } catch(e) {}
+
+                    // Update button
+                    btn.classList.remove('loading');
+                    btn.classList.add('detected');
+                    btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+                    if (btnText) btnText.textContent = '✅ Lokasi Ditemukan';
+
+                    // Update status card
+                    var statusCard = document.getElementById('mapLocStatus');
+                    if (statusCard) statusCard.classList.add('detected');
+                    var titleEl = document.getElementById('mapStatusTitle');
+                    if (titleEl) titleEl.textContent = 'Lokasi Anda terdeteksi';
+                    var descEl = document.getElementById('mapStatusDesc');
+                    if (descEl) descEl.textContent = 'Akurasi ±' + accuracy + 'm';
+
+                    // Update koordinat
+                    var coordsEl = document.getElementById('mapCoords');
+                    if (coordsEl) coordsEl.textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
+
+                    // Reverse geocode
+                    reverseGeocode(lat, lng);
+
+                    // Render map
+                    renderMap(lat, lng);
+
+                    // Update Gmaps button
+                    var gmapsBtn = document.getElementById('mapOpenGmapsBtn');
+                    if (gmapsBtn) gmapsBtn.href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+
+                    showToastPatch('📍 Lokasi Ditemukan', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
+                    if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+                },
+                function(error) {
+                    btn.classList.remove('loading');
+                    if (btnText) btnText.textContent = '📍 Ambil Lokasi Saya';
+                    var msg = 'Gagal mengambil lokasi';
+                    if (error.code === 1) msg = 'Izin lokasi ditolak';
+                    else if (error.code === 2) msg = 'Lokasi tidak tersedia';
+                    else if (error.code === 3) msg = 'Timeout';
+                    showToastPatch('⚠️ GPS Error', msg, 'fa-exclamation-triangle');
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            );
+        }
+
+        function reverseGeocode(lat, lng) {
+            var url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id';
+            fetch(url, {
+                method: 'GET',
+                headers: { 'User-Agent': 'SALINK-Map/10.2' }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data && data.display_name) {
+                    window.mapAddress = data.display_name;
+                    var regionEl = document.getElementById('mapRegion');
+                    if (regionEl) regionEl.textContent = data.display_name;
+                    var addrEl = document.getElementById('mapAddress');
+                    if (addrEl) addrEl.textContent = data.display_name;
+                }
+            })
+            .catch(function() {
+                var regionEl = document.getElementById('mapRegion');
+                if (regionEl) regionEl.textContent = 'Koordinat: ' + lat.toFixed(4) + ', ' + lng.toFixed(4);
+            });
+        }
+
+        function renderMap(lat, lng) {
+            var iframe = document.getElementById('mapIframe');
+            if (iframe) {
+                iframe.src = 'https://www.google.com/maps?q=' + lat + ',' + lng + '&z=15&output=embed';
+            }
+        }
+
+        // ============================================================
+        // 2. GRID 2x2 BANTUAN TERDEKAT
+        // ============================================================
+        function initEmergencyGrid() {
+            var buttons = document.querySelectorAll('.map-emergency-btn[data-search]');
+            buttons.forEach(function(btn) {
+                if (btn._gridSetup) return;
+                btn._gridSetup = true;
+
+                btn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var search = this.getAttribute('data-search');
+                    if (!search) return;
+
+                    if (!window.mapLat || !window.mapLng) {
+                        showToastPatch('⚠️ Perhatian', 'Ambil lokasi Anda terlebih dahulu', 'fa-exclamation-triangle');
+                        return;
+                    }
+
+                    var url = 'https://www.google.com/maps/search/' + encodeURIComponent(search) + '/@' + window.mapLat + ',' + window.mapLng + ',14z';
+                    window.open(url, '_blank');
+                    if (navigator.vibrate) navigator.vibrate(20);
+                });
+            });
+            console.log('✅ [Patch] Emergency grid ready:', buttons.length, 'buttons');
+        }
+
+        // ============================================================
+        // 3. TOMBOL TUTUP
+        // ============================================================
+        function initCloseButton() {
+            var closeBtn = document.getElementById('mapModalCloseBtn');
+            if (closeBtn && !closeBtn._closeSetup) {
+                closeBtn._closeSetup = true;
+                closeBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    closeMapModal();
+                });
+            }
+            var closeBtn2 = document.getElementById('mapModalClose');
+            if (closeBtn2 && !closeBtn2._closeSetup2) {
+                closeBtn2._closeSetup2 = true;
+                closeBtn2.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    closeMapModal();
+                });
+            }
+        }
+
+        // ============================================================
+        // 4. FUNGSI GLOBAL
+        // ============================================================
+        function closeMapModal() {
+            var m = document.getElementById('mapModal');
+            if (m) m.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+        window.closeMapModal = closeMapModal;
+
+        function showToastPatch(title, message, icon) {
+            if (typeof window.showToast === 'function') {
+                window.showToast(title, message, icon || 'fa-info-circle');
+                return;
+            }
+            // Fallback toast
+            var container = document.getElementById('toastContainer');
+            if (!container) return;
+            document.querySelectorAll('.toast').forEach(function(t) { t.remove(); });
+            var toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = '<div class="toast-icon"><i class="fas ' + (icon || 'fa-info-circle') + '"></i></div>' +
+                '<div class="toast-content">' +
+                    '<div class="toast-title">' + title + '</div>' +
+                    '<div class="toast-message">' + message + '</div>' +
+                '</div>' +
+                '<button class="toast-close" type="button"><i class="fas fa-times"></i></button>';
+            toast.querySelector('.toast-close').onclick = function() { toast.remove(); };
+            container.appendChild(toast);
+            setTimeout(function() {
+                toast.classList.add('hide');
+                setTimeout(function() { toast.remove(); }, 400);
+            }, 4500);
+        }
+
+        // ============================================================
+        // 5. EXPOSE GLOBAL untuk onclick fallback
+        // ============================================================
+        window.mapSearchService = function(keyword) {
+            if (!window.mapLat || !window.mapLng) {
+                showToastPatch('⚠️ Perhatian', 'Ambil lokasi Anda terlebih dahulu', 'fa-exclamation-triangle');
+                return;
+            }
+            var url = 'https://www.google.com/maps/search/' + encodeURIComponent(keyword) + '/@' + window.mapLat + ',' + window.mapLng + ',14z';
+            window.open(url, '_blank');
+        };
+
+        // ============================================================
+        // 6. INIT — Dijalankan saat DOM ready
+        // ============================================================
+        function initPatch() {
+            console.log('🔧 [Patch Peta] Initializing...');
+            initGpsButton();
+            initEmergencyGrid();
+            initCloseButton();
+            console.log('✅ [Patch Peta] Ready!');
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPatch);
+        } else {
+            initPatch();
+        }
+
+        // Re-init setiap 2 detik untuk handle elemen yang di-render ulang
+        setInterval(function() {
+            initGpsButton();
+            initEmergencyGrid();
+            initCloseButton();
+        }, 2000);
+
+    })();
+    </script>
     <!-- ============================================================ -->
     <!-- FCM SETUP SALINK + EMERGENCY ALERT                            -->
     <!-- ============================================================ -->
