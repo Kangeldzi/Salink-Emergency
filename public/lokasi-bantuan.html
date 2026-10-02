@@ -301,21 +301,25 @@
         /* ============ SIDEBAR ============ */
         .sidebar-overlay-bg {
             position: fixed;
-            inset: 0;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             background: rgba(0,0,0,0.6);
             z-index: 1099;
             display: none;
             backdrop-filter: blur(3px);
             -webkit-backdrop-filter: blur(3px);
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
-        .sidebar-overlay-bg.active { display: block; }
+        .sidebar-overlay-bg.active { display: block; opacity: 1; }
 
         .sidebar {
             position: fixed;
             top: 0;
-            left: 50%;
-            transform: translateX(-50%) translateX(-100%);
-            width: 290px;
+            left: 0;
+            width: 285px;
             max-width: 85%;
             height: 100vh;
             height: 100dvh;
@@ -327,12 +331,13 @@
             border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
-            transition: transform 0.3s ease;
+            transform: translateX(-100%);
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
             padding-top: env(safe-area-inset-top, 0px);
             padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
             -webkit-overflow-scrolling: touch;
         }
-        .sidebar.active { transform: translateX(-50%) translateX(0); }
+        .sidebar.active { transform: translateX(0); }
 
         .sidebar-close {
             position: absolute;
@@ -1441,56 +1446,122 @@
         }
 
         /* ============ 🗺️ MODAL PETA DARURAT ============ */
-        .map-modal-overlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.88);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            z-index: 2500;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 16px;
-        }
-        .map-modal-overlay.active { display: flex; animation: fadeIn 0.3s ease; }
 
-        .map-modal-content {
-            background: var(--modal-bg);
-            border-radius: 20px;
-            max-width: 440px;
-            width: 100%;
-            max-height: 92vh;
-            overflow-y: auto;
-            border: 1px solid var(--border-color);
-            animation: modalIn 0.35s cubic-bezier(.34,1.56,.64,1);
-            box-shadow: 0 20px 60px rgba(0,0,0,0.6);
-            position: relative;
+        #mapModal .modal-content {
+            max-width: 430px;
+            padding: 16px 14px;
         }
-
-        .map-modal-header {
+        .map-modal-title-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            background: var(--accent-blue-gradient);
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 16px 18px;
-            border-bottom: 1px solid var(--border-color);
-            background: linear-gradient(135deg, rgba(230,0,18,0.15), rgba(230,0,18,0.05));
-            border-radius: 20px 20px 0 0;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            backdrop-filter: blur(10px);
+            justify-content: center;
+            color: #fff;
+            font-size: 0.85rem;
+            flex-shrink: 0;
         }
-        .map-modal-title {
+        .map-status-card {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 14px;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .map-status-icon {
+            font-size: 2rem;
+            margin-bottom: 6px;
+            display: inline-block;
+            line-height: 1;
+        }
+        .map-status-title {
+            font-size: 0.88rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            font-family: 'Poppins', sans-serif;
+            margin-bottom: 3px;
+        }
+        .map-status-desc {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+        .map-btn-location {
+            width: 100%;
+            padding: 11px 14px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #fff;
+            font-size: 0.78rem;
+            font-weight: 800;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-family: inherit;
+            transition: all 0.3s;
+            box-shadow: 0 4px 14px rgba(16,185,129,0.3);
+        }
+        .map-btn-location:active { transform: scale(0.97); }
+        .map-btn-location:disabled { opacity: 0.7; cursor: not-allowed; }
+        .map-btn-location.loading { pointer-events: none; }
+
+        .map-info-card {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .map-info-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 0.72rem;
+            line-height: 1.45;
+            color: var(--text-secondary);
+        }
+        .map-info-row .info-icon {
+            width: 20px;
+            text-align: center;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        .map-info-row .info-label {
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-right: 4px;
+        }
+        .map-info-row .info-value {
+            color: var(--text-primary);
+            font-weight: 700;
+        }
+        .map-info-row .info-value.coords {
+            font-family: 'Courier New', monospace;
+            color: var(--primary);
+            font-size: 0.7rem;
+        }
+
+        .map-owner-card {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
             display: flex;
             align-items: center;
             gap: 10px;
-            font-family: 'Poppins', sans-serif;
-            font-weight: 800;
-            font-size: 1rem;
-            color: var(--text-primary);
         }
-        .map-modal-title .map-icon-pulse {
+        .map-owner-avatar {
             width: 36px;
             height: 36px;
             border-radius: 50%;
@@ -1499,273 +1570,145 @@
             align-items: center;
             justify-content: center;
             color: #fff;
-            font-size: 1rem;
-            box-shadow: 0 0 0 0 rgba(248,81,73,0.7);
-            animation: pulse-red 2s ease-in-out infinite;
-        }
-        .map-modal-close {
-            width: 34px;
-            height: 34px;
-            border-radius: 50%;
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.85rem;
-            font-family: inherit;
-            transition: all 0.2s;
-        }
-        .map-modal-close:active { transform: scale(0.9); background: rgba(248,81,73,0.15); }
-
-        .map-modal-body { padding: 16px 18px 20px; }
-
-        /* Lokasi status box */
-        .map-loc-status {
-            padding: 18px 16px;
-            background: var(--bg-input);
-            border: 1px dashed var(--border-color);
-            border-radius: 14px;
-            text-align: center;
-            margin-bottom: 14px;
-            transition: all 0.3s;
-        }
-        .map-loc-status.detected {
-            border-style: solid;
-            border-color: rgba(63,185,80,0.4);
-            background: rgba(63,185,80,0.06);
-            text-align: left;
-        }
-        .map-loc-status .map-loc-icon {
-            font-size: 2rem;
-            display: block;
-            margin-bottom: 8px;
-            opacity: 0.5;
-        }
-        .map-loc-status.detected .map-loc-icon { display: none; }
-        .map-loc-status .map-loc-title {
-            font-size: 0.85rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 4px;
-        }
-        .map-loc-status .map-loc-desc {
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            line-height: 1.5;
-            margin-bottom: 12px;
-        }
-        .map-loc-status.detected .map-loc-desc { display: none; }
-
-        .map-gps-btn {
-            width: 100%;
-            padding: 12px 16px;
-            background: var(--accent-blue-gradient);
-            color: #fff;
-            border: none;
-            border-radius: 12px;
-            font-size: 0.82rem;
-            font-weight: 800;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            font-family: inherit;
-            box-shadow: 0 4px 15px rgba(230,0,18,0.35);
-            transition: all 0.2s;
-        }
-        .map-gps-btn:active { transform: scale(0.97); }
-        .map-gps-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-        .map-gps-btn.loading { pointer-events: none; }
-        .map-gps-btn.detected {
-            background: linear-gradient(135deg, #10b981, #059669);
-            box-shadow: 0 4px 15px rgba(16,185,129,0.35);
-        }
-        .map-gps-btn .btn-spinner {
-            display: inline-block;
-            width: 14px;
-            height: 14px;
-            border: 2px solid rgba(255,255,255,0.3);
-            border-top-color: #fff;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        .map-info-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-bottom: 14px;
-        }
-        .map-info-row {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            padding: 12px 14px;
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            font-size: 0.75rem;
-            line-height: 1.5;
-        }
-        .map-info-row .info-icon {
-            color: var(--primary);
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             flex-shrink: 0;
-            margin-top: 2px;
-            width: 16px;
-            text-align: center;
+            border: 2px solid var(--primary);
+            font-weight: 700;
+            overflow: hidden;
         }
-        .map-info-row .info-content { flex: 1; min-width: 0; }
-        .map-info-row .info-label {
+        .map-owner-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .map-owner-info { flex: 1; min-width: 0; }
+        .map-owner-name {
+            font-size: 0.75rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            font-family: 'Poppins', sans-serif;
+        }
+        .map-owner-loc {
             font-size: 0.62rem;
             color: var(--text-muted);
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 3px;
-        }
-        .map-info-row .info-value {
-            color: var(--text-primary);
-            font-weight: 600;
-            word-break: break-word;
-            font-size: 0.75rem;
-        }
-        .map-info-row .info-value.empty {
-            color: var(--text-muted);
-            font-style: italic;
-            font-weight: 500;
-        }
-        .map-info-row .info-value .coords-mono {
-            font-family: 'Courier New', monospace;
-            color: var(--primary);
-            font-weight: 700;
+            margin-top: 2px;
         }
 
-        .map-real-container {
+        .map-iframe-wrap {
             width: 100%;
-            height: 240px;
-            border-radius: 14px;
+            height: 200px;
+            border-radius: 12px;
             overflow: hidden;
             border: 1px solid var(--border-color);
             background: var(--bg-input);
-            margin-bottom: 14px;
-            position: relative;
+            margin-bottom: 8px;
         }
-        .map-real-container iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            display: block;
-        }
-        .map-real-container .map-placeholder {
-            position: absolute;
-            inset: 0;
+        .map-iframe-wrap iframe { width: 100%; height: 100%; border: none; display: block; }
+
+        .map-address-row {
             display: flex;
-            flex-direction: column;
+            justify-content: space-between;
             align-items: center;
-            justify-content: center;
-            gap: 8px;
+            font-size: 0.62rem;
             color: var(--text-muted);
-            text-align: center;
-            padding: 20px;
-            background: var(--bg-input);
+            margin-bottom: 12px;
+            gap: 8px;
         }
-        .map-real-container .map-placeholder i {
-            font-size: 2.5rem;
-            opacity: 0.3;
+        .map-address-row .map-address-value {
+            color: var(--text-primary);
+            font-weight: 600;
+            text-align: right;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
-        .map-real-container .map-placeholder p {
+
+        .map-services-label {
             font-size: 0.72rem;
-            line-height: 1.5;
-            font-weight: 500;
-        }
-
-        .map-emergency-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
-            margin-bottom: 14px;
-        }
-        .map-emergency-btn {
-            aspect-ratio: 1/1;
-            border-radius: 14px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 12px;
-            cursor: pointer;
-            border: 2px solid var(--border-color);
-            background: var(--bg-input);
-            font-family: inherit;
-            transition: all 0.25s ease;
-            text-align: center;
-        }
-        .map-emergency-btn:active { transform: scale(0.95); }
-        .map-emergency-btn .map-em-icon {
-            font-size: 2rem;
-            line-height: 1;
-            filter: drop-shadow(0 4px 12px currentColor);
-        }
-        .map-emergency-btn .map-em-label {
-            font-size: 0.7rem;
             font-weight: 800;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
             letter-spacing: 0.3px;
-            line-height: 1.2;
         }
-        .map-emergency-btn .map-em-sub {
-            font-size: 0.55rem;
-            color: var(--text-muted);
-            font-weight: 500;
-        }
-        .map-emergency-btn.fire { border-color: rgba(248,81,73,0.4); }
-        .map-emergency-btn.fire:active { background: rgba(248,81,73,0.15); border-color: var(--emergency-fire); }
-        .map-emergency-btn.fire .map-em-label { color: var(--emergency-fire); }
-        .map-emergency-btn.medical { border-color: rgba(79,195,247,0.4); }
-        .map-emergency-btn.medical:active { background: rgba(79,195,247,0.15); border-color: var(--emergency-medical); }
-        .map-emergency-btn.medical .map-em-label { color: var(--emergency-medical); }
-        .map-emergency-btn.crime { border-color: rgba(240,208,128,0.4); }
-        .map-emergency-btn.crime:active { background: rgba(240,208,128,0.15); border-color: var(--emergency-crime); }
-        .map-emergency-btn.crime .map-em-label { color: var(--emergency-crime); }
-        .map-emergency-btn.disaster { border-color: rgba(199,146,234,0.4); }
-        .map-emergency-btn.disaster:active { background: rgba(199,146,234,0.15); border-color: var(--emergency-disaster); }
-        .map-emergency-btn.disaster .map-em-label { color: var(--emergency-disaster); }
-
-        .map-modal-actions {
+        .map-services-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            padding-top: 14px;
-            border-top: 1px solid var(--border-color);
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .map-service-card {
+            padding: 12px 8px;
+            border-radius: 12px;
+            background: var(--bg-input);
+            border: 2px solid var(--border-color);
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            transition: all 0.25s ease;
+            font-family: inherit;
+        }
+        .map-service-card:active { transform: scale(0.95); }
+        .map-service-card .service-icon {
+            font-size: 1.6rem;
+            line-height: 1;
+            filter: drop-shadow(0 3px 8px currentColor);
+        }
+        .map-service-card .service-label {
+            font-size: 0.62rem;
+            font-weight: 800;
+            letter-spacing: 0.2px;
+            text-align: center;
+            line-height: 1.2;
+        }
+        .map-service-card .service-desc {
+            font-size: 0.52rem;
+            color: var(--text-muted);
+            text-align: center;
+            font-weight: 500;
+        }
+        .map-service-card.fire { border-color: rgba(248,81,73,0.4); }
+        .map-service-card.fire:active { background: rgba(248,81,73,0.15); border-color: var(--emergency-fire); }
+        .map-service-card.fire .service-label { color: var(--emergency-fire); }
+        .map-service-card.medical { border-color: rgba(79,195,247,0.4); }
+        .map-service-card.medical:active { background: rgba(79,195,247,0.15); border-color: var(--emergency-medical); }
+        .map-service-card.medical .service-label { color: var(--emergency-medical); }
+        .map-service-card.crime { border-color: rgba(240,208,128,0.4); }
+        .map-service-card.crime:active { background: rgba(240,208,128,0.15); border-color: var(--emergency-crime); }
+        .map-service-card.crime .service-label { color: var(--emergency-crime); }
+        .map-service-card.disaster { border-color: rgba(199,146,234,0.4); }
+        .map-service-card.disaster:active { background: rgba(199,146,234,0.15); border-color: var(--emergency-disaster); }
+        .map-service-card.disaster .service-label { color: var(--emergency-disaster); }
+
+        .map-actions-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
         }
         .map-action-btn {
-            padding: 12px;
-            border-radius: 12px;
-            border: 1px solid var(--border-color);
-            background: var(--bg-input);
-            color: var(--text-primary);
-            font-family: inherit;
-            font-size: 0.75rem;
-            font-weight: 700;
+            padding: 11px 12px;
+            border-radius: 10px;
+            font-size: 0.72rem;
+            font-weight: 800;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
-            transition: all 0.2s;
+            gap: 7px;
+            font-family: inherit;
             text-decoration: none;
+            border: none;
+            transition: all 0.25s;
         }
         .map-action-btn:active { transform: scale(0.97); }
         .map-action-btn.primary {
-            background: var(--accent-blue-gradient);
-            border-color: transparent;
+            background: linear-gradient(135deg, var(--primary), var(--primary-glow));
             color: #fff;
-            box-shadow: 0 4px 15px rgba(230,0,18,0.3);
+            box-shadow: 0 4px 14px rgba(230,0,18,0.35);
+        }
+        .map-action-btn.secondary {
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
         }
 
         /* ============ PREVIEW OVERLAY ============ */
@@ -2516,129 +2459,109 @@
     <!-- 🗺️ MODAL PETA DARURAT                                        -->
     <!-- Dibuka dari Sidebar → Menu "Peta Darurat"                     -->
     <!-- ============================================================ -->
-    <div class="map-modal-overlay" id="mapModalOverlay">
-        <div class="map-modal-content">
-
-            <!-- HEADER -->
-            <div class="map-modal-header">
-                <div class="map-modal-title">
-                    <div class="map-icon-pulse">🗺️</div>
+    
+    <div class="modal-overlay" id="mapModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="map-modal-title-icon"><i class="fas fa-map-marked-alt"></i></span>
                     <span>Peta Darurat</span>
                 </div>
-                <button class="map-modal-close" id="mapModalClose" type="button" aria-label="Tutup">
+                <button class="modal-close" id="mapModalClose" type="button" aria-label="Tutup">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
+            <div class="modal-body">
 
-            <!-- BODY -->
-            <div class="map-modal-body">
-
-                <!-- 1. LOKASI STATUS / GPS BOX -->
-                <div class="map-loc-status" id="mapLocStatus">
-                    <span class="map-loc-icon">📍</span>
-                    <div class="map-loc-title">Lokasi belum terdeteksi</div>
-                    <div class="map-loc-desc">
+                <!-- Card 1: Status Lokasi -->
+                <div class="map-status-card">
+                    <span class="map-status-icon" id="mapStatusIcon">📍</span>
+                    <div class="map-status-title" id="mapStatusTitle">Lokasi belum terdeteksi</div>
+                    <div class="map-status-desc" id="mapStatusDesc">
                         Aktifkan GPS untuk mencari bantuan terdekat
                     </div>
-                    <button class="map-gps-btn" id="mapGpsBtn" type="button">
-                        <i class="fas fa-location-arrow"></i>
-                        <span id="mapGpsBtnText">📍 Ambil Lokasi Saya</span>
+                    <button type="button" class="map-btn-location" id="mapLocationBtn">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span id="mapLocationBtnText">Ambil Lokasi Saya</span>
                     </button>
                 </div>
 
-                <!-- 2. INFO GRID -->
-                <div class="map-info-grid">
-
-                    <!-- Wilayah -->
+                <!-- Card 2: Info Wilayah + Koordinat -->
+                <div class="map-info-card">
                     <div class="map-info-row">
-                        <span class="info-icon"><i class="fas fa-home"></i></span>
-                        <div class="info-content">
-                            <div class="info-label">Wilayah</div>
-                            <div class="info-value empty" id="mapWilayahValue">Belum terdeteksi</div>
-                        </div>
+                        <span class="info-icon">🏠</span>
+                        <span>
+                            <span class="info-label">Wilayah:</span>
+                            <span class="info-value" id="mapRegion">-</span>
+                        </span>
                     </div>
-
-                    <!-- Koordinat -->
                     <div class="map-info-row">
-                        <span class="info-icon"><i class="fas fa-crosshairs"></i></span>
-                        <div class="info-content">
-                            <div class="info-label">Koordinat</div>
-                            <div class="info-value empty" id="mapCoordsValue">-</div>
-                        </div>
+                        <span class="info-icon">📍</span>
+                        <span>
+                            <span class="info-label">Koordinat:</span>
+                            <span class="info-value coords" id="mapCoords">-</span>
+                        </span>
                     </div>
-
-                    <!-- Pemilik Akun -->
-                    <div class="map-info-row">
-                        <span class="info-icon"><i class="fas fa-user"></i></span>
-                        <div class="info-content">
-                            <div class="info-label">Pemilik Akun</div>
-                            <div class="info-value" id="mapOwnerValue">-</div>
-                        </div>
-                    </div>
-
-                    <!-- Lokasi Anda -->
-                    <div class="map-info-row">
-                        <span class="info-icon"><i class="fas fa-map-marker-alt"></i></span>
-                        <div class="info-content">
-                            <div class="info-label">Lokasi Anda</div>
-                            <div class="info-value empty" id="mapLocationValue">Belum terdeteksi</div>
-                        </div>
-                    </div>
-
                 </div>
 
-                <!-- 3. REAL GOOGLE MAPS -->
-                <div class="map-real-container" id="mapRealContainer">
-                    <div class="map-placeholder" id="mapPlaceholder">
-                        <i class="fas fa-map-marked-alt"></i>
-                        <p>Peta akan muncul setelah<br>lokasi Anda terdeteksi</p>
+                <!-- Card 3: Pemilik Akun -->
+                <div class="map-owner-card">
+                    <div class="map-owner-avatar" id="mapOwnerAvatar">
+                        <i class="fas fa-user"></i>
                     </div>
-                    <iframe id="mapRealFrame" style="display:none;" loading="lazy" allowfullscreen></iframe>
+                    <div class="map-owner-info">
+                        <div class="map-owner-name" id="mapOwner">Guest</div>
+                        <div class="map-owner-loc" id="mapOwnerLoc">-</div>
+                    </div>
                 </div>
 
-                <!-- 4. GRID 2x2 EMERGENCY QUICK ACTIONS -->
-                <div class="map-emergency-grid">
-
-                    <button class="map-emergency-btn fire" data-search="damkar terdekat" type="button">
-                        <span class="map-em-icon">🔥</span>
-                        <span class="map-em-label">DAMKAR</span>
-                        <span class="map-em-sub">Terdekat</span>
-                    </button>
-
-                    <button class="map-emergency-btn medical" data-search="rumah sakit terdekat" type="button">
-                        <span class="map-em-icon">🚑</span>
-                        <span class="map-em-label">RUMAH SAKIT</span>
-                        <span class="map-em-sub">Terdekat</span>
-                    </button>
-
-                    <button class="map-emergency-btn crime" data-search="polsek terdekat" type="button">
-                        <span class="map-em-icon">🚓</span>
-                        <span class="map-em-label">POLSEK</span>
-                        <span class="map-em-sub">Terdekat</span>
-                    </button>
-
-                    <button class="map-emergency-btn disaster" data-search="pos bnpb terdekat" type="button">
-                        <span class="map-em-icon">🌪️</span>
-                        <span class="map-em-label">BNPB</span>
-                        <span class="map-em-sub">Terdekat</span>
-                    </button>
-
+                <!-- Peta Google Maps -->
+                <div class="map-iframe-wrap">
+                    <iframe id="mapIframe" src="about:blank" loading="lazy" allowfullscreen></iframe>
+                </div>
+                <div class="map-address-row">
+                    <span>📍 Lokasi Anda</span>
+                    <span class="map-address-value" id="mapAddress">🗺️ Menunggu lokasi...</span>
                 </div>
 
-                <!-- 5. ACTION BUTTONS -->
-                <div class="map-modal-actions">
-                    <a href="#" class="map-action-btn primary" id="mapOpenGmapsBtn" target="_blank" rel="noopener">
+                <!-- Grid 2x2 Bantuan -->
+                <div class="map-services-label">🚨 Bantuan Terdekat</div>
+                <div class="map-services-grid">
+                    <button type="button" class="map-service-card fire" onclick="mapSearchService('DAMKAR terdekat')">
+                        <span class="service-icon">🔥</span>
+                        <span class="service-label">DAMKAR Terdekat</span>
+                        <span class="service-desc">Pemadam kebakaran</span>
+                    </button>
+                    <button type="button" class="map-service-card medical" onclick="mapSearchService('rumah sakit terdekat')">
+                        <span class="service-icon">🚑</span>
+                        <span class="service-label">RS Terdekat</span>
+                        <span class="service-desc">Rumah sakit</span>
+                    </button>
+                    <button type="button" class="map-service-card crime" onclick="mapSearchService('polsek terdekat')">
+                        <span class="service-icon">🚓</span>
+                        <span class="service-label">Polsek Terdekat</span>
+                        <span class="service-desc">Kantor polisi</span>
+                    </button>
+                    <button type="button" class="map-service-card disaster" onclick="mapSearchService('BNPB terdekat')">
+                        <span class="service-icon">🌪️</span>
+                        <span class="service-label">BNPB Terdekat</span>
+                        <span class="service-desc">Badan bencana</span>
+                    </button>
+                </div>
+
+                <!-- Tombol Action -->
+                <div class="map-actions-row">
+                    <a href="#" class="map-action-btn primary" id="mapOpenGmaps" target="_blank" rel="noopener">
                         <i class="fas fa-external-link-alt"></i>
                         <span>Buka di Google Maps</span>
                     </a>
-                    <button class="map-action-btn" id="mapModalCloseBtn" type="button">
+                    <button type="button" class="map-action-btn secondary" onclick="closeMapModal()">
                         <i class="fas fa-times"></i>
                         <span>Tutup</span>
                     </button>
                 </div>
 
             </div>
-
         </div>
     </div>
 
