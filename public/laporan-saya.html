@@ -330,19 +330,40 @@
             -webkit-overflow-scrolling: touch;
         }
         .sidebar.active { transform: translateX(0); }
+       
+             .sidebar-close {
+            position: absolute;
+            top: calc(12px + env(safe-area-inset-top, 0px));
+            right: 12px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.78rem;
+            z-index: 10;
+        }
+        .sidebar-close:active { transform: scale(0.9); }
+
         .sidebar-header {
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 4px;
-            padding: calc(56px + env(safe-area-inset-top, 0px)) 16px 16px;
+            padding: calc(52px + env(safe-area-inset-top, 0px)) 16px 14px;
             border-bottom: 1px solid var(--border-color);
             background: var(--bg-card);
             position: relative;
+            flex-shrink: 0;
         }
         .sidebar-user-avatar {
-            width: 64px;
-            height: 64px;
+            width: 58px;
+            height: 58px;
             border-radius: 50%;
             background: var(--accent-blue-gradient);
             display: flex;
@@ -350,14 +371,14 @@
             justify-content: center;
             color: #fff;
             font-weight: bold;
-            font-size: 1.5rem;
+            font-size: 1.35rem;
             overflow: hidden;
             border: 3px solid var(--primary);
             box-shadow: 0 4px 16px rgba(230,0,18,0.3);
         }
         .sidebar-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .sidebar-user-name {
-            font-size: 0.95rem;
+            font-size: 0.88rem;
             font-weight: 700;
             color: var(--text-primary);
             text-align: center;
@@ -365,7 +386,7 @@
             font-family: 'Poppins', sans-serif;
         }
         .sidebar-user-email {
-            font-size: 0.68rem;
+            font-size: 0.62rem;
             color: var(--text-muted);
             text-align: center;
             word-break: break-all;
@@ -374,36 +395,34 @@
 
         .nav-menu {
             list-style: none;
-            padding: 6px 12px calc(40px + env(safe-area-inset-bottom, 0px));
+            padding: 4px 10px calc(40px + env(safe-area-inset-bottom, 0px));
             flex: 1;
             overflow-y: auto;
         }
         .nav-section-title {
-            font-size: 0.58rem;
+            font-size: 0.55rem;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 1.2px;
-            padding: 14px 14px 6px;
+            padding: 12px 12px 4px;
             font-weight: 700;
         }
-        .nav-item { margin-bottom: 3px; }
+        .nav-item { margin-bottom: 2px; }
         .nav-link {
             display: flex;
             align-items: center;
-            gap: 14px;
-            padding: 11px 14px;
+            gap: 12px;
+            padding: 10px 12px;
             color: var(--text-primary);
             text-decoration: none;
             border-radius: 10px;
-            font-size: 0.82rem;
+            font-size: 0.78rem;
             background: transparent;
             border: 1px solid transparent;
             cursor: pointer;
             font-weight: 500;
             transition: all 0.2s;
             font-family: inherit;
-            width: 100%;
-            text-align: left;
         }
         .nav-link:active { transform: scale(0.98); background: var(--bg-input); }
         .nav-link.active {
@@ -413,24 +432,24 @@
             font-weight: 700;
         }
         .nav-link i {
-            width: 24px;
+            width: 22px;
             text-align: center;
-            font-size: 1.05rem;
+            font-size: 0.98rem;
             color: var(--accent-gold);
             flex-shrink: 0;
         }
         .nav-link.active i { color: var(--primary); }
         .nav-logout {
-            margin-top: 14px;
-            margin-bottom: 16px;
+            margin-top: 12px;
+            margin-bottom: 14px;
             border-top: 1px solid var(--border-color);
-            padding-top: 14px;
+            padding-top: 12px;
         }
         .nav-logout .nav-link,
         .nav-logout .nav-link i {
             color: var(--accent-red);
             font-weight: 700;
-        }
+        } 
 
         /* ============ MAIN CONTENT ============ */
         .main-content {
@@ -2038,7 +2057,9 @@
     <!-- ============================================================ -->
     <!-- HEADER                                                        -->
     <!-- ============================================================ -->
+
     <header class="app-bar" id="appBar">
+        <!-- KIRI: Menu ☰ + Logo 🚨 -->
         <div class="header-left">
             <button class="menu-btn" id="menuBtn" type="button" title="Menu" aria-label="Menu">
                 <i class="fas fa-bars"></i>
@@ -2049,6 +2070,7 @@
             </a>
         </div>
 
+        <!-- TENGAH: Search 🔍 + Notif 🔔 -->
         <div class="header-center">
             <button class="search-btn" id="headerSearchBtn" type="button" title="Cari" aria-label="Cari">
                 <i class="fas fa-search"></i>
@@ -2059,25 +2081,27 @@
             </button>
         </div>
 
+        <!-- KANAN: Theme Toggle + Avatar + Back -->
         <div class="header-right">
             <div class="theme-toggle" id="themeToggle" role="button" aria-label="Ganti tema" tabindex="0">
                 <div class="toggle-thumb" id="toggleThumb">
                     <i class="fas fa-moon" id="toggleIcon"></i>
                 </div>
             </div>
-            <button class="user-btn" id="userBtn" type="button" title="Profil" aria-label="Profil">
+            <a href="profil.html" class="user-btn" id="userBtn" data-action="profile" aria-label="Profil">
                 <i class="fas fa-user"></i>
-            </button>
-            <a href="dashboard.html" class="back-btn" title="Kembali" aria-label="Kembali">
-                <i class="fas fa-arrow-left"></i>
             </a>
+            <button class="back-btn" id="backBtn" type="button" title="Kembali" aria-label="Kembali">
+                <i class="fas fa-arrow-left"></i>
+            </button>
         </div>
     </header>
+    
 
     <!-- ============================================================ -->
     <!-- SIDEBAR HAMBURGER                                             -->
     <!-- ============================================================ -->
-    <div class="sidebar-overlay-bg" id="sidebarOverlay"></div>
+    
     <div class="sidebar" id="sidebar" role="navigation" aria-label="Menu Utama">
         <button class="sidebar-close" id="sidebarClose" type="button" aria-label="Tutup Menu">
             <i class="fas fa-times"></i>
@@ -2092,6 +2116,7 @@
         </div>
 
         <ul class="nav-menu">
+            <!-- MENU UTAMA -->
             <li class="nav-item">
                 <a href="dashboard.html" class="nav-link">
                     <i class="fas fa-home"></i>
@@ -2099,18 +2124,19 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a href="profil.html" class="nav-link">
+                <a href="profil.html" class="nav-link" data-action="profile">
                     <i class="fas fa-user-circle"></i>
                     <span>Profil Saya</span>
                 </a>
             </li>
 
+            <!-- MENU DARURAT -->
             <div class="nav-section-title">🚨 MENU DARURAT</div>
             <li class="nav-item">
-                <button type="button" class="nav-link" id="sidebarMapBtn">
+                <a href="#" class="nav-link" id="navPetaDarurat" type="button">
                     <i class="fas fa-map-marked-alt"></i>
                     <span>Peta Darurat</span>
-                </button>
+                </a>
             </li>
             <li class="nav-item">
                 <a href="kontak-darurat.html" class="nav-link">
@@ -2119,7 +2145,7 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a href="laporan-darurat.html" class="nav-link">
+                <a href="laporan-darurat.html" class="nav-link active">
                     <i class="fas fa-exclamation-circle"></i>
                     <span>Laporan Darurat</span>
                 </a>
@@ -2137,6 +2163,7 @@
                 </a>
             </li>
 
+            <!-- STATISTIK -->
             <div class="nav-section-title">📊 STATISTIK</div>
             <li class="nav-item">
                 <a href="statistik-emergency.html" class="nav-link">
@@ -2151,14 +2178,15 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a href="laporan-saya.html" class="nav-link active">
+                <a href="laporan-saya.html" class="nav-link" data-action="login">
                     <i class="fas fa-clipboard-list"></i>
                     <span>Laporan Saya</span>
                 </a>
             </li>
 
+            <!-- LOGOUT -->
             <li class="nav-item nav-logout" id="logoutNavItem" style="display:none;">
-                <a href="#" class="nav-link" id="logoutBtn">
+                <a href="#" class="nav-link" id="logoutBtn" type="button">
                     <i class="fas fa-sign-out-alt"></i>
                     <span>Keluar</span>
                 </a>
