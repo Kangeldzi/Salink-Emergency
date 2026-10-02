@@ -977,6 +977,37 @@
         }
         .modal-close:active { transform: scale(0.9); }
         .modal-body { font-size: 0.75rem; }
+                /* ✅ PATCH: Tombol Tutup Modal */
+        .modal-footer {
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            position: sticky;
+            bottom: 0;
+            background: var(--modal-bg);
+        }
+        .modal-footer .btn-close-modal {
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 10px 36px;
+            font-size: 0.78rem;
+            cursor: pointer;
+            font-weight: 700;
+            font-family: inherit;
+            transition: all 0.2s ease;
+            min-width: 140px;
+        }
+        .modal-footer .btn-close-modal:active {
+            transform: scale(0.96);
+            background: rgba(230,0,18,0.1);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
 
         /* ============ DELETE CONFIRM MODAL (DIPERBAIKI) ============ */
         .delete-confirm-modal {
@@ -2294,7 +2325,8 @@
     <!-- ============================================================ -->
     <!-- MODAL SEARCH (DI DALAM APP-SHELL)                             -->
     <!-- ============================================================ -->
-    <div class="modal-overlay" id="searchModal">
+    
+        <div class="modal-overlay" id="searchModal">
         <div class="modal-content search-modal-content">
             <div class="modal-header">
                 <div class="modal-title">
@@ -2339,13 +2371,17 @@
                 </div>
                 <div class="keyboard-hint">Tekan <kbd>/</kbd> untuk buka pencarian • <kbd>Esc</kbd> untuk tutup</div>
             </div>
+            <!-- ✅ TAMBAHAN: Tombol Tutup -->
+            <div class="modal-footer">
+                <button class="btn-close-modal" id="searchModalFooterBtn" type="button">Tutup</button>
+            </div>
         </div>
     </div>
 
     <!-- ============================================================ -->
     <!-- MODAL NOTIFIKASI (DI DALAM APP-SHELL)                         -->
     <!-- ============================================================ -->
-    <div class="modal-overlay" id="notifModal">
+        <div class="modal-overlay" id="notifModal">
         <div class="modal-content" style="max-width:460px;">
             <div class="modal-header">
                 <div class="modal-title">
@@ -2360,9 +2396,13 @@
             <div class="modal-body">
                 <div id="notifList" style="max-height:380px;overflow-y:auto;"></div>
             </div>
+            <!-- ✅ TAMBAHAN: Tombol Tutup -->
+            <div class="modal-footer">
+                <button class="btn-close-modal" id="notifModalFooterBtn" type="button">Tutup</button>
+            </div>
         </div>
     </div>
-
+        
     <!-- ============================================================ -->
     <!-- MODAL DETAIL LAPORAN (DI DALAM APP-SHELL)                     -->
     <!-- ============================================================ -->
@@ -3658,12 +3698,27 @@
         document.getElementById('sidebarClose')?.addEventListener('click', closeSidebar);
         document.getElementById('sidebarOverlay')?.addEventListener('click', closeSidebar);
 
-        // 🗺️ Sidebar Menu → Peta Darurat
-        document.getElementById('sidebarMapBtn')?.addEventListener('click', function(e) {
-            e.preventDefault(); e.stopPropagation();
-            closeSidebar();
-            setTimeout(function() { openMapModal(); }, 250);
-        });
+        // 🗺️ Sidebar Menu → Peta Darurat (FIX: ID sesuai HTML)
+var navPetaDarurat = document.getElementById('navPetaDarurat');
+if (navPetaDarurat) {
+    navPetaDarurat.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (navigator.vibrate) navigator.vibrate(10);
+        closeSidebar();
+        setTimeout(function() { openMapModal(); }, 300);
+    });
+}
+// Fallback alias
+var sidebarMapBtn = document.getElementById('sidebarMapBtn');
+if (sidebarMapBtn) {
+    sidebarMapBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        closeSidebar();
+        setTimeout(function() { openMapModal(); }, 300);
+    });
+}
 
         // Header Search 🔍
         document.getElementById('headerSearchBtn')?.addEventListener('click', function(e) {
@@ -3738,6 +3793,7 @@
 
         // Search Modal
         document.getElementById('searchModalCloseBtn')?.addEventListener('click', closeSearchModal);
+        document.getElementById('searchModalFooterBtn')?.addEventListener('click', closeSearchModal); // ✅ TAMBAHAN
         document.getElementById('clearSearchBtn')?.addEventListener('click', clearSearch);
         document.getElementById('searchModal')?.addEventListener('click', function(e) {
             if (e.target === this) closeSearchModal();
@@ -3764,6 +3820,7 @@
 
         // Notif Modal
         document.getElementById('notifModalCloseBtn')?.addEventListener('click', closeNotifModal);
+        document.getElementById('notifModalFooterBtn')?.addEventListener('click', closeNotifModal); // ✅ TAMBAHAN
         document.getElementById('notifModal')?.addEventListener('click', function(e) {
             if (e.target === this) closeNotifModal();
         });
