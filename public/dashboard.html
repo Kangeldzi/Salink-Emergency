@@ -1490,11 +1490,20 @@
         </div>
     </div>
     </div>
-       <script>
+
+    <script>
 /* ====================================================================
- * SALINK v10.5 — EMERGENCY ALARM SYSTEM (FIXED AUDIO)
+ * SALINK v10.5 — EMERGENCY ALARM SYSTEM (FULL FIXED)
  * ====================================================================
- * FIX: Multi-fallback URL MP3 + CrossOrigin removed + Smart fallback beep
+ * Perbaikan v10.5:
+ * 1. Grid button click tidak diblokir login guard
+ * 2. Manual test mode — klik grid tanpa emergency aktif tetap bunyi
+ * 3. Play MP3 emergency + fallback beep Web Audio API
+ * 4. Auto-play alarm dari emergency baru (server + broadcast)
+ * 5. BroadcastChannel + Storage Event — sync antar tab instant
+ * 6. Posting emergency → nada dering EMERGENCY (bukan regular)
+ * 7. Stat Card "Postingan Baru" — data muncul setelah posting
+ * 8. Reset fullScreenAlarmActive di awal
  * ==================================================================== */
 
 // ====================================================================
@@ -1518,30 +1527,28 @@ const EMERGENCY_CSS_CLASS = { 'fire': 'fire', 'medical': 'medical', 'crime': 'cr
 
 const REGULAR_SOUND_URL = '/Music/smsblackber_4a537f155087133.mp3';
 
-// ⭐ FIXED v10.5: Multi-fallback URL untuk nada dering emergency
-// Setiap tipe punya 3 alternatif URL. Kalau #1 gagal, otomatis coba #2, dst.
+// ⭐ v10.5: Playlist nada dering khusus emergency
 const EMERGENCY_SOUND_PLAYLIST = {
-    fire: [
-        'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/Kebakaran.mp3',
-        'https://raw.githubusercontent.com/Kangeldzi/salink/main/Music/Kebakaran.mp3',
-        'https://cdn.statically.io/gh/Kangeldzi/salink/main/Music/Kebakaran.mp3'
-    ],
-    medical: [
-        'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/kematian.mp3',
-        'https://raw.githubusercontent.com/Kangeldzi/salink/main/Music/kematian.mp3',
-        'https://cdn.statically.io/gh/Kangeldzi/salink/main/Music/kematian.mp3'
-    ],
-    crime: [
-        'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/pencurian.mp3',
-        'https://raw.githubusercontent.com/Kangeldzi/salink/main/Music/pencurian.mp3',
-        'https://cdn.statically.io/gh/Kangeldzi/salink/main/Music/pencurian.mp3'
-    ],
-    disaster: [
-        'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/bencana_tsunami.mp3',
-        'https://raw.githubusercontent.com/Kangeldzi/salink/main/Music/bencana_tsunami.mp3',
-        'https://cdn.statically.io/gh/Kangeldzi/salink/main/Music/bencana_tsunami.mp3'
-    ]
+    fire:     'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/Kebakaran.mp3',
+    medical:  'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/kematian.mp3',
+    crime:    'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/pencurian.mp3',
+    disaster: 'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/bencana_tsunami.mp3'
 };
+
+// ⭐ v10.5: Cek ketersediaan MP3 di startup
+const EMERGENCY_SOUND_AVAILABLE = {};
+(async function checkEmergencySounds() {
+    for (const [type, url] of Object.entries(EMERGENCY_SOUND_PLAYLIST)) {
+        try {
+            const res = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
+            EMERGENCY_SOUND_AVAILABLE[type] = true;
+            console.log('✅ [Sound] Tersedia:', type);
+        } catch(e) {
+            EMERGENCY_SOUND_AVAILABLE[type] = false;
+            console.warn('⚠️ [Sound] TIDAK tersedia:', type, '→', url);
+        }
+    }
+})();
 
 const POST_TYPE_MAP = {
     'biasa': { isSpecial: false, specialType: null },
@@ -1583,6 +1590,10 @@ window._salinkActiveAlarm = null;
 window._salinkAlarmAudioRef = null;
 window._salinkVibrateInterval = null;
 window._salinkBeepInterval = null;
+window._salinkAlarmChannel = null;
+
+// ⭐ v10.5: Reset fullScreenAlarmActive di awal
+window.addEventListener('load', () => { fullScreenAlarmActive = false; });
 
 // ====================================================================
 // GDRIVE CONFIG
@@ -1599,12 +1610,14 @@ let gdriveTokenExpiresAt = 0;
 let gdriveReady = false;
 
 // ====================================================================
-// 3. AUDIO SYSTEM (FIXED v10.5)
+// 3. AUDIO SYSTEM
 // ====================================================================
 function unlockAudio() {
-    if (_audioUnlocked) return;
+    if (_audioUnlocked && _audioContext && _audioContext.state === 'running') return;
     try {
-        _audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        if (!_audioContext) {
+            _audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
         const buffer = _audioContext.createBuffer(1, 1, 22050);
         const source = _audioContext.createBufferSource();
         source.buffer = buffer;
@@ -1612,13 +1625,10 @@ function unlockAudio() {
         source.start(0);
         if (_audioContext.state === 'suspended') _audioContext.resume().catch(() => {});
         _audioUnlocked = true;
-        console.log('🔓 [Audio] Unlocked');
-    } catch(e) {
-        console.warn('⚠️ [Audio] Unlock gagal:', e.message);
-    }
+    } catch(e) {}
 }
 ['click', 'touchstart', 'keydown'].forEach(evt => {
-    document.addEventListener(evt, unlockAudio, { once: true, passive: true });
+    document.addEventListener(evt, unlockAudio, { once: false, passive: true });
 });
 
 function playRegularSound() {
@@ -1629,7 +1639,7 @@ function playRegularSound() {
 }
 
 // ====================================================================
-// 3b. EMERGENCY ALARM LOOP (FIXED v10.5 — NO CROSSORIGIN + MULTI-URL)
+// 3b. EMERGENCY ALARM LOOP (FIXED v10.5)
 // ====================================================================
 function playEmergencyAlarmLoop(type) {
     if (!type || !EMERGENCY_SOUND_PLAYLIST[type]) {
@@ -1639,101 +1649,91 @@ function playEmergencyAlarmLoop(type) {
 
     stopEmergencyAlarm();
 
-    const urlList = EMERGENCY_SOUND_PLAYLIST[type];
-    console.log('🔊 [Alarm] Trying', urlList.length, 'URLs for:', type);
+    const soundUrl = EMERGENCY_SOUND_PLAYLIST[type];
+    console.log('🔊 [Alarm] Playing loop:', type);
 
-    unlockAudio();
-    if (_audioContext && _audioContext.state === 'suspended') {
-        _audioContext.resume().catch(() => {});
-    }
-
-    // Set state DULU
+    // Set state DULU agar highlight tahu
     window._salinkActiveAlarm = {
         type: type,
-        startedAt: Date.now(),
-        currentUrlIndex: 0
+        sound: soundUrl,
+        startedAt: Date.now()
     };
 
-    // Coba play URL satu per satu
-    tryPlayAudioUrl(urlList, 0, type);
+    // Coba play MP3 dulu
+    try {
+        unlockAudio();
+        if (_audioContext && _audioContext.state === 'suspended') {
+            _audioContext.resume().catch(() => {});
+        }
 
-    // Vibrate pattern
-    if (navigator.vibrate) {
-        window._salinkVibrateInterval = setInterval(() => {
-            if (window._salinkActiveAlarm) {
-                navigator.vibrate([1000, 500, 1000, 500]);
+        const audio = new Audio(soundUrl);
+        audio.loop = true;
+        audio.volume = 1.0;
+        audio.preload = 'auto';
+        audio.crossOrigin = 'anonymous';
+
+        window._salinkAlarmAudioRef = audio;
+
+        // Timeout: kalau 2 detik MP3 tidak playing → fallback beep
+        const fallbackTimer = setTimeout(() => {
+            if (window._salinkActiveAlarm &&
+                window._salinkAlarmAudioRef === audio &&
+                (audio.paused || audio.currentTime === 0 || audio.error)) {
+                console.warn('⚠️ [Alarm] MP3 timeout — pakai fallback beep');
+                audio.pause();
+                audio.src = '';
+                window._salinkAlarmAudioRef = null;
+                playFallbackBeep(type);
             }
-        }, 3000);
-        navigator.vibrate([1000, 500, 1000, 500]);
-    }
-}
+        }, 2000);
 
-// ⭐ Recursive: coba URL #1, kalau gagal → #2, dst.
-function tryPlayAudioUrl(urlList, index, type) {
-    if (!window._salinkActiveAlarm || window._salinkActiveAlarm.type !== type) {
-        console.log('⏹️ [Alarm] Cancelled (state changed)');
-        return;
-    }
-    if (index >= urlList.length) {
-        console.warn('⚠️ [Alarm] Semua URL gagal — pakai fallback beep');
-        playFallbackBeep(type);
-        return;
-    }
+        audio.addEventListener('playing', () => {
+            clearTimeout(fallbackTimer);
+            console.log('✅ [Alarm] MP3 playing');
+        });
 
-    const url = urlList[index];
-    console.log('🎵 [Alarm] Try URL #' + (index+1) + ':', url);
+        audio.addEventListener('error', () => {
+            clearTimeout(fallbackTimer);
+            console.warn('⚠️ [Alarm] MP3 error — fallback beep');
+            window._salinkAlarmAudioRef = null;
+            playFallbackBeep(type);
+        });
 
-    const audio = new Audio();
-    // ⭐ v10.5: JANGAN pakai crossOrigin = 'anonymous' → biar MP3 bisa play
-    audio.loop = true;
-    audio.volume = 1.0;
-    audio.preload = 'auto';
-
-    let hasFailed = false;
-    const failTimer = setTimeout(() => {
-        if (hasFailed) return;
-        hasFailed = true;
-        console.warn('⏱️ [Alarm] URL timeout 5s:', url);
-        try { audio.pause(); audio.src = ''; } catch(e) {}
-        tryPlayAudioUrl(urlList, index + 1, type);
-    }, 5000);
-
-    audio.addEventListener('error', () => {
-        if (hasFailed) return;
-        hasFailed = true;
-        clearTimeout(failTimer);
-        console.warn('❌ [Alarm] URL error:', url);
-        tryPlayAudioUrl(urlList, index + 1, type);
-    }, { once: true });
-
-    audio.addEventListener('canplaythrough', () => {
-        if (hasFailed) return;
-        clearTimeout(failTimer);
-        console.log('✅ [Alarm] URL loaded OK:', url);
-    }, { once: true });
-
-    const playPromise = audio.play();
-    if (playPromise !== undefined) {
-        playPromise
-            .then(() => {
-                if (hasFailed) return;
-                clearTimeout(failTimer);
-                console.log('✅ [Alarm] Playing:', url);
-                window._salinkAlarmAudioRef = audio;
-                window._salinkActiveAlarm.currentUrlIndex = index;
-            })
-            .catch(err => {
-                if (hasFailed) return;
-                hasFailed = true;
-                clearTimeout(failTimer);
-                console.warn('⚠️ [Alarm] Play blocked:', err.message);
-                tryPlayAudioUrl(urlList, index + 1, type);
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+            playPromise.catch(err => {
+                clearTimeout(fallbackTimer);
+                console.warn('⚠️ [Alarm] Play ditolak:', err.message);
+                audio.muted = true;
+                audio.play().then(() => {
+                    audio.muted = false;
+                    console.log('✅ [Alarm] Playing setelah unmute');
+                }).catch(() => {
+                    console.warn('⚠️ [Alarm] Gagal total → fallback beep');
+                    window._salinkAlarmAudioRef = null;
+                    playFallbackBeep(type);
+                });
             });
+        }
+
+        // Vibrate pattern
+        if (navigator.vibrate) {
+            window._salinkVibrateInterval = setInterval(() => {
+                if (window._salinkActiveAlarm) {
+                    navigator.vibrate([1000, 500, 1000, 500]);
+                }
+            }, 3000);
+            navigator.vibrate([1000, 500, 1000, 500]);
+        }
+    } catch (err) {
+        console.error('❌ [Alarm] Error:', err);
+        playFallbackBeep(type);
     }
 }
 
-// ⭐ Fallback beep: nada dering sederhana yang PASTI jalan
+// ⭐ v10.5: Fallback beep — pattern berbeda per jenis
 function playFallbackBeep(type) {
+    console.log('🔊 [Fallback] Playing beep for:', type);
     try {
         if (!_audioContext) {
             _audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -1742,61 +1742,50 @@ function playFallbackBeep(type) {
             _audioContext.resume().catch(() => {});
         }
 
-        const freqs = {
-            fire: [880, 660],
-            medical: [660, 880],
-            crime: [440, 550],
-            disaster: [1100, 880]
+        const patterns = {
+            fire:     { freq: 880,  beeps: 3, duration: 0.15, gap: 0.08, cycle: 1.2 },
+            medical:  { freq: 660,  beeps: 2, duration: 0.2,  gap: 0.15, cycle: 1.5 },
+            crime:    { freq: 440,  beeps: 4, duration: 0.1,  gap: 0.06, cycle: 1.0 },
+            disaster: { freq: 1100, beeps: 3, duration: 0.25, gap: 0.1,  cycle: 1.8 }
         };
-        const [freq1, freq2] = freqs[type] || [880, 660];
+        const p = patterns[type] || patterns.fire;
 
         if (window._salinkBeepInterval) clearInterval(window._salinkBeepInterval);
 
-        // Pattern: 2-tone siren (naik-turun), lebih enak didengar dari beep tunggal
-        window._salinkBeepInterval = setInterval(() => {
+        const playCycle = () => {
             if (!window._salinkActiveAlarm) {
                 clearInterval(window._salinkBeepInterval);
+                window._salinkBeepInterval = null;
                 return;
             }
-            const t = _audioContext.currentTime;
-            const beepDuration = 0.4;
+            const now = _audioContext.currentTime;
+            for (let i = 0; i < p.beeps; i++) {
+                const start = now + i * (p.duration + p.gap);
+                const osc = _audioContext.createOscillator();
+                const gain = _audioContext.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(p.freq, start);
+                osc.frequency.exponentialRampToValueAtTime(p.freq * 1.2, start + p.duration);
+                gain.gain.setValueAtTime(0, start);
+                gain.gain.linearRampToValueAtTime(0.3, start + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, start + p.duration);
+                osc.connect(gain);
+                gain.connect(_audioContext.destination);
+                osc.start(start);
+                osc.stop(start + p.duration);
+            }
+        };
 
-            // Tone 1
-            const osc1 = _audioContext.createOscillator();
-            const gain1 = _audioContext.createGain();
-            osc1.type = 'sawtooth';
-            osc1.frequency.setValueAtTime(freq1, t);
-            osc1.frequency.linearRampToValueAtTime(freq2, t + beepDuration);
-            gain1.gain.setValueAtTime(0.2, t);
-            gain1.gain.exponentialRampToValueAtTime(0.01, t + beepDuration);
-            osc1.connect(gain1);
-            gain1.connect(_audioContext.destination);
-            osc1.start(t);
-            osc1.stop(t + beepDuration);
-
-            // Tone 2
-            const osc2 = _audioContext.createOscillator();
-            const gain2 = _audioContext.createGain();
-            osc2.type = 'sawtooth';
-            osc2.frequency.setValueAtTime(freq2, t + beepDuration);
-            osc2.frequency.linearRampToValueAtTime(freq1, t + beepDuration * 2);
-            gain2.gain.setValueAtTime(0.2, t + beepDuration);
-            gain2.gain.exponentialRampToValueAtTime(0.01, t + beepDuration * 2);
-            osc2.connect(gain2);
-            gain2.connect(_audioContext.destination);
-            osc2.start(t + beepDuration);
-            osc2.stop(t + beepDuration * 2);
-        }, 1000);
-
-        console.log('✅ [Alarm] Fallback siren started');
+        playCycle();
+        window._salinkBeepInterval = setInterval(playCycle, p.cycle * 1000);
+        console.log('✅ [Fallback] Beep started for:', type);
     } catch (e) {
-        console.error('❌ [Alarm] Fallback gagal:', e);
+        console.error('❌ [Fallback] Beep gagal:', e);
     }
 }
 
 function stopEmergencyAlarm() {
     console.log('🔇 [Alarm] Stopping...');
-
     if (window._salinkAlarmAudioRef) {
         try {
             window._salinkAlarmAudioRef.pause();
@@ -1806,26 +1795,30 @@ function stopEmergencyAlarm() {
         } catch(e) {}
         window._salinkAlarmAudioRef = null;
     }
-
     if (window._salinkBeepInterval) {
         clearInterval(window._salinkBeepInterval);
         window._salinkBeepInterval = null;
     }
-
     if (window._salinkVibrateInterval) {
         clearInterval(window._salinkVibrateInterval);
         window._salinkVibrateInterval = null;
     }
     if (navigator.vibrate) navigator.vibrate(0);
-
     window._salinkActiveAlarm = null;
     console.log('✅ [Alarm] Stopped');
 }
 
+// ⭐ v10.5: Highlight grid button
 function highlightEmergencyButton(type, active) {
-    const btnMap = { 'fire': 'fireBtn', 'medical': 'medicalBtn', 'crime': 'securityBtn', 'disaster': 'disasterBtn' };
+    const btnMap = {
+        'fire': 'fireBtn',
+        'medical': 'medicalBtn',
+        'crime': 'securityBtn',
+        'disaster': 'disasterBtn'
+    };
     const btn = document.getElementById(btnMap[type]);
     if (!btn) return;
+
     if (active) {
         btn.classList.add('has-notification', 'grid-alarm-active');
         const st = btn.querySelector('.play-status');
@@ -1869,6 +1862,7 @@ function showFullScreenAlarm(em) {
     }
 }
 function dismissFullScreenAlarm(userAction) {
+    fullScreenAlarmActive = false;
     if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency && typeof SalinkEmergency.dismissAlarm === 'function') {
         SalinkEmergency.dismissAlarm(userAction);
         return;
@@ -2135,7 +2129,7 @@ function showFloatingEmergency(em) {
 }
 
 // ====================================================================
-// 11. TRIGGER EMERGENCY
+// 11. TRIGGER EMERGENCY FROM NOTIFICATION
 // ====================================================================
 function triggerEmergencyFromNotification(notif) {
     if (isDismissed(notif.id)) return;
@@ -2244,7 +2238,7 @@ async function ambilLokasiSaya() {
 }
 
 // ====================================================================
-// 13. GOOGLE DRIVE
+// 13. GOOGLE DRIVE MODULE
 // ====================================================================
 function initGoogleDrive() {
     return new Promise((resolve, reject) => {
@@ -2491,6 +2485,21 @@ try {
     syncChannel = new BroadcastChannel('salink_sync');
     syncChannel.onmessage = (event) => handleSyncMessage(event.data);
 } catch(e) {}
+
+// ⭐ v10.5: BroadcastChannel untuk alarm
+try {
+    window._salinkAlarmChannel = new BroadcastChannel('salink_alarm_channel');
+    window._salinkAlarmChannel.onmessage = (event) => {
+        const data = event.data;
+        if (data && data.type === 'new_emergency' && data.emergency) {
+            console.log('📡 [BroadcastChannel] Emergency baru:', data.emergency.type);
+            triggerEmergencyAutoAlarm(data.emergency);
+        }
+    };
+} catch(e) {
+    console.warn('⚠️ [BroadcastChannel] Tidak didukung:', e.message);
+}
+
 function handleSyncMessage(data) {
     if (!data || !data.type) return;
     showSyncIndicator();
@@ -2498,8 +2507,13 @@ function handleSyncMessage(data) {
         case 'delete_post': case 'delete_emergency': case 'delete_all':
         case 'new_post': case 'new_emergency':
             posts = loadPostsFromStorage();
-            renderPosts(); renderHologram(); updateEmergencyBadges();
-            updateNotifBadge(); updateAllCharts(); updateStatsCards();
+            renderPosts();
+            renderPostsStats();
+            renderHologram();
+            updateEmergencyBadges();
+            updateNotifBadge();
+            updateAllCharts();
+            updateStatsCards();
             break;
         case 'stats_update': updateStatsCards(); break;
     }
@@ -2534,8 +2548,39 @@ function loadPostsFromStorage() {
     return [];
 }
 
+// ⭐ v10.5: Trigger auto alarm untuk emergency baru
+function triggerEmergencyAutoAlarm(em) {
+    if (!em || !em.type) return;
+    console.log('🔊 [AutoAlarm] Triggering for:', em.type, 'ID:', em.id);
+
+    if (typeof renderHologram === 'function') renderHologram();
+    if (typeof updateEmergencyBadges === 'function') updateEmergencyBadges();
+    if (typeof updateNotifBadge === 'function') updateNotifBadge();
+
+    if (isStandbyMode()) {
+        console.log('📱 [AutoAlarm] Device standby — full screen alarm');
+        if (typeof showFullScreenAlarm === 'function') showFullScreenAlarm(em);
+        return;
+    }
+
+    window._salinkAllowAutoTrigger = true;
+
+    if (window._salinkActiveAlarm) {
+        const oldType = window._salinkActiveAlarm.type;
+        if (typeof stopEmergencyAlarm === 'function') stopEmergencyAlarm();
+        if (typeof highlightEmergencyButton === 'function') highlightEmergencyButton(oldType, false);
+    }
+
+    if (typeof playEmergencyAlarmLoop === 'function') playEmergencyAlarmLoop(em.type);
+    if (typeof highlightEmergencyButton === 'function') highlightEmergencyButton(em.type, true);
+    if (typeof showFloatingEmergency === 'function') showFloatingEmergency(em);
+
+    console.log('✅ [AutoAlarm] Alarm triggered for:', em.type);
+}
+window.triggerEmergencyAutoAlarm = triggerEmergencyAutoAlarm;
+
 // ====================================================================
-// 16. MEDIA HELPERS
+// 16. HELPERS: safeSavePosts + Media
 // ====================================================================
 function safeSavePosts(postsArray) {
     try {
@@ -2680,8 +2725,13 @@ async function confirmDeleteNow() {
         } catch(e) {}
         broadcastSync(type === 'post' ? 'delete_post' : 'delete_emergency', { id: id });
         posts = loadPostsFromStorage();
-        renderPosts(); renderHologram(); updateEmergencyBadges();
-        updateNotifBadge(); updateAllCharts(); updateStatsCards();
+        renderPosts();
+        renderPostsStats();
+        renderHologram();
+        updateEmergencyBadges();
+        updateNotifBadge();
+        updateAllCharts();
+        updateStatsCards();
         showToast('✅ Dihapus', 'Data berhasil dihapus', 'fa-check-circle');
         playRegularSound();
     } catch(e) {
@@ -2691,7 +2741,7 @@ async function confirmDeleteNow() {
 }
 
 // ====================================================================
-// 18. STATS
+// 18. CALCULATE STATS
 // ====================================================================
 function calculateRealStatistics() {
     const allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
@@ -2723,6 +2773,9 @@ function calculateRealStatistics() {
     };
 }
 
+// ====================================================================
+// 19. UPDATE STATS CARDS
+// ====================================================================
 function updateStatsCards() {
     const allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
     const now = Date.now();
@@ -2765,7 +2818,7 @@ function updateStatsCards() {
 }
 
 // ====================================================================
-// 19-20. RENDER HOLOGRAM
+// 20. RENDER HOLOGRAM
 // ====================================================================
 function renderHologram() {
     const list = document.getElementById('hologramList');
@@ -2927,7 +2980,7 @@ function buildHologramPagination(totalSlides) {
 }
 
 // ====================================================================
-// 21-22. RENDER POSTS
+// 21. RENDER POSTS
 // ====================================================================
 function renderPosts() {
     const feed = document.getElementById('postFeed');
@@ -3020,30 +3073,50 @@ function renderPosts() {
     renderPostsStats();
 }
 
+// ====================================================================
+// 22. RENDER POSTS STATS (FIXED v10.5)
+// ====================================================================
 function renderPostsStats() {
     const container = document.getElementById('postsList');
-    if (!container) return;
+    const countEl = document.getElementById('postsCount');
+    if (!container) {
+        console.warn('⚠️ [PostsStats] #postsList tidak ditemukan');
+        return;
+    }
+
     const uniquePosts = [];
     const seenIds = new Set();
     posts.forEach(p => {
-        if (p && p.id && !seenIds.has(p.id)) { seenIds.add(p.id); uniquePosts.push(p); }
+        if (p && p.id && !seenIds.has(p.id)) {
+            seenIds.add(p.id);
+            uniquePosts.push(p);
+        }
     });
-    const sorted = uniquePosts.sort((a, b) => b.timestamp - a.timestamp);
-    const countEl = document.getElementById('postsCount');
+
+    const sorted = uniquePosts.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    console.log('📊 [PostsStats] Rendering', sorted.length, 'posts');
+
     if (countEl) countEl.textContent = sorted.length;
+
     if (sorted.length === 0) {
-        container.innerHTML = '<div style="text-align:center;padding:12px;color:rgba(255,255,255,0.6);font-size:0.65rem;"><i class="fas fa-inbox" style="display:block;font-size:1.2rem;margin-bottom:4px;opacity:0.3;"></i><p>Belum ada postingan</p></div>';
+        container.innerHTML = '<div style="text-align:center;padding:16px;color:rgba(255,255,255,0.6);font-size:0.65rem;"><i class="fas fa-inbox" style="display:block;font-size:1.5rem;margin-bottom:6px;opacity:0.3;"></i><p>Belum ada postingan</p></div>';
         return;
     }
+
     container.innerHTML = sorted.slice(0, 15).map(p => {
         let isExpired = false;
         if (p.isSpecial && p.specialType) {
             const expiresAt = p.timestamp + EMERGENCY_DURATION;
             isExpired = expiresAt < Date.now();
         }
-        if (p.isSpecial && p.specialType) return renderFullPostCard(p, isExpired);
+        if (p.isSpecial && p.specialType) {
+            return renderFullPostCard(p, isExpired);
+        }
         return renderCompactPostCard(p);
     }).join('');
+
+    console.log('✅ [PostsStats] Rendered successfully');
 }
 
 function renderCompactPostCard(p) {
@@ -3217,15 +3290,21 @@ function sharePost(postId) {
 }
 
 // ====================================================================
-// 23. CREATE POST
+// 23. CREATE POST (v10.5 FIXED)
 // ====================================================================
 async function createPost(text, mediaFile, isSpecial, specialData) {
-    if (window._salinkPostingInProgress) { showToast('⏳ Tunggu', 'Postingan sedang diproses...', 'fa-spinner'); return; }
+    if (window._salinkPostingInProgress) {
+        showToast('⏳ Tunggu', 'Postingan sedang diproses...', 'fa-spinner');
+        return;
+    }
     if (isPreviewMode) { showPreviewOverlay(); return; }
     if (!currentUser) { redirectToLogin(); return; }
     window._salinkPostingInProgress = true;
     const submitBtn = document.getElementById('postSubmit');
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...'; }
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...';
+    }
     const POSTING_TIMEOUT = 60000;
     const timeoutId = setTimeout(() => {
         window._salinkPostingInProgress = false;
@@ -3266,7 +3345,10 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
                 mediaIdLocal = 'media-' + uniqueId;
                 try {
                     let mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}');
-                    mediaStore[mediaIdLocal] = { type: mediaType, data: mediaDataLocal, timestamp: Date.now(), size: mediaDataLocal.length };
+                    mediaStore[mediaIdLocal] = {
+                        type: mediaType, data: mediaDataLocal,
+                        timestamp: Date.now(), size: mediaDataLocal.length
+                    };
                     localStorage.setItem('salink_post_media', JSON.stringify(mediaStore));
                 } catch(e) {}
             }
@@ -3297,7 +3379,9 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
         posts.unshift(post);
         safeSavePosts(posts);
         renderPosts();
+        renderPostsStats();
         apiSavePost(post).then(ok => {});
+
         if (isSpecial && specialData) {
             const emPayload = {
                 id: emergencyId, type: specialData.type,
@@ -3322,41 +3406,46 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
                 read: 'FALSE', soundKey: specialData.type
             };
             apiCall('save_notification', notifPayload);
+
+            // ⭐ v10.5: Trigger visual + NADA DERING EMERGENCY (bukan regular sound)
             triggerLocalEmergencyVisual(emergencyId, specialData.type, currentUser.fullName, specialData.location, text);
 
-            // Broadcast ke tab/device lain
+            // ⭐ v10.5: Broadcast ke tab/device lain
+            const emergencyPayload = {
+                id: emergencyId,
+                type: specialData.type,
+                sender: currentUser.fullName,
+                senderUsername: currentUser.username,
+                location: specialData.location,
+                address: specialData.address,
+                text: text,
+                timestamp: Date.now(),
+                expiresAt: Date.now() + EMERGENCY_DURATION,
+                coords: specialData.coords,
+                mapsURL: specialData.mapsURL,
+                country: currentUser.country || 'Indonesia'
+            };
             try {
                 if (window._salinkAlarmChannel) {
                     window._salinkAlarmChannel.postMessage({
                         type: 'new_emergency',
-                        emergency: {
-                            id: emergencyId, type: specialData.type,
-                            sender: currentUser.fullName, senderUsername: currentUser.username,
-                            location: specialData.location, address: specialData.address,
-                            text: text, timestamp: Date.now(),
-                            expiresAt: Date.now() + EMERGENCY_DURATION,
-                            coords: specialData.coords, mapsURL: specialData.mapsURL,
-                            country: currentUser.country || 'Indonesia'
-                        }
+                        emergency: emergencyPayload
                     });
                 }
                 localStorage.setItem('salink_emergencies_new', JSON.stringify({
-                    emergency: {
-                        id: emergencyId, type: specialData.type,
-                        sender: currentUser.fullName, senderUsername: currentUser.username,
-                        location: specialData.location, text: text,
-                        timestamp: Date.now(), expiresAt: Date.now() + EMERGENCY_DURATION,
-                        coords: specialData.coords, mapsURL: specialData.mapsURL,
-                        country: currentUser.country || 'Indonesia'
-                    }
+                    emergency: emergencyPayload
                 }));
                 setTimeout(() => localStorage.removeItem('salink_emergencies_new'), 500);
-            } catch(e) {}
+            } catch(e) {
+                console.warn('⚠️ [Broadcast] Gagal:', e.message);
+            }
         } else {
             playRegularSound();
             showToast('📝', 'Postingan baru berhasil', 'fa-check-circle');
         }
         broadcastSync('new_post', { id: postId });
+
+        // Reset form
         const pi = document.getElementById('postInput'); if (pi) pi.value = '';
         const pst = document.getElementById('postSpecialText'); if (pst) pst.value = '';
         const mu = document.getElementById('mediaUpload'); if (mu) mu.value = '';
@@ -3385,17 +3474,19 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
 }
 
 // ====================================================================
-// 24. TRIGGER LOCAL EMERGENCY VISUAL
+// 24. TRIGGER LOCAL EMERGENCY VISUAL (v10.5 FIXED)
 // ====================================================================
 function triggerLocalEmergencyVisual(emergencyId, type, sender, location, text) {
     const em = {
         id: emergencyId, type: type, sender: sender,
         senderUsername: currentUser ? currentUser.username : 'user',
-        location: location || 'Lokasi tidak diketahui', address: location || '',
+        location: location || 'Lokasi tidak diketahui',
+        address: location || '',
         text: text || '',
         mapsURL: currentGpsData ? currentGpsData.mapsURL : '',
         coords: currentGpsData ? (currentGpsData.lat + ', ' + currentGpsData.lng) : '',
-        timestamp: Date.now(), expiresAt: Date.now() + EMERGENCY_DURATION,
+        timestamp: Date.now(),
+        expiresAt: Date.now() + EMERGENCY_DURATION,
         country: currentUser ? (currentUser.country || 'Indonesia') : 'Indonesia'
     };
     let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
@@ -3409,7 +3500,11 @@ function triggerLocalEmergencyVisual(emergencyId, type, sender, location, text) 
     readNotifs[em.id] = true;
     saveReadNotifs();
     dismissEmergency(em.id);
-    playRegularSound();
+
+    // ⭐ v10.5: Play NADA DERING EMERGENCY (bukan regular sound)
+    console.log('🔊 [Emergency] Playing emergency ringtone:', type);
+    playEmergencyAlarmLoop(type);
+
     highlightEmergencyButton(type, true);
     showFloatingNotification('emergency',
         EMERGENCY_ICONS[type] + ' ' + EMERGENCY_LABELS[type],
@@ -3854,11 +3949,6 @@ function updateMap() {
         }
     }
 }
-function setupChartNavigation() {
-    document.querySelectorAll('.chart-nav-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) { e.preventDefault(); switchChart(this.dataset.chart); });
-    });
-}
 
 // ====================================================================
 // 28. HANDLE EMERGENCY CLICK (FIXED v10.5)
@@ -3866,28 +3956,35 @@ function setupChartNavigation() {
 function handleEmergencyClick(e) {
     e.preventDefault();
     e.stopPropagation();
+
     const btn = e.currentTarget;
     const type = btn.dataset.type;
     if (!type) return;
 
     console.log('🔥 [Grid] Button clicked:', type);
 
-    if (isPreviewMode) { showPreviewOverlay(); return; }
-    if (!currentUser) { redirectToLogin(); return; }
+    if (isPreviewMode) {
+        if (typeof showPreviewOverlay === 'function') showPreviewOverlay();
+        return;
+    }
+    if (!currentUser) {
+        if (typeof redirectToLogin === 'function') redirectToLogin();
+        return;
+    }
 
     unlockAudio();
 
-    // Stop kalau alarm ini sedang aktif
+    // Stop alarm kalau type ini aktif
     if (window._salinkActiveAlarm && window._salinkActiveAlarm.type === type) {
         console.log('🔇 [Grid] Stop alarm:', type);
         stopEmergencyAlarm();
         highlightEmergencyButton(type, false);
-        showToast('🔇 Alarm Dimatikan', EMERGENCY_LABELS[type] + ' berhenti', 'fa-volume-mute');
+        showToast('🔇 Alarm Dimatikan', (EMERGENCY_LABELS[type] || type) + ' berhenti', 'fa-volume-mute');
         if (navigator.vibrate) navigator.vibrate(100);
         return;
     }
 
-    // Stop alarm lain kalau ada
+    // Stop alarm lain yang aktif dulu
     if (window._salinkActiveAlarm) {
         const oldType = window._salinkActiveAlarm.type;
         console.log('🔇 [Grid] Stop alarm sebelumnya:', oldType);
@@ -3895,12 +3992,26 @@ function handleEmergencyClick(e) {
         highlightEmergencyButton(oldType, false);
     }
 
-    // Play alarm (manual test mode kalau tidak ada emergency aktif)
+    // Cari emergency aktif
+    const activeEms = getActiveEmergencies().filter(em => em.type === type);
+    console.log('📊 [Grid] Active emergencies for', type, ':', activeEms.length);
+
+    // ⭐ MANUAL TEST MODE: Tetap bunyi walau tidak ada emergency
+    if (activeEms.length === 0) {
+        console.log('⚠️ [Grid] Manual test mode');
+        playEmergencyAlarmLoop(type);
+        highlightEmergencyButton(type, true);
+        showToast('🔊 Test Alarm', (EMERGENCY_LABELS[type] || type) + ' — Tap lagi untuk stop', 'fa-volume-up');
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        return;
+    }
+
+    // Ada emergency aktif
     console.log('🔊 [Grid] Starting alarm for:', type);
     window._salinkAllowAutoTrigger = true;
     playEmergencyAlarmLoop(type);
     highlightEmergencyButton(type, true);
-    showToast('🔊 Alarm Berbunyi', EMERGENCY_LABELS[type] + ' — Tap lagi untuk stop', 'fa-volume-up');
+    showToast('🔊 Alarm Berbunyi', (EMERGENCY_LABELS[type] || type) + ' — Tap lagi untuk stop', 'fa-volume-up');
 
     if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency &&
         typeof SalinkEmergency.handleGridButtonTap === 'function') {
@@ -3908,8 +4019,14 @@ function handleEmergencyClick(e) {
     }
 }
 
+function setupChartNavigation() {
+    document.querySelectorAll('.chart-nav-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) { e.preventDefault(); switchChart(this.dataset.chart); });
+    });
+}
+
 // ====================================================================
-// 29. USER & PREVIEW
+// 29. USER & PREVIEW MODE
 // ====================================================================
 function loadUser() {
     const s = localStorage.getItem('salink_user');
@@ -3978,6 +4095,10 @@ function setupLoginGuard() {
         const target = e.target.closest('[data-action]');
         if (!target) return;
         const action = target.dataset.action;
+
+        // ⭐ v10.5: Skip untuk emergency-btn — biarkan handleEmergencyClick yang handle
+        if (target.classList.contains('emergency-btn')) return;
+
         if (action === 'profile') {
             if (isPreviewMode) { e.preventDefault(); e.stopPropagation(); showPreviewOverlay(); return; }
             if (target.id === 'userBtn' || target.id === 'postProfilePic') {
@@ -3999,7 +4120,7 @@ function setupLoginGuard() {
 }
 
 // ====================================================================
-// 30. LOAD DATA
+// 30. LOAD DATA (v10.5 FIXED - renderPostsStats dipanggil)
 // ====================================================================
 async function loadData() {
     let localPosts = [];
@@ -4010,7 +4131,9 @@ async function loadData() {
     try { localNotifs = JSON.parse(localStorage.getItem('salink_notifications') || '[]'); } catch(e) { localNotifs = []; }
     let localUsers = [];
     try { localUsers = JSON.parse(localStorage.getItem('salink_users') || '[]'); } catch(e) { localUsers = []; }
-    posts = localPosts.filter(p => p && p.id && p.userId && p.userFullName).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    posts = localPosts
+        .filter(p => p && p.id && p.userId && p.userFullName)
+        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     const now = Date.now();
     const validLocalEms = localEms.filter(e => {
         if (!e || !e.id) return false;
@@ -4021,13 +4144,17 @@ async function loadData() {
     });
     notifications = localNotifs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     allUsers = localUsers;
+
+    // ⭐ v10.5: Render + Stats
     renderPosts();
+    renderPostsStats();
     renderHologram();
     updateEmergencyBadges();
     updateNotifBadge();
     updateInviteBadge();
     updateStatsCards();
     if (chartInstances.pie || chartInstances.bar) updateAllCharts();
+
     try {
         const results = await Promise.allSettled([
             apiGetPosts(), apiGetEmergencies(), apiGetNotifications(), apiGetStatistics(), apiGetUsers()
@@ -4041,6 +4168,7 @@ async function loadData() {
                 ((p.text && p.text.trim() !== '') || (p.mediaData && p.mediaData !== '') || p.mediaId || p.gdriveId))
             .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         safeSavePosts(posts);
+
         let apiEms = (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) ? results[1].value : [];
         apiEms = apiEms.map(em => {
             let ts = em.timestamp;
@@ -4075,12 +4203,14 @@ async function loadData() {
                 localStorage.setItem('salink_emergencies', JSON.stringify(mergedEms));
             }
         } catch(e) {}
+
         let apiNotifs = (results[2].status === 'fulfilled' && Array.isArray(results[2].value)) ? results[2].value : [];
         const notifMap = new Map();
         notifications.forEach(n => { if (n && n.id) notifMap.set(n.id, n); });
         apiNotifs.forEach(n => { if (n && n.id) notifMap.set(n.id, n); });
         notifications = Array.from(notifMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         try { localStorage.setItem('salink_notifications', JSON.stringify(notifications)); } catch(e) {}
+
         if (results[3].status === 'fulfilled' && results[3].value) statistics = results[3].value;
         let apiUsers = (results[4].status === 'fulfilled' && Array.isArray(results[4].value)) ? results[4].value : [];
         const userMap = new Map();
@@ -4088,7 +4218,10 @@ async function loadData() {
         apiUsers.forEach(u => { if (u && u.username) userMap.set(u.username, u); });
         allUsers = Array.from(userMap.values());
         try { if (allUsers.length > 0) localStorage.setItem('salink_users', JSON.stringify(allUsers)); } catch(e) {}
+
+        // ⭐ v10.5: Render + Stats setelah API
         renderPosts();
+        renderPostsStats();
         renderHologram();
         updateEmergencyBadges();
         updateNotifBadge();
@@ -4134,7 +4267,7 @@ function toggleTheme() {
 }
 
 // ====================================================================
-// 32. MODAL
+// 32. SIDEBAR & MODAL
 // ====================================================================
 function openProfileUser(username) {
     if (!username) return;
@@ -4351,7 +4484,7 @@ function setupSearchInput() {
 }
 
 // ====================================================================
-// 34. URL PARAMS + PENDING EMERGENCY
+// 34. URL PARAMS + HANDLE PENDING EMERGENCY
 // ====================================================================
 function checkURLParams() {
     const params = new URLSearchParams(window.location.search);
@@ -4446,7 +4579,7 @@ function initBottomNav() {
 }
 
 // ====================================================================
-// 36. POST INPUT
+// 36. SETUP POST INPUT
 // ====================================================================
 function setupPostInput() {
     const select = document.getElementById('postTypeSelect');
@@ -4825,7 +4958,7 @@ function initHeroCarousel() {
 }
 
 // ====================================================================
-// 41. HOLOGRAM CAROUSEL
+// 41. HOLOGRAM CAROUSEL AUTO-SLIDE
 // ====================================================================
 let hologramAutoTimer = null;
 window.hologramPaused = false;
@@ -4907,7 +5040,11 @@ function initHologramSwipe() {
         }
         setTimeout(() => { window.hologramPaused = false; }, 5000);
     }, { passive: true });
-    hologramCarousel.addEventListener('mousedown', (e) => { hStartX = e.clientX; hDragging = true; window.hologramPaused = true; });
+    hologramCarousel.addEventListener('mousedown', (e) => {
+        hStartX = e.clientX;
+        hDragging = true;
+        window.hologramPaused = true;
+    });
     hologramCarousel.addEventListener('mouseup', (e) => {
         if (!hDragging) return;
         hDragging = false;
@@ -4993,7 +5130,7 @@ function initFabModal() {
 }
 
 // ====================================================================
-// 43. HEADER NOTIF + RIPPLE + STORAGE
+// 43. HEADER NOTIF + RIPPLE + STORAGE EVENT
 // ====================================================================
 function initHeaderNotif() {
     const headerNotifBtn = document.getElementById('headerNotifBtn');
@@ -5031,78 +5168,32 @@ function initStorageEvents() {
         if (e.key === 'salink_theme') loadTheme();
         if (e.key === 'salink_posts' || e.key === 'salink_emergencies') {
             posts = loadPostsFromStorage();
-            renderPosts(); renderHologram(); updateEmergencyBadges();
-            updateNotifBadge(); updateAllCharts(); updateStatsCards();
+            renderPosts();
+            renderPostsStats();
+            renderHologram();
+            updateEmergencyBadges();
+            updateNotifBadge();
+            updateAllCharts();
+            updateStatsCards();
+        }
+        // ⭐ v10.5: Storage event untuk emergency baru (fallback BroadcastChannel)
+        if (e.key === 'salink_emergencies_new' && e.newValue) {
+            try {
+                const data = JSON.parse(e.newValue);
+                if (data && data.emergency) {
+                    console.log('📡 [Storage Event] Emergency baru:', data.emergency.type);
+                    setTimeout(() => triggerEmergencyAutoAlarm(data.emergency), 100);
+                }
+            } catch(err) {}
         }
     });
 }
 
 // ====================================================================
-// 44. AUTO ALARM + BROADCAST CHANNEL
-// ====================================================================
-function triggerEmergencyAutoAlarm(em) {
-    if (!em || !em.type) return;
-    console.log('🔊 [AutoAlarm] Triggering for:', em.type, 'ID:', em.id);
-
-    if (typeof renderHologram === 'function') renderHologram();
-    if (typeof updateEmergencyBadges === 'function') updateEmergencyBadges();
-    if (typeof updateNotifBadge === 'function') updateNotifBadge();
-
-    if (isStandbyMode()) {
-        console.log('📱 [AutoAlarm] Device standby — full screen alarm');
-        if (typeof showFullScreenAlarm === 'function') showFullScreenAlarm(em);
-        return;
-    }
-
-    window._salinkAllowAutoTrigger = true;
-
-    if (window._salinkActiveAlarm) {
-        const oldType = window._salinkActiveAlarm.type;
-        if (typeof stopEmergencyAlarm === 'function') stopEmergencyAlarm();
-        if (typeof highlightEmergencyButton === 'function') highlightEmergencyButton(oldType, false);
-    }
-
-    if (typeof playEmergencyAlarmLoop === 'function') playEmergencyAlarmLoop(em.type);
-    if (typeof highlightEmergencyButton === 'function') highlightEmergencyButton(em.type, true);
-    if (typeof showFloatingEmergency === 'function') showFloatingEmergency(em);
-
-    console.log('✅ [AutoAlarm] Alarm triggered for:', em.type);
-}
-window.triggerEmergencyAutoAlarm = triggerEmergencyAutoAlarm;
-
-// BroadcastChannel — sync antar tab
-try {
-    const alarmChannel = new BroadcastChannel('salink_alarm_channel');
-    alarmChannel.onmessage = (event) => {
-        const data = event.data;
-        if (data && data.type === 'new_emergency' && data.emergency) {
-            console.log('📡 [BroadcastChannel] Emergency baru:', data.emergency.type);
-            triggerEmergencyAutoAlarm(data.emergency);
-        }
-    };
-    window._salinkAlarmChannel = alarmChannel;
-} catch(e) {
-    console.warn('⚠️ [BroadcastChannel] Tidak didukung:', e.message);
-}
-
-// Storage event fallback
-window.addEventListener('storage', (e) => {
-    if (e.key === 'salink_emergencies_new' && e.newValue) {
-        try {
-            const data = JSON.parse(e.newValue);
-            if (data && data.emergency) {
-                console.log('📡 [Storage Event] Emergency baru:', data.emergency.type);
-                setTimeout(() => triggerEmergencyAutoAlarm(data.emergency), 100);
-            }
-        } catch(err) {}
-    }
-});
-
-// ====================================================================
-// 45. INIT
+// 44. INIT
 // ====================================================================
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 SALINK Dashboard v10.5 — Emergency Alarm System (FIXED)');
+    console.log('🚀 SALINK Dashboard v10.5 — Emergency Alarm System FIXED');
     setupIdleDetection();
     setupVisibilityDetection();
     setupPWA();
@@ -5172,7 +5263,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadData();
     setTimeout(() => { initAllCharts(); }, 800);
 
-    // Auto-poll emergency + AUTO PLAY ALARM
+    // Auto-poll emergency
     if (emergencyPollTimer) clearInterval(emergencyPollTimer);
     emergencyPollTimer = setInterval(async () => {
         if (fullScreenAlarmActive) return;
@@ -5228,7 +5319,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ====================================================================
-// 46. EXPOSE GLOBAL
+// 45. EXPOSE GLOBAL
 // ====================================================================
 window.openProfileUser = openProfileUser;
 window.requestDelete = requestDelete;
@@ -5268,6 +5359,7 @@ window.uploadToGDrive = uploadToGDrive;
 window.deleteFromGDrive = deleteFromGDrive;
 window.handleImageError = handleImageError;
 window.renderHologram = renderHologram;
+window.renderPostsStats = renderPostsStats;
 window.getAllNotifications = getAllNotifications;
 window.renderNotifList = renderNotifList;
 window.setupNotifFilters = setupNotifFilters;
@@ -5284,11 +5376,14 @@ window.handlePendingEmergencyFromURL = handlePendingEmergencyFromURL;
 window.playEmergencyAlarmLoop = playEmergencyAlarmLoop;
 window.stopEmergencyAlarm = stopEmergencyAlarm;
 window.highlightEmergencyButton = highlightEmergencyButton;
+window.playFallbackBeep = playFallbackBeep;
+window.triggerEmergencyAutoAlarm = triggerEmergencyAutoAlarm;
 window.EMERGENCY_SOUND_PLAYLIST = EMERGENCY_SOUND_PLAYLIST;
+window.EMERGENCY_SOUND_AVAILABLE = EMERGENCY_SOUND_AVAILABLE;
 
 console.log('✅ SALINK Dashboard v10.5 Script Loaded — Emergency Alarm System Active');
     </script>
-
+    
     <script>
     (function() {
         'use strict';
