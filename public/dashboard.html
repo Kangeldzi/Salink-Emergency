@@ -6824,18 +6824,22 @@ function setupSearchInput() {
 }
 
 // ====================================================================
-// 34. URL PARAMS & VISIBILITY
+// 34a. URL PARAMS & VISIBILITY
 // ====================================================================
+
 function checkURLParams() {
     const params = new URLSearchParams(window.location.search);
     const userParam = params.get('user');
     const logout = params.get('logout');
+    const emergencyParam = params.get('emergency'); // ⭐ BARU: ?emergency=TYPE
+
     if (logout === '1') {
         localStorage.removeItem('salink_user');
         window.history.replaceState({}, document.title, DASHBOARD_URL);
         location.reload();
         return;
     }
+
     if (userParam) {
         try {
             const userData = JSON.parse(decodeURIComponent(userParam));
@@ -6845,6 +6849,101 @@ function checkURLParams() {
                 isPreviewMode = false;
             }
         } catch(e) {}
+    }
+
+    // ⭐ BARU: Handle ?emergency=TYPE dari FAB halaman lain
+    if (emergencyParam) {
+        const validTypes = ['fire', 'medical', 'crime', 'disaster'];
+        if (validTypes.indexOf(emergencyParam) !== -1) {
+            console.log('🚨 [URL Param] Emergency type detected:', emergencyParam);
+            // Simpan ke window untuk diproses setelah DOM ready
+            window._salinkPendingEmergency = emergencyParam;
+            // Bersihkan URL agar tidak terus trigger saat refresh
+            try {
+                window.history.replaceState({}, document.title, DASHBOARD_URL);
+            } catch(e) {}
+        } else {
+            console.warn('⚠️ [URL Param] Emergency type tidak valid:', emergencyParam);
+            try {
+                window.history.replaceState({}, document.title, DASHBOARD_URL);
+            } catch(e) {}
+        }
+    }
+}
+// ====================================================================
+// 34b. HANDLE PENDING EMERGENCY DARI URL PARAM
+// ====================================================================
+function handlePendingEmergencyFromURL() {
+    const type = window._salinkPendingEmergency;
+    if (!type) return;
+
+    // Clear flag supaya tidak double-trigger
+    window._salinkPendingEmergency = null;
+
+    console.log('🚨 [Emergency URL] Processing:', type);
+
+    // Cek login — kalau belum login, tampilkan preview overlay
+    if (isPreviewMode || !currentUser) {
+        showToast('🔒 Login Diperlukan', 'Silakan login untuk melaporkan darurat', 'fa-lock');
+        setTimeout(() => {
+            if (typeof showPreviewOverlay === 'function') showPreviewOverlay();
+        }, 500);
+        return;
+    }
+
+    // 1️⃣ Set dropdown "Pilih Jenis Postingan"
+    const select = document.getElementById('postTypeSelect');
+    if (!select) {
+        console.warn('⚠️ [Emergency URL] #postTypeSelect tidak ditemukan');
+        return;
+    }
+
+    select.value = type;
+
+    // 2️⃣ Trigger event 'change' → otomatis tampilkan form khusus
+    //    (handler di setupPostInput() akan handle visibility)
+    const evt = new Event('change', { bubbles: true });
+    select.dispatchEvent(evt);
+
+    console.log('✅ [Emergency URL] Dropdown set ke:', type);
+
+    // 3️⃣ Isi otomatis "Dilaporkan Oleh" dengan nama user
+    const reportedBy = document.getElementById('postReportedBy');
+    if (reportedBy && currentUser) {
+        reportedBy.value = currentUser.fullName || currentUser.username || '';
+    }
+
+    // 4️⃣ Auto-scroll ke section "Bagikan Informasi Penting"
+    const postSection = document.getElementById('postSection');
+    if (postSection) {
+        setTimeout(() => {
+            postSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 400);
+    }
+
+    // 5️⃣ Toast konfirmasi dengan label jenis emergency
+    const typeLabels = {
+        fire: '🔥 Kebakaran',
+        medical: '🚑 Medis & Kematian',
+        crime: '🚓 Kriminal',
+        disaster: '🌪️ Bencana Alam'
+    };
+    const label = typeLabels[type] || type;
+
+    setTimeout(() => {
+        showToast('🚨 Mode Darurat', label + ' dipilih. Isi pesan & ambil lokasi.', 'fa-exclamation-triangle');
+    }, 700);
+
+    // 6️⃣ Vibrate untuk feedback haptic (mobile)
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+
+    // 7️⃣ Highlight visual pada form (opsional — efek pulse)
+    if (postSection) {
+        postSection.style.transition = 'box-shadow 0.5s ease';
+        postSection.style.boxShadow = '0 0 0 3px rgba(230, 0, 18, 0.5)';
+        setTimeout(() => {
+            postSection.style.boxShadow = '';
+        }, 2500);
     }
 }
 function setupVisibilityDetection() {
@@ -7547,6 +7646,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadDismissed();
     loadUser();
     applyPreviewMode();
+    document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 SALINK Dashboard v10.0 — Telkomsel Redesign');
+    setupIdleDetection();
+    setupVisibilityDetection();
+    setupPWA();
+    checkURLParams();
+    loadTheme();
+    loadReadNotifs();
+    loadDismissed();
+    loadUser();
+    applyPreviewMode();
+    
+    // ⭐ BARU: Handle ?emergency=TYPE dari FAB halaman lain
+    // Delay sedikit agar setupPostInput() selesai dulu
+    setTimeout(() => {
+        handlePendingEmergencyFromURL();
+    }, 800);
+     
     updateUserUI();
     setupLoginGuard();
     const savedLat = localStorage.getItem('salink_user_lat');
@@ -7715,6 +7832,7 @@ window.buildHologramPagination = buildHologramPagination;
 window.updateProgressBar = updateProgressBar;
 window.openFabModal = openFabModal;
 window.closeFabModal = closeFabModal;
+window.handlePendingEmergencyFromURL = handlePendingEmergencyFromURL;
 
 console.log('✅ SALINK Dashboard v10.0 Script Loaded — Telkomsel Redesign');
     </script>
