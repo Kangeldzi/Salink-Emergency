@@ -18,12 +18,12 @@
 
     <style>
         /* ==================================================================
-           SALINK LOKASI-BANTUAN v10.0 — TELKOMSEL REDESIGN
+           SALINK LOKASI-BANTUAN v10.1 — TELKOMSEL REDESIGN
            ==================================================================
            Tema    : Dark Navy #0a0e1a + Telkomsel Red #e60012
            Font    : Inter (body) + Poppins (heading)
            Layout  : Mobile-first, max 430px, centered
-           Konsisten dengan dashboard.html, detail-emergency.html, laporan-saya.html
+           Fix     : Sidebar & Modal Peta Darurat — sesuai konsep user
            ================================================================== */
 
         /* ============ ROOT VARIABLES ============ */
@@ -969,7 +969,7 @@
             justify-content: center;
             padding: 16px;
         }
-        .modal-overlay.active { display: flex; animation: fadeIn 0.3s ease; }
+        .modal-overlay.active { display: flex !important; animation: fadeIn 0.3s ease; }
         .modal-content {
             background: var(--modal-bg);
             border-radius: 18px;
@@ -1309,7 +1309,7 @@
             opacity: 0;
             transition: opacity 0.3s;
         }
-        .fab-modal-overlay.active { display: flex; opacity: 1; }
+        .fab-modal-overlay.active { display: flex !important; opacity: 1; }
         .fab-modal-content {
             background: var(--modal-bg);
             border-radius: 24px;
@@ -1446,7 +1446,6 @@
         }
 
         /* ============ 🗺️ MODAL PETA DARURAT ============ */
-
         #mapModal .modal-content {
             max-width: 430px;
             padding: 16px 14px;
@@ -1470,6 +1469,11 @@
             padding: 14px;
             text-align: center;
             margin-bottom: 10px;
+            transition: all 0.3s;
+        }
+        .map-status-card.detected {
+            border-color: rgba(16,185,129,0.4);
+            background: rgba(16,185,129,0.06);
         }
         .map-status-icon {
             font-size: 2rem;
@@ -1724,7 +1728,7 @@
             justify-content: center;
             padding: 20px;
         }
-        .preview-overlay.active { display: flex; animation: fadeIn 0.4s ease; }
+        .preview-overlay.active { display: flex !important; animation: fadeIn 0.4s ease; }
         .preview-overlay-content {
             background: var(--modal-bg);
             border-radius: 20px;
@@ -1833,7 +1837,7 @@
             color: #ffffff;
         }
         .floating-notification.active {
-            display: flex;
+            display: flex !important;
             align-items: center;
             gap: 12px;
             animation: floatingNotifIn 0.5s ease;
@@ -1993,7 +1997,6 @@
             .header-center { gap: 4px; }
             .header-left { gap: 4px; }
             .header-right { gap: 4px; }
-            .map-real-container { height: 200px; }
             .location-actions { flex-direction: column; }
             .primary-btn, .secondary-btn { width: 100%; }
         }
@@ -2007,8 +2010,6 @@
             .header-center { gap: 3px; }
             .nav-fab { width: 64px; height: 64px; }
             .nav-fab .fab-emoji { font-size: 1.7rem; }
-            .map-real-container { height: 180px; }
-            .map-emergency-btn .map-em-icon { font-size: 1.6rem; }
         }
     </style>
 </head>
@@ -2104,7 +2105,7 @@
     </header>
 
     <!-- ============================================================ -->
-    <!-- SIDEBAR HAMBURGER — TERTUTUP SEMPURNA                         -->
+    <!-- SIDEBAR HAMBURGER — SLIDE FROM LEFT                           -->
     <!-- ============================================================ -->
     <div class="sidebar-overlay-bg" id="sidebarOverlay"></div>
     <div class="sidebar" id="sidebar" role="navigation" aria-label="Menu Utama">
@@ -2138,7 +2139,7 @@
             <!-- MENU DARURAT -->
             <div class="nav-section-title">🚨 MENU DARURAT</div>
             <li class="nav-item">
-                <button type="button" class="nav-link" id="sidebarMapBtn">
+                <button type="button" class="nav-link" id="sidebarMapBtn" data-action="open-map">
                     <i class="fas fa-map-marked-alt"></i>
                     <span>Peta Darurat</span>
                 </button>
@@ -2204,9 +2205,7 @@
     <!-- ============================================================ -->
     <main class="main-content">
 
-        <!-- ======================================================== -->
-        <!-- BRAND SECTION                                             -->
-        <!-- ======================================================== -->
+        <!-- BRAND SECTION -->
         <div class="brand-section">
             <div class="brand-left">
                 <div class="brand-icon">📍</div>
@@ -2220,9 +2219,7 @@
             </button>
         </div>
 
-        <!-- ======================================================== -->
-        <!-- LOCATION PANEL                                            -->
-        <!-- ======================================================== -->
+        <!-- LOCATION PANEL -->
         <section class="location-panel">
             <div class="location-title">📍 Lokasi & Bantuan Terdekat</div>
             <div class="location-description">
@@ -2241,9 +2238,7 @@
             </div>
         </section>
 
-        <!-- ======================================================== -->
-        <!-- GPS STATUS                                                -->
-        <!-- ======================================================== -->
+        <!-- GPS STATUS -->
         <section class="gps-status" id="gpsStatus">
             <div class="gps-row">
                 <div class="gps-icon">📡</div>
@@ -2256,9 +2251,7 @@
             </div>
         </section>
 
-        <!-- ======================================================== -->
-        <!-- FILTER PANEL                                              -->
-        <!-- ======================================================== -->
+        <!-- FILTER PANEL -->
         <section class="filter-panel">
             <div class="filter-title">Cari bantuan berdasarkan jenis emergency</div>
             <div class="filter-buttons" id="filterContainer">
@@ -2270,9 +2263,7 @@
             </div>
         </section>
 
-        <!-- ======================================================== -->
-        <!-- RADIUS PANEL                                              -->
-        <!-- ======================================================== -->
+        <!-- RADIUS PANEL -->
         <section class="radius-panel">
             <div class="radius-title">📏 Jangkauan Pencarian</div>
             <div class="radius-buttons" id="radiusContainer">
@@ -2284,9 +2275,7 @@
             </div>
         </section>
 
-        <!-- ======================================================== -->
-        <!-- RESULTS                                                   -->
-        <!-- ======================================================== -->
+        <!-- RESULTS -->
         <section>
             <div class="results-header">
                 <div>
@@ -2459,7 +2448,6 @@
     <!-- 🗺️ MODAL PETA DARURAT                                        -->
     <!-- Dibuka dari Sidebar → Menu "Peta Darurat"                     -->
     <!-- ============================================================ -->
-        
     <div class="modal-overlay" id="mapModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -2564,22 +2552,30 @@
             </div>
         </div>
     </div>
+
     <!-- ============================================================ -->
     <!-- TOAST CONTAINER                                               -->
     <!-- ============================================================ -->
     <div class="toast-container" id="toastContainer"></div>
 
-      <!-- ============================================================ -->
+    <!-- ============================================================ -->
     <!-- SCRIPT UTAMA — LOKASI BANTUAN + PATCHES                       -->
     <!-- ============================================================ -->
     <script>
 /* ====================================================================
- * SALINK LOKASI-BANTUAN v10.0 — MAIN JS
+ * SALINK LOKASI-BANTUAN v10.1 — MAIN JS
  * ====================================================================
- * Struktur:
- * 1. JS ASLI v4.3 (GPS, Filter, Radius, Contacts) — DIPERTAHANKAN UTUH
- * 2. PATCH v10.0 — Modal Peta Darurat + Header + Sidebar + Search + 
- *    Notif + FAB + PWA + Theme + Ripple
+ * Structure:
+ * 1. Global Constants & State
+ * 2. Helper Functions
+ * 3. Toast, Theme, PWA, Floating Notification
+ * 4. Preview Mode
+ * 5. Sidebar
+ * 6. User Management
+ * 7. Location & Contacts (GPS, Filter, Radius)
+ * 8. Modals (Search, Notif, FAB, Map)
+ * 9. Event Listeners — DENGAN FIX UNTUK SIDEBAR MAP BUTTON
+ * 10. Init
  * ==================================================================== */
 (function() {
     'use strict';
@@ -2606,22 +2602,23 @@
     // ================================================================
     // STATE
     // ================================================================
-    let currentUser = null;
-    let isPreviewMode = true;
-    let currentTheme = 'dark';
-    let userLat = null;
-    let userLng = null;
-    let contactsData = [];
-    let currentFilter = '';
-    let currentRadius = 1.5;
-    let isSidebarOpen = false;
-    let isLoading = false;
-    let deferredPrompt = null;
-    let searchTab = 'all';
-    let searchDebounceTimer = null;
-    let floatingNotifTimeout = null;
-    let mapCurrentLat = null;
-    let mapCurrentLng = null;
+    var currentUser = null;
+    var isPreviewMode = true;
+    var currentTheme = 'dark';
+    var userLat = null;
+    var userLng = null;
+    var contactsData = [];
+    var currentFilter = '';
+    var currentRadius = 1.5;
+    var isSidebarOpen = false;
+    var isLoading = false;
+    var deferredPrompt = null;
+    var searchTab = 'all';
+    var searchDebounceTimer = null;
+    var floatingNotifTimeout = null;
+    var mapCurrentLat = null;
+    var mapCurrentLng = null;
+    var _salinkSetup = false;
 
     // ================================================================
     // HELPERS
@@ -2640,13 +2637,10 @@
     }
     function normalizeWhatsApp(value) {
         if (!value) return '';
-        let raw = String(value).trim();
-        if (raw.startsWith('https://wa.me/') || raw.startsWith('http://wa.me/') ||
-            raw.startsWith('https://api.whatsapp.com/') || raw.startsWith('http://api.whatsapp.com/')) {
-            return raw;
-        }
-        let number = raw.replace(/\D/g, '');
-        if (number.startsWith('0')) number = '62' + number.substring(1);
+        var raw = String(value).trim();
+        if (raw.indexOf('https://wa.me/') === 0 || raw.indexOf('https://api.whatsapp.com/') === 0) return raw;
+        var number = raw.replace(/\D/g, '');
+        if (number.indexOf('0') === 0) number = '62' + number.substring(1);
         if (!number) return '';
         return 'https://wa.me/' + number;
     }
@@ -2671,32 +2665,35 @@
         if (day < 7) return day + 'h lalu';
         return new Date(ts).toLocaleDateString('id-ID');
     }
+    function log(msg) {
+        console.log('[SALINK LokasiBantuan] ' + msg);
+    }
 
     // ================================================================
     // TOAST
     // ================================================================
-    function showToast(title, message, icon = 'fa-info-circle') {
-        document.querySelectorAll('.toast').forEach(t => t.remove());
-        const container = document.getElementById('toastContainer');
+    function showToast(title, message, icon) {
+        icon = icon || 'fa-info-circle';
+        document.querySelectorAll('.toast').forEach(function(t) { t.remove(); });
+        var container = document.getElementById('toastContainer');
         if (!container) return;
-        const toast = document.createElement('div');
+        var toast = document.createElement('div');
         toast.className = 'toast';
-        toast.innerHTML = `
-            <div class="toast-icon"><i class="fas ${icon}"></i></div>
-            <div class="toast-content">
-                <div class="toast-title">${escapeHTML(title)}</div>
-                <div class="toast-message">${escapeHTML(message)}</div>
-            </div>
-            <button class="toast-close" type="button"><i class="fas fa-times"></i></button>
-        `;
-        toast.querySelector('.toast-close').onclick = () => {
+        toast.innerHTML =
+            '<div class="toast-icon"><i class="fas ' + icon + '"></i></div>' +
+            '<div class="toast-content">' +
+                '<div class="toast-title">' + escapeHTML(title) + '</div>' +
+                '<div class="toast-message">' + escapeHTML(message) + '</div>' +
+            '</div>' +
+            '<button class="toast-close" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>';
+        toast.querySelector('.toast-close').onclick = function() {
             toast.classList.add('hide');
-            setTimeout(() => toast.remove(), 400);
+            setTimeout(function() { toast.remove(); }, 400);
         };
         container.appendChild(toast);
-        setTimeout(() => {
+        setTimeout(function() {
             toast.classList.add('hide');
-            setTimeout(() => toast.remove(), 400);
+            setTimeout(function() { toast.remove(); }, 400);
         }, 5000);
     }
 
@@ -2704,29 +2701,30 @@
     // THEME
     // ================================================================
     function loadTheme() {
-        const savedTheme = localStorage.getItem('salink_theme') || 'dark';
+        var savedTheme = localStorage.getItem('salink_theme') || 'dark';
         if (savedTheme === 'light') {
             currentTheme = 'light';
             document.documentElement.setAttribute('data-theme', 'light');
-            document.getElementById('themeToggle')?.classList.add('active');
-            const ti = document.getElementById('toggleIcon');
+            var tt = document.getElementById('themeToggle');
+            if (tt) tt.classList.add('active');
+            var ti = document.getElementById('toggleIcon');
             if (ti) ti.className = 'fas fa-sun';
         }
     }
     function toggleTheme() {
-        const html = document.documentElement;
-        const themeToggle = document.getElementById('themeToggle');
-        const toggleIcon = document.getElementById('toggleIcon');
+        var html = document.documentElement;
+        var themeToggle = document.getElementById('themeToggle');
+        var toggleIcon = document.getElementById('toggleIcon');
         if (currentTheme === 'dark') {
             currentTheme = 'light';
             html.setAttribute('data-theme', 'light');
-            themeToggle?.classList.add('active');
+            if (themeToggle) themeToggle.classList.add('active');
             if (toggleIcon) toggleIcon.className = 'fas fa-sun';
             localStorage.setItem('salink_theme', 'light');
         } else {
             currentTheme = 'dark';
             html.removeAttribute('data-theme');
-            themeToggle?.classList.remove('active');
+            if (themeToggle) themeToggle.classList.remove('active');
             if (toggleIcon) toggleIcon.className = 'fas fa-moon';
             localStorage.setItem('salink_theme', 'dark');
         }
@@ -2737,13 +2735,13 @@
     // ================================================================
     function setupPWA() {
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
+            window.addEventListener('load', function() {
                 navigator.serviceWorker.register('./sw.js', { scope: './' })
-                    .then(() => console.log('✅ PWA: SW registered'))
-                    .catch(err => console.warn('⚠️ PWA: SW gagal:', err.message));
+                    .then(function() { log('PWA: ServiceWorker registered'); })
+                    .catch(function(err) { console.warn('⚠️ PWA: SW gagal:', err.message); });
             });
         }
-        window.addEventListener('beforeinstallprompt', (e) => {
+        window.addEventListener('beforeinstallprompt', function(e) {
             e.preventDefault();
             deferredPrompt = e;
             setTimeout(function() {
@@ -2759,7 +2757,7 @@
                 }
             }, 10000);
         });
-        window.addEventListener('appinstalled', () => {
+        window.addEventListener('appinstalled', function() {
             localStorage.setItem('salink_installed', 'true');
             deferredPrompt = null;
             showToast('🎉 Selamat!', 'Aplikasi SALINK berhasil diinstall!', 'fa-rocket');
@@ -2789,7 +2787,7 @@
     function showFloatingNotification(type, title, message, subtitle, actionText, actionCallback) {
         var notif = document.getElementById('floatingNotification');
         var icon = document.getElementById('floatingIcon');
-        if (!notif) return;
+        if (!notif || !icon) return;
         clearTimeout(floatingNotifTimeout);
         icon.className = 'notif-icon ' + type;
         if (type === 'emergency') icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
@@ -2841,22 +2839,21 @@
     // PREVIEW MODE
     // ================================================================
     function showPreviewOverlay() {
-        const o = document.getElementById('previewOverlay');
+        var o = document.getElementById('previewOverlay');
         if (o) { o.classList.add('active'); document.body.style.overflow = 'hidden'; }
     }
     function hidePreviewOverlay() {
-        const o = document.getElementById('previewOverlay');
+        var o = document.getElementById('previewOverlay');
         if (o) { o.classList.remove('active'); document.body.style.overflow = ''; }
     }
     function redirectToLogin() {
         window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent('lokasi-bantuan.html');
     }
     function applyPreviewMode() {
-        if (isPreviewMode) {
-            document.getElementById('previewBadge')?.classList.add('active');
-        } else {
-            document.getElementById('previewBadge')?.classList.remove('active');
-        }
+        var badge = document.getElementById('previewBadge');
+        if (!badge) return;
+        if (isPreviewMode) badge.classList.add('active');
+        else badge.classList.remove('active');
     }
 
     // ================================================================
@@ -2864,9 +2861,9 @@
     // ================================================================
     function setupLoginGuard() {
         document.addEventListener('click', function(e) {
-            const target = e.target.closest('[data-action]');
+            var target = e.target.closest('[data-action]');
             if (!target) return;
-            const action = target.dataset.action;
+            var action = target.dataset.action;
             if (action === 'profile') {
                 if (isPreviewMode) {
                     e.preventDefault(); e.stopPropagation();
@@ -2882,7 +2879,7 @@
                     e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
                     showPreviewOverlay();
                     target.classList.add('shake-element');
-                    setTimeout(() => target.classList.remove('shake-element'), 300);
+                    setTimeout(function() { target.classList.remove('shake-element'); }, 300);
                     return false;
                 }
             }
@@ -2892,52 +2889,70 @@
     // ================================================================
     // SIDEBAR
     // ================================================================
-    function toggleSidebar() { isSidebarOpen ? closeSidebar() : openSidebar(); }
+    function toggleSidebar() {
+        if (isSidebarOpen) closeSidebar();
+        else openSidebar();
+    }
     function openSidebar() {
-        document.getElementById('sidebar')?.classList.add('active');
-        document.getElementById('sidebarOverlay')?.classList.add('active');
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.getElementById('sidebarOverlay');
+        if (sidebar) sidebar.classList.add('active');
+        if (overlay) overlay.classList.add('active');
         isSidebarOpen = true;
         document.body.style.overflow = 'hidden';
+        log('Sidebar opened');
     }
     function closeSidebar() {
-        document.getElementById('sidebar')?.classList.remove('active');
-        document.getElementById('sidebarOverlay')?.classList.remove('active');
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.getElementById('sidebarOverlay');
+        if (sidebar) sidebar.classList.remove('active');
+        if (overlay) overlay.classList.remove('active');
         isSidebarOpen = false;
         document.body.style.overflow = '';
+        log('Sidebar closed');
     }
 
     // ================================================================
-    // USER
+    // USER MANAGEMENT
     // ================================================================
     function loadCurrentUser() {
         try {
-            const savedUser = localStorage.getItem('salink_user');
+            var savedUser = localStorage.getItem('salink_user');
             if (savedUser) {
                 currentUser = JSON.parse(savedUser);
-                if (currentUser && currentUser.username) isPreviewMode = false;
+                if (currentUser && currentUser.username) {
+                    isPreviewMode = false;
+                    log('User loaded: ' + currentUser.username + ' | Preview: OFF');
+                }
             }
         } catch (e) { currentUser = null; }
-        if (!currentUser) isPreviewMode = true;
+        if (!currentUser) {
+            isPreviewMode = true;
+            log('No user found | Preview: ON');
+        }
         updateUserUI();
         updateSidebar();
         applyPreviewMode();
     }
     function updateUserUI() {
-        const userBtn = document.getElementById('userBtn');
+        var userBtn = document.getElementById('userBtn');
         if (!userBtn) return;
-        if (!currentUser) { userBtn.innerHTML = '<i class="fas fa-user"></i>'; return; }
+        if (!currentUser) {
+            userBtn.innerHTML = '<i class="fas fa-user"></i>';
+            return;
+        }
         if (currentUser.profilePicture) {
-            userBtn.innerHTML = `<img src="${escapeAttr(currentUser.profilePicture)}" alt="Profile">`;
+            userBtn.innerHTML = '<img src="' + escapeAttr(currentUser.profilePicture) + '" alt="Profile">';
         } else {
-            const icon = currentUser.gender === 'female' ? 'fa-female' : 'fa-user';
-            userBtn.innerHTML = `<i class="fas ${icon}"></i>`;
+            var icon = currentUser.gender === 'female' ? 'fa-female' : 'fa-user';
+            userBtn.innerHTML = '<i class="fas ' + icon + '"></i>';
         }
     }
     function updateSidebar() {
-        const nameEl = document.getElementById('sidebarUserName');
-        const emailEl = document.getElementById('sidebarUserEmail');
-        const avatarEl = document.getElementById('sidebarUserAvatar');
-        const logoutItem = document.getElementById('logoutNavItem');
+        var nameEl = document.getElementById('sidebarUserName');
+        var emailEl = document.getElementById('sidebarUserEmail');
+        var avatarEl = document.getElementById('sidebarUserAvatar');
+        var logoutItem = document.getElementById('logoutNavItem');
         if (!currentUser) {
             if (nameEl) nameEl.textContent = 'Guest';
             if (emailEl) emailEl.textContent = 'guest@salink.id';
@@ -2949,7 +2964,7 @@
         if (emailEl) emailEl.textContent = currentUser.email || currentUser.username || '-';
         if (avatarEl) {
             if (currentUser.profilePicture) {
-                avatarEl.innerHTML = `<img src="${escapeAttr(currentUser.profilePicture)}" alt="">`;
+                avatarEl.innerHTML = '<img src="' + escapeAttr(currentUser.profilePicture) + '" alt="">';
             } else {
                 avatarEl.innerHTML = currentUser.gender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>';
             }
@@ -2965,55 +2980,72 @@
     // ================================================================
     // API GET NEARBY CONTACTS
     // ================================================================
-    async function apiGetNearbyContacts(lat, lng, type = '', radiusKm = 1.5) {
-        try {
-            const urlParams = new URLSearchParams({
-                action: 'get_nearby_contacts',
-                latitude: lat,
-                longitude: lng,
-                type: type,
-                radiusKm: radiusKm,
-                timestamp: Date.now()
-            });
-            const url = API_URL + '?' + urlParams.toString();
-            const response = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' }, cache: 'no-store' });
+    function apiGetNearbyContacts(lat, lng, type, radiusKm) {
+        type = type || '';
+        radiusKm = radiusKm || 1.5;
+        var urlParams = new URLSearchParams({
+            action: 'get_nearby_contacts',
+            latitude: lat,
+            longitude: lng,
+            type: type,
+            radiusKm: radiusKm,
+            timestamp: Date.now()
+        });
+        var url = API_URL + '?' + urlParams.toString();
+        return fetch(url, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store'
+        })
+        .then(function(response) {
             if (!response.ok) throw new Error('HTTP ' + response.status);
-            const result = await response.json();
-            if (result.status === 'success' && Array.isArray(result.data)) return result.data;
+            return response.json();
+        })
+        .then(function(result) {
+            if (result && result.status === 'success' && Array.isArray(result.data)) {
+                return result.data;
+            }
             return [];
-        } catch (error) {
+        })
+        .catch(function(error) {
             console.error('❌ Gagal nearby contacts:', error);
             return [];
-        }
+        });
     }
 
     // ================================================================
-    // LOCATION
+    // LOCATION — GPS
     // ================================================================
     function getMyLocation() {
-        const btn = document.getElementById('locationBtn');
+        log('getMyLocation() called');
+        var btn = document.getElementById('locationBtn');
+        if (isPreviewMode) {
+            log('Preview mode ON — showing overlay');
+            showPreviewOverlay();
+            return;
+        }
         if (btn) {
             btn.disabled = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mendapatkan...';
         }
-
         if (!navigator.geolocation) {
             showToast('⚠️ Error', 'Perangkat tidak mendukung GPS.', 'fa-exclamation-triangle');
+            setGPSStatus('error', 'GPS tidak tersedia', 'Perangkat tidak mendukung layanan lokasi.');
             if (btn) {
                 btn.disabled = false;
                 btn.innerHTML = '<i class="fas fa-map-marker-alt"></i> Gunakan Lokasi Saya';
             }
             return;
         }
-
+        log('Requesting GPS position...');
         navigator.geolocation.getCurrentPosition(
             function(position) {
                 userLat = position.coords.latitude;
                 userLng = position.coords.longitude;
+                log('GPS success: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6));
                 localStorage.setItem('salink_user_lat', userLat);
                 localStorage.setItem('salink_user_lng', userLng);
-
-                setGPSStatus('success', 'Lokasi berhasil ditemukan', `Koordinat GPS: ${userLat.toFixed(6)}, ${userLng.toFixed(6)}`);
+                setGPSStatus('success', 'Lokasi berhasil ditemukan', 'Koordinat GPS: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6));
                 showToast('✅ Berhasil', 'Lokasi Anda berhasil didapatkan!', 'fa-check-circle');
                 if (btn) {
                     btn.disabled = false;
@@ -3023,7 +3055,7 @@
             },
             function(error) {
                 console.error('❌ GPS Error:', error);
-                let message = 'Gagal mendapatkan lokasi. ';
+                var message = 'Gagal mendapatkan lokasi. ';
                 if (error.code === 1) message += 'Izin lokasi ditolak.';
                 else if (error.code === 2) message += 'Sinyal GPS tidak tersedia.';
                 else if (error.code === 3) message += 'Waktu pengambilan habis.';
@@ -3039,9 +3071,9 @@
     }
 
     function setGPSStatus(type, title, detail) {
-        const status = document.getElementById('gpsStatus');
-        const titleEl = document.getElementById('gpsTitle');
-        const detailEl = document.getElementById('gpsDetail');
+        var status = document.getElementById('gpsStatus');
+        var titleEl = document.getElementById('gpsTitle');
+        var detailEl = document.getElementById('gpsDetail');
         if (!status || !titleEl || !detailEl) return;
         status.classList.remove('loading', 'success', 'error');
         if (type) status.classList.add(type);
@@ -3055,51 +3087,47 @@
     async function loadContacts() {
         if (isLoading) return;
         isLoading = true;
-
         if (!userLat || !userLng) {
             showState('📍', 'Lokasi belum tersedia', 'Silakan gunakan lokasi Anda terlebih dahulu.');
             isLoading = false;
             return;
         }
-
         showToast('🔄 Memuat', 'Mencari bantuan terdekat...', 'fa-spinner');
-
         try {
-            const radius = currentRadius === 0 ? 100 : currentRadius;
-            const data = await apiGetNearbyContacts(userLat, userLng, currentFilter, radius);
-
+            var radius = currentRadius === 0 ? 100 : currentRadius;
+            var data = await apiGetNearbyContacts(userLat, userLng, currentFilter, radius);
             if (data && data.length > 0) {
                 contactsData = data;
                 renderContacts(contactsData);
-                const radiusText = currentRadius === 0 ? 'semua pos' : currentRadius + ' km';
-                const rc = document.getElementById('resultsCount');
-                if (rc) rc.textContent = `${contactsData.length} bantuan ditemukan dalam radius ${radiusText}`;
+                var radiusText = currentRadius === 0 ? 'semua pos' : currentRadius + ' km';
+                var rc = document.getElementById('resultsCount');
+                if (rc) rc.textContent = contactsData.length + ' bantuan ditemukan dalam radius ' + radiusText;
+                showToast('✅ Berhasil', 'Data bantuan dimuat!', 'fa-check-circle');
             } else {
                 if (currentRadius === 1.5) {
-                    const fallbackData = await apiGetNearbyContacts(userLat, userLng, currentFilter, 5);
+                    var fallbackData = await apiGetNearbyContacts(userLat, userLng, currentFilter, 5);
                     if (fallbackData && fallbackData.length > 0) {
                         contactsData = fallbackData;
                         renderContacts(contactsData);
-                        const rc = document.getElementById('resultsCount');
-                        if (rc) rc.textContent = `${contactsData.length} bantuan ditemukan dalam radius 5 km (fallback)`;
+                        var rc2 = document.getElementById('resultsCount');
+                        if (rc2) rc2.textContent = contactsData.length + ' bantuan ditemukan dalam radius 5 km (fallback)';
                         showToast('ℹ️ Info', 'Dalam 1.5 km kosong, menampilkan radius 5 km.', 'fa-info-circle');
                         isLoading = false;
                         return;
                     }
                 }
                 contactsData = [];
-                showState('🏢', 'Belum ada bantuan di sekitar Anda',
-                    `Tidak ditemukan instansi dalam radius ${currentRadius === 0 ? 'semua pos' : currentRadius + ' km'}. Data dapat ditambahkan melalui Google Spreadsheet.`, 'warning');
-                const rc = document.getElementById('resultsCount');
-                if (rc) rc.textContent = 'Tidak ada bantuan terdaftar';
+                var radiusTxt = currentRadius === 0 ? 'semua pos' : currentRadius + ' km';
+                showState('🏢', 'Belum ada bantuan di sekitar Anda', 'Tidak ditemukan instansi dalam radius ' + radiusTxt + '. Data dapat ditambahkan melalui Google Spreadsheet.', 'warning');
+                var rc3 = document.getElementById('resultsCount');
+                if (rc3) rc3.textContent = 'Tidak ada bantuan terdaftar';
+                showToast('ℹ️ Info', 'Belum ada data bantuan terdaftar.', 'fa-info-circle');
             }
-            showToast('✅ Berhasil', 'Data bantuan dimuat!', 'fa-check-circle');
         } catch (error) {
-            console.error('❌ Error:', error);
+            console.error('❌ Error loadContacts:', error);
             showState('⚠️', 'Gagal mengambil data', 'Periksa koneksi internet Anda.', 'error');
             showToast('⚠️ Error', 'Gagal memuat data bantuan.', 'fa-exclamation-triangle');
         }
-
         isLoading = false;
     }
 
@@ -3107,17 +3135,16 @@
     // FILTER & RADIUS
     // ================================================================
     function setEmergencyFilter(btn) {
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
         btn.classList.add('active');
-        currentFilter = btn.dataset.type;
+        currentFilter = btn.dataset.type || '';
         if (userLat && userLng) loadContacts();
         else showState('📍', 'Lokasi belum tersedia', 'Gunakan lokasi Anda terlebih dahulu.');
     }
-
     function setRadius(btn) {
-        document.querySelectorAll('.radius-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.radius-btn').forEach(function(b) { b.classList.remove('active'); });
         btn.classList.add('active');
-        currentRadius = parseFloat(btn.dataset.radius);
+        currentRadius = parseFloat(btn.dataset.radius) || 1.5;
         if (userLat && userLng) loadContacts();
         else showState('📍', 'Lokasi belum tersedia', 'Gunakan lokasi Anda terlebih dahulu.');
     }
@@ -3126,58 +3153,61 @@
     // RENDER CONTACTS
     // ================================================================
     function renderContacts(contacts) {
-        const container = document.getElementById('contactContainer');
+        var container = document.getElementById('contactContainer');
         if (!container) return;
         container.innerHTML = '';
-
         if (!contacts || contacts.length === 0) {
-            showState('🏢', 'Belum ada bantuan di sekitar Anda', `Tidak ditemukan instansi dalam radius ${currentRadius === 0 ? 'semua pos' : currentRadius + ' km'}.`, 'warning');
+            showState('🏢', 'Belum ada bantuan di sekitar Anda', 'Tidak ditemukan instansi dalam radius yang dipilih.', 'warning');
             return;
         }
-
-        contacts.forEach(contact => {
-            const card = document.createElement('div');
+        contacts.forEach(function(contact) {
+            var card = document.createElement('div');
             card.className = 'contact-card';
+            var name = contact.name || 'Instansi Darurat';
+            var category = contact.category || contact.type || 'Layanan Darurat';
+            var level = contact.level || '';
+            var address = contact.address || [contact.village, contact.district, contact.city, contact.province].filter(Boolean).join(', ');
+            var distance = contact.distanceText || formatDistance(contact.distanceKm);
+            var phone = normalizePhone(contact.phone);
+            var whatsapp = normalizeWhatsApp(contact.whatsapp);
+            var mapsURL = contact.mapsURL || buildMapsURL(contact.latitude, contact.longitude);
 
-            const name = contact.name || 'Instansi Darurat';
-            const category = contact.category || contact.type || 'Layanan Darurat';
-            const level = contact.level || '';
-            const address = contact.address || [contact.village, contact.district, contact.city, contact.province].filter(Boolean).join(', ');
-            const distance = contact.distanceText || formatDistance(contact.distanceKm);
+            var html = '';
+            html += '<div class="contact-top">';
+            html += '<div>';
+            html += '<div class="contact-name">' + escapeHTML(name) + '</div>';
+            html += '<div class="contact-category">' + escapeHTML(category) + (level ? ' • ' + escapeHTML(level) : '') + '</div>';
+            html += '</div>';
+            if (distance) html += '<div class="distance-badge">' + escapeHTML(distance) + '</div>';
+            html += '</div>';
+            html += '<div class="contact-info">';
+            if (address) html += '<div class="info-row"><span class="info-label">📍</span><span>' + escapeHTML(address) + '</span></div>';
+            if (contact.serviceArea) html += '<div class="info-row"><span class="info-label">🏘️</span><span>Melayani: ' + escapeHTML(contact.serviceArea) + '</span></div>';
+            if (contact.operationalHours) html += '<div class="info-row"><span class="info-label">🕐</span><span>' + escapeHTML(contact.operationalHours) + '</span></div>';
+            html += '</div>';
+            html += '<div class="contact-actions">';
+            if (phone) html += '<a class="contact-action phone" href="tel:' + escapeAttr(phone) + '"><i class="fas fa-phone-alt"></i> Telepon</a>';
+            else html += '<span class="contact-action unavailable"><i class="fas fa-phone-alt"></i> N/A</span>';
+            if (whatsapp) html += '<a class="contact-action whatsapp" href="' + escapeAttr(whatsapp) + '" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> WA</a>';
+            else html += '<span class="contact-action unavailable"><i class="fab fa-whatsapp"></i> N/A</span>';
+            if (mapsURL) html += '<a class="contact-action maps" href="' + escapeAttr(mapsURL) + '" target="_blank" rel="noopener"><i class="fas fa-map-marked-alt"></i> Maps</a>';
+            else html += '<span class="contact-action unavailable"><i class="fas fa-map-marked-alt"></i> N/A</span>';
+            html += '</div>';
 
-            const phone = normalizePhone(contact.phone);
-            const whatsapp = normalizeWhatsApp(contact.whatsapp);
-            const mapsURL = contact.mapsURL || buildMapsURL(contact.latitude, contact.longitude);
-
-            card.innerHTML = `
-                <div class="contact-top">
-                    <div>
-                        <div class="contact-name">${escapeHTML(name)}</div>
-                        <div class="contact-category">${escapeHTML(category)}${level ? ' • ' + escapeHTML(level) : ''}</div>
-                    </div>
-                    <div class="distance-badge">${escapeHTML(distance)}</div>
-                </div>
-                <div class="contact-info">
-                    ${address ? `<div class="info-row"><span class="info-label">📍</span><span>${escapeHTML(address)}</span></div>` : ''}
-                    ${contact.serviceArea ? `<div class="info-row"><span class="info-label">🏘️</span><span>Melayani: ${escapeHTML(contact.serviceArea)}</span></div>` : ''}
-                    ${contact.operationalHours ? `<div class="info-row"><span class="info-label">🕐</span><span>${escapeHTML(contact.operationalHours)}</span></div>` : ''}
-                </div>
-                <div class="contact-actions">
-                    ${phone ? `<a class="contact-action phone" href="tel:${escapeAttr(phone)}"><i class="fas fa-phone-alt"></i> Telepon</a>` : `<span class="contact-action unavailable"><i class="fas fa-phone-alt"></i> N/A</span>`}
-                    ${whatsapp ? `<a class="contact-action whatsapp" href="${escapeAttr(whatsapp)}" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> WA</a>` : `<span class="contact-action unavailable"><i class="fab fa-whatsapp"></i> N/A</span>`}
-                    ${mapsURL ? `<a class="contact-action maps" href="${escapeAttr(mapsURL)}" target="_blank" rel="noopener"><i class="fas fa-map-marked-alt"></i> Maps</a>` : `<span class="contact-action unavailable"><i class="fas fa-map-marked-alt"></i> N/A</span>`}
-                </div>
-            `;
-
+            card.innerHTML = html;
             container.appendChild(card);
         });
     }
 
     function showState(icon, title, text, type) {
-        const container = document.getElementById('contactContainer');
+        var container = document.getElementById('contactContainer');
         if (!container) return;
-        container.innerHTML = `<div class="state-card ${type || ''}"><div class="state-icon">${icon}</div><div class="state-title">${escapeHTML(title)}</div><div class="state-text">${escapeHTML(text)}</div></div>`;
-        const rc = document.getElementById('resultsCount');
+        container.innerHTML = '<div class="state-card ' + (type || '') + '">' +
+            '<div class="state-icon">' + icon + '</div>' +
+            '<div class="state-title">' + escapeHTML(title) + '</div>' +
+            '<div class="state-text">' + escapeHTML(text) + '</div>' +
+        '</div>';
+        var rc = document.getElementById('resultsCount');
         if (rc) rc.textContent = 'Belum mencari lokasi';
     }
 
@@ -3195,16 +3225,18 @@
     function handleLogout() {
         if (confirm('Apakah Anda yakin ingin keluar?')) {
             currentUser = null;
-            ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies','salink_last_emergency_check_lokasi'].forEach(k => localStorage.removeItem(k));
+            ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies','salink_last_emergency_check_lokasi'].forEach(function(k) {
+                localStorage.removeItem(k);
+            });
             updateUserUI();
             updateSidebar();
             showToast('👋 Logout Berhasil', 'Anda telah keluar dari akun', 'fa-sign-out-alt');
-            setTimeout(() => { window.location.href = DASHBOARD_URL + '?logout=1'; }, 500);
+            setTimeout(function() { window.location.href = DASHBOARD_URL + '?logout=1'; }, 500);
         }
     }
 
     // ================================================================
-    // PATCH v10.0 — MODAL HELPERS
+    // MODAL HELPERS
     // ================================================================
     function openModalById(id) {
         var m = document.getElementById(id);
@@ -3222,7 +3254,7 @@
     }
 
     // ================================================================
-    // PATCH v10.0 — NOTIF BADGE
+    // NOTIF BADGE
     // ================================================================
     function getAllNotifications() {
         var list = [];
@@ -3276,7 +3308,9 @@
         if (!listEl) return;
         var all = getAllNotifications();
         if (all.length === 0) {
-            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-bell-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada notifikasi</p></div>';
+            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">' +
+                '<i class="fas fa-bell-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i>' +
+                '<p style="font-size:0.75rem;">Tidak ada notifikasi</p></div>';
             return;
         }
         listEl.innerHTML = all.slice(0, 30).map(function(n) {
@@ -3304,7 +3338,7 @@
     }
 
     // ================================================================
-    // PATCH v10.0 — SEARCH MODAL
+    // SEARCH MODAL
     // ================================================================
     function openSearchModal() {
         openModalById('searchModal');
@@ -3324,9 +3358,7 @@
         var allTab = document.querySelector('.search-tab[data-tab="all"]');
         if (allTab) allTab.classList.add('active');
     }
-    function closeSearchModal() {
-        closeModalById('searchModal');
-    }
+    function closeSearchModal() { closeModalById('searchModal'); }
     function clearSearch() {
         var input = document.getElementById('searchInput');
         if (input) input.value = '';
@@ -3453,7 +3485,7 @@
     }
 
     // ================================================================
-    // PATCH v10.0 — FAB MODAL
+    // FAB MODAL
     // ================================================================
     function openFabModal() {
         var overlay = document.getElementById('fabModalOverlay');
@@ -3470,24 +3502,25 @@
     }
 
     // ================================================================
-    // PATCH v10.0 — 🗺️ MODAL PETA DARURAT
+    // 🗺️ MODAL PETA DARURAT
     // ================================================================
-    var mapCurrentLat = null;
-    var mapCurrentLng = null;
-
     function openMapModal() {
+        log('openMapModal() called');
         var modal = document.getElementById('mapModal');
         if (!modal) {
             console.warn('⚠️ [MapModal] #mapModal tidak ditemukan di DOM');
+            showToast('⚠️ Error', 'Modal peta tidak tersedia', 'fa-exclamation-triangle');
             return;
         }
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
         if (navigator.vibrate) navigator.vibrate(30);
         updateMapOwnerInfo();
+        log('Map modal opened');
     }
 
     function closeMapModal() {
+        log('closeMapModal() called');
         var modal = document.getElementById('mapModal');
         if (!modal) return;
         modal.classList.remove('active');
@@ -3495,7 +3528,6 @@
     }
 
     function updateMapOwnerInfo() {
-        // Pemilik akun
         var ownerNameEl = document.getElementById('mapOwnerName');
         var ownerLocEl = document.getElementById('mapOwnerLoc');
         var ownerAvatarEl = document.getElementById('mapOwnerAvatar');
@@ -3521,7 +3553,7 @@
             if (ownerAvatarEl) ownerAvatarEl.innerHTML = '<i class="fas fa-user"></i>';
         }
 
-        // Kalau sudah ada koordinat dari sebelumnya
+        // Cek lokasi tersimpan
         var savedLat = localStorage.getItem('salink_user_lat');
         var savedLng = localStorage.getItem('salink_user_lng');
         if (savedLat && savedLng) {
@@ -3551,7 +3583,6 @@
             gmapsBtn.href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
         }
 
-        // Status
         var statusCard = document.getElementById('mapStatusCard');
         var statusTitle = document.getElementById('mapStatusTitle');
         var statusDesc = document.getElementById('mapStatusDesc');
@@ -3582,6 +3613,7 @@
     }
 
     function activateMapGps() {
+        log('activateMapGps() called');
         var btn = document.getElementById('mapLocationBtn');
         var btnText = document.getElementById('mapLocationBtnText');
 
@@ -3601,24 +3633,19 @@
                 var lat = position.coords.latitude;
                 var lng = position.coords.longitude;
                 var accuracy = Math.round(position.coords.accuracy || 0);
-
                 mapCurrentLat = lat;
                 mapCurrentLng = lng;
 
-                // Simpan ke localStorage
                 localStorage.setItem('salink_user_lat', lat);
                 localStorage.setItem('salink_user_lng', lng);
 
-                // Update button
                 if (btn) {
                     btn.classList.remove('loading');
                     btn.disabled = false;
                 }
                 if (btnText) btnText.textContent = '✅ Refresh Lokasi';
 
-                // Apply
                 applyMapCoords(lat, lng);
-
                 showToast('📍 Lokasi Ditemukan', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
                 if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
             },
@@ -3637,15 +3664,10 @@
                 if (btnText) btnText.textContent = '📍 Ambil Lokasi Saya';
                 showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle');
             },
-            {
-                enableHighAccuracy: true,
-                timeout: 15000,
-                maximumAge: 0
-            }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     }
 
-    // Search service via Google Maps
     function mapSearchService(searchQuery) {
         var lat = mapCurrentLat;
         var lng = mapCurrentLng;
@@ -3659,7 +3681,7 @@
     }
 
     // ================================================================
-    // PATCH v10.0 — RIPPLE
+    // RIPPLE
     // ================================================================
     function initRipple() {
         document.addEventListener('click', function(e) {
@@ -3680,10 +3702,14 @@
     }
 
     // ================================================================
-    // PATCH v10.0 — EVENT LISTENERS
+    // EVENT LISTENERS — CORE FIX
     // ================================================================
     function setupEventListeners() {
-        // Header Menu ☰
+        if (_salinkSetup) return;
+        _salinkSetup = true;
+        log('Setting up event listeners...');
+
+        // === HEADER MENU ===
         var menuBtn = document.getElementById('menuBtn');
         if (menuBtn) {
             menuBtn.addEventListener('click', function(e) {
@@ -3692,26 +3718,57 @@
                 if (navigator.vibrate) navigator.vibrate(10);
                 toggleSidebar();
             });
+            log('✓ menuBtn listener attached');
         }
 
-        // Sidebar Close
+        // === SIDEBAR CLOSE ===
         var sidebarClose = document.getElementById('sidebarClose');
-        if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+        if (sidebarClose) {
+            sidebarClose.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeSidebar();
+            });
+        }
         var sidebarOverlay = document.getElementById('sidebarOverlay');
-        if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', closeSidebar);
+        }
 
-        // 🗺️ Sidebar Menu → Peta Darurat
+        // === 🗺️ SIDEBAR MAP BUTTON — EVENT DELEGATION + DIRECT LISTENER ===
+        // Direct listener
         var sidebarMapBtn = document.getElementById('sidebarMapBtn');
         if (sidebarMapBtn) {
             sidebarMapBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
+                log('✓ sidebarMapBtn clicked');
                 closeSidebar();
-                setTimeout(function() { openMapModal(); }, 250);
+                // Delay lebih lama supaya sidebar animation selesai
+                setTimeout(function() {
+                    openMapModal();
+                }, 400);
             });
+            log('✓ sidebarMapBtn listener attached');
+        } else {
+            console.warn('⚠️ sidebarMapBtn not found!');
         }
 
-        // Logout
+        // Event delegation fallback — jaga-jaga
+        document.addEventListener('click', function(e) {
+            var mapBtn = e.target.closest('#sidebarMapBtn');
+            if (mapBtn) {
+                e.preventDefault();
+                e.stopPropagation();
+                log('✓ sidebarMapBtn clicked (delegation)');
+                closeSidebar();
+                setTimeout(function() {
+                    openMapModal();
+                }, 400);
+            }
+        });
+
+        // === LOGOUT ===
         var logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', function(e) {
@@ -3721,7 +3778,7 @@
             });
         }
 
-        // Header Search
+        // === HEADER SEARCH ===
         var headerSearchBtn = document.getElementById('headerSearchBtn');
         if (headerSearchBtn) {
             headerSearchBtn.addEventListener('click', function(e) {
@@ -3731,7 +3788,7 @@
             });
         }
 
-        // Header Notif
+        // === HEADER NOTIF ===
         var headerNotifBtn = document.getElementById('headerNotifBtn');
         if (headerNotifBtn) {
             headerNotifBtn.addEventListener('click', function(e) {
@@ -3741,7 +3798,7 @@
             });
         }
 
-        // Theme Toggle
+        // === THEME TOGGLE ===
         var themeToggle = document.getElementById('themeToggle');
         if (themeToggle) {
             themeToggle.addEventListener('click', function(e) {
@@ -3749,34 +3806,33 @@
                 e.stopPropagation();
                 toggleTheme();
             });
-            themeToggle.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    toggleTheme();
-                }
-            });
         }
 
-        // Back Home button (brand section)
+        // === BACK HOME ===
         var backHomeBtn = document.getElementById('backHomeBtn');
         if (backHomeBtn) {
             backHomeBtn.addEventListener('click', goHome);
         }
 
-        // Location button
+        // === LOCATION BUTTON ===
         var locationBtn = document.getElementById('locationBtn');
         if (locationBtn) {
-            locationBtn.addEventListener('click', function() {
-                if (isPreviewMode) { showPreviewOverlay(); return; }
+            locationBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                log('✓ locationBtn clicked');
                 getMyLocation();
             });
+            log('✓ locationBtn listener attached');
+        } else {
+            console.warn('⚠️ locationBtn not found!');
         }
 
-        // Refresh button
+        // === REFRESH BUTTON ===
         var refreshBtn = document.getElementById('refreshBtn');
         if (refreshBtn) {
-            refreshBtn.addEventListener('click', function() {
-                if (isPreviewMode) { showPreviewOverlay(); return; }
+            refreshBtn.addEventListener('click', function(e) {
+                e.preventDefault();
                 var self = this;
                 var icon = self.querySelector('i');
                 if (icon) icon.classList.add('fa-spin');
@@ -3787,23 +3843,23 @@
             });
         }
 
-        // Filter buttons
+        // === FILTER BUTTONS ===
         document.querySelectorAll('.filter-btn').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                if (isPreviewMode) { showPreviewOverlay(); return; }
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
                 setEmergencyFilter(this);
             });
         });
 
-        // Radius buttons
+        // === RADIUS BUTTONS ===
         document.querySelectorAll('.radius-btn').forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                if (isPreviewMode) { showPreviewOverlay(); return; }
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
                 setRadius(this);
             });
         });
 
-        // FAB 🚨
+        // === FAB ===
         var scanFab = document.getElementById('scanFab');
         if (scanFab) {
             scanFab.addEventListener('click', function(e) {
@@ -3821,7 +3877,7 @@
             });
         }
 
-        // FAB Emergency Cards
+        // === FAB CARDS ===
         document.querySelectorAll('.fab-emergency-card').forEach(function(card) {
             card.addEventListener('click', function() {
                 var type = this.getAttribute('data-fab-type');
@@ -3837,10 +3893,7 @@
             });
         });
 
-        // 🗺️ Modal Peta Darurat
-        var mapModal = document.getElementById('mapModal');
-        
-        // Close button di header
+        // === 🗺️ MAP MODAL CLOSE ===
         var mapModalCloseBtn = document.getElementById('mapModalCloseBtn');
         if (mapModalCloseBtn) {
             mapModalCloseBtn.addEventListener('click', function(e) {
@@ -3849,8 +3902,6 @@
                 closeMapModal();
             });
         }
-
-        // Close button di footer
         var mapModalCloseFooter = document.getElementById('mapModalCloseFooter');
         if (mapModalCloseFooter) {
             mapModalCloseFooter.addEventListener('click', function(e) {
@@ -3859,34 +3910,38 @@
                 closeMapModal();
             });
         }
-
-        // Click overlay untuk tutup
+        var mapModal = document.getElementById('mapModal');
         if (mapModal) {
             mapModal.addEventListener('click', function(e) {
                 if (e.target === mapModal) closeMapModal();
             });
         }
 
-        // GPS Button
+        // === 🗺️ MAP GPS BUTTON ===
         var mapLocationBtn = document.getElementById('mapLocationBtn');
         if (mapLocationBtn) {
             mapLocationBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
+                log('✓ mapLocationBtn clicked');
                 activateMapGps();
             });
+            log('✓ mapLocationBtn listener attached');
+        } else {
+            console.warn('⚠️ mapLocationBtn not found!');
         }
 
-        // Grid 2x2 Service Cards
+        // === 🗺️ MAP SERVICE CARDS ===
         document.querySelectorAll('.map-service-card[data-search]').forEach(function(btn) {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
                 var search = this.getAttribute('data-search');
                 if (!search) return;
                 mapSearchService(search);
             });
         });
 
-        // Search Modal
+        // === SEARCH MODAL ===
         var searchModalCloseBtn = document.getElementById('searchModalCloseBtn');
         if (searchModalCloseBtn) searchModalCloseBtn.addEventListener('click', closeSearchModal);
         var clearSearchBtn = document.getElementById('clearSearchBtn');
@@ -3917,7 +3972,7 @@
             });
         }
 
-        // Notif Modal
+        // === NOTIF MODAL ===
         var notifModalCloseBtn = document.getElementById('notifModalCloseBtn');
         if (notifModalCloseBtn) notifModalCloseBtn.addEventListener('click', closeNotifModal);
         var notifModal = document.getElementById('notifModal');
@@ -3942,7 +3997,7 @@
             });
         }
 
-        // Preview Overlay buttons
+        // === PREVIEW OVERLAY ===
         var overlayLoginBtn = document.getElementById('overlayLoginBtn');
         if (overlayLoginBtn) overlayLoginBtn.addEventListener('click', redirectToLogin);
         var overlayCancelBtn = document.getElementById('overlayCancelBtn');
@@ -3961,7 +4016,7 @@
             });
         }
 
-        // Bottom Invite/Notif Nav
+        // === BOTTOM INVITE NAV ===
         var bottomInviteNav = document.getElementById('bottomInviteNav');
         if (bottomInviteNav) {
             bottomInviteNav.addEventListener('click', function(e) {
@@ -3971,7 +4026,7 @@
             });
         }
 
-        // Keyboard shortcuts
+        // === KEYBOARD SHORTCUTS ===
         document.addEventListener('keydown', function(e) {
             if (e.key === '/' && !e.target.matches('input, textarea, select')) {
                 e.preventDefault();
@@ -3985,13 +4040,15 @@
                 closeSidebar();
             }
         });
+
+        log('✓ All event listeners attached');
     }
 
     // ================================================================
     // INIT
     // ================================================================
     function init() {
-        console.log('🚀 SALINK Lokasi Bantuan v10.0 Initializing...');
+        log('Initializing Lokasi Bantuan v10.1...');
 
         setupPWA();
         loadTheme();
@@ -4005,12 +4062,12 @@
         setInterval(updateNotifBadge, 30000);
 
         // Cek lokasi tersimpan
-        const savedLat = localStorage.getItem('salink_user_lat');
-        const savedLng = localStorage.getItem('salink_user_lng');
+        var savedLat = localStorage.getItem('salink_user_lat');
+        var savedLng = localStorage.getItem('salink_user_lng');
         if (savedLat && savedLng) {
             userLat = parseFloat(savedLat);
             userLng = parseFloat(savedLng);
-            setGPSStatus('success', 'Lokasi tersimpan', `Koordinat: ${userLat.toFixed(6)}, ${userLng.toFixed(6)}`);
+            setGPSStatus('success', 'Lokasi tersimpan', 'Koordinat: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6));
             loadContacts();
         }
 
@@ -4020,10 +4077,11 @@
             if (e.key === 'salink_theme') loadTheme();
         });
 
-        if (isPreviewMode) setTimeout(() => showPreviewOverlay(), 1200);
+        if (isPreviewMode) setTimeout(function() { showPreviewOverlay(); }, 1200);
 
-        console.log('✅ Lokasi Bantuan v10.0 Ready!');
-        console.log('👤 Mode:', isPreviewMode ? 'PREVIEW' : 'FULL');
+        log('✓ Lokasi Bantuan v10.1 Ready!');
+        log('  Mode: ' + (isPreviewMode ? 'PREVIEW' : 'FULL'));
+        log('  User: ' + (currentUser ? currentUser.username : 'Guest'));
     }
 
     // Bootstrap
@@ -4059,7 +4117,7 @@
     window.showPreviewOverlay = showPreviewOverlay;
     window.hidePreviewOverlay = hidePreviewOverlay;
 
-    console.log('✅ Lokasi Bantuan v10.0 Script Loaded');
+    log('✓ Lokasi Bantuan v10.1 Script Loaded');
 })();
     </script>
 
@@ -4075,9 +4133,6 @@
 
       console.log('🔔 [FCM] Initializing...');
 
-      // ================================================================
-      // 1. FCM INIT
-      // ================================================================
       window.addEventListener('load', async function() {
         console.log('🔔 [FCM] Page loaded');
 
@@ -4134,9 +4189,6 @@
         }
       });
 
-      // ================================================================
-      // 2. SALINK EMERGENCY ALERT — Auto-init
-      // ================================================================
       var checkEmergency = setInterval(function() {
         if (typeof SalinkEmergency !== 'undefined') {
           clearInterval(checkEmergency);
@@ -4151,9 +4203,6 @@
         }
       }, 10000);
 
-      // ================================================================
-      // 3. LISTENER visibilitychange (refresh FCM token)
-      // ================================================================
       document.addEventListener('visibilitychange', function() {
         if (!document.hidden && typeof SalinkFCM !== 'undefined') {
           if (typeof SalinkFCM.refreshToken === 'function') {
@@ -4162,9 +4211,6 @@
         }
       });
 
-      // ================================================================
-      // 4. EXPOSE GLOBAL (untuk debug)
-      // ================================================================
       window.SALINK_FCM_DEBUG = {
         getStatus: function() {
           return {
@@ -4182,3 +4228,5 @@
     </script>
 </body>
 </html>
+
+    
