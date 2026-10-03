@@ -1527,28 +1527,44 @@ const EMERGENCY_CSS_CLASS = { 'fire': 'fire', 'medical': 'medical', 'crime': 'cr
 
 const REGULAR_SOUND_URL = '/Music/smsblackber_4a537f155087133.mp3';
 
-// ⭐ v10.5: Playlist nada dering khusus emergency
+// ⭐ v10.6: Path audio LOKAL (kanibal dari kode lama yang terbukti bekerja)
+// File ada di folder /Music/ project Vercel
 const EMERGENCY_SOUND_PLAYLIST = {
-    fire:     'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/Kebakaran.mp3',
-    medical:  'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/kematian.mp3',
-    crime:    'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/pencurian.mp3',
-    disaster: 'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/bencana_tsunami.mp3'
+    fire:     '/Music/Kebakaran.mp3',
+    medical:  '/Music/kematian.mp3',
+    crime:    '/Music/pencurian.mp3',
+    disaster: '/Music/bencana_tsunami.mp3'
 };
 
-// ⭐ v10.5: Cek ketersediaan MP3 di startup
-const EMERGENCY_SOUND_AVAILABLE = {};
-(async function checkEmergencySounds() {
-    for (const [type, url] of Object.entries(EMERGENCY_SOUND_PLAYLIST)) {
+// Audio cache (kanibal dari kode lama)
+const audioCache = {};
+
+// ⭐ v10.6: Preload semua audio SEKALI di awal (bukan lazy load)
+function preloadAllAudio() {
+    console.log('🔊 [Audio] Preloading...');
+    Object.keys(EMERGENCY_SOUND_PLAYLIST).forEach(type => {
         try {
-            const res = await fetch(url, { method: 'HEAD', mode: 'no-cors' });
-            EMERGENCY_SOUND_AVAILABLE[type] = true;
-            console.log('✅ [Sound] Tersedia:', type);
+            const audio = new Audio();
+            audio.preload = 'auto';
+            audio.src = EMERGENCY_SOUND_PLAYLIST[type];
+            audio.volume = 1.0;
+            audio.load();
+            audioCache[type] = audio;
         } catch(e) {
-            EMERGENCY_SOUND_AVAILABLE[type] = false;
-            console.warn('⚠️ [Sound] TIDAK tersedia:', type, '→', url);
+            console.warn('⚠️ [Audio] Preload gagal:', type, e.message);
         }
-    }
-})();
+    });
+    // Preload regular sound
+    try {
+        const regAudio = new Audio();
+        regAudio.preload = 'auto';
+        regAudio.src = REGULAR_SOUND_URL;
+        regAudio.volume = 1.0;
+        regAudio.load();
+        audioCache['regular'] = regAudio;
+    } catch(e) {}
+    console.log('✅ [Audio] Preloaded:', Object.keys(audioCache).length);
+}
 
 const POST_TYPE_MAP = {
     'biasa': { isSpecial: false, specialType: null },
@@ -1610,14 +1626,12 @@ let gdriveTokenExpiresAt = 0;
 let gdriveReady = false;
 
 // ====================================================================
-// 3. AUDIO SYSTEM
+// 3. AUDIO SYSTEM (v10.6 — Kanibal dari kode lama)
 // ====================================================================
 function unlockAudio() {
-    if (_audioUnlocked && _audioContext && _audioContext.state === 'running') return;
+    if (_audioUnlocked) return;
     try {
-        if (!_audioContext) {
-            _audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
+        _audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const buffer = _audioContext.createBuffer(1, 1, 22050);
         const source = _audioContext.createBufferSource();
         source.buffer = buffer;
@@ -1625,22 +1639,41 @@ function unlockAudio() {
         source.start(0);
         if (_audioContext.state === 'suspended') _audioContext.resume().catch(() => {});
         _audioUnlocked = true;
-    } catch(e) {}
+        console.log('🔓 [Audio] Unlocked');
+    } catch(e) {
+        console.warn('⚠️ [Audio] Unlock failed:', e.message);
+    }
 }
+
 ['click', 'touchstart', 'keydown'].forEach(evt => {
     document.addEventListener(evt, unlockAudio, { once: false, passive: true });
 });
 
+// ⭐ v10.6: Play nada dering regular (kanibal dari kode lama)
 function playRegularSound() {
     try {
         unlockAudio();
-        new Audio(REGULAR_SOUND_URL).play().catch(() => {});
-    } catch(e) {}
+        const cached = audioCache['regular'];
+        if (cached) {
+            cached.currentTime = 0;
+            cached.volume = 1.0;
+            const p = cached.play();
+            if (p !== undefined) {
+                p.catch(() => {
+                    try { new Audio(REGULAR_SOUND_URL).play().catch(() => {}); } catch(e) {}
+                });
+            }
+            console.log('🔊 [Regular] Play from cache');
+        } else {
+            new Audio(REGULAR_SOUND_URL).play().catch(() => {});
+            console.log('🔊 [Regular] Play fresh');
+        }
+    } catch(e) {
+        console.warn('playRegularSound:', e.message);
+    }
 }
 
-// ====================================================================
-// 3b. EMERGENCY ALARM LOOP (FIXED v10.5)
-// ====================================================================
+// ⭐ v10.6: Play nada dering emergency LOOPING (kanibal dari kode lama)
 function playEmergencyAlarmLoop(type) {
     if (!type || !EMERGENCY_SOUND_PLAYLIST[type]) {
         console.warn('⚠️ [Alarm] Type tidak valid:', type);
@@ -1650,70 +1683,57 @@ function playEmergencyAlarmLoop(type) {
     stopEmergencyAlarm();
 
     const soundUrl = EMERGENCY_SOUND_PLAYLIST[type];
-    console.log('🔊 [Alarm] Playing loop:', type);
+    console.log('🔊 [Alarm] Playing loop:', type, '→', soundUrl);
 
-    // Set state DULU agar highlight tahu
+    // Set state DULU
     window._salinkActiveAlarm = {
         type: type,
         sound: soundUrl,
         startedAt: Date.now()
     };
 
-    // Coba play MP3 dulu
     try {
         unlockAudio();
         if (_audioContext && _audioContext.state === 'suspended') {
             _audioContext.resume().catch(() => {});
         }
 
-        const audio = new Audio(soundUrl);
+        // ⭐ Kanibal: pakai audio cache kalau ada
+        let audio = audioCache[type];
+        if (!audio) {
+            audio = new Audio(soundUrl);
+            audioCache[type] = audio;
+        }
         audio.loop = true;
         audio.volume = 1.0;
-        audio.preload = 'auto';
-        audio.crossOrigin = 'anonymous';
+        audio.currentTime = 0;
 
         window._salinkAlarmAudioRef = audio;
 
-        // Timeout: kalau 2 detik MP3 tidak playing → fallback beep
-        const fallbackTimer = setTimeout(() => {
-            if (window._salinkActiveAlarm &&
-                window._salinkAlarmAudioRef === audio &&
-                (audio.paused || audio.currentTime === 0 || audio.error)) {
-                console.warn('⚠️ [Alarm] MP3 timeout — pakai fallback beep');
-                audio.pause();
-                audio.src = '';
-                window._salinkAlarmAudioRef = null;
-                playFallbackBeep(type);
-            }
-        }, 2000);
-
-        audio.addEventListener('playing', () => {
-            clearTimeout(fallbackTimer);
-            console.log('✅ [Alarm] MP3 playing');
-        });
-
-        audio.addEventListener('error', () => {
-            clearTimeout(fallbackTimer);
-            console.warn('⚠️ [Alarm] MP3 error — fallback beep');
-            window._salinkAlarmAudioRef = null;
-            playFallbackBeep(type);
-        });
-
+        // ⭐ Play dengan multiple fallback
         const playPromise = audio.play();
+
         if (playPromise !== undefined) {
-            playPromise.catch(err => {
-                clearTimeout(fallbackTimer);
-                console.warn('⚠️ [Alarm] Play ditolak:', err.message);
-                audio.muted = true;
-                audio.play().then(() => {
-                    audio.muted = false;
-                    console.log('✅ [Alarm] Playing setelah unmute');
-                }).catch(() => {
-                    console.warn('⚠️ [Alarm] Gagal total → fallback beep');
-                    window._salinkAlarmAudioRef = null;
-                    playFallbackBeep(type);
+            playPromise
+                .then(() => {
+                    console.log('✅ [Alarm] MP3 playing:', type);
+                })
+                .catch(err => {
+                    console.warn('⚠️ [Alarm] Play ditolak:', err.message);
+                    // Fallback 1: muted trick
+                    audio.muted = true;
+                    const retry = audio.play();
+                    if (retry !== undefined) {
+                        retry.then(() => {
+                            audio.muted = false;
+                            console.log('✅ [Alarm] Playing setelah muted trick');
+                        }).catch(() => {
+                            console.warn('⚠️ [Alarm] Gagal total → fallback beep');
+                            window._salinkAlarmAudioRef = null;
+                            playFallbackBeep(type);
+                        });
+                    }
                 });
-            });
         }
 
         // Vibrate pattern
@@ -1725,13 +1745,25 @@ function playEmergencyAlarmLoop(type) {
             }, 3000);
             navigator.vibrate([1000, 500, 1000, 500]);
         }
+
+        // ⭐ Cek 3 detik: kalau MP3 masih paused → fallback beep
+        setTimeout(() => {
+            if (window._salinkActiveAlarm &&
+                window._salinkAlarmAudioRef === audio &&
+                (audio.paused || audio.currentTime === 0)) {
+                console.warn('⚠️ [Alarm] MP3 tidak playing setelah 3s → fallback beep');
+                window._salinkAlarmAudioRef = null;
+                playFallbackBeep(type);
+            }
+        }, 3000);
+
     } catch (err) {
         console.error('❌ [Alarm] Error:', err);
         playFallbackBeep(type);
     }
 }
 
-// ⭐ v10.5: Fallback beep — pattern berbeda per jenis
+// ⭐ v10.6: Fallback beep (last resort)
 function playFallbackBeep(type) {
     console.log('🔊 [Fallback] Playing beep for:', type);
     try {
@@ -1778,7 +1810,7 @@ function playFallbackBeep(type) {
 
         playCycle();
         window._salinkBeepInterval = setInterval(playCycle, p.cycle * 1000);
-        console.log('✅ [Fallback] Beep started for:', type);
+        console.log('✅ [Fallback] Beep started');
     } catch (e) {
         console.error('❌ [Fallback] Beep gagal:', e);
     }
@@ -1790,8 +1822,6 @@ function stopEmergencyAlarm() {
         try {
             window._salinkAlarmAudioRef.pause();
             window._salinkAlarmAudioRef.currentTime = 0;
-            window._salinkAlarmAudioRef.src = '';
-            window._salinkAlarmAudioRef.load();
         } catch(e) {}
         window._salinkAlarmAudioRef = null;
     }
@@ -1808,13 +1838,11 @@ function stopEmergencyAlarm() {
     console.log('✅ [Alarm] Stopped');
 }
 
-// ⭐ v10.5: Highlight grid button
+// ⭐ v10.6: Highlight grid button
 function highlightEmergencyButton(type, active) {
     const btnMap = {
-        'fire': 'fireBtn',
-        'medical': 'medicalBtn',
-        'crime': 'securityBtn',
-        'disaster': 'disasterBtn'
+        'fire': 'fireBtn', 'medical': 'medicalBtn',
+        'crime': 'securityBtn', 'disaster': 'disasterBtn'
     };
     const btn = document.getElementById(btnMap[type]);
     if (!btn) return;
@@ -3501,9 +3529,12 @@ function triggerLocalEmergencyVisual(emergencyId, type, sender, location, text) 
     saveReadNotifs();
     dismissEmergency(em.id);
 
-    // ⭐ v10.5: Play NADA DERING EMERGENCY (bukan regular sound)
+        // ⭐ v10.6: Play NADA DERING EMERGENCY via playEmergencyAlarmLoop
     console.log('🔊 [Emergency] Playing emergency ringtone:', type);
-    playEmergencyAlarmLoop(type);
+    // Delay 200ms supaya audio cache sudah ready
+    setTimeout(() => {
+        playEmergencyAlarmLoop(type);
+    }, 200);
 
     highlightEmergencyButton(type, true);
     showFloatingNotification('emergency',
@@ -5193,7 +5224,10 @@ function initStorageEvents() {
 // 44. INIT
 // ====================================================================
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 SALINK Dashboard v10.5 — Emergency Alarm System FIXED');
+    console.log('🚀 SALINK Dashboard v10.6 — Kanibal Audio System');
+    
+    // ⭐ v10.6: PRELOAD AUDIO DULU (kanibal dari kode lama)
+    preloadAllAudio();
     setupIdleDetection();
     setupVisibilityDetection();
     setupPWA();
