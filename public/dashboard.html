@@ -7524,61 +7524,59 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadData();
     setTimeout(() => { initAllCharts(); }, 800);
 
-    // ⭐ v10.4: Auto-poll emergency + AUTO PLAY ALARM + BroadcastChannel
-if (emergencyPollTimer) clearInterval(emergencyPollTimer);
+        // ⭐ v10.4: Auto-poll emergency + AUTO PLAY ALARM
+    if (emergencyPollTimer) clearInterval(emergencyPollTimer);
 
-emergencyPollTimer = setInterval(async () => {
-    if (fullScreenAlarmActive) return;
-    try {
-        const remoteEms = await apiGetEmergencies();
-        if (!remoteEms || remoteEms.length === 0) return;
+    emergencyPollTimer = setInterval(async () => {
+        if (fullScreenAlarmActive) return;
+        try {
+            const remoteEms = await apiGetEmergencies();
+            if (!remoteEms || remoteEms.length === 0) return;
 
-        const localEms = getAllEmergencies();
-        const localIds = new Set(localEms.map(e => e.id));
-        const newEms = remoteEms.filter(em => !localIds.has(em.id));
+            const localEms = getAllEmergencies();
+            const localIds = new Set(localEms.map(e => e.id));
+            const newEms = remoteEms.filter(em => !localIds.has(em.id));
 
-        if (newEms.length > 0) {
-            console.log('🚨 [Poll] Emergency baru dari server:', newEms.length);
-
-            const merged = [...newEms, ...localEms];
-            localStorage.setItem('salink_emergencies', JSON.stringify(merged));
-
-            // ⭐ Trigger via function reusable
-            triggerEmergencyAutoAlarm(newEms[0]);
+            if (newEms.length > 0) {
+                console.log('🚨 [Poll] Emergency baru dari server:', newEms.length);
+                const merged = [...newEms, ...localEms];
+                localStorage.setItem('salink_emergencies', JSON.stringify(merged));
+                triggerEmergencyAutoAlarm(newEms[0]);
+            }
+        } catch(e) {
+            console.warn('⚠️ [Poll] Error:', e.message);
         }
-    } catch(e) {
-        console.warn('⚠️ [Poll] Error:', e.message);
-    }
-}, EMERGENCY_POLL_INTERVAL);
+    }, EMERGENCY_POLL_INTERVAL);
 
-// ⭐ v10.4: Fungsi reusable untuk trigger auto alarm
+    // ✅ PENUTUP DOMContentLoaded — WAJIB ADA!
+    console.log('✅ SALINK Dashboard v10.3 Ready!');
+});
+
+// ====================================================================
+// 44b. AUTO ALARM TRIGGER + BROADCAST CHANNEL (GLOBAL SCOPE)
+// ====================================================================
 function triggerEmergencyAutoAlarm(em) {
     if (!em || !em.type) return;
     console.log('🔊 [AutoAlarm] Triggering for:', em.type, 'ID:', em.id);
 
-    // Refresh UI
     if (typeof renderHologram === 'function') renderHologram();
     if (typeof updateEmergencyBadges === 'function') updateEmergencyBadges();
     if (typeof updateNotifBadge === 'function') updateNotifBadge();
 
-    // ⭐ Cek apakah device standby / locked
     if (isStandbyMode()) {
         console.log('📱 [AutoAlarm] Device standby — full screen alarm');
         if (typeof showFullScreenAlarm === 'function') showFullScreenAlarm(em);
         return;
     }
 
-    // Device aktif → play alarm + highlight + floating notif
     window._salinkAllowAutoTrigger = true;
 
-    // ⭐ Stop alarm lama dulu
     if (window._salinkActiveAlarm) {
         const oldType = window._salinkActiveAlarm.type;
         if (typeof stopEmergencyAlarm === 'function') stopEmergencyAlarm();
         if (typeof highlightEmergencyButton === 'function') highlightEmergencyButton(oldType, false);
     }
 
-    // ⭐ Play alarm baru
     if (typeof playEmergencyAlarmLoop === 'function') playEmergencyAlarmLoop(em.type);
     if (typeof highlightEmergencyButton === 'function') highlightEmergencyButton(em.type, true);
     if (typeof showFloatingEmergency === 'function') showFloatingEmergency(em);
@@ -7587,14 +7585,13 @@ function triggerEmergencyAutoAlarm(em) {
 }
 window.triggerEmergencyAutoAlarm = triggerEmergencyAutoAlarm;
 
-// ⭐ v10.4: BroadcastChannel — instant sync antar tab di device yang sama
+// ⭐ BroadcastChannel — instant sync antar tab di device yang sama
 try {
     const alarmChannel = new BroadcastChannel('salink_alarm_channel');
     alarmChannel.onmessage = (event) => {
         const data = event.data;
         if (data && data.type === 'new_emergency' && data.emergency) {
             console.log('📡 [BroadcastChannel] Emergency baru:', data.emergency.type);
-            // Trigger auto alarm di tab lain
             triggerEmergencyAutoAlarm(data.emergency);
         }
     };
@@ -7603,7 +7600,7 @@ try {
     console.warn('⚠️ [BroadcastChannel] Tidak didukung:', e.message);
 }
 
-// ⭐ v10.4: Storage event — fallback kalau BroadcastChannel tidak jalan
+// ⭐ Storage event — fallback kalau BroadcastChannel tidak jalan
 window.addEventListener('storage', (e) => {
     if (e.key === 'salink_emergencies_new' && e.newValue) {
         try {
@@ -7615,9 +7612,9 @@ window.addEventListener('storage', (e) => {
         } catch(err) {}
     }
 });
-
+            
 // ====================================================================
-// 45. EXPOSE GLOBAL
+// 45. EXPOSE GLOBAL (DI LUAR DOMContentLoaded)
 // ====================================================================
 window.openProfileUser = openProfileUser;
 window.requestDelete = requestDelete;
