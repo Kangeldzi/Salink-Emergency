@@ -3239,25 +3239,36 @@ function calculateRealStatistics() {
 // ====================================================================
 // 19. UPDATE STATS CARDS
 // ====================================================================
-function updateStatsCards() {
+
+    function updateStatsCards() {
     const allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
     const now = Date.now();
     let activeCount = 0, resolvedCount = 0;
+    
+    console.log('📊 [updateStatsCards] Total ems:', allEms.length);
+    
     allEms.forEach(e => {
         if (!e) return;
+        if (isDeleted(e.id)) return;
+        
         let ts;
         if (typeof e.timestamp === 'number') ts = e.timestamp;
         else if (e.timestamp) ts = new Date(e.timestamp).getTime();
         else ts = now;
         if (isNaN(ts)) ts = now;
+        
         const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
         const status = String(e.status || 'active').toLowerCase();
         const isManuallyResolved = ['resolved', 'selesai', 'ditangani', 'completed', 'closed'].indexOf(status) !== -1;
         const isExpired = exp <= now;
+        
         if (isManuallyResolved) resolvedCount++;
         else if (isExpired) resolvedCount++;
         else activeCount++;
     });
+    
+    console.log('📊 [updateStatsCards] Active:', activeCount, '| Resolved:', resolvedCount);
+    
     let teamsDisplay = 0;
     if (allUsers && allUsers.length > 0) {
         const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
@@ -3272,12 +3283,16 @@ function updateStatsCards() {
         }).length;
         teamsDisplay = teamsOnline > 0 ? teamsOnline : allUsers.length;
     }
+    
     const totalEms = activeCount + resolvedCount;
     const responseRate = totalEms > 0 ? Math.round((resolvedCount / totalEms) * 100) : 0;
+    
     const sa = document.getElementById('statActive'); if (sa) sa.textContent = activeCount;
     const sc = document.getElementById('statCompleted'); if (sc) sc.textContent = resolvedCount;
     const st = document.getElementById('statTeams'); if (st) st.textContent = teamsDisplay;
     const sr = document.getElementById('statResponse'); if (sr) sr.textContent = responseRate + '%';
+    
+    console.log('✅ [updateStatsCards] UI updated:', activeCount, resolvedCount, teamsDisplay, responseRate + '%');
 }
 
 // ====================================================================
@@ -4049,7 +4064,18 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
 // ====================================================================
 // 26. TRIGGER LOCAL EMERGENCY VISUAL
 // ====================================================================
-function triggerLocalEmergencyVisual(emergencyId, type, sender, location, text) {
+// ⭐ FIX BUG 2: Force re-render dengan delay
+triggerLocalEmergencyVisual(emergencyId, specialData.type, currentUser.fullName, specialData.location, text);
+
+// Double-check: force re-render setelah delay
+setTimeout(() => {
+    console.log('🔄 [CreatePost] Force re-render hologram');
+    console.log('🔍 [CreatePost] Current emergencies:', getAllEmergencies().length);
+    console.log('🔍 [CreatePost] Active emergencies:', getActiveEmergencies().length);
+    renderHologram();
+    updateEmergencyBadges();
+    updateStatsCards();
+}, 1000); {
     const em = {
         id: emergencyId, type: type, sender: sender,
         senderUsername: currentUser ? currentUser.username : 'user',
@@ -6161,8 +6187,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     }, 1500); // Delay 1.5s supaya data utama selesai load dulu
     
     initAllCharts();
+await loadData();
+
+    initAllCharts();
     await loadData();
-    setTimeout(() => { initAllCharts(); }, 800);
+
+    // ⭐ FIX BUG 1: Update stats & badges SETELAH data selesai load
+    updateStatsCards();
+    updateEmergencyBadges();
+    updateNotifBadge();
+    renderHologram();
+
+    setTimeout(() => { 
+        initAllCharts(); 
+        updateStatsCards();
+        updateEmergencyBadges();
+        renderHologram();
+    }, 800);
+
+    // ⭐ FIX BUG 1: Auto-refresh stats card setiap 30 detik
+    setInterval(() => {
+        if (!document.hidden) {
+            updateStatsCards();
+            updateEmergencyBadges();
+        }
+    }, 30000);
 
     if (emergencyPollTimer) clearInterval(emergencyPollTimer);
     emergencyPollTimer = setInterval(async () => {
