@@ -1144,7 +1144,43 @@
     cursor: pointer !important;
     z-index: 10 !important;
 }
-        
+
+/* ================================================================
+   PATCH — Globe Berputar (Rotating)
+   ================================================================ */
+
+/* Keyframe baru khusus globe */
+@keyframes globeRotate {
+    0% {
+        transform: rotate(0deg) scale(1);
+    }
+    50% {
+        transform: rotate(180deg) scale(1.1);
+    }
+    100% {
+        transform: rotate(360deg) scale(1);
+    }
+}
+
+/* Override animasi globe — ganti floatGlow dengan globeRotate */
+.hologram-summary-header .summary-globe {
+    display: inline-block;
+    position: relative;
+    animation: globeRotate 4s linear infinite !important;
+    transform-origin: center center;
+    will-change: transform;
+}
+
+/* Efek glow tambahan yang berputar */
+.hologram-summary-header .summary-globe::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(199,146,234,0.4), transparent 70%);
+    animation: globeRotate 4s linear infinite reverse;
+    pointer-events: none;
+}
 </style>
 </head>
 <body>
@@ -1765,17 +1801,11 @@
 
     <script>
 /* ====================================================================
- * SALINK v10.5 — EMERGENCY ALARM SYSTEM (FULL FIXED)
+ * SALINK v10.7 — EMERGENCY ALARM + GOOGLE DRIVE + DELETE SYSTEM
  * ====================================================================
- * Perbaikan v10.5:
- * 1. Grid button click tidak diblokir login guard
- * 2. Manual test mode — klik grid tanpa emergency aktif tetap bunyi
- * 3. Play MP3 emergency + fallback beep Web Audio API
- * 4. Auto-play alarm dari emergency baru (server + broadcast)
- * 5. BroadcastChannel + Storage Event — sync antar tab instant
- * 6. Posting emergency → nada dering EMERGENCY (bukan regular)
- * 7. Stat Card "Postingan Baru" — data muncul setelah posting
- * 8. Reset fullScreenAlarmActive di awal
+ * FULL FIXED — 2 error v10.6 sudah diperbaiki:
+ * FIX #1: EMERGENCY_SOUND_AVAILABLE dihapus dari Expose Global
+ * FIX #2: Syntax error di renderNotifList() diperbaiki
  * ==================================================================== */
 
 // ====================================================================
@@ -1799,8 +1829,6 @@ const EMERGENCY_CSS_CLASS = { 'fire': 'fire', 'medical': 'medical', 'crime': 'cr
 
 const REGULAR_SOUND_URL = '/Music/smsblackber_4a537f155087133.mp3';
 
-// ⭐ v10.6: Path audio LOKAL (kanibal dari kode lama yang terbukti bekerja)
-// File ada di folder /Music/ project Vercel
 const EMERGENCY_SOUND_PLAYLIST = {
     fire:     '/Music/Kebakaran.mp3',
     medical:  '/Music/kematian.mp3',
@@ -1808,10 +1836,8 @@ const EMERGENCY_SOUND_PLAYLIST = {
     disaster: '/Music/bencana_tsunami.mp3'
 };
 
-// Audio cache (kanibal dari kode lama)
 const audioCache = {};
 
-// ⭐ v10.6: Preload semua audio SEKALI di awal (bukan lazy load)
 function preloadAllAudio() {
     console.log('🔊 [Audio] Preloading...');
     Object.keys(EMERGENCY_SOUND_PLAYLIST).forEach(type => {
@@ -1826,7 +1852,6 @@ function preloadAllAudio() {
             console.warn('⚠️ [Audio] Preload gagal:', type, e.message);
         }
     });
-    // Preload regular sound
     try {
         const regAudio = new Audio();
         regAudio.preload = 'auto';
@@ -1880,7 +1905,6 @@ window._salinkVibrateInterval = null;
 window._salinkBeepInterval = null;
 window._salinkAlarmChannel = null;
 
-// ⭐ v10.5: Reset fullScreenAlarmActive di awal
 window.addEventListener('load', () => { fullScreenAlarmActive = false; });
 
 // ====================================================================
@@ -1898,7 +1922,7 @@ let gdriveTokenExpiresAt = 0;
 let gdriveReady = false;
 
 // ====================================================================
-// 3. AUDIO SYSTEM (v10.6 — Kanibal dari kode lama)
+// 3. AUDIO SYSTEM
 // ====================================================================
 function unlockAudio() {
     if (_audioUnlocked) return;
@@ -1921,7 +1945,6 @@ function unlockAudio() {
     document.addEventListener(evt, unlockAudio, { once: false, passive: true });
 });
 
-// ⭐ v10.6: Play nada dering regular (kanibal dari kode lama)
 function playRegularSound() {
     try {
         unlockAudio();
@@ -1945,7 +1968,6 @@ function playRegularSound() {
     }
 }
 
-// ⭐ v10.6: Play nada dering emergency LOOPING (kanibal dari kode lama)
 function playEmergencyAlarmLoop(type) {
     if (!type || !EMERGENCY_SOUND_PLAYLIST[type]) {
         console.warn('⚠️ [Alarm] Type tidak valid:', type);
@@ -1957,7 +1979,6 @@ function playEmergencyAlarmLoop(type) {
     const soundUrl = EMERGENCY_SOUND_PLAYLIST[type];
     console.log('🔊 [Alarm] Playing loop:', type, '→', soundUrl);
 
-    // Set state DULU
     window._salinkActiveAlarm = {
         type: type,
         sound: soundUrl,
@@ -1970,7 +1991,6 @@ function playEmergencyAlarmLoop(type) {
             _audioContext.resume().catch(() => {});
         }
 
-        // ⭐ Kanibal: pakai audio cache kalau ada
         let audio = audioCache[type];
         if (!audio) {
             audio = new Audio(soundUrl);
@@ -1982,7 +2002,6 @@ function playEmergencyAlarmLoop(type) {
 
         window._salinkAlarmAudioRef = audio;
 
-        // ⭐ Play dengan multiple fallback
         const playPromise = audio.play();
 
         if (playPromise !== undefined) {
@@ -1992,7 +2011,6 @@ function playEmergencyAlarmLoop(type) {
                 })
                 .catch(err => {
                     console.warn('⚠️ [Alarm] Play ditolak:', err.message);
-                    // Fallback 1: muted trick
                     audio.muted = true;
                     const retry = audio.play();
                     if (retry !== undefined) {
@@ -2008,7 +2026,6 @@ function playEmergencyAlarmLoop(type) {
                 });
         }
 
-        // Vibrate pattern
         if (navigator.vibrate) {
             window._salinkVibrateInterval = setInterval(() => {
                 if (window._salinkActiveAlarm) {
@@ -2018,7 +2035,6 @@ function playEmergencyAlarmLoop(type) {
             navigator.vibrate([1000, 500, 1000, 500]);
         }
 
-        // ⭐ Cek 3 detik: kalau MP3 masih paused → fallback beep
         setTimeout(() => {
             if (window._salinkActiveAlarm &&
                 window._salinkAlarmAudioRef === audio &&
@@ -2035,7 +2051,6 @@ function playEmergencyAlarmLoop(type) {
     }
 }
 
-// ⭐ v10.6: Fallback beep (last resort)
 function playFallbackBeep(type) {
     console.log('🔊 [Fallback] Playing beep for:', type);
     try {
@@ -2110,7 +2125,6 @@ function stopEmergencyAlarm() {
     console.log('✅ [Alarm] Stopped');
 }
 
-// ⭐ v10.6: Highlight grid button
 function highlightEmergencyButton(type, active) {
     const btnMap = {
         'fire': 'fireBtn', 'medical': 'medicalBtn',
@@ -2501,7 +2515,7 @@ async function ambilLokasiSaya() {
         try {
             const nominatimUrl = NOMINATIM_URL + '?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id';
             const response = await fetch(nominatimUrl, {
-                method: 'GET', headers: { 'User-Agent': 'SALINK-Emergency-App/10.5' }
+                method: 'GET', headers: { 'User-Agent': 'SALINK-Emergency-App/10.7' }
             });
             if (response.ok) {
                 const data = await response.json();
@@ -2786,7 +2800,6 @@ try {
     syncChannel.onmessage = (event) => handleSyncMessage(event.data);
 } catch(e) {}
 
-// ⭐ v10.5: BroadcastChannel untuk alarm
 try {
     window._salinkAlarmChannel = new BroadcastChannel('salink_alarm_channel');
     window._salinkAlarmChannel.onmessage = (event) => {
@@ -2848,7 +2861,6 @@ function loadPostsFromStorage() {
     return [];
 }
 
-// ⭐ v10.5: Trigger auto alarm untuk emergency baru
 function triggerEmergencyAutoAlarm(em) {
     if (!em || !em.type) return;
     console.log('🔊 [AutoAlarm] Triggering for:', em.type, 'ID:', em.id);
@@ -2974,7 +2986,7 @@ function handleImageError(img) {
 }
 
 // ====================================================================
-// 17. CENTRAL DELETE
+// 17. CENTRAL DELETE (OLD — untuk backward compatibility)
 // ====================================================================
 let pendingDelete = null;
 function requestDelete(type, id, description) {
@@ -3209,7 +3221,7 @@ function buildDetailSlide(em, counter) {
         ? '<span class="hologram-item-status expired"><i class="fas fa-clock"></i> Kadaluarsa</span>'
         : '<span class="hologram-item-status live">Live</span>';
     const textContent = em.text || em.description || '';
-    return '<div class="hologram-slide"><div class="hologram-item ' + cssClass + '" data-id="' + escapeAttr(em.id) + '"><div class="hologram-item-header"><span class="hologram-item-icon">' + icon + '</span><span class="hologram-item-type ' + cssClass + '">' + label + '</span><span class="hologram-item-counter">' + counterText + '</span>' + statusHTML + '<button class="hologram-item-delete" onclick="event.stopPropagation();window.handleDeleteFromHologram(\'' + escapeAttr(em.id) + '\')" title="Hapus permanen"><i class="fas fa-times"></i></button>' + </div><div class="hologram-item-sender"><i class="fas fa-user"></i><strong onclick="handleProfileClick(\'' + escapeAttr(senderUsername) + '\')">' + escapeHTML(senderName) + '</strong><span class="time-ago">🕐 ' + timeAgo + '</span></div>' + (textContent ? '<div class="hologram-item-text">"' + escapeHTML(textContent) + '"</div>' : '') + hierarchyHTML + (coords ? '<div class="hologram-item-coords"><i class="fas fa-crosshairs"></i> ' + escapeHTML(coords) + '</div>' : '') + '<div class="hologram-item-actions">' + (mapLink ? '<a href="' + escapeAttr(mapLink) + '" target="_blank" class="btn-action btn-map"><i class="fas fa-external-link-alt"></i> Lihat Peta</a>' : '') + '<a href="detail-emergency.html?id=' + encodeURIComponent(em.id) + '" class="btn-action btn-detail"><i class="fas fa-info-circle"></i> Detail</a></div><div class="hologram-item-expiry"><i class="fas fa-clock"></i> ' + getRemainingTime(expiresAt) + '</div></div></div>';
+    return '<div class="hologram-slide"><div class="hologram-item ' + cssClass + '" data-id="' + escapeAttr(em.id) + '"><div class="hologram-item-header"><span class="hologram-item-icon">' + icon + '</span><span class="hologram-item-type ' + cssClass + '">' + label + '</span><span class="hologram-item-counter">' + counterText + '</span>' + statusHTML + '<button class="hologram-item-delete" onclick="event.stopPropagation();window.handleDeleteFromHologram(\'' + escapeAttr(em.id) + '\')" title="Hapus permanen"><i class="fas fa-times"></i></button></div><div class="hologram-item-sender"><i class="fas fa-user"></i><strong onclick="handleProfileClick(\'' + escapeAttr(senderUsername) + '\')">' + escapeHTML(senderName) + '</strong><span class="time-ago">🕐 ' + timeAgo + '</span></div>' + (textContent ? '<div class="hologram-item-text">"' + escapeHTML(textContent) + '"</div>' : '') + hierarchyHTML + (coords ? '<div class="hologram-item-coords"><i class="fas fa-crosshairs"></i> ' + escapeHTML(coords) + '</div>' : '') + '<div class="hologram-item-actions">' + (mapLink ? '<a href="' + escapeAttr(mapLink) + '" target="_blank" class="btn-action btn-map"><i class="fas fa-external-link-alt"></i> Lihat Peta</a>' : '') + '<a href="detail-emergency.html?id=' + encodeURIComponent(em.id) + '" class="btn-action btn-detail"><i class="fas fa-info-circle"></i> Detail</a></div><div class="hologram-item-expiry"><i class="fas fa-clock"></i> ' + getRemainingTime(expiresAt) + '</div></div></div>';
 }
 
 function buildLocationHierarchy(em) {
@@ -3374,15 +3386,12 @@ function renderPosts() {
 }
 
 // ====================================================================
-// 22. RENDER POSTS STATS (FIXED v10.5)
+// 22. RENDER POSTS STATS
 // ====================================================================
 function renderPostsStats() {
     const container = document.getElementById('postsList');
     const countEl = document.getElementById('postsCount');
-    if (!container) {
-        console.warn('⚠️ [PostsStats] #postsList tidak ditemukan');
-        return;
-    }
+    if (!container) return;
 
     const uniquePosts = [];
     const seenIds = new Set();
@@ -3415,8 +3424,6 @@ function renderPostsStats() {
         }
         return renderCompactPostCard(p);
     }).join('');
-
-    console.log('✅ [PostsStats] Rendered successfully');
 }
 
 function renderCompactPostCard(p) {
@@ -3515,12 +3522,13 @@ function attachPostListeners() {
         };
     });
     document.querySelectorAll('.delete-post').forEach(el => {
-    el.onclick = function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        window.handleDeleteFromMenu(this.dataset.postId);
-    };
-});
+        el.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            window.handleDeleteFromMenu(this.dataset.postId);
+        };
+    });
+}
 
 function handleLikeClick(postId) { if (isPreviewMode) { showPreviewOverlay(); return; } toggleLike(postId); }
 function handleShareClick(postId) { if (isPreviewMode) { showPreviewOverlay(); return; } sharePost(postId); }
@@ -3593,7 +3601,7 @@ function sharePost(postId) {
 }
 
 // ====================================================================
-// 23. CREATE POST (v10.5 FIXED)
+// 23. CREATE POST
 // ====================================================================
 async function createPost(text, mediaFile, isSpecial, specialData) {
     if (window._salinkPostingInProgress) {
@@ -3710,10 +3718,8 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
             };
             apiCall('save_notification', notifPayload);
 
-            // ⭐ v10.5: Trigger visual + NADA DERING EMERGENCY (bukan regular sound)
             triggerLocalEmergencyVisual(emergencyId, specialData.type, currentUser.fullName, specialData.location, text);
 
-            // ⭐ v10.5: Broadcast ke tab/device lain
             const emergencyPayload = {
                 id: emergencyId,
                 type: specialData.type,
@@ -3748,7 +3754,6 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
         }
         broadcastSync('new_post', { id: postId });
 
-        // Reset form
         const pi = document.getElementById('postInput'); if (pi) pi.value = '';
         const pst = document.getElementById('postSpecialText'); if (pst) pst.value = '';
         const mu = document.getElementById('mediaUpload'); if (mu) mu.value = '';
@@ -3777,7 +3782,7 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
 }
 
 // ====================================================================
-// 24. TRIGGER LOCAL EMERGENCY VISUAL (v10.5 FIXED)
+// 24. TRIGGER LOCAL EMERGENCY VISUAL
 // ====================================================================
 function triggerLocalEmergencyVisual(emergencyId, type, sender, location, text) {
     const em = {
@@ -3804,9 +3809,7 @@ function triggerLocalEmergencyVisual(emergencyId, type, sender, location, text) 
     saveReadNotifs();
     dismissEmergency(em.id);
 
-        // ⭐ v10.6: Play NADA DERING EMERGENCY via playEmergencyAlarmLoop
     console.log('🔊 [Emergency] Playing emergency ringtone:', type);
-    // Delay 200ms supaya audio cache sudah ready
     setTimeout(() => {
         playEmergencyAlarmLoop(type);
     }, 200);
@@ -3874,7 +3877,24 @@ function renderNotifList() {
         const iconHtml = n.type === 'emergency' ? '<div class="notif-item-icon emergency">' + (EMERGENCY_ICONS[n.emergencyType] || '🚨') + '</div>' : '<div class="notif-item-icon regular"><i class="fas fa-bell"></i></div>';
         const unreadClass = n.read ? '' : 'unread';
         const typeClass = n.type === 'emergency' ? 'emergency' : '';
-        return '<div class="notif-item ' + unreadClass + ' ' + typeClass + '" onclick="openNotifDetail(\'' + escapeAttr(n.id) + '\')">' + iconHtml + '<div class="notif-item-content"><div class="notif-item-title">' + escapeHTML(n.title) + '</div><div class="notif-item-message">' + escapeHTML(n.message) + '</div><div class="notif-item-time"><i class="fas fa-clock"></i> ' + getTimeAgo(n.timestamp) + (n.sender ? ' • ' + escapeHTML(n.sender) : '') + '</div><div class="notif-item-actions">' + (!n.read ? '<button onclick="event.stopPropagation();markNotifRead(\'' + escapeAttr(n.id) + '\')"><i class="fas fa-check"></i> Tandai Dibaca</button>' : '') + (n.location ? '<button onclick="event.stopPropagation();goToLocation(\'' + escapeAttr(n.location) + '\')"><i class="fas fa-map-marker-alt"></i> Lokasi</button>' : '') + '<button onclick="event.stopPropagation();window.handleDeleteFromNotif(\'' + escapeAttr(n.id) + '\')" title="Hapus permanen"><i class="fas fa-trash"></i> Hapus</button>' + </div> + </div> + </div>';
+        let actionsHtml = '';
+        if (!n.read) {
+            actionsHtml += '<button onclick="event.stopPropagation();markNotifRead(\'' + escapeAttr(n.id) + '\')"><i class="fas fa-check"></i> Tandai Dibaca</button>';
+        }
+        if (n.location) {
+            actionsHtml += '<button onclick="event.stopPropagation();goToLocation(\'' + escapeAttr(n.location) + '\')"><i class="fas fa-map-marker-alt"></i> Lokasi</button>';
+        }
+        actionsHtml += '<button onclick="event.stopPropagation();window.handleDeleteFromNotif(\'' + escapeAttr(n.id) + '\')" title="Hapus permanen"><i class="fas fa-trash"></i> Hapus</button>';
+
+        return '<div class="notif-item ' + unreadClass + ' ' + typeClass + '" onclick="openNotifDetail(\'' + escapeAttr(n.id) + '\')">' +
+            iconHtml +
+            '<div class="notif-item-content">' +
+                '<div class="notif-item-title">' + escapeHTML(n.title) + '</div>' +
+                '<div class="notif-item-message">' + escapeHTML(n.message) + '</div>' +
+                '<div class="notif-item-time"><i class="fas fa-clock"></i> ' + getTimeAgo(n.timestamp) + (n.sender ? ' • ' + escapeHTML(n.sender) : '') + '</div>' +
+                '<div class="notif-item-actions">' + actionsHtml + '</div>' +
+            '</div>' +
+        '</div>';
     }).join('');
 }
 function setupNotifFilters() {
@@ -4257,7 +4277,7 @@ function updateMap() {
 }
 
 // ====================================================================
-// 28. HANDLE EMERGENCY CLICK (FIXED v10.5)
+// 28. HANDLE EMERGENCY CLICK
 // ====================================================================
 function handleEmergencyClick(e) {
     e.preventDefault();
@@ -4280,7 +4300,6 @@ function handleEmergencyClick(e) {
 
     unlockAudio();
 
-    // Stop alarm kalau type ini aktif
     if (window._salinkActiveAlarm && window._salinkActiveAlarm.type === type) {
         console.log('🔇 [Grid] Stop alarm:', type);
         stopEmergencyAlarm();
@@ -4290,7 +4309,6 @@ function handleEmergencyClick(e) {
         return;
     }
 
-    // Stop alarm lain yang aktif dulu
     if (window._salinkActiveAlarm) {
         const oldType = window._salinkActiveAlarm.type;
         console.log('🔇 [Grid] Stop alarm sebelumnya:', oldType);
@@ -4298,11 +4316,9 @@ function handleEmergencyClick(e) {
         highlightEmergencyButton(oldType, false);
     }
 
-    // Cari emergency aktif
     const activeEms = getActiveEmergencies().filter(em => em.type === type);
     console.log('📊 [Grid] Active emergencies for', type, ':', activeEms.length);
 
-    // ⭐ MANUAL TEST MODE: Tetap bunyi walau tidak ada emergency
     if (activeEms.length === 0) {
         console.log('⚠️ [Grid] Manual test mode');
         playEmergencyAlarmLoop(type);
@@ -4312,7 +4328,6 @@ function handleEmergencyClick(e) {
         return;
     }
 
-    // Ada emergency aktif
     console.log('🔊 [Grid] Starting alarm for:', type);
     window._salinkAllowAutoTrigger = true;
     playEmergencyAlarmLoop(type);
@@ -4401,10 +4416,7 @@ function setupLoginGuard() {
         const target = e.target.closest('[data-action]');
         if (!target) return;
         const action = target.dataset.action;
-
-        // ⭐ v10.5: Skip untuk emergency-btn — biarkan handleEmergencyClick yang handle
         if (target.classList.contains('emergency-btn')) return;
-
         if (action === 'profile') {
             if (isPreviewMode) { e.preventDefault(); e.stopPropagation(); showPreviewOverlay(); return; }
             if (target.id === 'userBtn' || target.id === 'postProfilePic') {
@@ -4426,7 +4438,7 @@ function setupLoginGuard() {
 }
 
 // ====================================================================
-// 30. LOAD DATA (v10.5 FIXED - renderPostsStats dipanggil)
+// 30. LOAD DATA
 // ====================================================================
 async function loadData() {
     let localPosts = [];
@@ -4451,7 +4463,6 @@ async function loadData() {
     notifications = localNotifs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     allUsers = localUsers;
 
-    // ⭐ v10.5: Render + Stats
     renderPosts();
     renderPostsStats();
     renderHologram();
@@ -4525,7 +4536,6 @@ async function loadData() {
         allUsers = Array.from(userMap.values());
         try { if (allUsers.length > 0) localStorage.setItem('salink_users', JSON.stringify(allUsers)); } catch(e) {}
 
-        // ⭐ v10.5: Render + Stats setelah API
         renderPosts();
         renderPostsStats();
         renderHologram();
@@ -5482,7 +5492,6 @@ function initStorageEvents() {
             updateAllCharts();
             updateStatsCards();
         }
-        // ⭐ v10.5: Storage event untuk emergency baru (fallback BroadcastChannel)
         if (e.key === 'salink_emergencies_new' && e.newValue) {
             try {
                 const data = JSON.parse(e.newValue);
@@ -5499,9 +5508,8 @@ function initStorageEvents() {
 // 44. INIT
 // ====================================================================
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 SALINK Dashboard v10.6 — Kanibal Audio System');
-    
-    // ⭐ v10.6: PRELOAD AUDIO DULU (kanibal dari kode lama)
+    console.log('🚀 SALINK Dashboard v10.7 — FULL FIXED');
+
     preloadAllAudio();
     setupIdleDetection();
     setupVisibilityDetection();
@@ -5572,7 +5580,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadData();
     setTimeout(() => { initAllCharts(); }, 800);
 
-    // Auto-poll emergency
     if (emergencyPollTimer) clearInterval(emergencyPollTimer);
     emergencyPollTimer = setInterval(async () => {
         if (fullScreenAlarmActive) return;
@@ -5624,7 +5631,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             headerInfo.textContent = formatBytes(usage.total) + ' (' + usage.percent + '%)';
         }
     }, 2000);
-    console.log('✅ SALINK Dashboard v10.5 Ready!');
+    console.log('✅ SALINK Dashboard v10.7 Ready!');
 });
 
 // ====================================================================
@@ -5688,21 +5695,11 @@ window.highlightEmergencyButton = highlightEmergencyButton;
 window.playFallbackBeep = playFallbackBeep;
 window.triggerEmergencyAutoAlarm = triggerEmergencyAutoAlarm;
 window.EMERGENCY_SOUND_PLAYLIST = EMERGENCY_SOUND_PLAYLIST;
-window.EMERGENCY_SOUND_AVAILABLE = EMERGENCY_SOUND_AVAILABLE;
+// ⭐ FIX #1: Baris EMERGENCY_SOUND_AVAILABLE DIHAPUS (tidak ada variabel ini)
 
 // ====================================================================
-// PATCH v10.7 — FUNGSI HAPUS PERMANEN (LOCALSTORAGE + BACKEND)
+// 46. PATCH v10.7 — FUNGSI HAPUS PERMANEN
 // ====================================================================
-
-/**
- * Hapus POST (postingan biasa atau emergency) dari:
- * - localStorage (salink_posts)
- * - localStorage (salink_emergencies)
- * - localStorage (salink_notifications)
- * - Backend Google Apps Script
- * - Google Drive (kalau ada media)
- * - Broadcast ke semua tab
- */
 async function deletePostPermanent(postId, options) {
     options = options || {};
     const silent = options.silent || false;
@@ -5713,11 +5710,9 @@ async function deletePostPermanent(postId, options) {
         return false;
     }
 
-    // Cari post di data
     const post = posts.find(p => p.id === postId);
     const isEmergency = post && post.isSpecial && post.specialType;
 
-    // Konfirmasi dobel
     if (!skipConfirm) {
         const label = post ? (post.text ? post.text.substring(0, 50) : 'Postingan media') : 'Postingan';
         if (!confirm('🗑️ HAPUS PERMANEN?\n\n"' + label + '"\n\nAkan dihapus dari:\n✅ Tampilan aplikasi\n✅ Penyimpanan lokal\n✅ Database server\n✅ Google Drive (media)\n\nTindakan ini TIDAK BISA DIBATALKAN!')) {
@@ -5732,9 +5727,6 @@ async function deletePostPermanent(postId, options) {
     console.log('🗑️ [deletePostPermanent] Deleting:', postId, '| Emergency:', isEmergency);
 
     try {
-        // ═══════════════════════════════════════════════════════════
-        // STEP 1: Hapus media dari Google Drive
-        // ═══════════════════════════════════════════════════════════
         if (post && post.gdriveId) {
             try {
                 console.log('🗑️ [deletePostPermanent] Deleting GDrive file:', post.gdriveId);
@@ -5744,31 +5736,24 @@ async function deletePostPermanent(postId, options) {
             }
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // STEP 2: Hapus dari localStorage
-        // ═══════════════════════════════════════════════════════════
-        // 2a. Hapus dari salink_posts
         let allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
         const beforeCount = allPosts.length;
         allPosts = allPosts.filter(p => p && p.id !== postId);
         safeSavePosts(allPosts);
         console.log('✅ [deletePostPermanent] Posts:', beforeCount, '→', allPosts.length);
 
-        // 2b. Hapus dari salink_emergencies
         let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
         const beforeEmsCount = ems.length;
         ems = ems.filter(e => e && e.id !== postId);
         localStorage.setItem('salink_emergencies', JSON.stringify(ems));
         console.log('✅ [deletePostPermanent] Emergencies:', beforeEmsCount, '→', ems.length);
 
-        // 2c. Hapus dari salink_notifications
         let notifs = JSON.parse(localStorage.getItem('salink_notifications') || '[]');
         const beforeNotifsCount = notifs.length;
         notifs = notifs.filter(n => n && n.id !== postId && n.postId !== postId);
         localStorage.setItem('salink_notifications', JSON.stringify(notifs));
         console.log('✅ [deletePostPermanent] Notifications:', beforeNotifsCount, '→', notifs.length);
 
-        // 2d. Hapus media lokal
         if (post && post.mediaId) {
             try {
                 const mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}');
@@ -5780,7 +5765,6 @@ async function deletePostPermanent(postId, options) {
             } catch(e) {}
         }
 
-        // 2e. Hapus readNotifs & dismissed
         if (readNotifs[postId]) {
             delete readNotifs[postId];
             saveReadNotifs();
@@ -5790,9 +5774,6 @@ async function deletePostPermanent(postId, options) {
             saveDismissed();
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // STEP 3: Hapus dari backend Google Apps Script
-        // ═══════════════════════════════════════════════════════════
         try {
             const deleteType = isEmergency ? 'emergency' : 'post';
             const response = await fetch(API_URL, {
@@ -5818,14 +5799,8 @@ async function deletePostPermanent(postId, options) {
             console.warn('⚠️ [deletePostPermanent] Backend error:', e.message);
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // STEP 4: Broadcast ke tab lain
-        // ═══════════════════════════════════════════════════════════
         broadcastSync(isEmergency ? 'delete_emergency' : 'delete_post', { id: postId });
 
-        // ═══════════════════════════════════════════════════════════
-        // STEP 5: Refresh UI
-        // ═══════════════════════════════════════════════════════════
         posts = loadPostsFromStorage();
         renderPosts();
         renderPostsStats();
@@ -5835,7 +5810,6 @@ async function deletePostPermanent(postId, options) {
         updateAllCharts();
         updateStatsCards();
 
-        // Tutup modal kalau terbuka
         closeModal('notifModal');
         closeDeleteConfirm();
 
@@ -5855,48 +5829,30 @@ async function deletePostPermanent(postId, options) {
     }
 }
 
-/**
- * Wrapper untuk tombol hapus di notif modal & stats card.
- * Cukup panggil window.deletePostPermanent(postId)
- */
 window.deletePostPermanent = deletePostPermanent;
 
-/**
- * Handle tombol hapus dari post menu (titik 3).
- */
 function handleDeleteFromMenu(postId) {
-    // Tutup dropdown menu
     document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
-    // Hapus
     deletePostPermanent(postId);
 }
 window.handleDeleteFromMenu = handleDeleteFromMenu;
 
-/**
- * Handle tombol hapus dari stats card (Postingan Baru).
- */
 function handleDeleteFromStatsCard(postId) {
     deletePostPermanent(postId);
 }
 window.handleDeleteFromStatsCard = handleDeleteFromStatsCard;
 
-/**
- * Handle tombol hapus dari hologram (emergency).
- */
 function handleDeleteFromHologram(emergencyId) {
     deletePostPermanent(emergencyId);
 }
 window.handleDeleteFromHologram = handleDeleteFromHologram;
 
-/**
- * Handle tombol hapus dari modal notif.
- */
 function handleDeleteFromNotif(notifId) {
     deletePostPermanent(notifId);
 }
 window.handleDeleteFromNotif = handleDeleteFromNotif;
-        
-console.log('✅ SALINK Dashboard v6.0 Script Loaded — Google Drive Integrated');
+
+console.log('✅ SALINK Dashboard v10.7 Script Loaded — ALL FIXED');
     </script>
     
     <script>
@@ -5966,4 +5922,3 @@ console.log('✅ SALINK Dashboard v6.0 Script Loaded — Google Drive Integrated
     </script>
 </body>
 </html> 
-    
