@@ -55,12 +55,12 @@
         SWIPE_MIN_DISTANCE: 50,                     // 50 px minimum swipe
 
         AUDIO: {
-    'fire':     'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/Kebakaran.mp3',
-    'medical':  'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/kematian.mp3',
-    'crime':    'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/pencurian.mp3',
-    'disaster': 'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/bencana_tsunami.mp3'
-},
-REGULAR_AUDIO: 'https://cdn.jsdelivr.net/gh/Kangeldzi/salink@main/Music/smsblackber_4a537f155087133.mp3',
+            'fire':     '/Music/Kebakaran.mp3',
+            'medical':  '/Music/kematian.mp3',
+            'crime':    '/Music/pencurian.mp3',
+            'disaster': '/Music/bencana_tsunami.mp3'
+        },
+        REGULAR_AUDIO: '/Music/smsblackber_4a537f155087133.mp3',
 
         LABELS: {
             'fire': '🔥 Kebakaran',
