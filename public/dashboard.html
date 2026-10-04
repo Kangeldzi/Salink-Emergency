@@ -928,7 +928,24 @@
         .item-delete, .post-action.delete, .hologram-item-delete, .notif-item-actions button { cursor: pointer !important; transition: all 0.2s ease !important; z-index: 10 !important; position: relative !important; }
         .item-delete:hover, .post-action.delete:hover, .hologram-item-delete:hover { transform: scale(1.1) !important; background: rgba(248,81,73,0.3) !important; }
         .post-menu-toggle { cursor: pointer !important; z-index: 10 !important; }
-    </style>
+
+   /* ================================================================
+   FIX v11.1 — Hide redundant full-screen alarm
+   ================================================================ */
+#fullScreenAlarm {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    top: -99999px !important;
+    left: -99999px !important;
+    width: 1px !important;
+    height: 1px !important;
+    overflow: hidden !important;
+    z-index: -1 !important;
+}
+</style>
 </head>
 <body>
       <div class="app-shell">
@@ -2469,7 +2486,7 @@ async function incrementViewerCount(postId) {
 }
 
 // ====================================================================
-// 15. CROSS-TAB SYNC
+// 15a. CROSS-TAB SYNC
 // ====================================================================
 let syncChannel = null;
 try {
@@ -2564,6 +2581,37 @@ function triggerEmergencyAutoAlarm(em) {
 }
 window.triggerEmergencyAutoAlarm = triggerEmergencyAutoAlarm;
 
+// ====================================================================
+// 15b. SERVICE WORKER MESSAGE HANDLER
+// ====================================================================
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        const data = event.data || {};
+        console.log('📨 [SW Message]', data.type, data);
+
+        if (data.type === 'EMERGENCY_PUSH_RECEIVED') {
+            // Emergency baru diterima via push → trigger auto alarm
+            const em = data.emergency;
+            if (em && em.id) {
+                console.log('🚨 [SW] Emergency push diterima:', em.type);
+                triggerEmergencyAutoAlarm(em);
+            }
+        }
+
+        if (data.type === 'EMERGENCY_NOTIFICATION_CLICK') {
+            // User tap notif → buka detail emergency
+            const emergencyId = data.emergencyId;
+            if (emergencyId) {
+                console.log('👆 [SW] User tap notif:', emergencyId);
+                setTimeout(() => {
+                    window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(emergencyId);
+                }, 300);
+            }
+        }
+    });
+    console.log('✅ [SW] Message listener terpasang');
+}
+            
 // ====================================================================
 // 16. HELPERS: safeSavePosts + Media
 // ====================================================================
