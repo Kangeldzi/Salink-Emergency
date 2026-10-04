@@ -1972,8 +1972,14 @@
     </div>
         <script>
 /* ====================================================================
- * SALINK v11.0 — TELKOMSEL REDESIGN + SALINK EMERGENCY DELEGATION
- * + PERSISTENT LIKE/COMMENT + PERMANENT DELETE FIX
+ * SALINK v12.0 — DASHBOARD JAVASCRIPT LENGKAP
+ * ====================================================================
+ * File ini TUNGGAL, TIDAK PERLU PATCH.
+ * Struktur:
+ *   Section 1-15   : Konstanta, State, Audio, Helper, Badges, GPS
+ *   Section 16-30  : GDrive, API, Sync, Media, Delete, Stats, Hologram
+ *   Section 31-50  : Posts, Like, Comment, CreatePost, Notif, Charts
+ *   Section 51-70  : User, LoadData, Search, PWA, E-Commerce, INIT
  * ==================================================================== */
 
 // ====================================================================
@@ -1991,7 +1997,12 @@ const EMERGENCY_CLEANUP_INTERVAL = 60000;
 const IDLE_THRESHOLD_MS = 30000;
 const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
 
-const EMERGENCY_LABELS = { 'fire': '🔥 Kebakaran', 'medical': '🚑 Medis & Kematian', 'crime': '🚓 Kriminal', 'disaster': '🌪️ Bencana Alam' };
+const EMERGENCY_LABELS = {
+    'fire': '🔥 Kebakaran',
+    'medical': '🚑 Medis & Kematian',
+    'crime': '🚓 Kriminal',
+    'disaster': '🌪️ Bencana Alam'
+};
 const EMERGENCY_ICONS = { 'fire': '🔥', 'medical': '🚑', 'crime': '🚓', 'disaster': '🌪️' };
 const EMERGENCY_CSS_CLASS = { 'fire': 'fire', 'medical': 'medical', 'crime': 'crime', 'disaster': 'disaster' };
 
@@ -2006,20 +2017,28 @@ const EMERGENCY_SOUND_PLAYLIST = {
 const audioCache = {};
 
 const POST_TYPE_MAP = {
-    'biasa': { isSpecial: false, specialType: null },
-    'fire': { isSpecial: true, specialType: 'fire' },
-    'medical': { isSpecial: true, specialType: 'medical' },
-    'crime': { isSpecial: true, specialType: 'crime' },
-    'disaster': { isSpecial: true, specialType: 'disaster' }
+    'biasa':    { isSpecial: false, specialType: null },
+    'fire':     { isSpecial: true,  specialType: 'fire' },
+    'medical':  { isSpecial: true,  specialType: 'medical' },
+    'crime':    { isSpecial: true,  specialType: 'crime' },
+    'disaster': { isSpecial: true,  specialType: 'disaster' }
 };
 
 // ====================================================================
-// 2. STATE
+// 2. STATE GLOBAL
 // ====================================================================
-let currentUser = null, isPreviewMode = true, currentTheme = 'dark';
-let posts = [], notifications = [], statistics = null, chartInstances = {};
+let currentUser = null;
+let isPreviewMode = true;
+let currentTheme = 'dark';
+
+let posts = [];
+let notifications = [];
+let statistics = null;
+let chartInstances = {};
+
 let floatingNotificationTimeout = null;
-let userLat = null, userLng = null, allUsers = [];
+let userLat = null, userLng = null;
+let allUsers = [];
 let currentPostType = 'biasa';
 let deferredPrompt = null;
 let notifFilter = 'all';
@@ -2042,8 +2061,16 @@ let sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}'
 window._salinkPostingInProgress = false;
 window._salinkAllowAutoTrigger = false;
 
+// E-Commerce state
+let allProducts = [];
+let allTransactions = [];
+let miniAllProducts = [];
+let miniAllTransactions = [];
+const MINI_PRODUCT_COUNT = 6;
+const MINI_ORDER_COUNT = 3;
+
 // ====================================================================
-// 2b. PERSISTENT LIKE/COMMENT/DELETED (BUG 2, 3, 4, 5 FIX)
+// 3. PERSISTENT STORAGE (Deleted IDs, Likes, Comments)
 // ====================================================================
 function loadDeletedIds() {
     try {
@@ -2121,7 +2148,7 @@ function setPostComments(postId, commentsArray) {
 }
 
 // ====================================================================
-// GDRIVE CONFIG
+// 4. GDRIVE CONFIG
 // ====================================================================
 const GDRIVE_CONFIG = {
     CLIENT_ID: '477566648959-32hl34krtgob7k5a2usestsg17fmv5gf.apps.googleusercontent.com',
@@ -2135,7 +2162,7 @@ let gdriveTokenExpiresAt = 0;
 let gdriveReady = false;
 
 // ====================================================================
-// 3. AUDIO SYSTEM
+// 5. AUDIO SYSTEM
 // ====================================================================
 function unlockAudio() {
     if (_audioUnlocked) return;
@@ -2201,29 +2228,7 @@ function playRegularSound() {
 }
 
 // ====================================================================
-// 4. IDLE DETECTION
-// ====================================================================
-function isStandbyMode() {
-    if (document.hidden) return true;
-    if (isIdleStandby) return true;
-    return false;
-}
-function resetIdleTimer() {
-    isIdleStandby = false;
-    if (idleTimer) clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => { isIdleStandby = true; }, IDLE_THRESHOLD_MS);
-}
-function setupIdleDetection() {
-    ['mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'visibilitychange'].forEach(evt => {
-        document.addEventListener(evt, () => {
-            if (document.visibilityState === 'visible') resetIdleTimer();
-        }, { passive: true });
-    });
-    resetIdleTimer();
-}
-
-// ====================================================================
-// 5. DELEGASI KE SalinkEmergency (OPSI A)
+// 6. DELEGASI KE SalinkEmergency (OPSI A)
 // ====================================================================
 function showFullScreenAlarm(em) {
     if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency && typeof SalinkEmergency.showAlarm === 'function') {
@@ -2232,6 +2237,7 @@ function showFullScreenAlarm(em) {
     }
     console.warn('⚠️ [FullScreenAlarm] SalinkEmergency tidak tersedia');
 }
+
 function dismissFullScreenAlarm(userAction) {
     fullScreenAlarmActive = false;
     if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency && typeof SalinkEmergency.dismissAlarm === 'function') {
@@ -2239,6 +2245,7 @@ function dismissFullScreenAlarm(userAction) {
         return;
     }
 }
+
 function playEmergencyAlarmLoop(type) {
     if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency && typeof SalinkEmergency.playEmergency === 'function') {
         SalinkEmergency.playEmergency(type);
@@ -2256,6 +2263,7 @@ function playEmergencyAlarmLoop(type) {
         window._salinkFallbackAudio = audio;
     } catch(e) {}
 }
+
 function stopEmergencyAlarm() {
     if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency && typeof SalinkEmergency.stopEmergency === 'function') {
         SalinkEmergency.stopEmergency();
@@ -2268,6 +2276,7 @@ function stopEmergencyAlarm() {
         window._salinkFallbackAudio = null;
     }
 }
+
 function highlightEmergencyButton(type, active) {
     const btnMap = { 'fire': 'fireBtn', 'medical': 'medicalBtn', 'crime': 'securityBtn', 'disaster': 'disasterBtn' };
     const btn = document.getElementById(btnMap[type]);
@@ -2284,7 +2293,7 @@ function highlightEmergencyButton(type, active) {
 }
 
 // ====================================================================
-// 6. STORAGE HELPERS
+// 7. STORAGE HELPERS (Read Notifs, Dismissed)
 // ====================================================================
 function loadReadNotifs() {
     try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); } catch(e) { readNotifs = {}; }
@@ -2313,6 +2322,7 @@ function dismissEmergency(id) {
     dismissedEmergencies[id] = Date.now();
     saveDismissed();
 }
+
 function getAllEmergencies() {
     try { return JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) { return []; }
 }
@@ -2333,7 +2343,7 @@ function getActiveEmergencies() {
 }
 
 // ====================================================================
-// 7. ADAPTERS// 
+// 8. ADAPTERS
 // ====================================================================
 function adaptEmergency(em) {
     const ts = em.timestamp ? new Date(em.timestamp).getTime() : Date.now();
@@ -2391,7 +2401,7 @@ function adaptNotification(n) {
 }
 
 // ====================================================================
-// 8. HELPERS
+// 9. HELPERS (Format, Time)
 // ====================================================================
 function formatDate(ts) {
     const d = new Date(ts);
@@ -2422,9 +2432,40 @@ function escapeAttr(str) {
     if (!str) return '';
     return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
+function formatRupiah(num) {
+    return 'Rp ' + Number(num || 0).toLocaleString('id-ID');
+}
+function formatRupiahMini(num) {
+    const n = Number(num || 0);
+    if (n >= 1000000) return 'Rp ' + (n / 1000000).toFixed(1).replace('.0', '') + 'jt';
+    if (n >= 1000) return 'Rp ' + (n / 1000).toFixed(0) + 'rb';
+    return 'Rp ' + n.toLocaleString('id-ID');
+}
 
 // ====================================================================
-// 9. BADGES
+// 10. IDLE DETECTION
+// ====================================================================
+function isStandbyMode() {
+    if (document.hidden) return true;
+    if (isIdleStandby) return true;
+    return false;
+}
+function resetIdleTimer() {
+    isIdleStandby = false;
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { isIdleStandby = true; }, IDLE_THRESHOLD_MS);
+}
+function setupIdleDetection() {
+    ['mousemove', 'keydown', 'scroll', 'touchstart', 'click', 'visibilitychange'].forEach(evt => {
+        document.addEventListener(evt, () => {
+            if (document.visibilityState === 'visible') resetIdleTimer();
+        }, { passive: true });
+    });
+    resetIdleTimer();
+}
+
+// ====================================================================
+// 11. BADGES
 // ====================================================================
 function updateEmergencyBadges() {
     const counts = getActiveEmergencyCountByType();
@@ -2476,7 +2517,7 @@ function getActiveEmergencyCountByType() {
 }
 
 // ====================================================================
-// 10. TOAST & FLOATING
+// 12. TOAST & FLOATING NOTIFICATION
 // ====================================================================
 function showToast(title, message, icon) {
     icon = icon || 'fa-info-circle';
@@ -2490,6 +2531,7 @@ function showToast(title, message, icon) {
     container.appendChild(toast);
     setTimeout(() => { toast.classList.remove('active'); setTimeout(() => toast.remove(), 400); }, 5000);
 }
+
 function showFloatingNotification(type, title, message, subtitle, actionText, actionCallback) {
     const notif = document.getElementById('floatingNotification');
     const icon = document.getElementById('floatingIcon');
@@ -2544,7 +2586,7 @@ function showFloatingEmergency(em) {
 }
 
 // ====================================================================
-// 11. TRIGGER EMERGENCY FROM NOTIFICATION
+// 13. TRIGGER EMERGENCY FROM NOTIFICATION
 // ====================================================================
 function triggerEmergencyFromNotification(notif) {
     if (isDismissed(notif.id)) return;
@@ -2578,7 +2620,34 @@ function triggerEmergencyFromNotification(notif) {
 }
 
 // ====================================================================
-// 12. GPS
+// 14. TRIGGER EMERGENCY AUTO ALARM (untuk polling & push)
+// ====================================================================
+function triggerEmergencyAutoAlarm(em) {
+    if (!em || !em.type) return;
+    console.log('🔊 [AutoAlarm] Triggering for:', em.type, 'ID:', em.id);
+
+    if (typeof renderHologram === 'function') renderHologram();
+    if (typeof updateEmergencyBadges === 'function') updateEmergencyBadges();
+    if (typeof updateNotifBadge === 'function') updateNotifBadge();
+
+    if (isStandbyMode()) {
+        if (typeof showFullScreenAlarm === 'function') showFullScreenAlarm(em);
+        return;
+    }
+
+    window._salinkAllowAutoTrigger = true;
+
+    if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency && typeof SalinkEmergency.triggerGridAlarmFromPost === 'function') {
+        SalinkEmergency.triggerGridAlarmFromPost(em.type, false);
+    }
+
+    if (typeof showFloatingEmergency === 'function') showFloatingEmergency(em);
+    console.log('✅ [AutoAlarm] Delegated to SalinkEmergency for:', em.type);
+}
+window.triggerEmergencyAutoAlarm = triggerEmergencyAutoAlarm;
+
+// ====================================================================
+// 15. GPS — Ambil Lokasi
 // ====================================================================
 async function ambilLokasiSaya() {
     const btn = document.getElementById('gpsLocationBtn');
@@ -2617,7 +2686,7 @@ async function ambilLokasiSaya() {
         try {
             const nominatimUrl = NOMINATIM_URL + '?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id';
             const response = await fetch(nominatimUrl, {
-                method: 'GET', headers: { 'User-Agent': 'SALINK-Emergency-App/11.0' }
+                method: 'GET', headers: { 'User-Agent': 'SALINK-Emergency-App/12.0' }
             });
             if (response.ok) {
                 const data = await response.json();
@@ -2653,8 +2722,10 @@ async function ambilLokasiSaya() {
     }
 }
 
+console.log('✅ [TAHAP 1] Foundation loaded');
+            
 // ====================================================================
-// 13. GOOGLE DRIVE MODULE
+// 16. GOOGLE DRIVE MODULE
 // ====================================================================
 function initGoogleDrive() {
     return new Promise((resolve, reject) => {
@@ -2682,6 +2753,7 @@ function initGoogleDrive() {
         });
     });
 }
+
 function requestGDriveToken(forceNew) {
     return new Promise((resolve, reject) => {
         if (!forceNew && gdriveAccessToken && Date.now() < gdriveTokenExpiresAt - 60000) {
@@ -2699,6 +2771,7 @@ function requestGDriveToken(forceNew) {
         catch (err) { reject(err); }
     });
 }
+
 async function uploadToGDrive(file, retryCount) {
     retryCount = retryCount || 0;
     try {
@@ -2769,6 +2842,7 @@ async function uploadToGDrive(file, retryCount) {
         throw err;
     }
 }
+
 async function setViewOnlyPermission(fileId, token) {
     try {
         await fetch('https://www.googleapis.com/drive/v3/files/' + fileId + '/permissions', {
@@ -2778,6 +2852,7 @@ async function setViewOnlyPermission(fileId, token) {
         });
     } catch (err) {}
 }
+
 async function deleteFromGDrive(fileId) {
     if (!fileId) return false;
     try {
@@ -2790,7 +2865,7 @@ async function deleteFromGDrive(fileId) {
 }
 
 // ====================================================================
-// 14. API CALLS
+// 17. API CALLS
 // ====================================================================
 async function apiCall(action, data) {
     data = data || {};
@@ -2815,6 +2890,7 @@ async function apiCall(action, data) {
         return { status: 'error', message: error.message };
     }
 }
+
 async function apiGetPosts() {
     const r = await apiCall('get_posts');
     return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptPost) : [];
@@ -2835,6 +2911,7 @@ async function apiGetUsers() {
     const r = await apiCall('get_users');
     return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptUser) : [];
 }
+
 async function apiSavePost(postData) {
     const payload = {
         id: postData.id, userId: postData.userId, userFullName: postData.userFullName,
@@ -2858,6 +2935,7 @@ async function apiSavePost(postData) {
     const r = await apiCall('save_post', payload);
     return r.status === 'success';
 }
+
 async function apiSaveEmergency(emergencyData) {
     const payload = {
         id: emergencyData.id || ('emergency-' + Date.now()),
@@ -2878,6 +2956,7 @@ async function apiSaveEmergency(emergencyData) {
     const r = await apiCall('save_emergency', payload);
     return r.status === 'success';
 }
+
 async function incrementViewerCount(postId) {
     if (!postId) return;
     try {
@@ -2895,7 +2974,7 @@ async function incrementViewerCount(postId) {
 }
 
 // ====================================================================
-// 15a. CROSS-TAB SYNC
+// 18. CROSS-TAB SYNC
 // ====================================================================
 let syncChannel = null;
 try {
@@ -2918,8 +2997,11 @@ function handleSyncMessage(data) {
     if (!data || !data.type) return;
     showSyncIndicator();
     switch(data.type) {
-        case 'delete_post': case 'delete_emergency': case 'delete_all':
-        case 'new_post': case 'new_emergency':
+        case 'delete_post':
+        case 'delete_emergency':
+        case 'delete_all':
+        case 'new_post':
+        case 'new_emergency':
             posts = loadPostsFromStorage();
             renderPosts();
             renderPostsStats();
@@ -2929,7 +3011,9 @@ function handleSyncMessage(data) {
             updateAllCharts();
             updateStatsCards();
             break;
-        case 'stats_update': updateStatsCards(); break;
+        case 'stats_update':
+            updateStatsCards();
+            break;
     }
     hideSyncIndicator();
 }
@@ -2957,41 +3041,15 @@ function loadPostsFromStorage() {
         if (raw) {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed)) {
-                return parsed
-                    .map(adaptPost)
-                    .filter(p => p && p.id && !isDeleted(p.id));
+                return parsed.map(adaptPost).filter(p => p && p.id && !isDeleted(p.id));
             }
         }
     } catch(e) {}
     return [];
 }
 
-function triggerEmergencyAutoAlarm(em) {
-    if (!em || !em.type) return;
-    console.log('🔊 [AutoAlarm] Triggering for:', em.type, 'ID:', em.id);
-
-    if (typeof renderHologram === 'function') renderHologram();
-    if (typeof updateEmergencyBadges === 'function') updateEmergencyBadges();
-    if (typeof updateNotifBadge === 'function') updateNotifBadge();
-
-    if (isStandbyMode()) {
-        if (typeof showFullScreenAlarm === 'function') showFullScreenAlarm(em);
-        return;
-    }
-
-    window._salinkAllowAutoTrigger = true;
-
-    if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency && typeof SalinkEmergency.triggerGridAlarmFromPost === 'function') {
-        SalinkEmergency.triggerGridAlarmFromPost(em.type, false);
-    }
-
-    if (typeof showFloatingEmergency === 'function') showFloatingEmergency(em);
-    console.log('✅ [AutoAlarm] Delegated to SalinkEmergency for:', em.type);
-}
-window.triggerEmergencyAutoAlarm = triggerEmergencyAutoAlarm;
-
 // ====================================================================
-// 15b. SERVICE WORKER MESSAGE HANDLER
+// 19. SERVICE WORKER MESSAGE HANDLER
 // ====================================================================
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', (event) => {
@@ -2999,7 +3057,6 @@ if ('serviceWorker' in navigator) {
         console.log('📨 [SW Message]', data.type, data);
 
         if (data.type === 'EMERGENCY_PUSH_RECEIVED') {
-            // Emergency baru diterima via push → trigger auto alarm
             const em = data.emergency;
             if (em && em.id) {
                 console.log('🚨 [SW] Emergency push diterima:', em.type);
@@ -3008,7 +3065,6 @@ if ('serviceWorker' in navigator) {
         }
 
         if (data.type === 'EMERGENCY_NOTIFICATION_CLICK') {
-            // User tap notif → buka detail emergency
             const emergencyId = data.emergencyId;
             if (emergencyId) {
                 console.log('👆 [SW] User tap notif:', emergencyId);
@@ -3017,7 +3073,7 @@ if ('serviceWorker' in navigator) {
                 }, 300);
             }
         }
-        // ⭐ User tap notif sosial / e-commerce → redirect
+
         if (data.type === 'NOTIFICATION_CLICK') {
             if (data.url) {
                 setTimeout(() => { window.location.href = data.url; }, 300);
@@ -3026,24 +3082,19 @@ if ('serviceWorker' in navigator) {
     });
     console.log('✅ [SW] Message listener terpasang');
 }
-            
+
 // ====================================================================
-// 16. HELPERS: safeSavePosts + Media
+// 20. MEDIA HELPERS (safeSavePosts, getMediaUrl, handleImageError)
 // ====================================================================
 function safeSavePosts(postsArray) {
     try {
-        // ⭐ Coba simpan versi lengkap dulu
         const fullPosts = postsArray.filter(p => p && p.id);
         const fullJson = JSON.stringify(fullPosts);
-        
-        // Kalau < 4MB, simpan langsung
         if (fullJson.length < 4 * 1024 * 1024) {
             localStorage.setItem('salink_posts', fullJson);
             console.log('✅ [safeSavePosts] Saved full:', fullPosts.length, 'posts,', (fullJson.length / 1024).toFixed(1), 'KB');
             return true;
         }
-        
-        // Kalau terlalu besar, truncate mediaData
         const lightPosts = fullPosts.map(p => {
             const copy = Object.assign({}, p);
             if (copy.mediaData && copy.mediaData.length > 50000) {
@@ -3056,8 +3107,6 @@ function safeSavePosts(postsArray) {
         return true;
     } catch (e) {
         console.error('❌ [safeSavePosts] Error:', e.message);
-        
-        // Fallback: hapus semua mediaData
         try {
             const noMediaPosts = postsArray.filter(p => p && p.id).map(p => {
                 const copy = Object.assign({}, p);
@@ -3065,14 +3114,13 @@ function safeSavePosts(postsArray) {
                 return copy;
             });
             localStorage.setItem('salink_posts', JSON.stringify(noMediaPosts));
-            console.log('✅ [safeSavePosts] Saved no-media:', noMediaPosts.length, 'posts');
             return true;
         } catch (e2) {
-            console.error('❌ [safeSavePosts] Fatal:', e2.message);
             return false;
         }
     }
 }
+
 function getMediaFromStore(mediaId, fallbackData) {
     if (!mediaId) return fallbackData || '';
     try {
@@ -3082,6 +3130,7 @@ function getMediaFromStore(mediaId, fallbackData) {
     } catch(e) {}
     return fallbackData || '';
 }
+
 function getMediaUrlFromPost(post) {
     if (!post) return '';
     if (post.gdriveId) {
@@ -3095,6 +3144,7 @@ function getMediaUrlFromPost(post) {
     if (post.mediaId) return getMediaFromStore(post.mediaId, post.mediaData);
     return '';
 }
+
 function cleanupOldMedia() {
     try {
         const mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}');
@@ -3105,6 +3155,7 @@ function cleanupOldMedia() {
         localStorage.setItem('salink_post_media', JSON.stringify(mediaStore));
     } catch(e) {}
 }
+
 function handleImageError(img) {
     const fallback1 = img.getAttribute('data-fallback-1');
     const fallback2 = img.getAttribute('data-fallback-2');
@@ -3137,7 +3188,7 @@ function handleImageError(img) {
 }
 
 // ====================================================================
-// 17. CENTRAL DELETE (OLD)
+// 21. CENTRAL DELETE (Request, Confirm)
 // ====================================================================
 let pendingDelete = null;
 function requestDelete(type, id, description) {
@@ -3153,40 +3204,103 @@ function closeDeleteConfirm() {
     const modal = document.getElementById('deleteConfirmModal');
     if (modal) modal.classList.remove('active');
 }
-async function confirmDeleteNow() {
-    if (!pendingDelete) return;
-    const type = pendingDelete.type;
-    const id = pendingDelete.id;
-    const modal = document.getElementById('deleteConfirmModal');
-    if (modal) modal.classList.remove('active');
-    pendingDelete = null;
-    showSyncIndicator();
-    try {
-        if (type === 'post' || type === 'emergency') {
-            const postToDelete = posts.find(p => p.id === id);
-            if (postToDelete && postToDelete.gdriveId) {
-                try { await deleteFromGDrive(postToDelete.gdriveId); } catch(e) {}
-            }
-            let allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
-            allPosts = allPosts.filter(p => p.id !== id);
-            safeSavePosts(allPosts);
-            let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-            ems = ems.filter(e => e.id !== id);
-            localStorage.setItem('salink_emergencies', JSON.stringify(ems));
-            if (readNotifs[id]) { delete readNotifs[id]; saveReadNotifs(); }
-        } else if (type === 'all_posts') {
-            localStorage.setItem('salink_posts', JSON.stringify([]));
-        } else if (type === 'all_emergencies') {
-            localStorage.setItem('salink_emergencies', JSON.stringify([]));
+
+// ====================================================================
+// 22. DELETE PERMANENT (FIX BUG 2)
+// ====================================================================
+async function deletePostPermanent(postId, options) {
+    options = options || {};
+    const silent = options.silent || false;
+    const skipConfirm = options.skipConfirm || false;
+
+    if (!postId) {
+        showToast('⚠️ Error', 'ID postingan tidak valid', 'fa-exclamation-triangle');
+        return false;
+    }
+
+    const post = posts.find(p => p.id === postId);
+    const isEmergency = post && post.isSpecial && post.specialType;
+
+    if (!skipConfirm) {
+        const label = post ? (post.text ? post.text.substring(0, 50) : 'Postingan media') : 'Postingan';
+        if (!confirm('🗑️ HAPUS PERMANEN?\n\n"' + label + '"\n\nAkan dihapus dari:\n✅ Tampilan aplikasi\n✅ Penyimpanan lokal\n✅ Database server\n✅ Google Drive (media)\n\nTindakan ini TIDAK BISA DIBATALKAN!')) {
+            return false;
         }
+        if (!confirm('🛑 KONFIRMASI KEDUA\n\nYakin ingin menghapus? Data tidak dapat dikembalikan.')) {
+            return false;
+        }
+    }
+
+    showSyncIndicator();
+    console.log('🗑️ [deletePostPermanent] Deleting:', postId, '| Emergency:', isEmergency);
+
+    try {
+        markAsDeleted(postId);
+        console.log('✅ [deletePostPermanent] Marked as deleted');
+
+        if (post && post.gdriveId) {
+            try {
+                await deleteFromGDrive(post.gdriveId);
+            } catch(e) {}
+        }
+
+        let allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
+        allPosts = allPosts.filter(p => p && p.id !== postId);
+        safeSavePosts(allPosts);
+
+        let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+        ems = ems.filter(e => e && e.id !== postId);
+        localStorage.setItem('salink_emergencies', JSON.stringify(ems));
+
+        let notifs = JSON.parse(localStorage.getItem('salink_notifications') || '[]');
+        notifs = notifs.filter(n => n && n.id !== postId && n.postId !== postId);
+        localStorage.setItem('salink_notifications', JSON.stringify(notifs));
+
+        if (window._salinkLikesMap && window._salinkLikesMap[postId]) {
+            delete window._salinkLikesMap[postId];
+            saveLikesMap();
+        }
+        if (window._salinkCommentsMap && window._salinkCommentsMap[postId]) {
+            delete window._salinkCommentsMap[postId];
+            saveCommentsMap();
+        }
+
+        if (post && post.mediaId) {
+            try {
+                const mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}');
+                if (mediaStore[post.mediaId]) {
+                    delete mediaStore[post.mediaId];
+                    localStorage.setItem('salink_post_media', JSON.stringify(mediaStore));
+                }
+            } catch(e) {}
+        }
+
+        if (readNotifs[postId]) { delete readNotifs[postId]; saveReadNotifs(); }
+        if (dismissedEmergencies[postId]) { delete dismissedEmergencies[postId]; saveDismissed(); }
+
         try {
-            await fetch(API_URL, {
+            const deleteType = isEmergency ? 'emergency' : 'post';
+            const response = await fetch(API_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'delete_content', data: { type: type, id: id, userId: currentUser ? currentUser.username : '' }, timestamp: Date.now() })
+                body: JSON.stringify({
+                    action: 'delete_content',
+                    data: {
+                        type: deleteType,
+                        id: postId,
+                        userId: currentUser ? currentUser.username : ''
+                    },
+                    timestamp: Date.now()
+                })
             });
+            const result = await response.json();
+            if (result && result.status === 'success') {
+                console.log('✅ [deletePostPermanent] Backend delete OK');
+            }
         } catch(e) {}
-        broadcastSync(type === 'post' ? 'delete_post' : 'delete_emergency', { id: id });
+
+        broadcastSync(isEmergency ? 'delete_emergency' : 'delete_post', { id: postId });
+
         posts = loadPostsFromStorage();
         renderPosts();
         renderPostsStats();
@@ -3195,16 +3309,48 @@ async function confirmDeleteNow() {
         updateNotifBadge();
         updateAllCharts();
         updateStatsCards();
-        showToast('✅ Dihapus', 'Data berhasil dihapus', 'fa-check-circle');
+
+        closeModal('notifModal');
+        closeDeleteConfirm();
+
+        if (!silent) showToast('✅ Terhapus', 'Postingan dihapus permanen', 'fa-check-circle');
         playRegularSound();
+
+        hideSyncIndicator();
+        return true;
     } catch(e) {
-        showToast('⚠️ Gagal', 'Tidak dapat menghapus data', 'fa-exclamation-triangle');
+        console.error('❌ [deletePostPermanent] Error:', e);
+        hideSyncIndicator();
+        if (!silent) showToast('⚠️ Gagal', 'Error: ' + e.message, 'fa-exclamation-triangle');
+        return false;
     }
-    hideSyncIndicator();
 }
 
+window.deletePostPermanent = deletePostPermanent;
+
+function handleDeleteFromMenu(postId) {
+    document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
+    deletePostPermanent(postId);
+}
+window.handleDeleteFromMenu = handleDeleteFromMenu;
+
+function handleDeleteFromStatsCard(postId) {
+    deletePostPermanent(postId);
+}
+window.handleDeleteFromStatsCard = handleDeleteFromStatsCard;
+
+function handleDeleteFromHologram(emergencyId) {
+    deletePostPermanent(emergencyId);
+}
+window.handleDeleteFromHologram = handleDeleteFromHologram;
+
+function handleDeleteFromNotif(notifId) {
+    deletePostPermanent(notifId);
+}
+window.handleDeleteFromNotif = handleDeleteFromNotif;
+
 // ====================================================================
-// 18. CALCULATE STATS
+// 23. CALCULATE STATS (Helper)
 // ====================================================================
 function calculateRealStatistics() {
     const allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
@@ -3212,6 +3358,7 @@ function calculateRealStatistics() {
     const now = Date.now();
     const activeEms = allEms.filter(e => {
         if (!e) return false;
+        if (isDeleted(e.id)) return false;
         let ts = typeof e.timestamp === 'number' ? e.timestamp : new Date(e.timestamp).getTime();
         if (isNaN(ts)) ts = now;
         const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
@@ -3227,48 +3374,51 @@ function calculateRealStatistics() {
     });
     const byType = { fire: 0, medical: 0, crime: 0, disaster: 0 };
     allPosts.forEach(p => {
+        if (isDeleted(p.id)) return;
         if (p.isSpecial && p.specialType && byType.hasOwnProperty(p.specialType)) byType[p.specialType]++;
     });
     return {
-        totalPosts: allPosts.length, totalEmergencies: allEms.length,
-        activeEmergencies: activeEms.length, totalLikes: totalLikes,
-        totalViewers: totalViewers, byType: byType
+        totalPosts: allPosts.length,
+        totalEmergencies: allEms.length,
+        activeEmergencies: activeEms.length,
+        totalLikes: totalLikes,
+        totalViewers: totalViewers,
+        byType: byType
     };
 }
 
 // ====================================================================
-// 19. UPDATE STATS CARDS
+// 24. UPDATE STATS CARDS (FIX BUG 1)
 // ====================================================================
-
-    function updateStatsCards() {
+function updateStatsCards() {
     const allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
     const now = Date.now();
     let activeCount = 0, resolvedCount = 0;
-    
+
     console.log('📊 [updateStatsCards] Total ems:', allEms.length);
-    
+
     allEms.forEach(e => {
         if (!e) return;
         if (isDeleted(e.id)) return;
-        
+
         let ts;
         if (typeof e.timestamp === 'number') ts = e.timestamp;
         else if (e.timestamp) ts = new Date(e.timestamp).getTime();
         else ts = now;
         if (isNaN(ts)) ts = now;
-        
+
         const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
         const status = String(e.status || 'active').toLowerCase();
         const isManuallyResolved = ['resolved', 'selesai', 'ditangani', 'completed', 'closed'].indexOf(status) !== -1;
         const isExpired = exp <= now;
-        
+
         if (isManuallyResolved) resolvedCount++;
         else if (isExpired) resolvedCount++;
         else activeCount++;
     });
-    
+
     console.log('📊 [updateStatsCards] Active:', activeCount, '| Resolved:', resolvedCount);
-    
+
     let teamsDisplay = 0;
     if (allUsers && allUsers.length > 0) {
         const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
@@ -3283,20 +3433,26 @@ function calculateRealStatistics() {
         }).length;
         teamsDisplay = teamsOnline > 0 ? teamsOnline : allUsers.length;
     }
-    
+
     const totalEms = activeCount + resolvedCount;
     const responseRate = totalEms > 0 ? Math.round((resolvedCount / totalEms) * 100) : 0;
-    
-    const sa = document.getElementById('statActive'); if (sa) sa.textContent = activeCount;
-    const sc = document.getElementById('statCompleted'); if (sc) sc.textContent = resolvedCount;
-    const st = document.getElementById('statTeams'); if (st) st.textContent = teamsDisplay;
-    const sr = document.getElementById('statResponse'); if (sr) sr.textContent = responseRate + '%';
-    
+
+    const sa = document.getElementById('statActive');
+    if (sa) sa.textContent = activeCount;
+    const sc = document.getElementById('statCompleted');
+    if (sc) sc.textContent = resolvedCount;
+    const st = document.getElementById('statTeams');
+    if (st) st.textContent = teamsDisplay;
+    const sr = document.getElementById('statResponse');
+    if (sr) sr.textContent = responseRate + '%';
+
     console.log('✅ [updateStatsCards] UI updated:', activeCount, resolvedCount, teamsDisplay, responseRate + '%');
 }
 
+console.log('✅ [TAHAP 2] GDrive, API, Sync, Media, Delete, Stats loaded');
+
 // ====================================================================
-// 20. RENDER HOLOGRAM
+// 25. RENDER HOLOGRAM (Hologram Darurat)
 // ====================================================================
 function renderHologram() {
     const list = document.getElementById('hologramList');
@@ -3366,7 +3522,27 @@ function buildSummarySlide(typeGroups, allEms) {
         regions.add(country);
     });
     const regionCount = regions.size;
-    return '<div class="hologram-slide active"><div class="hologram-summary"><div class="hologram-summary-header"><div class="summary-globe">🌍</div><div class="summary-title"><h3>Ringkasan Emergency Global</h3><div class="summary-subtitle">24 Jam Terakhir · Real-time</div></div></div><div class="hologram-summary-grid"><div class="summary-stat-item fire"><div class="stat-icon-wrap">🔥</div><div class="stat-info"><div class="stat-name">Kebakaran</div><div class="stat-count">' + totalFire + '</div></div></div><div class="summary-stat-item medical"><div class="stat-icon-wrap">🚑</div><div class="stat-info"><div class="stat-name">Medis & Kematian</div><div class="stat-count">' + totalMedical + '</div></div></div><div class="summary-stat-item crime"><div class="stat-icon-wrap">🚓</div><div class="stat-info"><div class="stat-name">Kriminal</div><div class="stat-count">' + totalCrime + '</div></div></div><div class="summary-stat-item disaster"><div class="stat-icon-wrap">🌪️</div><div class="stat-info"><div class="stat-name">Bencana Alam</div><div class="stat-count">' + totalDisaster + '</div></div></div></div><div class="hologram-summary-footer"><div class="total-info"><div class="total-label">📊 Total Aktif</div><div class="total-value"><span class="highlight">' + totalAll + '</span> Emergency</div></div><div class="region-info"><i class="fas fa-globe"></i><span>Tersebar di ' + regionCount + ' Wilayah</span></div></div></div></div>';
+    return '<div class="hologram-slide active">' +
+        '<div class="hologram-summary">' +
+            '<div class="hologram-summary-header">' +
+                '<div class="summary-globe">🌍</div>' +
+                '<div class="summary-title">' +
+                    '<h3>Ringkasan Emergency Global</h3>' +
+                    '<div class="summary-subtitle">24 Jam Terakhir · Real-time</div>' +
+                '</div>' +
+            '</div>' +
+            '<div class="hologram-summary-grid">' +
+                '<div class="summary-stat-item fire"><div class="stat-icon-wrap">🔥</div><div class="stat-info"><div class="stat-name">Kebakaran</div><div class="stat-count">' + totalFire + '</div></div></div>' +
+                '<div class="summary-stat-item medical"><div class="stat-icon-wrap">🚑</div><div class="stat-info"><div class="stat-name">Medis & Kematian</div><div class="stat-count">' + totalMedical + '</div></div></div>' +
+                '<div class="summary-stat-item crime"><div class="stat-icon-wrap">🚓</div><div class="stat-info"><div class="stat-name">Kriminal</div><div class="stat-count">' + totalCrime + '</div></div></div>' +
+                '<div class="summary-stat-item disaster"><div class="stat-icon-wrap">🌪️</div><div class="stat-info"><div class="stat-name">Bencana Alam</div><div class="stat-count">' + totalDisaster + '</div></div></div>' +
+            '</div>' +
+            '<div class="hologram-summary-footer">' +
+                '<div class="total-info"><div class="total-label">📊 Total Aktif</div><div class="total-value"><span class="highlight">' + totalAll + '</span> Emergency</div></div>' +
+                '<div class="region-info"><i class="fas fa-globe"></i><span>Tersebar di ' + regionCount + ' Wilayah</span></div>' +
+            '</div>' +
+        '</div>' +
+    '</div>';
 }
 
 function buildDetailSlide(em, counter) {
@@ -3387,7 +3563,31 @@ function buildDetailSlide(em, counter) {
         ? '<span class="hologram-item-status expired"><i class="fas fa-clock"></i> Kadaluarsa</span>'
         : '<span class="hologram-item-status live">Live</span>';
     const textContent = em.text || em.description || '';
-    return '<div class="hologram-slide"><div class="hologram-item ' + cssClass + '" data-id="' + escapeAttr(em.id) + '"><div class="hologram-item-header"><span class="hologram-item-icon">' + icon + '</span><span class="hologram-item-type ' + cssClass + '">' + label + '</span><span class="hologram-item-counter">' + counterText + '</span>' + statusHTML + '<button class="hologram-item-delete" onclick="event.stopPropagation();window.handleDeleteFromHologram(\'' + escapeAttr(em.id) + '\')" title="Hapus permanen"><i class="fas fa-times"></i></button></div><div class="hologram-item-sender"><i class="fas fa-user"></i><strong onclick="handleProfileClick(\'' + escapeAttr(senderUsername) + '\')">' + escapeHTML(senderName) + '</strong><span class="time-ago">🕐 ' + timeAgo + '</span></div>' + (textContent ? '<div class="hologram-item-text">"' + escapeHTML(textContent) + '"</div>' : '') + hierarchyHTML + (coords ? '<div class="hologram-item-coords"><i class="fas fa-crosshairs"></i> ' + escapeHTML(coords) + '</div>' : '') + '<div class="hologram-item-actions">' + (mapLink ? '<a href="' + escapeAttr(mapLink) + '" target="_blank" class="btn-action btn-map"><i class="fas fa-external-link-alt"></i> Lihat Peta</a>' : '') + '<a href="detail-emergency.html?id=' + encodeURIComponent(em.id) + '" class="btn-action btn-detail"><i class="fas fa-info-circle"></i> Detail</a></div><div class="hologram-item-expiry"><i class="fas fa-clock"></i> ' + getRemainingTime(expiresAt) + '</div></div></div>';
+
+    return '<div class="hologram-slide">' +
+        '<div class="hologram-item ' + cssClass + '" data-id="' + escapeAttr(em.id) + '">' +
+            '<div class="hologram-item-header">' +
+                '<span class="hologram-item-icon">' + icon + '</span>' +
+                '<span class="hologram-item-type ' + cssClass + '">' + label + '</span>' +
+                '<span class="hologram-item-counter">' + counterText + '</span>' +
+                statusHTML +
+                '<button class="hologram-item-delete" onclick="event.stopPropagation();window.handleDeleteFromHologram(\'' + escapeAttr(em.id) + '\')" title="Hapus permanen"><i class="fas fa-times"></i></button>' +
+            '</div>' +
+            '<div class="hologram-item-sender">' +
+                '<i class="fas fa-user"></i>' +
+                '<strong onclick="handleProfileClick(\'' + escapeAttr(senderUsername) + '\')">' + escapeHTML(senderName) + '</strong>' +
+                '<span class="time-ago">🕐 ' + timeAgo + '</span>' +
+            '</div>' +
+            (textContent ? '<div class="hologram-item-text">"' + escapeHTML(textContent) + '"</div>' : '') +
+            hierarchyHTML +
+            (coords ? '<div class="hologram-item-coords"><i class="fas fa-crosshairs"></i> ' + escapeHTML(coords) + '</div>' : '') +
+            '<div class="hologram-item-actions">' +
+                (mapLink ? '<a href="' + escapeAttr(mapLink) + '" target="_blank" class="btn-action btn-map"><i class="fas fa-external-link-alt"></i> Lihat Peta</a>' : '') +
+                '<a href="detail-emergency.html?id=' + encodeURIComponent(em.id) + '" class="btn-action btn-detail"><i class="fas fa-info-circle"></i> Detail</a>' +
+            '</div>' +
+            '<div class="hologram-item-expiry"><i class="fas fa-clock"></i> ' + getRemainingTime(expiresAt) + '</div>' +
+        '</div>' +
+    '</div>';
 }
 
 function buildLocationHierarchy(em) {
@@ -3427,7 +3627,13 @@ function buildLocationHierarchy(em) {
     if (address && parts.length > 0 && address !== parts[parts.length - 1]) {
         addressHTML = '<div style="font-size:0.6rem;color:rgba(255,255,255,0.6);margin-top:3px;padding-left:18px;line-height:1.4;">' + escapeHTML(address) + '</div>';
     }
-    return '<div><div class="hologram-item-location-hierarchy"><i class="fas fa-map-marker-alt"></i><div class="hierarchy"><span style="font-size:0.85rem;">' + flag + '</span> ' + hierarchyHTML + '</div></div>' + addressHTML + '</div>';
+    return '<div>' +
+        '<div class="hologram-item-location-hierarchy">' +
+            '<i class="fas fa-map-marker-alt"></i>' +
+            '<div class="hierarchy"><span style="font-size:0.85rem;">' + flag + '</span> ' + hierarchyHTML + '</div>' +
+        '</div>' +
+        addressHTML +
+    '</div>';
 }
 
 function buildHologramPagination(totalSlides) {
@@ -3458,7 +3664,7 @@ function buildHologramPagination(totalSlides) {
 }
 
 // ====================================================================
-// 21. RENDER POSTS (FIX BUG 3, 4, 5)
+// 26. RENDER POSTS (Post Feed)
 // ====================================================================
 function renderPosts() {
     const feed = document.getElementById('postFeed');
@@ -3467,18 +3673,20 @@ function renderPosts() {
     const sorted = posts
         .filter(p => p && p.id && !isDeleted(p.id))
         .slice()
-        .sort((a,b) => b.timestamp - a.timestamp);
+        .sort((a, b) => b.timestamp - a.timestamp);
+
     if (sorted.length === 0) {
         feed.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.75rem;"><i class="fas fa-file-alt" style="font-size:1.5rem;display:block;margin-bottom:8px;opacity:0.3;"></i><p>Belum ada postingan</p></div>';
         return;
     }
+
     sorted.forEach(post => {
         if (!post.userId || !post.userFullName || post.userFullName.trim() === '') return;
 
-        // ⭐ BUG 3 FIX: Ambil likes & comments dari localStorage (persistent)
         let likes = [], comments = [];
         const cachedLikes = getPostLikes(post.id);
         const cachedComments = getPostComments(post.id);
+
         if (cachedLikes && Array.isArray(cachedLikes) && cachedLikes.length > 0) {
             likes = cachedLikes;
         } else {
@@ -3513,18 +3721,29 @@ function renderPosts() {
                     const fallbackUrl1 = 'https://lh3.googleusercontent.com/d/' + post.gdriveId + '=w1000';
                     const fallbackUrl2 = 'https://drive.google.com/uc?export=view&id=' + post.gdriveId;
                     const backupThumb = post.mediaData || '';
-                    mediaHTML = '<div class="post-media" style="position:relative;min-height:150px;background:#f5f7fa;border-radius:8px;overflow:hidden;"><img src="' + escapeAttr(primaryUrl) + '" alt="" loading="lazy" draggable="false" oncontextmenu="return false;" style="width:100%;height:auto;max-height:400px;object-fit:contain;display:block;user-select:none;-webkit-user-drag:none;border-radius:8px;" data-post-id="' + escapeAttr(post.id) + '" data-fallback-1="' + escapeAttr(fallbackUrl1) + '" data-fallback-2="' + escapeAttr(fallbackUrl2) + '" data-backup-thumb="' + escapeAttr(backupThumb) + '" onerror="handleImageError(this);" onload="this.parentElement.style.minHeight=\'0\';this.parentElement.style.background=\'transparent\';"></div>';
+                    mediaHTML = '<div class="post-media" style="position:relative;min-height:150px;background:#f5f7fa;border-radius:8px;overflow:hidden;">' +
+                        '<img src="' + escapeAttr(primaryUrl) + '" alt="" loading="lazy" draggable="false" oncontextmenu="return false;" style="width:100%;height:auto;max-height:400px;object-fit:contain;display:block;user-select:none;-webkit-user-drag:none;border-radius:8px;" ' +
+                        'data-post-id="' + escapeAttr(post.id) + '" ' +
+                        'data-fallback-1="' + escapeAttr(fallbackUrl1) + '" ' +
+                        'data-fallback-2="' + escapeAttr(fallbackUrl2) + '" ' +
+                        'data-backup-thumb="' + escapeAttr(backupThumb) + '" ' +
+                        'onerror="handleImageError(this);" ' +
+                        'onload="this.parentElement.style.minHeight=\'0\';this.parentElement.style.background=\'transparent\';">' +
+                    '</div>';
                 } else if (mediaSource) {
                     mediaHTML = '<div class="post-media"><img src="' + escapeAttr(mediaSource) + '" alt="" loading="lazy" draggable="false" oncontextmenu="return false;" style="width:100%;height:auto;max-height:400px;object-fit:contain;border-radius:8px;"></div>';
                 }
             } else if (post.mediaType === 'video') {
                 if (isGDrive) {
-                    mediaHTML = '<div class="post-media" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:8px;"><iframe src="' + escapeAttr(mediaSource) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" allow="autoplay" allowfullscreen loading="lazy"></iframe></div>';
+                    mediaHTML = '<div class="post-media" style="position:relative;padding-bottom:56.25%;height:0;overflow:hidden;border-radius:8px;">' +
+                        '<iframe src="' + escapeAttr(mediaSource) + '" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" allow="autoplay" allowfullscreen loading="lazy"></iframe>' +
+                    '</div>';
                 } else if (mediaSource) {
                     mediaHTML = '<div class="post-media"><video controls preload="metadata" controlsList="nodownload" oncontextmenu="return false;" style="width:100%;max-height:400px;border-radius:8px;"><source src="' + escapeAttr(mediaSource) + '"></video></div>';
                 }
             }
         }
+
         const el = document.createElement('div');
         el.className = 'post';
         el.id = 'post-' + post.id;
@@ -3573,17 +3792,13 @@ function renderPosts() {
 }
 
 // ====================================================================
-// 22. RENDER POSTS STATS (FIX BUG 1, 4)
+// 27. RENDER POSTS STATS (Postingan Baru)
 // ====================================================================
 function renderPostsStats() {
     const container = document.getElementById('postsList');
     const countEl = document.getElementById('postsCount');
     if (!container) return;
 
-    // ⭐ BUG 1 FIX: Filter post yang:
-    //  - Tidak ada di deleted list
-    //  - Masih ada di salink_emergencies (untuk special)
-    //  - Atau post biasa (semua valid)
     const seenIds = new Set();
     const uniquePosts = posts.filter(p => {
         if (!p || !p.id) return false;
@@ -3594,18 +3809,13 @@ function renderPostsStats() {
         return true;
     });
 
-    // ⭐ BUG 1 & 4: Sync dengan emergencies — hanya tampil special yang masih aktif
     const activeEms = getActiveEmergencies();
     const activeEmsIds = new Set(activeEms.map(e => e.id));
 
-    // Untuk special posts: hanya tampil jika masih ada di activeEms
-    // Untuk regular posts: tampil jika belum expired 24 jam (karena post biasa tidak di-cleanup)
-    const now = Date.now();
     const filteredPosts = uniquePosts.filter(p => {
         if (p.isSpecial && p.specialType) {
             return activeEmsIds.has(p.id);
         }
-        // Regular posts: tetap tampil selama belum dihapus
         return true;
     });
 
@@ -3636,7 +3846,15 @@ function renderPostsStats() {
 function renderCompactPostCard(p) {
     if (!p.userId || !p.userFullName || p.userFullName.trim() === '') return '';
     const isOwner = currentUser && p.userId === currentUser.username;
-    return '<div class="post-list-item"><div class="item-icon" onclick="handlePostItemClick(\'' + escapeAttr(p.id) + '\')" style="cursor:pointer;">📝</div><div class="item-content" onclick="handlePostItemClick(\'' + escapeAttr(p.id) + '\')" style="cursor:pointer;"><div class="item-title">' + escapeHTML(p.text ? p.text.substring(0,50) : 'Postingan media') + '</div><div class="item-sub">' + escapeHTML(p.userFullName) + ' • Biasa</div></div><div class="item-time">' + getTimeAgo(p.timestamp) + '</div>' + (isOwner ? '<button class="item-delete" onclick="event.stopPropagation();window.handleDeleteFromStatsCard(\'' + escapeAttr(p.id) + '\')" title="Hapus permanen"><i class="fas fa-trash"></i></button>' : '') + '</div>';
+    return '<div class="post-list-item">' +
+        '<div class="item-icon" onclick="handlePostItemClick(\'' + escapeAttr(p.id) + '\')" style="cursor:pointer;">📝</div>' +
+        '<div class="item-content" onclick="handlePostItemClick(\'' + escapeAttr(p.id) + '\')" style="cursor:pointer;">' +
+            '<div class="item-title">' + escapeHTML(p.text ? p.text.substring(0, 50) : 'Postingan media') + '</div>' +
+            '<div class="item-sub">' + escapeHTML(p.userFullName) + ' • Biasa</div>' +
+        '</div>' +
+        '<div class="item-time">' + getTimeAgo(p.timestamp) + '</div>' +
+        (isOwner ? '<button class="item-delete" onclick="event.stopPropagation();window.handleDeleteFromStatsCard(\'' + escapeAttr(p.id) + '\')" title="Hapus permanen"><i class="fas fa-trash"></i></button>' : '') +
+    '</div>';
 }
 
 function renderFullPostCard(p, isExpired) {
@@ -3649,6 +3867,7 @@ function renderFullPostCard(p, isExpired) {
     const coords = (p.latitude && p.longitude) ? p.latitude + ', ' + p.longitude : '';
     const detailLink = 'detail-emergency.html?id=' + encodeURIComponent(p.id);
     const isOwner = currentUser && p.userId === currentUser.username;
+
     let mediaBlock = '';
     if (p.mediaType) {
         const isGDrive = !!p.gdriveId;
@@ -3687,6 +3906,9 @@ function renderFullPostCard(p, isExpired) {
     '</div>';
 }
 
+// ====================================================================
+// 28. ATTACH POST LISTENERS
+// ====================================================================
 function attachPostListeners() {
     document.querySelectorAll('.comment-toggle').forEach(el => {
         el.onclick = function(e) {
@@ -3704,7 +3926,12 @@ function attachPostListeners() {
         };
     });
     document.querySelectorAll('.comment-input').forEach(el => {
-        el.onkeypress = function(e) { if (e.key === 'Enter') { const btn = this.parentElement.querySelector('.send-comment'); if (btn) btn.click(); } };
+        el.onkeypress = function(e) {
+            if (e.key === 'Enter') {
+                const btn = this.parentElement.querySelector('.send-comment');
+                if (btn) btn.click();
+            }
+        };
     });
     document.querySelectorAll('.post-menu-toggle').forEach(el => {
         el.onclick = function(e) {
@@ -3737,11 +3964,26 @@ function attachPostListeners() {
     });
 }
 
-function handleLikeClick(postId) { if (isPreviewMode) { showPreviewOverlay(); return; } toggleLike(postId); }
-function handleShareClick(postId) { if (isPreviewMode) { showPreviewOverlay(); return; } sharePost(postId); }
-function handleProfileClick(username) { if (isPreviewMode) { showPreviewOverlay(); return; } openProfileUser(username); }
-function handlePostItemClick(postId) { if (isPreviewMode) { showPreviewOverlay(); return; } const el = document.getElementById('post-' + postId); if (el) el.scrollIntoView({behavior:'smooth',block:'center'}); }
-
+// ====================================================================
+// 29. POST CLICK HANDLERS
+// ====================================================================
+function handleLikeClick(postId) {
+    if (isPreviewMode) { showPreviewOverlay(); return; }
+    toggleLike(postId);
+}
+function handleShareClick(postId) {
+    if (isPreviewMode) { showPreviewOverlay(); return; }
+    sharePost(postId);
+}
+function handleProfileClick(username) {
+    if (isPreviewMode) { showPreviewOverlay(); return; }
+    openProfileUser(username);
+}
+function handlePostItemClick(postId) {
+    if (isPreviewMode) { showPreviewOverlay(); return; }
+    const el = document.getElementById('post-' + postId);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
 function handleDetailClick(postId) {
     if (isPreviewMode) { showPreviewOverlay(); return; }
     const post = posts.find(p => p.id === postId);
@@ -3755,15 +3997,16 @@ function handleDetailClick(postId) {
     }
 }
 
-// ====================================================================
-// 23. TOGGLE LIKE (FIX BUG 3 — PERSISTENT)
+console.log('✅ [TAHAP 3] Hologram + Render Posts + Posts Stats loaded');
+
+ // ====================================================================
+// 30. TOGGLE LIKE (PERSISTENT)
 // ====================================================================
 function toggleLike(postId) {
     if (!currentUser) { redirectToLogin(); return; }
     const post = posts.find(p => p.id === postId);
     if (!post) return;
 
-    // ⭐ BUG 3 FIX: Ambil dari localStorage dulu, fallback ke post.likes
     let likes = getPostLikes(postId) || [];
     if (!Array.isArray(likes)) likes = [];
     if (likes.length === 0) {
@@ -3771,20 +4014,21 @@ function toggleLike(postId) {
     }
 
     const idx = likes.indexOf(currentUser.username);
-    if (idx > -1) likes.splice(idx, 1);
+    const isUnlike = idx > -1;
+    if (isUnlike) likes.splice(idx, 1);
     else likes.push(currentUser.username);
 
-    // Simpan ke localStorage (persistent)
     setPostLikes(postId, likes);
     post.likes = JSON.stringify(likes);
 
-    // ⭐ BUG 3 FIX: Simpan ke backend juga
-    const action = idx > -1 ? 'unlike_post' : 'like_post';
+    // Sync ke backend
+    const action = isUnlike ? 'unlike_post' : 'like_post';
     apiCall(action, {
         postId: postId,
-        userId: currentUser.username
+        userId: currentUser.username,
+        userName: currentUser.fullName
     }).then(r => {
-        console.log('✅ [Like] Synced to backend:', action, r.status);
+        console.log('✅ [Like] Backend sync OK:', r.status);
     }).catch(e => {
         console.warn('⚠️ [Like] Backend error:', e.message);
     });
@@ -3796,14 +4040,13 @@ function toggleLike(postId) {
 }
 
 // ====================================================================
-// 24. ADD COMMENT (FIX BUG 3 — PERSISTENT)
+// 31. ADD COMMENT (FCM TRIGGER)
 // ====================================================================
 function addComment(postId, text) {
     if (!currentUser) { redirectToLogin(); return; }
     const post = posts.find(p => p.id === postId);
     if (!post) return;
 
-    // ⭐ BUG 3 FIX: Ambil dari localStorage dulu
     let comments = getPostComments(postId) || [];
     if (!Array.isArray(comments)) comments = [];
     if (comments.length === 0) {
@@ -3821,16 +4064,17 @@ function addComment(postId, text) {
     };
     comments.push(newComment);
 
-    // Simpan ke localStorage (persistent)
     setPostComments(postId, comments);
     post.comments = JSON.stringify(comments);
 
-    // ⭐ BUG 3 FIX: Sync ke backend via save_post
-    apiCall('save_post', {
-        id: postId,
-        comments: JSON.stringify(comments)
+    // Sync via action comment_post → trigger FCM ke pemilik post
+    apiCall('comment_post', {
+        postId: postId,
+        commenterId: currentUser.username,
+        commenterName: currentUser.fullName,
+        text: text.trim()
     }).then(r => {
-        console.log('✅ [Comment] Synced to backend:', r.status);
+        console.log('✅ [Comment] FCM trigger OK:', r.status);
     }).catch(e => {
         console.warn('⚠️ [Comment] Backend error:', e.message);
     });
@@ -3876,7 +4120,95 @@ function sharePost(postId) {
 }
 
 // ====================================================================
-// 25. CREATE POST (FIX BUG 4, 5)
+// 32. TRIGGER LOCAL EMERGENCY VISUAL (FIX BUG 2)
+// ====================================================================
+// ⭐ FUNGSI INI YANG BIKIN EMERGENCY MASUK KE HOLOGRAM
+// Dipanggil dari createPost() setelah emergency disimpan
+// ====================================================================
+function triggerLocalEmergencyVisual(emergencyId, type, sender, location, text) {
+    console.log('🚨 [TriggerLocalEmergency] Starting:', { emergencyId, type, sender, location });
+
+    // 1. Bangun payload emergency
+    const em = {
+        id: emergencyId,
+        type: type,
+        sender: sender,
+        senderUsername: currentUser ? currentUser.username : 'user',
+        location: location || 'Lokasi tidak diketahui',
+        address: location || '',
+        text: text || '',
+        mapsURL: currentGpsData ? currentGpsData.mapsURL : '',
+        coords: currentGpsData ? (currentGpsData.lat + ', ' + currentGpsData.lng) : '',
+        timestamp: Date.now(),
+        expiresAt: Date.now() + EMERGENCY_DURATION,
+        country: currentUser ? (currentUser.country || 'Indonesia') : 'Indonesia',
+        province: currentUser ? (currentUser.province || '') : '',
+        city: currentUser ? (currentUser.city || '') : '',
+        district: currentUser ? (currentUser.district || '') : '',
+        village: currentUser ? (currentUser.village || '') : ''
+    };
+
+    // 2. Simpan ke localStorage
+    let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+    const existingIndex = ems.findIndex(e => e.id === em.id);
+    if (existingIndex > -1) ems[existingIndex] = em;
+    else ems.unshift(em);
+    localStorage.setItem('salink_emergencies', JSON.stringify(ems));
+
+    console.log('✅ [TriggerLocalEmergency] Saved. Total ems:', ems.length);
+
+    // 3. Mark as read (untuk pengirim sendiri)
+    readNotifs[em.id] = true;
+    saveReadNotifs();
+    dismissEmergency(em.id);
+
+    // 4. Render ulang hologram
+    renderHologram();
+    updateEmergencyBadges();
+    updateNotifBadge();
+    updateStatsCards(); // ⭐ PENTING: update stat card
+
+    // 5. Delegate ke SalinkEmergency (untuk animasi tombol grid)
+    if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency && typeof SalinkEmergency.triggerGridAlarmFromPost === 'function') {
+        try {
+            SalinkEmergency.triggerGridAlarmFromPost(type, true);
+        } catch(e) {
+            console.warn('⚠️ [TriggerLocalEmergency] SalinkEmergency error:', e.message);
+        }
+    }
+
+    // 6. Floating notification
+    showFloatingNotification('emergency',
+        EMERGENCY_ICONS[type] + ' ' + EMERGENCY_LABELS[type],
+        em.sender + ' melaporkan darurat di ' + em.location,
+        '📍 ' + (em.address || em.location),
+        'Lihat',
+        () => {
+            const el = document.getElementById('hologramDisplay');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+            hideFloatingNotification();
+        }
+    );
+
+    // 7. Vibrate
+    if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 1000]);
+
+    // 8. Toast
+    showToast('🚨 ' + EMERGENCY_LABELS[type], em.sender + ' melaporkan darurat!', 'fa-exclamation-triangle');
+
+    // 9. Force re-render setelah delay (double-check)
+    setTimeout(() => {
+        console.log('🔄 [TriggerLocalEmergency] Force re-render');
+        renderHologram();
+        updateEmergencyBadges();
+        updateStatsCards();
+    }, 800);
+
+    console.log('✅ [TriggerLocalEmergency] Complete');
+}
+
+// ====================================================================
+// 33. CREATE POST
 // ====================================================================
 async function createPost(text, mediaFile, isSpecial, specialData) {
     if (window._salinkPostingInProgress) {
@@ -3885,39 +4217,54 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
     }
     if (isPreviewMode) { showPreviewOverlay(); return; }
     if (!currentUser) { redirectToLogin(); return; }
+
     window._salinkPostingInProgress = true;
     const submitBtn = document.getElementById('postSubmit');
     if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...';
     }
+
     const POSTING_TIMEOUT = 60000;
     const timeoutId = setTimeout(() => {
         window._salinkPostingInProgress = false;
         if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Posting'; }
         showToast('⚠️ Timeout', 'Upload terlalu lama. Coba lagi.', 'fa-exclamation-triangle');
     }, POSTING_TIMEOUT);
+
     try {
         const hasText = text && text.trim() !== '';
         const hasMedia = mediaFile && mediaFile.size > 0;
+
         if (isSpecial) {
-            if (!hasText) { showToast('⚠️ Pesan kosong', 'Postingan khusus wajib isi pesan notifikasi', 'fa-exclamation-triangle'); return; }
+            if (!hasText) {
+                showToast('⚠️ Pesan kosong', 'Postingan khusus wajib isi pesan notifikasi', 'fa-exclamation-triangle');
+                return;
+            }
         } else {
-            if (!hasText && !hasMedia) { showToast('⚠️ Postingan kosong', 'Isi teks atau upload foto/video', 'fa-exclamation-triangle'); return; }
+            if (!hasText && !hasMedia) {
+                showToast('⚠️ Postingan kosong', 'Isi teks atau upload foto/video', 'fa-exclamation-triangle');
+                return;
+            }
         }
+
         const uniqueId = 'content-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10);
         const postId = uniqueId;
         const emergencyId = uniqueId;
         const notifId = uniqueId;
+
         let mediaType = '';
         let gdriveData = null;
         let mediaDataLocal = '';
         let mediaIdLocal = '';
+
+        // Upload media (jika ada)
         if (hasMedia) {
             const isImage = mediaFile.type.indexOf('image/') === 0;
             const isVideo = mediaFile.type.indexOf('video/') === 0;
             mediaType = isImage ? 'image' : (isVideo ? 'video' : '');
             showToast('📤 Upload...', 'Mengirim media ke Google Drive...', 'fa-cloud-upload-alt');
+
             try {
                 gdriveData = await uploadToGDrive(mediaFile);
                 showToast('✅ Upload Berhasil', 'Media tersimpan di Google Drive', 'fa-check-circle');
@@ -3939,17 +4286,26 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
                 } catch(e) {}
             }
         }
+
+        // Bangun objek post
         const post = {
-            id: postId, userId: currentUser.username, userFullName: currentUser.fullName,
-            userGender: currentUser.gender || 'male', userProfilePic: currentUser.profilePicture || '',
-            text: text || '', mediaType: mediaType,
+            id: postId,
+            userId: currentUser.username,
+            userFullName: currentUser.fullName,
+            userGender: currentUser.gender || 'male',
+            userProfilePic: currentUser.profilePicture || '',
+            text: text || '',
+            mediaType: mediaType,
             gdriveId: gdriveData ? gdriveData.id : '',
             gdriveImageUrl: gdriveData ? gdriveData.imageUrl : '',
             gdriveVideoEmbed: gdriveData ? gdriveData.videoEmbed : '',
             gdriveThumbnail: gdriveData ? gdriveData.thumbnail : '',
-            mediaId: mediaIdLocal, mediaData: '',
+            mediaId: mediaIdLocal,
+            mediaData: '',
             timestamp: Date.now(),
-            likes: '[]', comments: '[]', viewerCount: 0,
+            likes: '[]',
+            comments: '[]',
+            viewerCount: 0,
             isSpecial: isSpecial || false,
             specialType: isSpecial && specialData ? specialData.type : '',
             specialLocation: isSpecial && specialData ? specialData.location : '',
@@ -3958,14 +4314,19 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
             longitude: isSpecial && specialData ? specialData.longitude : '',
             mapsURL: isSpecial && specialData ? specialData.mapsURL : '',
             postType: isSpecial ? 'khusus' : 'biasa',
-            country: currentUser.country || '', province: currentUser.province || '',
-            city: currentUser.city || '', district: currentUser.district || '',
-            village: currentUser.village || '', address: currentUser.address || ''
+            country: currentUser.country || '',
+            province: currentUser.province || '',
+            city: currentUser.city || '',
+            district: currentUser.district || '',
+            village: currentUser.village || '',
+            address: currentUser.address || ''
         };
+
+        // Simpan ke array lokal
         posts.unshift(post);
         safeSavePosts(posts);
 
-        // ⭐ BUG 4 & 5 FIX: Render post FEED dan STATS langsung
+        // Render ulang feed & stats
         renderPosts();
         renderPostsStats();
 
@@ -3975,30 +4336,49 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
             else console.warn('⚠️ [CreatePost] Backend save failed, keeping local');
         });
 
+        // ⭐ KALAU EMERGENCY
         if (isSpecial && specialData) {
             const emPayload = {
-                id: emergencyId, type: specialData.type,
+                id: emergencyId,
+                type: specialData.type,
                 title: EMERGENCY_LABELS[specialData.type],
-                sender: currentUser.fullName, senderUsername: currentUser.username,
+                sender: currentUser.fullName,
+                senderUsername: currentUser.username,
                 senderPhone: currentUser.phone || '',
-                location: specialData.location, address: specialData.address,
-                latitude: specialData.latitude, longitude: specialData.longitude,
-                mapsURL: specialData.mapsURL, description: text, status: 'active',
-                province: currentUser.province || '', city: currentUser.city || '',
-                district: currentUser.district || '', village: currentUser.village || '',
+                location: specialData.location,
+                address: specialData.address,
+                latitude: specialData.latitude,
+                longitude: specialData.longitude,
+                mapsURL: specialData.mapsURL,
+                description: text,
+                status: 'active',
+                province: currentUser.province || '',
+                city: currentUser.city || '',
+                district: currentUser.district || '',
+                village: currentUser.village || '',
                 country: currentUser.country || 'Indonesia'
             };
+
+            // Simpan emergency ke backend
             apiSaveEmergency(emPayload);
+
+            // Simpan notif ke backend
             const notifPayload = {
-                id: notifId, type: specialData.type,
+                id: notifId,
+                type: specialData.type,
                 title: EMERGENCY_LABELS[specialData.type] + ' — ' + (text.substring(0, 50)),
                 message: text.substring(0, 200),
-                sender: currentUser.fullName, senderUsername: currentUser.username,
+                sender: currentUser.fullName,
+                senderUsername: currentUser.username,
                 link: DETAIL_URL + '?id=' + encodeURIComponent(emergencyId),
-                postId: postId, timestamp: new Date().toISOString(),
-                read: 'FALSE', soundKey: specialData.type
+                postId: postId,
+                timestamp: new Date().toISOString(),
+                read: 'FALSE',
+                soundKey: specialData.type
             };
             apiCall('save_notification', notifPayload);
+
+            // ⭐ PENTING: Trigger emergency visual (masuk ke hologram)
             triggerLocalEmergencyVisual(emergencyId, specialData.type, currentUser.fullName, specialData.location, text);
 
             // Broadcast ke tab lain
@@ -4029,20 +4409,29 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
                 setTimeout(() => localStorage.removeItem('salink_emergencies_new'), 500);
             } catch(e) {}
         } else {
+            // Postingan biasa
             playRegularSound();
             showToast('📝', 'Postingan baru berhasil', 'fa-check-circle');
         }
+
         broadcastSync('new_post', { id: postId });
 
-        const pi = document.getElementById('postInput'); if (pi) pi.value = '';
-        const pst = document.getElementById('postSpecialText'); if (pst) pst.value = '';
-        const mu = document.getElementById('mediaUpload'); if (mu) mu.value = '';
-        const mp = document.getElementById('mediaPreview'); if (mp) mp.style.display = 'none';
+        // Reset form
+        const pi = document.getElementById('postInput');
+        if (pi) pi.value = '';
+        const pst = document.getElementById('postSpecialText');
+        if (pst) pst.value = '';
+        const mu = document.getElementById('mediaUpload');
+        if (mu) mu.value = '';
+        const mp = document.getElementById('mediaPreview');
+        if (mp) mp.style.display = 'none';
         const sel = document.getElementById('postTypeSelect');
         if (sel) sel.value = 'biasa';
         currentPostType = 'biasa';
-        const psf = document.getElementById('postSpecialFields'); if (psf) psf.classList.remove('active');
-        const pbf = document.getElementById('postBiasaForm'); if (pbf) pbf.style.display = 'block';
+        const psf = document.getElementById('postSpecialFields');
+        if (psf) psf.classList.remove('active');
+        const pbf = document.getElementById('postBiasaForm');
+        if (pbf) pbf.style.display = 'block';
         currentGpsData = null;
         const gpsResult = document.getElementById('gpsLocationResult');
         if (gpsResult) gpsResult.classList.remove('active');
@@ -4053,123 +4442,163 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
             if (txt) txt.textContent = '📍 Ambil Lokasi Saya';
         }
     } catch (err) {
+        console.error('❌ [CreatePost] Error:', err);
         showToast('❌ Gagal', err.message || 'Gagal posting', 'fa-exclamation-triangle');
     } finally {
         clearTimeout(timeoutId);
         window._salinkPostingInProgress = false;
-        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Posting'; }
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Posting';
+        }
     }
 }
 
 // ====================================================================
-// 26. TRIGGER LOCAL EMERGENCY VISUAL
-// ====================================================================
-// ⭐ FIX BUG 2: Force re-render dengan delay
-triggerLocalEmergencyVisual(emergencyId, specialData.type, currentUser.fullName, specialData.location, text);
-
-// Double-check: force re-render setelah delay
-setTimeout(() => {
-    console.log('🔄 [CreatePost] Force re-render hologram');
-    console.log('🔍 [CreatePost] Current emergencies:', getAllEmergencies().length);
-    console.log('🔍 [CreatePost] Active emergencies:', getActiveEmergencies().length);
-    renderHologram();
-    updateEmergencyBadges();
-    updateStatsCards();
-}, 1000); {
-    const em = {
-        id: emergencyId, type: type, sender: sender,
-        senderUsername: currentUser ? currentUser.username : 'user',
-        location: location || 'Lokasi tidak diketahui',
-        address: location || '',
-        text: text || '',
-        mapsURL: currentGpsData ? currentGpsData.mapsURL : '',
-        coords: currentGpsData ? (currentGpsData.lat + ', ' + currentGpsData.lng) : '',
-        timestamp: Date.now(),
-        expiresAt: Date.now() + EMERGENCY_DURATION,
-        country: currentUser ? (currentUser.country || 'Indonesia') : 'Indonesia'
-    };
-    let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-    const existingIndex = ems.findIndex(e => e.id === em.id);
-    if (existingIndex > -1) ems[existingIndex] = em;
-    else ems.unshift(em);
-    localStorage.setItem('salink_emergencies', JSON.stringify(ems));
-    renderHologram();
-    updateEmergencyBadges();
-    updateNotifBadge();
-    readNotifs[em.id] = true;
-    saveReadNotifs();
-    dismissEmergency(em.id);
-
-    // Delegate ke SalinkEmergency (OPSI A)
-    if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency && typeof SalinkEmergency.triggerGridAlarmFromPost === 'function') {
-        SalinkEmergency.triggerGridAlarmFromPost(type, true);
-    }
-
-    showFloatingNotification('emergency',
-        EMERGENCY_ICONS[type] + ' ' + EMERGENCY_LABELS[type],
-        em.sender + ' melaporkan darurat di ' + em.location,
-        '📍 ' + (em.address || em.location),
-        'Lihat',
-        () => { const el = document.getElementById('hologramDisplay'); if (el) el.scrollIntoView({ behavior: 'smooth' }); hideFloatingNotification(); }
-    );
-    if (navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 1000]);
-    showToast('🚨 ' + EMERGENCY_LABELS[type], em.sender + ' melaporkan darurat!', 'fa-exclamation-triangle');
-}
-
-// ====================================================================
-// 27. NOTIF MODAL
+// 34. NOTIF MODAL — GET ALL NOTIFICATIONS
 // ====================================================================
 function getAllNotifications() {
     const list = [];
+    // Emergency aktif
     getActiveEmergencies().forEach(em => {
         list.push({
-            id: em.id, type: 'emergency', emergencyType: em.type,
+            id: em.id,
+            type: 'emergency',
+            emergencyType: em.type,
+            notifType: 'emergency_' + em.type,
             title: EMERGENCY_ICONS[em.type] + ' ' + EMERGENCY_LABELS[em.type],
             message: em.text || (em.sender + ' melaporkan darurat di ' + em.location),
-            sender: em.sender, senderUsername: em.senderUsername, location: em.location,
-            timestamp: em.timestamp, read: readNotifs[em.id] === true || isDismissed(em.id)
+            sender: em.sender,
+            senderUsername: em.senderUsername,
+            location: em.location,
+            timestamp: em.timestamp,
+            read: readNotifs[em.id] === true || isDismissed(em.id)
         });
     });
+    // Notif reguler
     notifications.forEach(n => {
         if (isDeleted(n.id)) return;
         list.push({
-            id: n.id, type: 'regular', notifType: n.type || 'info',
-            title: n.title, message: n.message,
-            sender: n.sender, senderUsername: n.senderUsername,
-            timestamp: n.timestamp, read: readNotifs[n.id] === true || n.read || isDismissed(n.id)
+            id: n.id,
+            type: 'regular',
+            notifType: n.type || n.soundKey || 'info',
+            title: n.title,
+            message: n.message,
+            sender: n.sender,
+            senderUsername: n.senderUsername,
+            link: n.link || '',
+            timestamp: n.timestamp,
+            read: readNotifs[n.id] === true || n.read || isDismissed(n.id)
         });
     });
-    list.sort((a,b) => b.timestamp - a.timestamp);
+    list.sort((a, b) => b.timestamp - a.timestamp);
     return list;
 }
+
+// ====================================================================
+// 35. RENDER NOTIF ITEM UNIVERSAL (Emergency + Sosial + E-Commerce)
+// ====================================================================
+function renderNotifItemUniversal(n) {
+    const notifType = n.notifType || n.type || 'social_post';
+    const t = String(notifType).toLowerCase();
+
+    // Mapping ikon & warna per jenis notif
+    let icon = '🔔';
+    let iconClass = 'regular';
+    let borderClass = '';
+
+    if (t.indexOf('emergency_') === 0) {
+        const emergencyIcons = { 'emergency_fire': '🔥', 'emergency_medical': '🚑', 'emergency_crime': '🚓', 'emergency_disaster': '🌪️' };
+        icon = emergencyIcons[t] || '🚨';
+        iconClass = 'emergency';
+        borderClass = 'emergency';
+    } else if (t === 'social_comment') { icon = '💬'; iconClass = 'social'; borderClass = 'social-comment'; }
+    else if (t === 'social_like') { icon = '❤️'; iconClass = 'social'; borderClass = 'social-like'; }
+    else if (t === 'social_post') { icon = '📝'; iconClass = 'social'; borderClass = 'social-post'; }
+    else if (t === 'social_invite') { icon = '👥'; iconClass = 'social'; borderClass = 'social-invite'; }
+    else if (t === 'social_invite_accepted') { icon = '✅'; iconClass = 'success'; borderClass = 'social-invite'; }
+    else if (t === 'social_message') { icon = '✉️'; iconClass = 'social'; borderClass = 'social-message'; }
+    else if (t === 'ecom_order_new') { icon = '🛒'; iconClass = 'ecom'; borderClass = 'ecom-order'; }
+    else if (t === 'ecom_payment_success' || t === 'ecom_payment_confirmed') { icon = '💳'; iconClass = 'success'; borderClass = 'ecom-payment'; }
+    else if (t === 'ecom_shipping') { icon = '📦'; iconClass = 'ecom'; borderClass = 'ecom-shipping'; }
+    else if (t === 'ecom_received') { icon = '✅'; iconClass = 'success'; borderClass = 'ecom-payment'; }
+    else if (t === 'ecom_rating') { icon = '⭐'; iconClass = 'ecom'; borderClass = 'ecom-order'; }
+    else if (t === 'ecom_stock_out') { icon = '⚠️'; iconClass = 'ecom'; borderClass = 'ecom-order'; }
+    else if (t === 'ecom_order_cancelled') { icon = '❌'; iconClass = 'emergency'; borderClass = 'emergency'; }
+    else if (n.type === 'emergency' || n.emergencyType) {
+        const et = n.emergencyType || 'fire';
+        const emergencyIcons = { 'fire': '🔥', 'medical': '🚑', 'crime': '🚓', 'disaster': '🌪️' };
+        icon = emergencyIcons[et] || '🚨';
+        iconClass = 'emergency';
+        borderClass = 'emergency';
+    }
+
+    const unreadClass = n.read ? '' : 'unread';
+    const safeId = escapeAttr(n.id || '');
+    const safeType = escapeAttr(notifType);
+    const safeLink = escapeAttr(n.link || '');
+
+    return '<div class="notif-item ' + unreadClass + ' ' + borderClass + '" onclick="handleNotifClick(\'' + safeId + '\', \'' + safeType + '\', \'' + safeLink + '\')">' +
+        '<div class="notif-item-icon ' + iconClass + '">' + icon + '</div>' +
+        '<div class="notif-item-content">' +
+            '<div class="notif-item-title">' + escapeHTML(n.title || 'Notifikasi') + '</div>' +
+            '<div class="notif-item-message">' + escapeHTML(n.message || '') + '</div>' +
+            '<div class="notif-item-time"><i class="fas fa-clock"></i> ' + getTimeAgo(n.timestamp || Date.now()) + (n.sender ? ' • ' + escapeHTML(n.sender) : '') + '</div>' +
+        '</div>' +
+    '</div>';
+}
+
+function handleNotifClick(notifId, notifType, link) {
+    if (notifId) markNotifRead(notifId);
+
+    if (link) {
+        if (link.startsWith('http')) window.open(link, '_blank');
+        else window.location.href = link;
+    } else if (notifType && (notifType.indexOf('emergency_') === 0 || notifType === 'emergency') && notifId) {
+        window.location.href = 'detail-emergency.html?id=' + encodeURIComponent(notifId);
+    }
+
+    closeModal('notifModal');
+}
+
+// ====================================================================
+// 36. NOTIF MODAL — OPEN & RENDER
+// ====================================================================
 function openNotifModal() {
     if (isPreviewMode) { showPreviewOverlay(); return; }
     openModal('notifModal');
     renderNotifList();
     setupNotifFilters();
 }
+
 function renderNotifList() {
     const listEl = document.getElementById('notifList');
     if (!listEl) return;
+
     let allNotifs = getAllNotifications();
     let filtered = allNotifs;
-    if (notifFilter === 'unread') filtered = allNotifs.filter(n => !n.read);
-    else if (notifFilter === 'emergency') filtered = allNotifs.filter(n => n.type === 'emergency');
-    else if (notifFilter === 'regular') filtered = allNotifs.filter(n => n.type === 'regular');
+
+    if (notifFilter === 'unread') {
+        filtered = allNotifs.filter(n => !n.read);
+    } else if (notifFilter === 'emergency') {
+        filtered = allNotifs.filter(n => n.type === 'emergency' || (n.notifType && n.notifType.indexOf('emergency_') === 0));
+    } else if (notifFilter === 'regular') {
+        filtered = allNotifs.filter(n => n.type === 'regular' && (!n.notifType || n.notifType.indexOf('emergency_') !== 0));
+    }
+
     const unreadCount = allNotifs.filter(n => !n.read).length;
     const statsEl = document.getElementById('notifStatsText');
     if (statsEl) statsEl.textContent = allNotifs.length + ' total • ' + unreadCount + ' belum dibaca';
     updateNotifBadge(unreadCount);
+
     if (filtered.length === 0) {
         listEl.innerHTML = '<div style="text-align:center;padding:30px;color:#6b7688;"><i class="fas fa-bell-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada notifikasi</p></div>';
         return;
     }
-    listEl.innerHTML = filtered.map(n => {
-    const notifType = n.notifType || n.type || 'social_post';
-    // ⭐ Pakai universal renderer kalau bukan emergency murni
-    return renderNotifItemUniversal(n);
-}).join('');
+
+    listEl.innerHTML = filtered.map(n => renderNotifItemUniversal(n)).join('');
 }
+
 function setupNotifFilters() {
     document.querySelectorAll('.notif-filter-btn').forEach(btn => {
         btn.onclick = function() {
@@ -4192,6 +4621,7 @@ function setupNotifFilters() {
         };
     }
 }
+
 function markNotifRead(id) {
     readNotifs[id] = true;
     saveReadNotifs();
@@ -4199,6 +4629,7 @@ function markNotifRead(id) {
     updateNotifBadge();
     playRegularSound();
 }
+
 function openNotifDetail(id) {
     const allNotifs = getAllNotifications();
     const n = allNotifs.find(x => x.id === id);
@@ -4209,16 +4640,20 @@ function openNotifDetail(id) {
         const detailUrl = DETAIL_URL + '?id=' + encodeURIComponent(id);
         incrementViewerCount(id);
         if (confirm('Buka detail emergency?')) window.location.href = detailUrl;
-        else { const el = document.getElementById('hologramDisplay'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }
+        else {
+            const el = document.getElementById('hologramDisplay');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }
     }
 }
+
 function goToLocation(location) {
     if (!location) return;
     window.open('https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(location), '_blank');
 }
 
 // ====================================================================
-// 28. INVITE MODAL
+// 37. INVITE MODAL
 // ====================================================================
 function openInviteModal() {
     if (isPreviewMode) { showPreviewOverlay(); return; }
@@ -4226,6 +4661,7 @@ function openInviteModal() {
     loadInviteUsers();
     setupInviteFilters();
 }
+
 function loadInviteUsers() {
     const listEl = document.getElementById('inviteUserList');
     if (!listEl) return;
@@ -4249,9 +4685,19 @@ function loadInviteUsers() {
         const isSent = sentInvites[u.username] === true;
         const location = [u.city, u.province].filter(Boolean).join(', ') || u.country || 'Lokasi tidak diketahui';
         const statusDot = u.isOnline ? '🟢' : '⚪';
-        return '<div class="invite-user-item"><div class="invite-user-avatar">' + avatar + '</div><div class="invite-user-info"><div class="invite-user-name">' + statusDot + ' ' + escapeHTML(u.fullName || u.username) + '</div><div class="invite-user-sub"><i class="fas fa-map-marker-alt" style="font-size:0.5rem;"></i> ' + escapeHTML(location) + '</div></div><button class="invite-user-btn ' + (isSent ? 'sent' : '') + '" onclick="sendInvite(\'' + escapeAttr(u.username) + '\', this)" ' + (isSent ? 'disabled' : '') + '>' + (isSent ? '<i class="fas fa-check"></i> Terkirim' : '<i class="fas fa-paper-plane"></i> Undang') + '</button></div>';
+        return '<div class="invite-user-item">' +
+            '<div class="invite-user-avatar">' + avatar + '</div>' +
+            '<div class="invite-user-info">' +
+                '<div class="invite-user-name">' + statusDot + ' ' + escapeHTML(u.fullName || u.username) + '</div>' +
+                '<div class="invite-user-sub"><i class="fas fa-map-marker-alt" style="font-size:0.5rem;"></i> ' + escapeHTML(location) + '</div>' +
+            '</div>' +
+            '<button class="invite-user-btn ' + (isSent ? 'sent' : '') + '" onclick="sendInvite(\'' + escapeAttr(u.username) + '\', this)" ' + (isSent ? 'disabled' : '') + '>' +
+                (isSent ? '<i class="fas fa-check"></i> Terkirim' : '<i class="fas fa-paper-plane"></i> Undang') +
+            '</button>' +
+        '</div>';
     }).join('');
 }
+
 function setupInviteFilters() {
     const searchInput = document.getElementById('inviteSearchInput');
     if (searchInput) searchInput.oninput = loadInviteUsers;
@@ -4265,11 +4711,14 @@ function setupInviteFilters() {
                 if (users && users.length > 0) allUsers = users;
                 loadInviteUsers();
                 showToast('🔄', 'Daftar pengguna diperbarui', 'fa-sync-alt');
-            } catch(e) { showToast('⚠️', 'Gagal refresh', 'fa-exclamation-triangle'); }
+            } catch(e) {
+                showToast('⚠️', 'Gagal refresh', 'fa-exclamation-triangle');
+            }
             icon.classList.remove('fa-spin');
         };
     }
 }
+
 async function sendInvite(username, btnEl) {
     if (!currentUser) { redirectToLogin(); return; }
     if (!username) return;
@@ -4279,9 +4728,13 @@ async function sendInvite(username, btnEl) {
         sentInvites[username] = true;
         localStorage.setItem('salink_sent_invites', JSON.stringify(sentInvites));
         const invitePayload = {
-            id: 'invite-' + Date.now(), user1: currentUser.username, user2: username,
-            status: 'pending', requestedBy: currentUser.username,
-            timestamp: new Date().toISOString(), acceptedAt: ''
+            id: 'invite-' + Date.now(),
+            user1: currentUser.username,
+            user2: username,
+            status: 'pending',
+            requestedBy: currentUser.username,
+            timestamp: new Date().toISOString(),
+            acceptedAt: ''
         };
         await apiCall('save_invite', invitePayload);
         btnEl.classList.add('sent');
@@ -4297,28 +4750,35 @@ async function sendInvite(username, btnEl) {
 }
 
 // ====================================================================
-// 29. CHARTS
+// 38. CHARTS
 // ====================================================================
 function getChartColors() {
     const isDark = currentTheme === 'dark';
     return {
         text: isDark ? '#e6edf3' : '#0a0e1a',
         grid: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-        fire: '#f85149', medical: '#4fc3f7', security: '#f0d080', disaster: '#c792ea'
+        fire: '#f85149',
+        medical: '#4fc3f7',
+        security: '#f0d080',
+        disaster: '#c792ea'
     };
 }
+
 function getChartData() {
     let fire = 0, medical = 0, crime = 0, disaster = 0;
     posts.forEach(post => {
         if (isDeleted(post.id)) return;
         if (post.isSpecial && post.specialType) {
             const t = post.specialType;
-            if (t === 'fire') fire++; else if (t === 'medical') medical++;
-            else if (t === 'crime') crime++; else if (t === 'disaster') disaster++;
+            if (t === 'fire') fire++;
+            else if (t === 'medical') medical++;
+            else if (t === 'crime') crime++;
+            else if (t === 'disaster') disaster++;
         }
     });
     return { fire: fire, medical: medical, crime: crime, disaster: disaster };
 }
+
 function getWeeklyChartData() {
     const now = new Date();
     const labels = [];
@@ -4341,14 +4801,17 @@ function getWeeklyChartData() {
         let f = 0, m = 0, c = 0, d = 0;
         allEvents.forEach(ev => {
             if (ev.ts >= day.start && ev.ts < day.end) {
-                if (ev.type === 'fire') f++; else if (ev.type === 'medical') m++;
-                else if (ev.type === 'crime') c++; else if (ev.type === 'disaster') d++;
+                if (ev.type === 'fire') f++;
+                else if (ev.type === 'medical') m++;
+                else if (ev.type === 'crime') c++;
+                else if (ev.type === 'disaster') d++;
             }
         });
         fire.push(f); medical.push(m); crime.push(c); disaster.push(d);
     });
     return { labels: labels, fire: fire, medical: medical, crime: crime, disaster: disaster };
 }
+
 function initAllCharts() {
     if (typeof Chart === 'undefined') return;
     const colors = getChartColors();
@@ -4357,10 +4820,13 @@ function initAllCharts() {
     const values = [data.fire, data.medical, data.crime, data.disaster];
     const bgColors = [colors.fire, colors.medical, colors.security, colors.disaster];
     const weekly = getWeeklyChartData();
+
     const pieCtx = document.getElementById('pieChart');
     if (pieCtx) {
-        if (chartInstances.pie) { chartInstances.pie.data.datasets[0].data = values; chartInstances.pie.update(); }
-        else {
+        if (chartInstances.pie) {
+            chartInstances.pie.data.datasets[0].data = values;
+            chartInstances.pie.update();
+        } else {
             chartInstances.pie = new Chart(pieCtx, {
                 type: 'pie',
                 data: { labels: labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#141b2e', borderWidth: 2 }] },
@@ -4370,8 +4836,10 @@ function initAllCharts() {
     }
     const barCtx = document.getElementById('barChart');
     if (barCtx) {
-        if (chartInstances.bar) { chartInstances.bar.data.datasets[0].data = values; chartInstances.bar.update(); }
-        else {
+        if (chartInstances.bar) {
+            chartInstances.bar.data.datasets[0].data = values;
+            chartInstances.bar.update();
+        } else {
             chartInstances.bar = new Chart(barCtx, {
                 type: 'bar',
                 data: { labels: labels, datasets: [{ label: 'Jumlah', data: values, backgroundColor: bgColors, borderRadius: 6 }] },
@@ -4425,8 +4893,10 @@ function initAllCharts() {
     }
     const doughnutCtx = document.getElementById('doughnutChart');
     if (doughnutCtx) {
-        if (chartInstances.doughnut) { chartInstances.doughnut.data.datasets[0].data = values; chartInstances.doughnut.update(); }
-        else {
+        if (chartInstances.doughnut) {
+            chartInstances.doughnut.data.datasets[0].data = values;
+            chartInstances.doughnut.update();
+        } else {
             chartInstances.doughnut = new Chart(doughnutCtx, {
                 type: 'doughnut',
                 data: { labels: labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#141b2e', borderWidth: 3, hoverOffset: 10 }] },
@@ -4437,10 +4907,18 @@ function initAllCharts() {
     updateGaugeChart();
     updateHeatmap();
 }
+
 function switchChart(type) {
     document.querySelectorAll('.chart-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.chart === type));
-    const map = { pie: 'pieChartContainer', bar: 'barChartContainer', line: 'lineChartContainer', area: 'areaChartContainer', doughnut: 'doughnutChartContainer', gauge: 'gaugeChartContainer', heatmap: 'heatmapChartContainer', map: 'mapChartContainer' };
-    Object.keys(map).forEach(k => { const el = document.getElementById(map[k]); if (el) el.classList.toggle('active', k === type); });
+    const map = {
+        pie: 'pieChartContainer', bar: 'barChartContainer', line: 'lineChartContainer',
+        area: 'areaChartContainer', doughnut: 'doughnutChartContainer',
+        gauge: 'gaugeChartContainer', heatmap: 'heatmapChartContainer', map: 'mapChartContainer'
+    };
+    Object.keys(map).forEach(k => {
+        const el = document.getElementById(map[k]);
+        if (el) el.classList.toggle('active', k === type);
+    });
     setTimeout(() => {
         const chart = chartInstances[type];
         if (chart) chart.resize();
@@ -4450,14 +4928,18 @@ function switchChart(type) {
         else if (type === 'line' || type === 'area') updateLineAreaCharts();
     }, 100);
 }
+
 function updateAllCharts() {
     const data = getChartData();
     const values = [data.fire, data.medical, data.crime, data.disaster];
     if (chartInstances.pie) { chartInstances.pie.data.datasets[0].data = values; chartInstances.pie.update(); }
     if (chartInstances.bar) { chartInstances.bar.data.datasets[0].data = values; chartInstances.bar.update(); }
     if (chartInstances.doughnut) { chartInstances.doughnut.data.datasets[0].data = values; chartInstances.doughnut.update(); }
-    updateLineAreaCharts(); updateGaugeChart(); updateHeatmap();
+    updateLineAreaCharts();
+    updateGaugeChart();
+    updateHeatmap();
 }
+
 function updateLineAreaCharts() {
     const weekly = getWeeklyChartData();
     if (chartInstances.line) {
@@ -4477,6 +4959,7 @@ function updateLineAreaCharts() {
         chartInstances.area.update();
     }
 }
+
 let gaugeTicksDrawn = false;
 function updateGaugeChart() {
     const realStats = calculateRealStatistics();
@@ -4485,6 +4968,7 @@ function updateGaugeChart() {
     const resolved = total - active;
     let rate = total > 0 ? Math.round((resolved / total) * 100) : 0;
     rate = Math.max(0, Math.min(100, rate));
+
     const ticksGroup = document.getElementById('gaugeModernTicks');
     if (ticksGroup && !gaugeTicksDrawn) {
         let ticksHTML = '';
@@ -4494,18 +4978,22 @@ function updateGaugeChart() {
             const isMajor = i % 2 === 0;
             const r1 = isMajor ? 95 : 100;
             const r2 = 108;
-            const x1 = 160 + r1 * Math.cos(rad); const y1 = 180 + r1 * Math.sin(rad);
-            const x2 = 160 + r2 * Math.cos(rad); const y2 = 180 + r2 * Math.sin(rad);
+            const x1 = 160 + r1 * Math.cos(rad);
+            const y1 = 180 + r1 * Math.sin(rad);
+            const x2 = 160 + r2 * Math.cos(rad);
+            const y2 = 180 + r2 * Math.sin(rad);
             ticksHTML += '<line x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '" stroke="rgba(255,255,255,' + (isMajor ? 0.6 : 0.3) + ')" stroke-width="' + (isMajor ? 3 : 1.5) + '" stroke-linecap="round"/>';
             if (i % 2 === 0) {
                 const rLabel = 78;
-                const xL = 160 + rLabel * Math.cos(rad); const yL = 180 + rLabel * Math.sin(rad);
+                const xL = 160 + rLabel * Math.cos(rad);
+                const yL = 180 + rLabel * Math.sin(rad);
                 ticksHTML += '<text x="' + xL.toFixed(1) + '" y="' + (yL + 4).toFixed(1) + '" text-anchor="middle" fill="#a8b2c1" font-size="11" font-weight="600" font-family="Inter, sans-serif">' + (i * 10) + '</text>';
             }
         }
         ticksGroup.innerHTML = ticksHTML;
         gaugeTicksDrawn = true;
     }
+
     const arc = document.getElementById('gaugeModernArc');
     if (arc) {
         const totalArcLength = Math.PI * 120;
@@ -4517,11 +5005,14 @@ function updateGaugeChart() {
     if (needle) needle.style.transform = 'rotate(' + (-90 + (rate * 1.8)) + 'deg)';
     const valueEl = document.getElementById('gaugeModernValue');
     if (valueEl) valueEl.textContent = total === 0 ? 'N/A' : rate + '%';
-    const gl = document.getElementById('gaugeLow'), gm = document.getElementById('gaugeMedium'), gh = document.getElementById('gaugeHigh');
+    const gl = document.getElementById('gaugeLow');
+    const gm = document.getElementById('gaugeMedium');
+    const gh = document.getElementById('gaugeHigh');
     if (gl) gl.textContent = active;
     if (gm) gm.textContent = total;
     if (gh) gh.textContent = resolved;
 }
+
 function updateHeatmap() {
     const grid = document.getElementById('heatmapGrid');
     if (!grid) return;
@@ -4533,17 +5024,24 @@ function updateHeatmap() {
         const cell = document.createElement('div');
         const val = totals[i];
         let level = 'none';
-        if (val > 0) { const ratio = val / maxTotal; if (ratio > 0.7) level = 'high'; else if (ratio > 0.3) level = 'medium'; else level = 'low'; }
+        if (val > 0) {
+            const ratio = val / maxTotal;
+            if (ratio > 0.7) level = 'high';
+            else if (ratio > 0.3) level = 'medium';
+            else level = 'low';
+        }
         cell.className = 'heatmap-cell ' + level;
         cell.textContent = val > 0 ? val : '·';
         cell.title = label + ': ' + val + ' kejadian';
         grid.appendChild(cell);
     });
 }
+
 function updateMap() {
     const f = document.getElementById('emergencyMapFrame');
-    if (f && userLat && userLng) f.src = 'https://www.google.com/maps?q=' + userLat + ',' + userLng + '&output=embed';
-    else if (f) {
+    if (f && userLat && userLng) {
+        f.src = 'https://www.google.com/maps?q=' + userLat + ',' + userLng + '&output=embed';
+    } else if (f) {
         const ems = getActiveEmergencies();
         const withCoords = ems.find(e => e.coords && e.coords.indexOf(',') !== -1);
         if (withCoords) {
@@ -4554,7 +5052,7 @@ function updateMap() {
 }
 
 // ====================================================================
-// 30. HANDLE EMERGENCY CLICK (DELEGASI KE SalinkEmergency — OPSI A)
+// 39. HANDLE EMERGENCY CLICK (DELEGASI KE SalinkEmergency)
 // ====================================================================
 function handleEmergencyClick(e) {
     e.preventDefault();
@@ -4577,7 +5075,7 @@ function handleEmergencyClick(e) {
 
     unlockAudio();
 
-    // ⭐ OPSI A: Delegasi total ke SalinkEmergency
+    // Delegasi ke SalinkEmergency
     if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency &&
         typeof SalinkEmergency.handleGridButtonTap === 'function') {
         console.log('✅ [Grid] Delegating to SalinkEmergency');
@@ -4585,7 +5083,7 @@ function handleEmergencyClick(e) {
         return;
     }
 
-    // Fallback kalau SalinkEmergency tidak tersedia
+    // Fallback
     console.warn('⚠️ [Grid] SalinkEmergency tidak tersedia, pakai fallback');
     if (window._salinkActiveAlarm && window._salinkActiveAlarm.type === type) {
         stopEmergencyAlarm();
@@ -4597,30 +5095,41 @@ function handleEmergencyClick(e) {
     highlightEmergencyButton(type, true);
     showToast('🔊 Alarm Berbunyi', (EMERGENCY_LABELS[type] || type) + ' — Tap lagi untuk stop', 'fa-volume-up');
 }
+
 function setupChartNavigation() {
     document.querySelectorAll('.chart-nav-btn').forEach(btn => {
-        btn.addEventListener('click', function(e) { e.preventDefault(); switchChart(this.dataset.chart); });
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            switchChart(this.dataset.chart);
+        });
     });
 }
 
+console.log('✅ [TAHAP 4] Like, Comment, CreatePost, TriggerLocalEmergency, Notif, Invite, Charts loaded');
+
 // ====================================================================
-// 31. USER & PREVIEW MODE
+// 40. USER & PREVIEW MODE
 // ====================================================================
 function loadUser() {
     const s = localStorage.getItem('salink_user');
     if (s) {
         try {
             currentUser = JSON.parse(s);
-            if (currentUser && currentUser.username && currentUser.fullName) { isPreviewMode = false; return; }
+            if (currentUser && currentUser.username && currentUser.fullName) {
+                isPreviewMode = false;
+                return;
+            }
         } catch(e) {}
     }
     isPreviewMode = true;
 }
+
 function updateUserUI() {
     const userBtn = document.getElementById('userBtn');
     const postPic = document.getElementById('postProfilePic');
     const postName = document.getElementById('postUserName');
     const reportedBy = document.getElementById('postReportedBy');
+
     if (!currentUser) {
         if (userBtn) userBtn.innerHTML = '<i class="fas fa-user"></i>';
         if (postPic) postPic.innerHTML = '<i class="fas fa-user"></i>';
@@ -4639,6 +5148,7 @@ function updateUserUI() {
     if (postName) postName.textContent = currentUser.fullName || 'User';
     if (reportedBy) reportedBy.value = currentUser.fullName || '';
 }
+
 function showPreviewOverlay() {
     const o = document.getElementById('previewOverlay');
     if (o) { o.classList.add('active'); document.body.style.overflow = 'hidden'; }
@@ -4648,43 +5158,71 @@ function hidePreviewOverlay() {
     const o = document.getElementById('previewOverlay');
     if (o) { o.classList.remove('active'); document.body.style.overflow = ''; }
 }
-function redirectToLogin() { window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(DASHBOARD_URL); }
+function redirectToLogin() {
+    window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(DASHBOARD_URL);
+}
+
 function applyPreviewMode() {
     if (isPreviewMode) {
-        const pb = document.getElementById('previewBadge'); if (pb) pb.classList.add('active');
-        ['postInput','postSpecialText'].forEach(id => { const el = document.getElementById(id); if (el) el.readOnly = true; });
-        const mu = document.getElementById('mediaUpload'); if (mu) mu.disabled = true;
-        const ps = document.getElementById('postSubmit'); if (ps) ps.disabled = true;
-        const pts = document.getElementById('postTypeSelect'); if (pts) pts.disabled = true;
-        const gps = document.getElementById('gpsLocationBtn'); if (gps) gps.disabled = true;
+        const pb = document.getElementById('previewBadge');
+        if (pb) pb.classList.add('active');
+        ['postInput', 'postSpecialText'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.readOnly = true;
+        });
+        const mu = document.getElementById('mediaUpload');
+        if (mu) mu.disabled = true;
+        const ps = document.getElementById('postSubmit');
+        if (ps) ps.disabled = true;
+        const pts = document.getElementById('postTypeSelect');
+        if (pts) pts.disabled = true;
+        const gps = document.getElementById('gpsLocationBtn');
+        if (gps) gps.disabled = true;
         document.querySelectorAll('.emergency-btn').forEach(b => b.style.opacity = '0.7');
     } else {
-        const pb = document.getElementById('previewBadge'); if (pb) pb.classList.remove('active');
-        ['postInput','postSpecialText'].forEach(id => { const el = document.getElementById(id); if (el) el.readOnly = false; });
-        const mu = document.getElementById('mediaUpload'); if (mu) mu.disabled = false;
-        const pts = document.getElementById('postTypeSelect'); if (pts) pts.disabled = false;
-        const gps = document.getElementById('gpsLocationBtn'); if (gps) gps.disabled = false;
+        const pb = document.getElementById('previewBadge');
+        if (pb) pb.classList.remove('active');
+        ['postInput', 'postSpecialText'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.readOnly = false;
+        });
+        const mu = document.getElementById('mediaUpload');
+        if (mu) mu.disabled = false;
+        const pts = document.getElementById('postTypeSelect');
+        if (pts) pts.disabled = false;
+        const gps = document.getElementById('gpsLocationBtn');
+        if (gps) gps.disabled = false;
         document.querySelectorAll('.emergency-btn').forEach(b => b.style.opacity = '1');
         setTimeout(() => { try { validatePost(); } catch(e) {} }, 100);
     }
 }
+
 function setupLoginGuard() {
     document.addEventListener('click', function(e) {
         const target = e.target.closest('[data-action]');
         if (!target) return;
         const action = target.dataset.action;
         if (target.classList.contains('emergency-btn')) return;
+
         if (action === 'profile') {
-            if (isPreviewMode) { e.preventDefault(); e.stopPropagation(); showPreviewOverlay(); return; }
+            if (isPreviewMode) {
+                e.preventDefault();
+                e.stopPropagation();
+                showPreviewOverlay();
+                return;
+            }
             if (target.id === 'userBtn' || target.id === 'postProfilePic') {
-                e.preventDefault(); e.stopPropagation();
+                e.preventDefault();
+                e.stopPropagation();
                 window.location.href = PROFILE_URL;
             }
             return;
         }
         if (action === 'login') {
             if (isPreviewMode) {
-                e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
                 showPreviewOverlay();
                 target.classList.add('shake-element');
                 setTimeout(() => target.classList.remove('shake-element'), 300);
@@ -4695,7 +5233,7 @@ function setupLoginGuard() {
 }
 
 // ====================================================================
-// 32. LOAD DATA (FIX BUG 1, 2, 4, 5)
+// 41. LOAD DATA — API + Local Merge
 // ====================================================================
 async function loadData() {
     let localPosts = [];
@@ -4712,6 +5250,7 @@ async function loadData() {
     posts = localPosts
         .filter(p => p && p.id && p.userId && p.userFullName && !isDeleted(p.id))
         .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
     const now = Date.now();
     const validLocalEms = localEms.filter(e => {
         if (!e || !e.id) return false;
@@ -4721,11 +5260,14 @@ async function loadData() {
         const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
         return exp > now;
     });
+
     notifications = localNotifs
         .filter(n => n && n.id && !isDeleted(n.id))
         .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
     allUsers = localUsers;
 
+    // Render awal dari local
     renderPosts();
     renderPostsStats();
     renderHologram();
@@ -4733,12 +5275,20 @@ async function loadData() {
     updateNotifBadge();
     updateInviteBadge();
     updateStatsCards();
+
     if (chartInstances.pie || chartInstances.bar) updateAllCharts();
 
+    // Fetch dari API
     try {
         const results = await Promise.allSettled([
-            apiGetPosts(), apiGetEmergencies(), apiGetNotifications(), apiGetStatistics(), apiGetUsers()
+            apiGetPosts(),
+            apiGetEmergencies(),
+            apiGetNotifications(),
+            apiGetStatistics(),
+            apiGetUsers()
         ]);
+
+        // Posts
         let apiPosts = (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) ? results[0].value : [];
         const postMap = new Map();
         posts.forEach(p => { if (p && p.id && !isDeleted(p.id)) postMap.set(p.id, p); });
@@ -4748,10 +5298,11 @@ async function loadData() {
             }
         });
         posts = Array.from(postMap.values())
-        .filter(p => p && p.id && p.userId && p.userFullName)
-        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            .filter(p => p && p.id && p.userId && p.userFullName)
+            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         safeSavePosts(posts);
 
+        // Emergencies
         let apiEms = (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) ? results[1].value : [];
         apiEms = apiEms.map(em => {
             let ts = em.timestamp;
@@ -4793,6 +5344,7 @@ async function loadData() {
             localStorage.setItem('salink_emergencies', JSON.stringify(merged));
         } catch(e) {}
 
+        // Notifications
         let apiNotifs = (results[2].status === 'fulfilled' && Array.isArray(results[2].value)) ? results[2].value : [];
         const notifMap = new Map();
         notifications.forEach(n => { if (n && n.id && !isDeleted(n.id)) notifMap.set(n.id, n); });
@@ -4804,14 +5356,20 @@ async function loadData() {
         notifications = Array.from(notifMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         try { localStorage.setItem('salink_notifications', JSON.stringify(notifications)); } catch(e) {}
 
+        // Statistics
         if (results[3].status === 'fulfilled' && results[3].value) statistics = results[3].value;
+
+        // Users
         let apiUsers = (results[4].status === 'fulfilled' && Array.isArray(results[4].value)) ? results[4].value : [];
         const userMap = new Map();
         allUsers.forEach(u => { if (u && u.username) userMap.set(u.username, u); });
         apiUsers.forEach(u => { if (u && u.username) userMap.set(u.username, u); });
         allUsers = Array.from(userMap.values());
-        try { if (allUsers.length > 0) localStorage.setItem('salink_users', JSON.stringify(allUsers)); } catch(e) {}
+        try {
+            if (allUsers.length > 0) localStorage.setItem('salink_users', JSON.stringify(allUsers));
+        } catch(e) {}
 
+        // Render ulang
         renderPosts();
         renderPostsStats();
         renderHologram();
@@ -4826,14 +5384,15 @@ async function loadData() {
 }
 
 // ====================================================================
-// 33. THEME
+// 42. THEME
 // ====================================================================
 function loadTheme() {
     const t = localStorage.getItem('salink_theme');
     if (t === 'light') {
         currentTheme = 'light';
         document.documentElement.setAttribute('data-theme', 'light');
-        const tt = document.getElementById('themeToggle'); if (tt) tt.classList.add('active');
+        const tt = document.getElementById('themeToggle');
+        if (tt) tt.classList.add('active');
         const ti = document.getElementById('toggleIcon');
         if (ti) ti.className = 'fas fa-sun';
     }
@@ -4859,43 +5418,60 @@ function toggleTheme() {
 }
 
 // ====================================================================
-// 34. SIDEBAR & MODAL
+// 43. SIDEBAR & MODAL
 // ====================================================================
 function openProfileUser(username) {
     if (!username) return;
     if (isPreviewMode) { showPreviewOverlay(); return; }
     window.open('profile-user.html?username=' + encodeURIComponent(username), '_blank');
 }
-function openModal(id) { const m = document.getElementById(id); if (m) m.classList.add('active'); document.body.style.overflow = 'hidden'; }
-function closeModal(id) { const m = document.getElementById(id); if (m) m.classList.remove('active'); document.body.style.overflow = ''; }
+function openModal(id) {
+    const m = document.getElementById(id);
+    if (m) m.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(id) {
+    const m = document.getElementById(id);
+    if (m) m.classList.remove('active');
+    document.body.style.overflow = '';
+}
 
 // ====================================================================
-// 35. SEARCH
+// 44. SEARCH
 // ====================================================================
 function openSearchModal() {
     if (isPreviewMode) { showPreviewOverlay(); return; }
     openModal('searchModal');
     const input = document.getElementById('searchInput');
     if (input) { input.value = ''; setTimeout(() => input.focus(), 200); }
-    const cb = document.getElementById('clearSearchBtn'); if (cb) cb.classList.remove('visible');
-    const sar = document.getElementById('searchActiveResults'); if (sar) sar.style.display = 'none';
-    const sdv = document.getElementById('searchDefaultView'); if (sdv) sdv.style.display = 'block';
+    const cb = document.getElementById('clearSearchBtn');
+    if (cb) cb.classList.remove('visible');
+    const sar = document.getElementById('searchActiveResults');
+    if (sar) sar.style.display = 'none';
+    const sdv = document.getElementById('searchDefaultView');
+    if (sdv) sdv.style.display = 'block';
     renderSearchDefaultView();
     searchTab = 'all';
     document.querySelectorAll('.search-tab').forEach(t => t.classList.remove('active'));
-    const allTab = document.querySelector('.search-tab[data-tab="all"]'); if (allTab) allTab.classList.add('active');
-    const ef = document.getElementById('emergencyFilters'); if (ef) ef.style.display = 'none';
+    const allTab = document.querySelector('.search-tab[data-tab="all"]');
+    if (allTab) allTab.classList.add('active');
+    const ef = document.getElementById('emergencyFilters');
+    if (ef) ef.style.display = 'none';
     searchEmergencyFilter = 'all';
     document.querySelectorAll('.search-filter-chip').forEach(c => c.classList.remove('active'));
-    const allChip = document.querySelector('.search-filter-chip[data-filter="all"]'); if (allChip) allChip.classList.add('active');
+    const allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
+    if (allChip) allChip.classList.add('active');
 }
 function closeSearchModal() { closeModal('searchModal'); }
 function clearSearch() {
     const input = document.getElementById('searchInput');
     if (input) input.value = '';
-    const cb = document.getElementById('clearSearchBtn'); if (cb) cb.classList.remove('visible');
-    const sar = document.getElementById('searchActiveResults'); if (sar) sar.style.display = 'none';
-    const sdv = document.getElementById('searchDefaultView'); if (sdv) sdv.style.display = 'block';
+    const cb = document.getElementById('clearSearchBtn');
+    if (cb) cb.classList.remove('visible');
+    const sar = document.getElementById('searchActiveResults');
+    if (sar) sar.style.display = 'none';
+    const sdv = document.getElementById('searchDefaultView');
+    if (sdv) sdv.style.display = 'block';
     renderSearchDefaultView();
 }
 function renderSearchDefaultView() {
@@ -4923,7 +5499,8 @@ function switchSearchTab(tab, btnEl) {
     searchTab = tab;
     document.querySelectorAll('.search-tab').forEach(t => t.classList.remove('active'));
     btnEl.classList.add('active');
-    const ef = document.getElementById('emergencyFilters'); if (ef) ef.style.display = (tab === 'emergency') ? 'flex' : 'none';
+    const ef = document.getElementById('emergencyFilters');
+    if (ef) ef.style.display = (tab === 'emergency') ? 'flex' : 'none';
     const input = document.getElementById('searchInput');
     if (input && input.value.trim()) performSearch(input.value.trim());
 }
@@ -4936,7 +5513,11 @@ function setEmergencyFilter(filter, btnEl) {
 }
 function applySearchQuery(q) {
     const input = document.getElementById('searchInput');
-    if (input) { input.value = q; input.focus(); input.dispatchEvent(new Event('input')); }
+    if (input) {
+        input.value = q;
+        input.focus();
+        input.dispatchEvent(new Event('input'));
+    }
 }
 function removeRecentSearch(q) {
     recentSearches = recentSearches.filter(x => x !== q);
@@ -4960,9 +5541,12 @@ function addRecentSearch(q) {
 function highlightText(text, query) {
     if (!text || !query) return escapeHTML(text || '');
     const safeText = escapeHTML(text);
-    const safeQuery = escapeHTML(query);
-    const regex = new RegExp('(' + safeQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+    const safeQuery = escapeQuery(query);
+    const regex = new RegExp('(' + safeQuery + ')', 'gi');
     return safeText.replace(regex, '<mark>$1</mark>');
+}
+function escapeQuery(query) {
+    return String(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 function getTrendingPosts() {
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
@@ -4977,17 +5561,30 @@ function getTrendingPosts() {
 }
 function performSearch(query) {
     const q = query.trim().toLowerCase();
-    if (!q) { const sar = document.getElementById('searchActiveResults'); if (sar) sar.style.display = 'none'; const sdv = document.getElementById('searchDefaultView'); if (sdv) sdv.style.display = 'block'; return; }
-    const sdv = document.getElementById('searchDefaultView'); if (sdv) sdv.style.display = 'none';
-    const sar = document.getElementById('searchActiveResults'); if (sar) sar.style.display = 'block';
-    const cb = document.getElementById('clearSearchBtn'); if (cb) cb.classList.add('visible');
+    if (!q) {
+        const sar = document.getElementById('searchActiveResults');
+        if (sar) sar.style.display = 'none';
+        const sdv = document.getElementById('searchDefaultView');
+        if (sdv) sdv.style.display = 'block';
+        return;
+    }
+    const sdv = document.getElementById('searchDefaultView');
+    if (sdv) sdv.style.display = 'none';
+    const sar = document.getElementById('searchActiveResults');
+    if (sar) sar.style.display = 'block';
+    const cb = document.getElementById('clearSearchBtn');
+    if (cb) cb.classList.add('visible');
+
     const users = searchUsers(q);
     const matchedPosts = searchPosts(q);
     const matchedEm = searchEmergencies(q);
-    let html = ''; let totalCount = 0;
+
+    let html = '';
+    let totalCount = 0;
     const showUsers = (searchTab === 'all' || searchTab === 'users');
     const showPosts = (searchTab === 'all' || searchTab === 'posts');
     const showEm = (searchTab === 'all' || searchTab === 'emergency');
+
     if (showUsers && users.length > 0) {
         totalCount += users.length;
         html += '<div class="search-section-title"><span>👤 Pengguna</span><span class="count-pill">' + users.length + '</span></div>';
@@ -5072,17 +5669,20 @@ function setupSearchInput() {
             if (val) addRecentSearch(val);
         }, 300);
     });
-    input.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeSearchModal(); });
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeSearchModal();
+    });
 }
 
 // ====================================================================
-// 36. URL PARAMS + PENDING EMERGENCY
+// 45. URL PARAMS + PENDING EMERGENCY FROM URL
 // ====================================================================
 function checkURLParams() {
     const params = new URLSearchParams(window.location.search);
     const userParam = params.get('user');
     const logout = params.get('logout');
     const emergencyParam = params.get('emergency');
+
     if (logout === '1') {
         localStorage.removeItem('salink_user');
         window.history.replaceState({}, document.title, DASHBOARD_URL);
@@ -5151,7 +5751,7 @@ function setupVisibilityDetection() {
 }
 
 // ====================================================================
-// 37. BOTTOM NAV
+// 46. BOTTOM NAV
 // ====================================================================
 function initBottomNav() {
     document.querySelectorAll('.nav-item-bottom').forEach(item => {
@@ -5162,8 +5762,13 @@ function initBottomNav() {
                 e.preventDefault();
                 if (isPreviewMode) { showPreviewOverlay(); return; }
                 window.location.href = PROFILE_URL;
-            } else if (w === 'invite') { e.preventDefault(); openInviteModal(); }
-            else if (w === 'notification') { e.preventDefault(); openNotifModal(); }
+            } else if (w === 'invite') {
+                e.preventDefault();
+                openInviteModal();
+            } else if (w === 'notification') {
+                e.preventDefault();
+                openNotifModal();
+            }
             document.querySelectorAll('.nav-item-bottom').forEach(i => i.classList.remove('active'));
             this.classList.add('active');
         });
@@ -5171,7 +5776,7 @@ function initBottomNav() {
 }
 
 // ====================================================================
-// 38. SETUP POST INPUT
+// 47. SETUP POST INPUT
 // ====================================================================
 function setupPostInput() {
     const select = document.getElementById('postTypeSelect');
@@ -5182,7 +5787,9 @@ function setupPostInput() {
     const submitBtn = document.getElementById('postSubmit');
     const mediaUpload = document.getElementById('mediaUpload');
     const reportedBy = document.getElementById('postReportedBy');
+
     if (reportedBy && currentUser) reportedBy.value = currentUser.fullName || '';
+
     if (select && !select._salinkSetup) {
         select._salinkSetup = true;
         select.addEventListener('change', function() {
@@ -5201,8 +5808,14 @@ function setupPostInput() {
             validatePost();
         });
     }
-    if (input && !input._salinkSetup) { input._salinkSetup = true; input.addEventListener('input', validatePost); }
-    if (specialText && !specialText._salinkSetup) { specialText._salinkSetup = true; specialText.addEventListener('input', validatePost); }
+    if (input && !input._salinkSetup) {
+        input._salinkSetup = true;
+        input.addEventListener('input', validatePost);
+    }
+    if (specialText && !specialText._salinkSetup) {
+        specialText._salinkSetup = true;
+        specialText.addEventListener('input', validatePost);
+    }
     if (mediaUpload && !mediaUpload._salinkSetup) {
         mediaUpload._salinkSetup = true;
         mediaUpload.addEventListener('change', function() {
@@ -5212,8 +5825,18 @@ function setupPostInput() {
                 const isVideo = f.type.indexOf('video/') === 0;
                 const isImage = f.type.indexOf('image/') === 0;
                 let maxSize = isVideo ? 100 * 1024 * 1024 : (isImage ? 20 * 1024 * 1024 : 0);
-                if (!maxSize) { showToast('⚠️ Format tidak didukung', 'Hanya foto/video', 'fa-exclamation-triangle'); this.value = ''; validatePost(); return; }
-                if (f.size > maxSize) { showToast('⚠️ File terlalu besar', 'Max ' + (maxSize/1024/1024).toFixed(0) + 'MB', 'fa-exclamation-triangle'); this.value = ''; validatePost(); return; }
+                if (!maxSize) {
+                    showToast('⚠️ Format tidak didukung', 'Hanya foto/video', 'fa-exclamation-triangle');
+                    this.value = '';
+                    validatePost();
+                    return;
+                }
+                if (f.size > maxSize) {
+                    showToast('⚠️ File terlalu besar', 'Max ' + (maxSize / 1024 / 1024).toFixed(0) + 'MB', 'fa-exclamation-triangle');
+                    this.value = '';
+                    validatePost();
+                    return;
+                }
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const p = document.getElementById('mediaPreview');
@@ -5231,35 +5854,50 @@ function setupPostInput() {
     if (submitBtn && !submitBtn._salinkPostSetup) {
         submitBtn._salinkPostSetup = true;
         submitBtn.addEventListener('click', async function(e) {
-            e.preventDefault(); e.stopPropagation();
+            e.preventDefault();
+            e.stopPropagation();
             if (window._salinkPostingInProgress) return;
             if (isPreviewMode) { showPreviewOverlay(); return; }
             if (!currentUser) { redirectToLogin(); return; }
+
             const val = document.getElementById('postTypeSelect') ? document.getElementById('postTypeSelect').value : 'biasa';
             const mapping = POST_TYPE_MAP[val] || POST_TYPE_MAP['biasa'];
             const isSpecial = mapping.isSpecial;
             const specialType = mapping.specialType;
-            const text = isSpecial ? (document.getElementById('postSpecialText') ? document.getElementById('postSpecialText').value.trim() : '') : (document.getElementById('postInput') ? document.getElementById('postInput').value.trim() : '');
+            const text = isSpecial
+                ? (document.getElementById('postSpecialText') ? document.getElementById('postSpecialText').value.trim() : '')
+                : (document.getElementById('postInput') ? document.getElementById('postInput').value.trim() : '');
             const fileEl = document.getElementById('mediaUpload');
             const file = fileEl && fileEl.files ? fileEl.files[0] : null;
-            if (!text && !file) { showToast('⚠️ Perhatian', 'Isi teks atau upload media', 'fa-exclamation-triangle'); return; }
+
+            if (!text && !file) {
+                showToast('⚠️ Perhatian', 'Isi teks atau upload media', 'fa-exclamation-triangle');
+                return;
+            }
+
             let specialData = null;
             if (isSpecial) {
-                if (!currentGpsData) { showToast('⚠️ Perhatian', 'Tekan "Ambil Lokasi Saya" dulu', 'fa-exclamation-triangle'); return; }
+                if (!currentGpsData) {
+                    showToast('⚠️ Perhatian', 'Tekan "Ambil Lokasi Saya" dulu', 'fa-exclamation-triangle');
+                    return;
+                }
                 specialData = {
                     type: specialType,
                     location: currentGpsData.address || ('Koordinat: ' + currentGpsData.lat + ', ' + currentGpsData.lng),
                     address: currentGpsData.address,
-                    latitude: currentGpsData.lat, longitude: currentGpsData.lng,
+                    latitude: currentGpsData.lat,
+                    longitude: currentGpsData.lng,
                     mapsURL: currentGpsData.mapsURL,
                     coords: currentGpsData.lat + ', ' + currentGpsData.lng
                 };
             }
+
             await createPost(text, file, isSpecial, specialData);
         });
     }
     validatePost();
 }
+
 function validatePost() {
     const selectEl = document.getElementById('postTypeSelect');
     const val = selectEl ? selectEl.value : 'biasa';
@@ -5279,7 +5917,7 @@ function validatePost() {
 }
 
 // ====================================================================
-// 39. PWA
+// 48. PWA
 // ====================================================================
 function setupPWA() {
     if ('serviceWorker' in navigator) {
@@ -5319,7 +5957,7 @@ function showInstallPrompt() {
 }
 
 // ====================================================================
-// 40. VIEW-ONLY PROTECTION
+// 49. VIEW-ONLY PROTECTION
 // ====================================================================
 function setupViewOnlyProtection() {
     document.addEventListener('contextmenu', function(e) {
@@ -5335,7 +5973,7 @@ function setupViewOnlyProtection() {
 }
 
 // ====================================================================
-// 41. CLEAR CACHE SYSTEM
+// 50. CLEAR CACHE SYSTEM
 // ====================================================================
 function formatBytes(bytes) {
     if (!bytes || bytes < 0) return '0 B';
@@ -5475,16 +6113,8 @@ function clearAllCache() {
     } catch(e) {}
 }
 
-window.showClearCacheMenu = showClearCacheMenu;
-window.closeClearCacheModal = closeClearCacheModal;
-window.showStorageDetail = showStorageDetail;
-window.clearMediaOnly = clearMediaOnly;
-window.clearOldData = clearOldData;
-window.forceSyncData = forceSyncData;
-window.clearAllCache = clearAllCache;
-
 // ====================================================================
-// 42. HERO CAROUSEL
+// 51. HERO CAROUSEL
 // ====================================================================
 let heroIndex = 0;
 let heroAutoTimer = null;
@@ -5550,7 +6180,7 @@ function initHeroCarousel() {
 }
 
 // ====================================================================
-// 43. HOLOGRAM CAROUSEL AUTO-SLIDE
+// 52. HOLOGRAM CAROUSEL AUTO-SLIDE
 // ====================================================================
 let hologramAutoTimer = null;
 window.hologramPaused = false;
@@ -5654,7 +6284,7 @@ function initHologramSwipe() {
 }
 
 // ====================================================================
-// 44. FAB MODAL
+// 53. FAB MODAL
 // ====================================================================
 function openFabModal() {
     const fabModalOverlay = document.getElementById('fabModalOverlay');
@@ -5674,6 +6304,7 @@ function initFabModal() {
     const fabModalOverlay = document.getElementById('fabModalOverlay');
     const fabModalClose = document.getElementById('fabModalClose');
     const fabEmergencyCards = document.querySelectorAll('.fab-emergency-card');
+
     if (scanFab) {
         scanFab.addEventListener('click', function(e) {
             e.preventDefault();
@@ -5722,7 +6353,7 @@ function initFabModal() {
 }
 
 // ====================================================================
-// 45. HEADER NOTIF + RIPPLE + STORAGE EVENT
+// 54. HEADER NOTIF + RIPPLE + STORAGE EVENT
 // ====================================================================
 function initHeaderNotif() {
     const headerNotifBtn = document.getElementById('headerNotifBtn');
@@ -5766,7 +6397,7 @@ function initStorageEvents() {
             updateEmergencyBadges();
             updateNotifBadge();
             updateAllCharts();
-            updateStatsCard
+            updateStatsCards();
         }
         if (e.key === 'salink_emergencies_new' && e.newValue) {
             try {
@@ -5781,528 +6412,9 @@ function initStorageEvents() {
 }
 
 // ====================================================================
-// 46. DELETE PERMANENT (FIX BUG 2)
+// 55. E-COMMERCE (Mini Marketplace)
 // ====================================================================
-async function deletePostPermanent(postId, options) {
-    options = options || {};
-    const silent = options.silent || false;
-    const skipConfirm = options.skipConfirm || false;
-
-    if (!postId) {
-        showToast('⚠️ Error', 'ID postingan tidak valid', 'fa-exclamation-triangle');
-        return false;
-    }
-
-    const post = posts.find(p => p.id === postId);
-    const isEmergency = post && post.isSpecial && post.specialType;
-
-    if (!skipConfirm) {
-        const label = post ? (post.text ? post.text.substring(0, 50) : 'Postingan media') : 'Postingan';
-        if (!confirm('🗑️ HAPUS PERMANEN?\n\n"' + label + '"\n\nAkan dihapus dari:\n✅ Tampilan aplikasi\n✅ Penyimpanan lokal\n✅ Database server\n✅ Google Drive (media)\n\nTindakan ini TIDAK BISA DIBATALKAN!')) {
-            return false;
-        }
-        if (!confirm('🛑 KONFIRMASI KEDUA\n\nYakin ingin menghapus? Data tidak dapat dikembalikan.')) {
-            return false;
-        }
-    }
-
-    showSyncIndicator();
-    console.log('🗑️ [deletePostPermanent] Deleting:', postId, '| Emergency:', isEmergency);
-
-    try {
-        // ⭐ BUG 2 FIX: Mark as deleted DULU
-        markAsDeleted(postId);
-        console.log('✅ [deletePostPermanent] Marked as deleted');
-
-        // Hapus dari Google Drive
-        if (post && post.gdriveId) {
-            try {
-                console.log('🗑️ [deletePostPermanent] Deleting GDrive file:', post.gdriveId);
-                await deleteFromGDrive(post.gdriveId);
-            } catch(e) {
-                console.warn('⚠️ [deletePostPermanent] GDrive delete error:', e.message);
-            }
-        }
-
-        // Hapus dari localStorage
-        let allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
-        const beforeCount = allPosts.length;
-        allPosts = allPosts.filter(p => p && p.id !== postId);
-        safeSavePosts(allPosts);
-        console.log('✅ [deletePostPermanent] Posts:', beforeCount, '→', allPosts.length);
-
-        let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-        const beforeEmsCount = ems.length;
-        ems = ems.filter(e => e && e.id !== postId);
-        localStorage.setItem('salink_emergencies', JSON.stringify(ems));
-        console.log('✅ [deletePostPermanent] Emergencies:', beforeEmsCount, '→', ems.length);
-
-        let notifs = JSON.parse(localStorage.getItem('salink_notifications') || '[]');
-        const beforeNotifsCount = notifs.length;
-        notifs = notifs.filter(n => n && n.id !== postId && n.postId !== postId);
-        localStorage.setItem('salink_notifications', JSON.stringify(notifs));
-        console.log('✅ [deletePostPermanent] Notifications:', beforeNotifsCount, '→', notifs.length);
-
-        // Hapus likes/comments cache
-        if (window._salinkLikesMap && window._salinkLikesMap[postId]) {
-            delete window._salinkLikesMap[postId];
-            saveLikesMap();
-        }
-        if (window._salinkCommentsMap && window._salinkCommentsMap[postId]) {
-            delete window._salinkCommentsMap[postId];
-            saveCommentsMap();
-        }
-
-        // Hapus media lokal
-        if (post && post.mediaId) {
-            try {
-                const mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}');
-                if (mediaStore[post.mediaId]) {
-                    delete mediaStore[post.mediaId];
-                    localStorage.setItem('salink_post_media', JSON.stringify(mediaStore));
-                    console.log('✅ [deletePostPermanent] Media local deleted');
-                }
-            } catch(e) {}
-        }
-
-        if (readNotifs[postId]) {
-            delete readNotifs[postId];
-            saveReadNotifs();
-        }
-        if (dismissedEmergencies[postId]) {
-            delete dismissedEmergencies[postId];
-            saveDismissed();
-        }
-
-        // ⭐ BUG 2 FIX: Kirim ke backend DAN tunggu response
-        try {
-            const deleteType = isEmergency ? 'emergency' : 'post';
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({
-                    action: 'delete_content',
-                    data: {
-                        type: deleteType,
-                        id: postId,
-                        userId: currentUser ? currentUser.username : ''
-                    },
-                    timestamp: Date.now()
-                })
-            });
-            const result = await response.json();
-            if (result && result.status === 'success') {
-                console.log('✅ [deletePostPermanent] Backend delete OK');
-            } else {
-                console.warn('⚠️ [deletePostPermanent] Backend response:', result);
-            }
-        } catch(e) {
-            console.warn('⚠️ [deletePostPermanent] Backend error:', e.message);
-        }
-
-        broadcastSync(isEmergency ? 'delete_emergency' : 'delete_post', { id: postId });
-
-        posts = loadPostsFromStorage();
-        renderPosts();
-        renderPostsStats();
-        renderHologram();
-        updateEmergencyBadges();
-        updateNotifBadge();
-        updateAllCharts();
-        updateStatsCards();
-
-        closeModal('notifModal');
-        closeDeleteConfirm();
-
-        if (!silent) {
-            showToast('✅ Terhapus', 'Postingan dihapus permanen', 'fa-check-circle');
-        }
-        playRegularSound();
-
-        hideSyncIndicator();
-        return true;
-
-    } catch(e) {
-        console.error('❌ [deletePostPermanent] Error:', e);
-        hideSyncIndicator();
-        if (!silent) showToast('⚠️ Gagal', 'Error: ' + e.message, 'fa-exclamation-triangle');
-        return false;
-    }
-}
-
-window.deletePostPermanent = deletePostPermanent;
-
-function handleDeleteFromMenu(postId) {
-    document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
-    deletePostPermanent(postId);
-}
-window.handleDeleteFromMenu = handleDeleteFromMenu;
-
-function handleDeleteFromStatsCard(postId) {
-    deletePostPermanent(postId);
-}
-window.handleDeleteFromStatsCard = handleDeleteFromStatsCard;
-
-function handleDeleteFromHologram(emergencyId) {
-    deletePostPermanent(emergencyId);
-}
-window.handleDeleteFromHologram = handleDeleteFromHologram;
-
-function handleDeleteFromNotif(notifId) {
-    deletePostPermanent(notifId);
-}
-window.handleDeleteFromNotif = handleDeleteFromNotif;
-
-// ====================================================================
-// 47. OVERRIDE: Sosial Media → FCM Trigger
-// ====================================================================
-
-// ⭐ Override addComment → pakai action comment_post (untuk trigger FCM)
-window.addComment = async function(postId, text) {
-    if (!currentUser) { redirectToLogin(); return; }
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-
-    let comments = getPostComments(postId) || [];
-    if (!Array.isArray(comments)) comments = [];
-
-    const newComment = {
-        id: 'c-' + Date.now(),
-        userId: currentUser.username,
-        userFullName: currentUser.fullName,
-        userGender: currentUser.gender,
-        userProfilePic: currentUser.profilePicture,
-        text: text.trim(),
-        timestamp: Date.now()
-    };
-    comments.push(newComment);
-    setPostComments(postId, comments);
-    post.comments = JSON.stringify(comments);
-    safeSavePosts(posts);
-    renderPosts();
-    broadcastSync('new_post', { id: postId });
-    playRegularSound();
-
-    // ⭐ Kirim ke backend dengan action comment_post (untuk trigger FCM)
-    try {
-        await apiCall('comment_post', {
-            postId: postId,
-            commenterId: currentUser.username,
-            commenterName: currentUser.fullName,
-            text: text.trim()
-        });
-        console.log('✅ [Comment] Synced + FCM triggered');
-    } catch (e) {
-        console.warn('⚠️ [Comment] Backend error:', e.message);
-    }
-};
-
-// ⭐ Override toggleLike → pakai action like_post (untuk trigger FCM)
-window.toggleLike = async function(postId) {
-    if (!currentUser) { redirectToLogin(); return; }
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-
-    let likes = getPostLikes(postId) || [];
-    if (!Array.isArray(likes)) likes = [];
-
-    const idx = likes.indexOf(currentUser.username);
-    const isUnlike = idx > -1;
-
-    if (isUnlike) likes.splice(idx, 1);
-    else likes.push(currentUser.username);
-
-    setPostLikes(postId, likes);
-    post.likes = JSON.stringify(likes);
-    safeSavePosts(posts);
-    renderPosts();
-    broadcastSync('stats_update', { postId: postId });
-    playRegularSound();
-
-    // ⭐ Kirim ke backend dengan action like_post (untuk trigger FCM)
-    try {
-        await apiCall('like_post', {
-            postId: postId,
-            userId: currentUser.username,
-            userName: currentUser.fullName
-        });
-        console.log('✅ [Like] Synced + FCM triggered (isUnlike=' + isUnlike + ')');
-    } catch (e) {
-        console.warn('⚠️ [Like] Backend error:', e.message);
-    }
-};
-
-console.log('✅ [Override] addComment & toggleLike pakai action baru');
-
-// ====================================================================
-// 48. RENDER NOTIF SOSIAL & E-COMMERCE
-// ====================================================================
-
-/**
- * Render notif item untuk notif sosial / e-commerce
- * Dipanggil di dalam renderNotifList() yang sudah ada
- */
-function renderNotifItemUniversal(n) {
-    const notifType = n.notifType || n.type || 'social_post';
-    const t = String(notifType).toLowerCase();
-
-    // ⭐ Mapping ikon & warna per jenis
-    let icon = '🔔';
-    let iconClass = 'regular';
-    let borderClass = '';
-
-    if (t.indexOf('emergency_') === 0) {
-        const emergencyIcons = { 'emergency_fire': '🔥', 'emergency_medical': '🚑', 'emergency_crime': '🚓', 'emergency_disaster': '🌪️' };
-        icon = emergencyIcons[t] || '🚨';
-        iconClass = 'emergency';
-        borderClass = 'emergency';
-    } else if (t === 'social_comment') { icon = '💬'; iconClass = 'social'; borderClass = 'social-comment'; }
-    else if (t === 'social_like') { icon = '❤️'; iconClass = 'social'; borderClass = 'social-like'; }
-    else if (t === 'social_post') { icon = '📝'; iconClass = 'social'; borderClass = 'social-post'; }
-    else if (t === 'social_invite') { icon = '👥'; iconClass = 'social'; borderClass = 'social-invite'; }
-    else if (t === 'social_invite_accepted') { icon = '✅'; iconClass = 'success'; borderClass = 'social-invite'; }
-    else if (t === 'social_message') { icon = '✉️'; iconClass = 'social'; borderClass = 'social-message'; }
-    else if (t === 'ecom_order_new') { icon = '🛒'; iconClass = 'ecom'; borderClass = 'ecom-order'; }
-    else if (t === 'ecom_payment_success' || t === 'ecom_payment_confirmed') { icon = '💳'; iconClass = 'success'; borderClass = 'ecom-payment'; }
-    else if (t === 'ecom_shipping') { icon = '📦'; iconClass = 'ecom'; borderClass = 'ecom-shipping'; }
-    else if (t === 'ecom_received') { icon = '✅'; iconClass = 'success'; borderClass = 'ecom-payment'; }
-    else if (t === 'ecom_rating') { icon = '⭐'; iconClass = 'ecom'; borderClass = 'ecom-order'; }
-    else if (t === 'ecom_stock_out') { icon = '⚠️'; iconClass = 'ecom'; borderClass = 'ecom-order'; }
-    else if (t === 'ecom_order_cancelled') { icon = '❌'; iconClass = 'emergency'; borderClass = 'emergency'; }
-
-    const unreadClass = n.read ? '' : 'unread';
-    const safeId = escapeAttr(n.id || '');
-    const safeType = escapeAttr(notifType);
-    const safeLink = escapeAttr(n.link || '');
-
-    return '<div class="notif-item ' + unreadClass + ' ' + borderClass + '" onclick="handleNotifClick(\'' + safeId + '\', \'' + safeType + '\', \'' + safeLink + '\')">' +
-        '<div class="notif-item-icon ' + iconClass + '">' + icon + '</div>' +
-        '<div class="notif-item-content">' +
-            '<div class="notif-item-title">' + escapeHTML(n.title || 'Notifikasi') + '</div>' +
-            '<div class="notif-item-message">' + escapeHTML(n.message || '') + '</div>' +
-            '<div class="notif-item-time"><i class="fas fa-clock"></i> ' + getTimeAgo(n.timestamp || Date.now()) + (n.sender ? ' • ' + escapeHTML(n.sender) : '') + '</div>' +
-        '</div>' +
-    '</div>';
-}
-
-function handleNotifClick(notifId, notifType, link) {
-    if (notifId) markNotifRead(notifId);
-
-    if (link) {
-        if (link.startsWith('http')) window.open(link, '_blank');
-        else window.location.href = link;
-    } else if (notifType && notifType.indexOf('emergency_') === 0 && notifId) {
-        window.location.href = 'detail-emergency.html?id=' + encodeURIComponent(notifId);
-    }
-
-    closeModal('notifModal');
-}
-
-console.log('✅ [Notif] Universal renderer loaded');
-            
-// ====================================================================
-// 49. INIT
-// ====================================================================
-document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 SALINK Dashboard v11.0 — FULL FIXED + DELEGATION');
-
-    preloadAllAudio();
-    loadDeletedIds();
-    loadLikesMap();
-    loadCommentsMap();
-    setupIdleDetection();
-    setupVisibilityDetection();
-    setupPWA();
-    checkURLParams();
-    loadTheme();
-    loadReadNotifs();
-    loadDismissed();
-    loadUser();
-    applyPreviewMode();
-    setTimeout(() => { handlePendingEmergencyFromURL(); }, 800);
-    updateUserUI();
-    setupLoginGuard();
-    const savedLat = localStorage.getItem('salink_user_lat');
-    const savedLng = localStorage.getItem('salink_user_lng');
-    if (savedLat && savedLng) { userLat = parseFloat(savedLat); userLng = parseFloat(savedLng); }
-    const themeT = document.getElementById('themeToggle'); if (themeT) themeT.addEventListener('click', toggleTheme);
-    const oLB = document.getElementById('overlayLoginBtn'); if (oLB) oLB.addEventListener('click', redirectToLogin);
-    const oCB = document.getElementById('overlayCancelBtn'); if (oCB) oCB.addEventListener('click', hidePreviewOverlay);
-    const bLL = document.getElementById('badgeLoginLink'); if (bLL) bLL.addEventListener('click', redirectToLogin);
-    const pO = document.getElementById('previewOverlay'); if (pO) pO.addEventListener('click', function(e) { if (e.target === this) hidePreviewOverlay(); });
-    const aT = document.getElementById('appTitle');
-    if (aT) {
-        aT.style.cursor = 'pointer';
-        aT.addEventListener('click', function() {
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-            if (history.replaceState) history.replaceState(null, '', '#');
-        });
-    }
-    const rB = document.getElementById('refreshBtn');
-    if (rB) rB.addEventListener('click', function() {
-        const i = this.querySelector('i');
-        if (i) i.classList.add('fa-spin');
-        loadData().finally(() => { if (i) i.classList.remove('fa-spin'); });
-    });
-    const sB = document.getElementById('searchBtn'); if (sB) sB.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openSearchModal(); });
-    document.querySelectorAll('.emergency-btn').forEach(b => {
-        b.removeEventListener('click', handleEmergencyClick);
-        b.addEventListener('click', handleEmergencyClick);
-        b._salinkEmergencySetup = true;
-    });
-    const gpsB = document.getElementById('gpsLocationBtn'); if (gpsB) gpsB.addEventListener('click', ambilLokasiSaya);
-    initHeroCarousel();
-    initHologramSwipe();
-    initFabModal();
-    initHeaderNotif();
-    initRipple();
-    initStorageEvents();
-    setupChartNavigation();
-    initBottomNav();
-    setupPostInput();
-    setupSearchInput();
-    document.addEventListener('keydown', function(e) {
-        if (e.key === '/' && !e.target.matches('input, textarea, select')) { e.preventDefault(); openSearchModal(); }
-        if (e.key === 'Escape') {
-            const sm = document.getElementById('searchModal');
-            if (sm && sm.classList.contains('active')) closeSearchModal();
-        }
-    });
-    try {
-        await initGoogleDrive();
-        console.log('✅ [Init] Google Drive ready');
-    } catch (err) {
-        console.warn('⚠️ [Init] Google Drive tidak tersedia:', err.message);
-    }
-    setupViewOnlyProtection();
-    // ⭐ v12.0: Init E-commerce
-    initEcommerce();
-    loadProducts();
-    loadMyOrders();
-    
-    // ⭐ v12.0: Init Mini Marketplace (Opsi C)
-    setTimeout(() => {
-    loadMiniProducts();
-    loadMiniOrders();
-    }, 1500); // Delay 1.5s supaya data utama selesai load dulu
-    
-    initAllCharts();
-await loadData();
-
-    initAllCharts();
-    await loadData();
-
-    // ⭐ FIX BUG 1: Update stats & badges SETELAH data selesai load
-    updateStatsCards();
-    updateEmergencyBadges();
-    updateNotifBadge();
-    renderHologram();
-
-    setTimeout(() => { 
-        initAllCharts(); 
-        updateStatsCards();
-        updateEmergencyBadges();
-        renderHologram();
-    }, 800);
-
-    // ⭐ FIX BUG 1: Auto-refresh stats card setiap 30 detik
-    setInterval(() => {
-        if (!document.hidden) {
-            updateStatsCards();
-            updateEmergencyBadges();
-        }
-    }, 30000);
-
-    if (emergencyPollTimer) clearInterval(emergencyPollTimer);
-    emergencyPollTimer = setInterval(async () => {
-        if (fullScreenAlarmActive) return;
-        try {
-            const remoteEms = await apiGetEmergencies();
-            if (!remoteEms || remoteEms.length === 0) return;
-            const localEms = getAllEmergencies();
-            const localIds = new Set(localEms.map(e => e.id));
-            const newEms = remoteEms.filter(em => !localIds.has(em.id) && !isDeleted(em.id));
-            if (newEms.length > 0) {
-                console.log('🚨 [Poll] Emergency baru dari server:', newEms.length);
-                const merged = [...newEms, ...localEms];
-                localStorage.setItem('salink_emergencies', JSON.stringify(merged));
-                triggerEmergencyAutoAlarm(newEms[0]);
-            }
-        } catch(e) {
-            console.warn('⚠️ [Poll] Error:', e.message);
-        }
-    }, EMERGENCY_POLL_INTERVAL);
-
-    setInterval(() => { renderHologram(); updateEmergencyBadges(); }, EMERGENCY_CLEANUP_INTERVAL);
-    if (isPreviewMode) setTimeout(() => showPreviewOverlay(), 1200);
-    setInterval(() => { if (!document.hidden) loadData(); }, AUTO_REFRESH);
-    setInterval(() => {
-        try {
-            const usage = getStorageUsage();
-            if (usage.percent > 80) {
-                const mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}');
-                const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-                let cleaned = 0;
-                Object.keys(mediaStore).forEach(id => {
-                    const entry = mediaStore[id];
-                    if (entry && entry.timestamp && entry.timestamp < sevenDaysAgo) {
-                        delete mediaStore[id];
-                        cleaned++;
-                    }
-                });
-                if (cleaned > 0) {
-                    localStorage.setItem('salink_post_media', JSON.stringify(mediaStore));
-                    showToast('🧹 Auto-Cleanup', cleaned + ' media lama dihapus', 'fa-broom');
-                }
-            }
-        } catch(e) {}
-    }, 30000);
-    setTimeout(() => {
-        const headerInfo = document.getElementById('storageInfo');
-        if (headerInfo) {
-            const usage = getStorageUsage();
-            headerInfo.textContent = formatBytes(usage.total) + ' (' + usage.percent + '%)';
-        }
-    }, 2000);
-    // ⭐ v12.0: E-Commerce di dashboard HANYA untuk tampilkan notif
-// (produk & order detail di halaman toko.html)
-// Jadi tidak perlu load produk di sini
-
-// Refresh notif dari server setiap 60 detik
-setInterval(() => {
-    if (!document.hidden) {
-        apiGetNotifications().then(notifs => {
-            if (notifs && notifs.length > 0) {
-                notifications = notifs;
-                updateNotifBadge();
-                if (document.getElementById('notifModal')?.classList.contains('active')) {
-                    renderNotifList();
-                }
-            }
-        }).catch(() => {});
-    }
-}, 60000);
-
-console.log('✅ [Dashboard] Notif refresh interval set');
-});
-
-
-// ====================================================================
-// 50. E-COMMERCE INIT (Minimal — untuk Dashboard)
-// ====================================================================
-let allProducts = [];
-let allTransactions = [];
-let currentEcomTab = 'products';
-let miniAllProducts = [];
-let miniAllTransactions = [];
-const MINI_PRODUCT_COUNT = 6;
-const MINI_ORDER_COUNT = 3;
-
-/**
- * Init E-commerce basic (dipanggil dari DOMContentLoaded)
- */
 function initEcommerce() {
-    // Setup event listeners untuk refresh button mini marketplace
     const refreshBtn = document.querySelector('.mini-marketplace-refresh');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', function(e) {
@@ -6313,9 +6425,6 @@ function initEcommerce() {
     console.log('✅ [Ecom] Initialized');
 }
 
-/**
- * Load produk dari backend (global, untuk dashboard)
- */
 async function loadProducts() {
     try {
         const r = await apiCall('get_products');
@@ -6327,9 +6436,6 @@ async function loadProducts() {
     }
 }
 
-/**
- * Load pesanan user dari backend (global)
- */
 async function loadMyOrders() {
     if (!currentUser) return;
     try {
@@ -6343,20 +6449,12 @@ async function loadMyOrders() {
     }
 }
 
-// ====================================================================
-// 51. MINI MARKETPLACE — Load 6 Produk dari User Lain
-// ====================================================================
 async function loadMiniProducts() {
     const grid = document.getElementById('miniProductGrid');
-    if (!grid) {
-        console.warn('⚠️ [MiniMarket] #miniProductGrid tidak ditemukan');
-        return;
-    }
+    if (!grid) { console.warn('⚠️ [MiniMarket] #miniProductGrid tidak ditemukan'); return; }
 
-    // Show loading
     grid.innerHTML = '<div class="mini-loader"><span class="spinner-mini"></span><div>Memuat produk...</div></div>';
 
-    // ⭐ Timeout guard — 8 detik
     const timeoutId = setTimeout(() => {
         if (grid.querySelector('.mini-loader')) {
             console.warn('⚠️ [MiniMarket] Timeout 8s');
@@ -6365,27 +6463,21 @@ async function loadMiniProducts() {
     }, 8000);
 
     try {
-        // Fetch dari backend
         const r = await apiCall('get_products');
         clearTimeout(timeoutId);
-
         let products = (r.status === 'success' && Array.isArray(r.data)) ? r.data : [];
-        console.log('🛍️ [MiniMarket] Loaded', products.length, 'products from backend');
+        console.log('🛍️ [MiniMarket] Loaded', products.length, 'products');
 
-        // ⭐ Filter: exclude produk milik user sendiri
         if (currentUser && currentUser.username) {
             const myUsername = currentUser.username.toLowerCase();
-            const beforeCount = products.length;
             products = products.filter(p => {
                 if (!p) return false;
                 const sellerId = String(p.sellerId || '').trim().toLowerCase();
                 const sellerName = String(p.sellerName || '').trim().toLowerCase();
                 return sellerId !== myUsername && sellerName !== myUsername;
             });
-            console.log('🛍️ [MiniMarket] After exclude self:', products.length, '(filtered', beforeCount - products.length, 'own products)');
         }
 
-        // ⭐ Filter: hanya produk yang valid
         products = products.filter(p => p && p.id && (p.name || p.productName));
 
         if (products.length === 0) {
@@ -6393,55 +6485,38 @@ async function loadMiniProducts() {
             return;
         }
 
-        // ⭐ Sort by createdAt DESC (terbaru)
         products.sort((a, b) => {
             const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
             const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
             return dateB - dateA;
         });
 
-        // ⭐ Mix: 3 terbaru + 3 random
         const newest = products.slice(0, 3);
         const remaining = products.slice(3);
         const shuffled = remaining.slice().sort(() => Math.random() - 0.5);
         const randomPicks = shuffled.slice(0, MINI_PRODUCT_COUNT - newest.length);
 
-        // Gabung & shuffle hasil akhir
         let finalProducts = [...newest, ...randomPicks];
         finalProducts = finalProducts.sort(() => Math.random() - 0.5);
         finalProducts = finalProducts.slice(0, MINI_PRODUCT_COUNT);
 
         miniAllProducts = products;
-
-        console.log('🛍️ [MiniMarket] Final products to show:', finalProducts.length);
         renderMiniProducts(finalProducts);
 
-        // Cache
         try {
             localStorage.setItem('salink_mini_products_cache', JSON.stringify(finalProducts));
         } catch(e) {}
-
     } catch (e) {
         clearTimeout(timeoutId);
-        console.error('❌ [MiniMarket] Load products error:', e);
-
-        // Coba dari cache
+        console.error('❌ [MiniMarket] Load error:', e);
         try {
             const cached = JSON.parse(localStorage.getItem('salink_mini_products_cache') || '[]');
-            if (cached.length > 0) {
-                console.log('🛍️ [MiniMarket] Using cached products:', cached.length);
-                renderMiniProducts(cached);
-                return;
-            }
+            if (cached.length > 0) { renderMiniProducts(cached); return; }
         } catch(e2) {}
-
         grid.innerHTML = '<div class="mini-empty"><i class="fas fa-exclamation-triangle"></i><div>Gagal memuat produk</div></div>';
     }
 }
 
-/**
- * Render 6 produk dalam grid 2×3
- */
 function renderMiniProducts(products) {
     const grid = document.getElementById('miniProductGrid');
     if (!grid) return;
@@ -6455,15 +6530,10 @@ function renderMiniProducts(products) {
         const stock = parseInt(p.stock || 0, 10) || 0;
         const price = parseInt(p.price || 0, 10) || 0;
 
-        // Badge stok
         let stockBadge = '';
-        if (stock === 0) {
-            stockBadge = '<div class="mini-product-stock out">HABIS</div>';
-        } else if (stock < 5) {
-            stockBadge = '<div class="mini-product-stock low">' + stock + '</div>';
-        }
+        if (stock === 0) stockBadge = '<div class="mini-product-stock out">HABIS</div>';
+        else if (stock < 5) stockBadge = '<div class="mini-product-stock low">' + stock + '</div>';
 
-        // Badge "Baru" kalau < 3 hari
         let newBadge = '';
         const createdAt = new Date(p.createdAt || p.updatedAt || 0).getTime();
         const threeDaysAgo = Date.now() - (3 * 24 * 60 * 60 * 1000);
@@ -6471,12 +6541,10 @@ function renderMiniProducts(products) {
             newBadge = '<div class="mini-product-new">BARU</div>';
         }
 
-        // Image
         const imgHTML = p.imageUrl
             ? '<img src="' + escapeAttr(p.imageUrl) + '" alt="" loading="lazy" draggable="false" oncontextmenu="return false;" onerror="this.style.display=\'none\';this.parentElement.innerHTML=\'<i class=&quot;fas fa-box&quot;></i>\';">'
             : '<i class="fas fa-box"></i>';
 
-        // Sederhanakan seller name
         const sellerName = p.sellerName || p.sellerId || 'Seller';
         const sellerShort = String(sellerName).substring(0, 15);
 
@@ -6494,40 +6562,17 @@ function renderMiniProducts(products) {
     grid.innerHTML = html;
 }
 
-/**
- * Format Rupiah ringkas
- */
-function formatRupiahMini(num) {
-    const n = Number(num || 0);
-    if (n >= 1000000) {
-        return 'Rp ' + (n / 1000000).toFixed(1).replace('.0', '') + 'jt';
-    }
-    if (n >= 1000) {
-        return 'Rp ' + (n / 1000).toFixed(0) + 'rb';
-    }
-    return 'Rp ' + n.toLocaleString('id-ID');
-}
-
-// ====================================================================
-// 52. MINI ORDERS — Load 3 Pesanan Terakhir User
-// ====================================================================
 async function loadMiniOrders() {
     const listEl = document.getElementById('miniOrderList');
     const sectionEl = document.getElementById('miniOrdersSection');
-    if (!listEl || !sectionEl) {
-        console.warn('⚠️ [MiniOrders] Elemen tidak ditemukan');
-        return;
-    }
+    if (!listEl || !sectionEl) return;
 
-    // Kalau belum login, sembunyikan section
     if (!currentUser || !currentUser.username) {
         sectionEl.style.display = 'none';
         return;
     }
 
-    // ⭐ Timeout guard
     const timeoutId = setTimeout(() => {
-        console.warn('⚠️ [MiniOrders] Timeout 8s');
         sectionEl.style.display = 'block';
         listEl.innerHTML = '<div class="mini-empty-text"><i class="fas fa-receipt"></i><div>Belum ada pesanan</div></div>';
     }, 8000);
@@ -6535,12 +6580,8 @@ async function loadMiniOrders() {
     try {
         const r = await apiCall('get_transactions');
         clearTimeout(timeoutId);
-
         let transactions = (r.status === 'success' && Array.isArray(r.data)) ? r.data : [];
 
-        console.log('📋 [MiniOrders] Loaded', transactions.length, 'transactions');
-
-        // ⭐ Filter: hanya pesanan milik user (sebagai buyer)
         const myUsername = currentUser.username.toLowerCase();
         const myFullName = (currentUser.fullName || '').toLowerCase();
 
@@ -6551,42 +6592,26 @@ async function loadMiniOrders() {
             return buyerId === myUsername || buyerName === myFullName;
         });
 
-        // Sort by createdAt DESC
         transactions.sort((a, b) => {
             const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
             const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
             return dateB - dateA;
         });
 
-        // Ambil 3 terakhir
         const recent = transactions.slice(0, MINI_ORDER_COUNT);
-
         miniAllTransactions = transactions;
-
-        console.log('📋 [MiniOrders] Showing', recent.length, 'recent orders');
         renderMiniOrders(recent);
-
     } catch (e) {
         clearTimeout(timeoutId);
-        console.error('❌ [MiniOrders] Load error:', e);
-
-        // Coba dari cache
         try {
             const cached = JSON.parse(localStorage.getItem('salink_mini_orders_cache') || '[]');
-            if (cached.length > 0) {
-                renderMiniOrders(cached);
-                return;
-            }
+            if (cached.length > 0) { renderMiniOrders(cached); return; }
         } catch(e2) {}
-
         sectionEl.style.display = 'block';
         listEl.innerHTML = '<div class="mini-empty-text"><i class="fas fa-exclamation-triangle"></i><div>Gagal memuat pesanan</div></div>';
     }
 }
 
-/**
- * Render 3 pesanan terakhir
- */
 function renderMiniOrders(orders) {
     const listEl = document.getElementById('miniOrderList');
     const sectionEl = document.getElementById('miniOrdersSection');
@@ -6615,17 +6640,8 @@ function renderMiniOrders(orders) {
             '<div class="mini-order-icon">🛒</div>' +
             '<div class="mini-order-content">' +
                 '<div class="mini-order-title">' + escapeHTML(productName) + '</div>' +
-                '<div class="mini-order-meta">' +
-                    '<span>' + quantity + 'x</span>' +
-                    '<span>•</span>' +
-                    '<span class="mini-order-price">' + formatRupiahMini(totalPrice) + '</span>' +
-                '</div>' +
-                '<div class="mini-order-meta">' +
-                    '<i class="fas fa-store" style="font-size:0.5rem;color:#3b82f6;"></i>' +
-                    '<span>' + escapeHTML(sellerName) + '</span>' +
-                    '<span>•</span>' +
-                    '<span>' + timeAgo + '</span>' +
-                '</div>' +
+                '<div class="mini-order-meta"><span>' + quantity + 'x</span><span>•</span><span class="mini-order-price">' + formatRupiahMini(totalPrice) + '</span></div>' +
+                '<div class="mini-order-meta"><i class="fas fa-store" style="font-size:0.5rem;color:#3b82f6;"></i><span>' + escapeHTML(sellerName) + '</span><span>•</span><span>' + timeAgo + '</span></div>' +
             '</div>' +
             '<div class="mini-order-status-badge ' + statusClass + '">' + statusLabel + '</div>' +
         '</div>';
@@ -6633,7 +6649,6 @@ function renderMiniOrders(orders) {
 
     listEl.innerHTML = html;
 
-    // Cache
     try {
         localStorage.setItem('salink_mini_orders_cache', JSON.stringify(orders));
     } catch(e) {}
@@ -6666,13 +6681,9 @@ function getMiniOrderStatusLabel(status) {
     return labels[s] || '⏳ Menunggu';
 }
 
-// ====================================================================
-// 53. NAVIGASI MARKETPLACE
-// ====================================================================
 function openProductInToko(productId) {
     if (!productId) return;
     if (isPreviewMode) { showPreviewOverlay(); return; }
-
     console.log('🛍️ [MiniMarket] Open product:', productId);
     window.location.href = 'toko.html?id=' + encodeURIComponent(productId);
 }
@@ -6708,106 +6719,327 @@ async function refreshMiniMarketplace() {
 }
 
 // ====================================================================
-// 54. RENDER NOTIF UNIVERSAL (Emergency + Sosial + E-Commerce)
+// 56. INIT — DOMContentLoaded
 // ====================================================================
-function renderNotifItemUniversal(n) {
-    const notifType = n.notifType || n.type || 'social_post';
-    const t = String(notifType).toLowerCase();
+document.addEventListener('DOMContentLoaded', async () => {
+    console.log('🚀 SALINK Dashboard v12.0 — Full Rewrite (No Patch)');
 
-    // ⭐ Mapping ikon & warna
-    let icon = '🔔';
-    let iconClass = 'regular';
-    let borderClass = '';
+    // --- Setup dasar ---
+    preloadAllAudio();
+    loadDeletedIds();
+    loadLikesMap();
+    loadCommentsMap();
+    setupIdleDetection();
+    setupVisibilityDetection();
+    setupPWA();
+    checkURLParams();
+    loadTheme();
+    loadReadNotifs();
+    loadDismissed();
+    loadUser();
+    applyPreviewMode();
+    setTimeout(() => { handlePendingEmergencyFromURL(); }, 800);
+    updateUserUI();
+    setupLoginGuard();
 
-    if (t.indexOf('emergency_') === 0) {
-        const emergencyIcons = { 'emergency_fire': '🔥', 'emergency_medical': '🚑', 'emergency_crime': '🚓', 'emergency_disaster': '🌪️' };
-        icon = emergencyIcons[t] || '🚨';
-        iconClass = 'emergency';
-        borderClass = 'emergency';
-    } else if (t === 'social_comment') { icon = '💬'; iconClass = 'social'; borderClass = 'social-comment'; }
-    else if (t === 'social_like') { icon = '❤️'; iconClass = 'social'; borderClass = 'social-like'; }
-    else if (t === 'social_post') { icon = '📝'; iconClass = 'social'; borderClass = 'social-post'; }
-    else if (t === 'social_invite') { icon = '👥'; iconClass = 'social'; borderClass = 'social-invite'; }
-    else if (t === 'social_invite_accepted') { icon = '✅'; iconClass = 'success'; borderClass = 'social-invite'; }
-    else if (t === 'social_message') { icon = '✉️'; iconClass = 'social'; borderClass = 'social-message'; }
-    else if (t === 'ecom_order_new') { icon = '🛒'; iconClass = 'ecom'; borderClass = 'ecom-order'; }
-    else if (t === 'ecom_payment_success' || t === 'ecom_payment_confirmed') { icon = '💳'; iconClass = 'success'; borderClass = 'ecom-payment'; }
-    else if (t === 'ecom_shipping') { icon = '📦'; iconClass = 'ecom'; borderClass = 'ecom-shipping'; }
-    else if (t === 'ecom_received') { icon = '✅'; iconClass = 'success'; borderClass = 'ecom-payment'; }
-    else if (t === 'ecom_rating') { icon = '⭐'; iconClass = 'ecom'; borderClass = 'ecom-order'; }
-    else if (t === 'ecom_stock_out') { icon = '⚠️'; iconClass = 'ecom'; borderClass = 'ecom-order'; }
-    else if (t === 'ecom_order_cancelled') { icon = '❌'; iconClass = 'emergency'; borderClass = 'emergency'; }
-    // Fallback untuk emergency tanpa prefix
-    else if (n.type === 'emergency' || n.emergencyType) {
-        const et = n.emergencyType || 'fire';
-        const emergencyIcons = { 'fire': '🔥', 'medical': '🚑', 'crime': '🚓', 'disaster': '🌪️' };
-        icon = emergencyIcons[et] || '🚨';
-        iconClass = 'emergency';
-        borderClass = 'emergency';
+    // --- GPS cache ---
+    const savedLat = localStorage.getItem('salink_user_lat');
+    const savedLng = localStorage.getItem('salink_user_lng');
+    if (savedLat && savedLng) {
+        userLat = parseFloat(savedLat);
+        userLng = parseFloat(savedLng);
     }
 
-    const unreadClass = n.read ? '' : 'unread';
-    const safeId = escapeAttr(n.id || '');
-    const safeType = escapeAttr(notifType);
-    const safeLink = escapeAttr(n.link || '');
+    // --- Theme toggle ---
+    const themeT = document.getElementById('themeToggle');
+    if (themeT) themeT.addEventListener('click', toggleTheme);
 
-    return '<div class="notif-item ' + unreadClass + ' ' + borderClass + '" onclick="handleNotifClick(\'' + safeId + '\', \'' + safeType + '\', \'' + safeLink + '\')">' +
-        '<div class="notif-item-icon ' + iconClass + '">' + icon + '</div>' +
-        '<div class="notif-item-content">' +
-            '<div class="notif-item-title">' + escapeHTML(n.title || 'Notifikasi') + '</div>' +
-            '<div class="notif-item-message">' + escapeHTML(n.message || '') + '</div>' +
-            '<div class="notif-item-time"><i class="fas fa-clock"></i> ' + getTimeAgo(n.timestamp || Date.now()) + (n.sender ? ' • ' + escapeHTML(n.sender) : '') + '</div>' +
-        '</div>' +
-    '</div>';
-}
-
-function handleNotifClick(notifId, notifType, link) {
-    if (notifId) markNotifRead(notifId);
-
-    if (link) {
-        if (link.startsWith('http')) window.open(link, '_blank');
-        else window.location.href = link;
-    } else if (notifType && notifType.indexOf('emergency_') === 0 && notifId) {
-        window.location.href = 'detail-emergency.html?id=' + encodeURIComponent(notifId);
-    } else if (notifType && (notifType === 'emergency' || notifType.indexOf('emergency') === 0) && notifId) {
-        window.location.href = 'detail-emergency.html?id=' + encodeURIComponent(notifId);
+    // --- Preview overlay buttons ---
+    const oLB = document.getElementById('overlayLoginBtn');
+    if (oLB) oLB.addEventListener('click', redirectToLogin);
+    const oCB = document.getElementById('overlayCancelBtn');
+    if (oCB) oCB.addEventListener('click', hidePreviewOverlay);
+    const bLL = document.getElementById('badgeLoginLink');
+    if (bLL) bLL.addEventListener('click', redirectToLogin);
+    const pO = document.getElementById('previewOverlay');
+    if (pO) {
+        pO.addEventListener('click', function(e) {
+            if (e.target === this) hidePreviewOverlay();
+        });
     }
 
-    closeModal('notifModal');
-}
-
-// ====================================================================
-// 55. OVERRIDE renderNotifList() — Pakai Universal Renderer
-// ====================================================================
-// Simpan referensi fungsi lama (jika ada)
-const _originalRenderNotifList = window.renderNotifList;
-
-window.renderNotifList = function() {
-    const listEl = document.getElementById('notifList');
-    if (!listEl) return;
-
-    let allNotifs = getAllNotifications();
-    let filtered = allNotifs;
-    if (notifFilter === 'unread') filtered = allNotifs.filter(n => !n.read);
-    else if (notifFilter === 'emergency') filtered = allNotifs.filter(n => n.type === 'emergency' || (n.notifType && n.notifType.indexOf('emergency_') === 0));
-    else if (notifFilter === 'regular') filtered = allNotifs.filter(n => n.type === 'regular' || (n.notifType && n.notifType.indexOf('emergency_') !== 0));
-
-    const unreadCount = allNotifs.filter(n => !n.read).length;
-    const statsEl = document.getElementById('notifStatsText');
-    if (statsEl) statsEl.textContent = allNotifs.length + ' total • ' + unreadCount + ' belum dibaca';
-    updateNotifBadge(unreadCount);
-
-    if (filtered.length === 0) {
-        listEl.innerHTML = '<div style="text-align:center;padding:30px;color:#6b7688;"><i class="fas fa-bell-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada notifikasi</p></div>';
-        return;
+    // --- App title click → scroll to top ---
+    const aT = document.getElementById('appTitle');
+    if (aT) {
+        aT.style.cursor = 'pointer';
+        aT.addEventListener('click', function() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            if (history.replaceState) history.replaceState(null, '', '#');
+        });
     }
 
-    listEl.innerHTML = filtered.map(n => renderNotifItemUniversal(n)).join('');
-};
+    // --- Refresh button ---
+    const rB = document.getElementById('refreshBtn');
+    if (rB) {
+        rB.addEventListener('click', function() {
+            const i = this.querySelector('i');
+            if (i) i.classList.add('fa-spin');
+            loadData().finally(() => { if (i) i.classList.remove('fa-spin'); });
+        });
+    }
 
-console.log('✅ [Notif] Universal renderer loaded & applied');
+    // --- Search button ---
+    const sB = document.getElementById('searchBtn');
+    if (sB) {
+        sB.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            openSearchModal();
+        });
+    }
 
-// ⭐ Export ke global
+    // --- Emergency grid buttons ---
+    document.querySelectorAll('.emergency-btn').forEach(b => {
+        b.removeEventListener('click', handleEmergencyClick);
+        b.addEventListener('click', handleEmergencyClick);
+        b._salinkEmergencySetup = true;
+    });
+
+    // --- GPS button ---
+    const gpsB = document.getElementById('gpsLocationBtn');
+    if (gpsB) gpsB.addEventListener('click', ambilLokasiSaya);
+
+    // --- Init UI components ---
+    initHeroCarousel();
+    initHologramSwipe();
+    initFabModal();
+    initHeaderNotif();
+    initRipple();
+    initStorageEvents();
+    setupChartNavigation();
+    initBottomNav();
+    setupPostInput();
+    setupSearchInput();
+    setupViewOnlyProtection();
+
+    // --- Keyboard shortcuts ---
+    document.addEventListener('keydown', function(e) {
+        if (e.key === '/' && !e.target.matches('input, textarea, select')) {
+            e.preventDefault();
+            openSearchModal();
+        }
+        if (e.key === 'Escape') {
+            const sm = document.getElementById('searchModal');
+            if (sm && sm.classList.contains('active')) closeSearchModal();
+        }
+    });
+
+    // --- Init Google Drive ---
+    try {
+        await initGoogleDrive();
+        console.log('✅ [Init] Google Drive ready');
+    } catch (err) {
+        console.warn('⚠️ [Init] Google Drive tidak tersedia:', err.message);
+    }
+
+    // --- Init E-commerce ---
+    initEcommerce();
+    loadProducts();
+    loadMyOrders();
+
+    // --- Init Mini Marketplace (delay supaya data utama selesai load) ---
+    setTimeout(() => {
+        loadMiniProducts();
+        loadMiniOrders();
+    }, 1500);
+
+    // --- Init Charts (sebelum loadData supaya canvas siap) ---
+    initAllCharts();
+
+    // --- Load data dari API ---
+    await loadData();
+
+    // --- Setelah loadData: update stats & badges ---
+    updateStatsCards();
+    updateEmergencyBadges();
+    updateNotifBadge();
+    renderHologram();
+
+    // --- Double-check setelah 800ms ---
+    setTimeout(() => {
+        initAllCharts();
+        updateStatsCards();
+        updateEmergencyBadges();
+        renderHologram();
+        console.log('🔄 [Init] Double-check rendered');
+    }, 800);
+
+    // --- Auto-refresh stats card setiap 30 detik ---
+    setInterval(() => {
+        if (!document.hidden) {
+            updateStatsCards();
+            updateEmergencyBadges();
+        }
+    }, 30000);
+
+    // --- Polling emergency dari server ---
+    if (emergencyPollTimer) clearInterval(emergencyPollTimer);
+    emergencyPollTimer = setInterval(async () => {
+        if (fullScreenAlarmActive) return;
+        try {
+            const remoteEms = await apiGetEmergencies();
+            if (!remoteEms || remoteEms.length === 0) return;
+            const localEms = getAllEmergencies();
+            const localIds = new Set(localEms.map(e => e.id));
+            const newEms = remoteEms.filter(em => !localIds.has(em.id) && !isDeleted(em.id));
+            if (newEms.length > 0) {
+                console.log('🚨 [Poll] Emergency baru dari server:', newEms.length);
+                const merged = [...newEms, ...localEms];
+                localStorage.setItem('salink_emergencies', JSON.stringify(merged));
+                triggerEmergencyAutoAlarm(newEms[0]);
+            }
+        } catch(e) {
+            console.warn('⚠️ [Poll] Error:', e.message);
+        }
+    }, EMERGENCY_POLL_INTERVAL);
+
+    // --- Cleanup emergency setiap 60 detik ---
+    setInterval(() => {
+        renderHologram();
+        updateEmergencyBadges();
+    }, EMERGENCY_CLEANUP_INTERVAL);
+
+    // --- Preview overlay kalau belum login ---
+    if (isPreviewMode) setTimeout(() => showPreviewOverlay(), 1200);
+
+    // --- Auto-refresh data setiap 60 detik ---
+    setInterval(() => {
+        if (!document.hidden) loadData();
+    }, AUTO_REFRESH);
+
+    // --- Auto-cleanup media kalau storage > 80% ---
+    setInterval(() => {
+        try {
+            const usage = getStorageUsage();
+            if (usage.percent > 80) {
+                const mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}');
+                const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+                let cleaned = 0;
+                Object.keys(mediaStore).forEach(id => {
+                    const entry = mediaStore[id];
+                    if (entry && entry.timestamp && entry.timestamp < sevenDaysAgo) {
+                        delete mediaStore[id];
+                        cleaned++;
+                    }
+                });
+                if (cleaned > 0) {
+                    localStorage.setItem('salink_post_media', JSON.stringify(mediaStore));
+                    showToast('🧹 Auto-Cleanup', cleaned + ' media lama dihapus', 'fa-broom');
+                }
+            }
+        } catch(e) {}
+    }, 30000);
+
+    // --- Storage info di header ---
+    setTimeout(() => {
+        const headerInfo = document.getElementById('storageInfo');
+        if (headerInfo) {
+            const usage = getStorageUsage();
+            headerInfo.textContent = formatBytes(usage.total) + ' (' + usage.percent + '%)';
+        }
+    }, 2000);
+
+    // --- Refresh notif dari server setiap 60 detik ---
+    setInterval(() => {
+        if (!document.hidden) {
+            apiGetNotifications().then(notifs => {
+                if (notifs && notifs.length > 0) {
+                    notifications = notifs;
+                    updateNotifBadge();
+                    if (document.getElementById('notifModal')?.classList.contains('active')) {
+                        renderNotifList();
+                    }
+                }
+            }).catch(() => {});
+        }
+    }, 60000);
+
+    console.log('✅ SALINK Dashboard v12.0 Ready!');
+});
+
+// ====================================================================
+// 57. EXPOSE GLOBAL (untuk onclick="" di HTML)
+// ====================================================================
+window.openProfileUser = openProfileUser;
+window.requestDelete = requestDelete;
+window.confirmDeleteNow = confirmDeleteNow;
+window.closeDeleteConfirm = closeDeleteConfirm;
+window.toggleLike = toggleLike;
+window.addComment = addComment;
+window.deleteComment = deleteComment;
+window.sharePost = sharePost;
+window.closeModal = closeModal;
+window.openModal = openModal;
+window.showInstallPrompt = showInstallPrompt;
+window.handleProfileClick = handleProfileClick;
+window.handleLikeClick = handleLikeClick;
+window.handleShareClick = handleShareClick;
+window.handlePostItemClick = handlePostItemClick;
+window.handleDetailClick = handleDetailClick;
+window.sendInvite = sendInvite;
+window.markNotifRead = markNotifRead;
+window.openNotifDetail = openNotifDetail;
+window.goToLocation = goToLocation;
+window.openInviteModal = openInviteModal;
+window.openNotifModal = openNotifModal;
+window.incrementViewerCount = incrementViewerCount;
+window.openSearchModal = openSearchModal;
+window.closeSearchModal = closeSearchModal;
+window.clearSearch = clearSearch;
+window.switchSearchTab = switchSearchTab;
+window.setEmergencyFilter = setEmergencyFilter;
+window.applySearchQuery = applySearchQuery;
+window.removeRecentSearch = removeRecentSearch;
+window.clearRecentSearches = clearRecentSearches;
+window.goToUser = goToUser;
+window.goToPost = goToPost;
+window.goToEmergency = goToEmergency;
+window.ambilLokasiSaya = ambilLokasiSaya;
+window.uploadToGDrive = uploadToGDrive;
+window.deleteFromGDrive = deleteFromGDrive;
+window.handleImageError = handleImageError;
+window.renderHologram = renderHologram;
+window.renderPostsStats = renderPostsStats;
+window.getAllNotifications = getAllNotifications;
+window.renderNotifList = renderNotifList;
+window.setupNotifFilters = setupNotifFilters;
+window.renderNotifItemUniversal = renderNotifItemUniversal;
+window.handleNotifClick = handleNotifClick;
+window.transformHologramToSlides = transformHologramToSlides;
+window.goToHologramSlide = goToHologramSlide;
+window.buildSummarySlide = buildSummarySlide;
+window.buildDetailSlide = buildDetailSlide;
+window.buildLocationHierarchy = buildLocationHierarchy;
+window.buildHologramPagination = buildHologramPagination;
+window.updateProgressBar = updateProgressBar;
+window.openFabModal = openFabModal;
+window.closeFabModal = closeFabModal;
+window.handlePendingEmergencyFromURL = handlePendingEmergencyFromURL;
+window.triggerEmergencyAutoAlarm = triggerEmergencyAutoAlarm;
+window.triggerLocalEmergencyVisual = triggerLocalEmergencyVisual;
+window.EMERGENCY_SOUND_PLAYLIST = EMERGENCY_SOUND_PLAYLIST;
+window.deletePostPermanent = deletePostPermanent;
+window.handleDeleteFromMenu = handleDeleteFromMenu;
+window.handleDeleteFromStatsCard = handleDeleteFromStatsCard;
+window.handleDeleteFromHologram = handleDeleteFromHologram;
+window.handleDeleteFromNotif = handleDeleteFromNotif;
+window.showClearCacheMenu = showClearCacheMenu;
+window.closeClearCacheModal = closeClearCacheModal;
+window.showStorageDetail = showStorageDetail;
+window.clearMediaOnly = clearMediaOnly;
+window.clearOldData = clearOldData;
+window.forceSyncData = forceSyncData;
+window.clearAllCache = clearAllCache;
 window.initEcommerce = initEcommerce;
 window.loadProducts = loadProducts;
 window.loadMyOrders = loadMyOrders;
@@ -6821,16 +7053,25 @@ window.getMiniOrderStatusLabel = getMiniOrderStatusLabel;
 window.openProductInToko = openProductInToko;
 window.openOrderTracking = openOrderTracking;
 window.refreshMiniMarketplace = refreshMiniMarketplace;
-window.renderNotifItemUniversal = renderNotifItemUniversal;
-window.handleNotifClick = handleNotifClick;
 
-console.log('✅ [MiniMarket] Loaded — Opsi C Custom');
-console.log('✅ [Ecom] Initialized');
+// ====================================================================
+// 58. BOOTSTRAP — Load awal (fallback kalau DOMContentLoaded sudah lewat)
+// ====================================================================
+if (document.readyState === 'loading') {
+    // DOMContentLoaded akan trigger init
+} else {
+    // Kalau script di-load setelah DOM ready, trigger manual
+    // Tapi biarkan DOMContentLoaded handler yang jalan
+}
+
+console.log('✅ [TAHAP 5] User, LoadData, Search, PWA, E-Commerce, INIT, Expose Global loaded');
+console.log('🎉 SALINK Dashboard v12.0 — FULL SCRIPT LOADED');
+
             
-    </script>
+</script>
 
     <!-- ============================================================ -->
-    <!-- 56. HERO CAROUSEL IMAGES LOADER                                   -->
+    <!-- 59. HERO CAROUSEL IMAGES LOADER                                   -->
     <!-- ============================================================ -->
     <script>
     (function() {
@@ -6864,7 +7105,7 @@ console.log('✅ [Ecom] Initialized');
     </script>
 
     <!-- ============================================================ -->
-    <!-- 57. FCM SETUP SALINK + EMERGENCY ALERT                            -->
+    <!-- 60. FCM SETUP SALINK + EMERGENCY ALERT                            -->
     <!-- ============================================================ -->
     <script src="/firebase-config.js"></script>
     <script src="/fcm-client.js"></script>
