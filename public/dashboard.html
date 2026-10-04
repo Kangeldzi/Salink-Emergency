@@ -6237,69 +6237,551 @@ setInterval(() => {
 console.log('✅ [Dashboard] Notif refresh interval set');
 });
 
-// ====================================================================
-// 50. EXPOSE GLOBAL
-// ====================================================================
-window.openProfileUser = openProfileUser;
-window.requestDelete = requestDelete;
-window.confirmDeleteNow = confirmDeleteNow;
-window.closeDeleteConfirm = closeDeleteConfirm;
-window.toggleLike = toggleLike;
-window.deleteComment = deleteComment;
-window.sharePost = sharePost;
-window.closeModal = closeModal;
-window.openModal = openModal;
-window.showInstallPrompt = showInstallPrompt;
-window.handleProfileClick = handleProfileClick;
-window.handleLikeClick = handleLikeClick;
-window.handleShareClick = handleShareClick;
-window.handlePostItemClick = handlePostItemClick;
-window.handleDetailClick = handleDetailClick;
-window.sendInvite = sendInvite;
-window.markNotifRead = markNotifRead;
-window.openNotifDetail = openNotifDetail;
-window.goToLocation = goToLocation;
-window.openInviteModal = openInviteModal;
-window.openNotifModal = openNotifModal;
-window.incrementViewerCount = incrementViewerCount;
-window.openSearchModal = openSearchModal;
-window.closeSearchModal = closeSearchModal;
-window.clearSearch = clearSearch;
-window.switchSearchTab = switchSearchTab;
-window.setEmergencyFilter = setEmergencyFilter;
-window.applySearchQuery = applySearchQuery;
-window.removeRecentSearch = removeRecentSearch;
-window.clearRecentSearches = clearRecentSearches;
-window.goToUser = goToUser;
-window.goToPost = goToPost;
-window.goToEmergency = goToEmergency;
-window.ambilLokasiSaya = ambilLokasiSaya;
-window.uploadToGDrive = uploadToGDrive;
-window.deleteFromGDrive = deleteFromGDrive;
-window.handleImageError = handleImageError;
-window.renderHologram = renderHologram;
-window.renderPostsStats = renderPostsStats;
-window.getAllNotifications = getAllNotifications;
-window.renderNotifList = renderNotifList;
-window.setupNotifFilters = setupNotifFilters;
-window.transformHologramToSlides = transformHologramToSlides;
-window.goToHologramSlide = goToHologramSlide;
-window.buildSummarySlide = buildSummarySlide;
-window.buildDetailSlide = buildDetailSlide;
-window.buildLocationHierarchy = buildLocationHierarchy;
-window.buildHologramPagination = buildHologramPagination;
-window.updateProgressBar = updateProgressBar;
-window.openFabModal = openFabModal;
-window.closeFabModal = closeFabModal;
-window.handlePendingEmergencyFromURL = handlePendingEmergencyFromURL;
-window.triggerEmergencyAutoAlarm = triggerEmergencyAutoAlarm;
-window.EMERGENCY_SOUND_PLAYLIST = EMERGENCY_SOUND_PLAYLIST;
 
-console.log('✅ SALINK Dashboard v11.0 Script Loaded — ALL FIXED');
+// ====================================================================
+// 50. E-COMMERCE INIT (Minimal — untuk Dashboard)
+// ====================================================================
+let allProducts = [];
+let allTransactions = [];
+let currentEcomTab = 'products';
+let miniAllProducts = [];
+let miniAllTransactions = [];
+const MINI_PRODUCT_COUNT = 6;
+const MINI_ORDER_COUNT = 3;
+
+/**
+ * Init E-commerce basic (dipanggil dari DOMContentLoaded)
+ */
+function initEcommerce() {
+    // Setup event listeners untuk refresh button mini marketplace
+    const refreshBtn = document.querySelector('.mini-marketplace-refresh');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            refreshMiniMarketplace();
+        });
+    }
+    console.log('✅ [Ecom] Initialized');
+}
+
+/**
+ * Load produk dari backend (global, untuk dashboard)
+ */
+async function loadProducts() {
+    try {
+        const r = await apiCall('get_products');
+        allProducts = (r.status === 'success' && Array.isArray(r.data)) ? r.data : [];
+        console.log('📦 [Ecom] Loaded', allProducts.length, 'products');
+    } catch (e) {
+        console.error('❌ [Ecom] Load products error:', e);
+        allProducts = [];
+    }
+}
+
+/**
+ * Load pesanan user dari backend (global)
+ */
+async function loadMyOrders() {
+    if (!currentUser) return;
+    try {
+        const r = await apiCall('get_transactions');
+        const all = (r.status === 'success' && Array.isArray(r.data)) ? r.data : [];
+        allTransactions = all;
+        try { localStorage.setItem('salink_transactions_cache', JSON.stringify(all)); } catch(e) {}
+        console.log('📋 [Ecom] Loaded', allTransactions.length, 'transactions');
+    } catch (e) {
+        try { allTransactions = JSON.parse(localStorage.getItem('salink_transactions_cache') || '[]'); } catch(e2) { allTransactions = []; }
+    }
+}
+
+// ====================================================================
+// 51. MINI MARKETPLACE — Load 6 Produk dari User Lain
+// ====================================================================
+async function loadMiniProducts() {
+    const grid = document.getElementById('miniProductGrid');
+    if (!grid) {
+        console.warn('⚠️ [MiniMarket] #miniProductGrid tidak ditemukan');
+        return;
+    }
+
+    // Show loading
+    grid.innerHTML = '<div class="mini-loader"><span class="spinner-mini"></span><div>Memuat produk...</div></div>';
+
+    // ⭐ Timeout guard — 8 detik
+    const timeoutId = setTimeout(() => {
+        if (grid.querySelector('.mini-loader')) {
+            console.warn('⚠️ [MiniMarket] Timeout 8s');
+            grid.innerHTML = '<div class="mini-empty"><i class="fas fa-box-open"></i><div>Belum ada produk dari pengguna lain</div></div>';
+        }
+    }, 8000);
+
+    try {
+        // Fetch dari backend
+        const r = await apiCall('get_products');
+        clearTimeout(timeoutId);
+
+        let products = (r.status === 'success' && Array.isArray(r.data)) ? r.data : [];
+        console.log('🛍️ [MiniMarket] Loaded', products.length, 'products from backend');
+
+        // ⭐ Filter: exclude produk milik user sendiri
+        if (currentUser && currentUser.username) {
+            const myUsername = currentUser.username.toLowerCase();
+            const beforeCount = products.length;
+            products = products.filter(p => {
+                if (!p) return false;
+                const sellerId = String(p.sellerId || '').trim().toLowerCase();
+                const sellerName = String(p.sellerName || '').trim().toLowerCase();
+                return sellerId !== myUsername && sellerName !== myUsername;
+            });
+            console.log('🛍️ [MiniMarket] After exclude self:', products.length, '(filtered', beforeCount - products.length, 'own products)');
+        }
+
+        // ⭐ Filter: hanya produk yang valid
+        products = products.filter(p => p && p.id && (p.name || p.productName));
+
+        if (products.length === 0) {
+            grid.innerHTML = '<div class="mini-empty"><i class="fas fa-box-open"></i><div>Belum ada produk dari pengguna lain</div></div>';
+            return;
+        }
+
+        // ⭐ Sort by createdAt DESC (terbaru)
+        products.sort((a, b) => {
+            const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+            const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+            return dateB - dateA;
+        });
+
+        // ⭐ Mix: 3 terbaru + 3 random
+        const newest = products.slice(0, 3);
+        const remaining = products.slice(3);
+        const shuffled = remaining.slice().sort(() => Math.random() - 0.5);
+        const randomPicks = shuffled.slice(0, MINI_PRODUCT_COUNT - newest.length);
+
+        // Gabung & shuffle hasil akhir
+        let finalProducts = [...newest, ...randomPicks];
+        finalProducts = finalProducts.sort(() => Math.random() - 0.5);
+        finalProducts = finalProducts.slice(0, MINI_PRODUCT_COUNT);
+
+        miniAllProducts = products;
+
+        console.log('🛍️ [MiniMarket] Final products to show:', finalProducts.length);
+        renderMiniProducts(finalProducts);
+
+        // Cache
+        try {
+            localStorage.setItem('salink_mini_products_cache', JSON.stringify(finalProducts));
+        } catch(e) {}
+
+    } catch (e) {
+        clearTimeout(timeoutId);
+        console.error('❌ [MiniMarket] Load products error:', e);
+
+        // Coba dari cache
+        try {
+            const cached = JSON.parse(localStorage.getItem('salink_mini_products_cache') || '[]');
+            if (cached.length > 0) {
+                console.log('🛍️ [MiniMarket] Using cached products:', cached.length);
+                renderMiniProducts(cached);
+                return;
+            }
+        } catch(e2) {}
+
+        grid.innerHTML = '<div class="mini-empty"><i class="fas fa-exclamation-triangle"></i><div>Gagal memuat produk</div></div>';
+    }
+}
+
+/**
+ * Render 6 produk dalam grid 2×3
+ */
+function renderMiniProducts(products) {
+    const grid = document.getElementById('miniProductGrid');
+    if (!grid) return;
+
+    if (!products || products.length === 0) {
+        grid.innerHTML = '<div class="mini-empty"><i class="fas fa-box-open"></i><div>Belum ada produk dari pengguna lain</div></div>';
+        return;
+    }
+
+    const html = products.map(p => {
+        const stock = parseInt(p.stock || 0, 10) || 0;
+        const price = parseInt(p.price || 0, 10) || 0;
+
+        // Badge stok
+        let stockBadge = '';
+        if (stock === 0) {
+            stockBadge = '<div class="mini-product-stock out">HABIS</div>';
+        } else if (stock < 5) {
+            stockBadge = '<div class="mini-product-stock low">' + stock + '</div>';
+        }
+
+        // Badge "Baru" kalau < 3 hari
+        let newBadge = '';
+        const createdAt = new Date(p.createdAt || p.updatedAt || 0).getTime();
+        const threeDaysAgo = Date.now() - (3 * 24 * 60 * 60 * 1000);
+        if (createdAt > threeDaysAgo && createdAt > 0) {
+            newBadge = '<div class="mini-product-new">BARU</div>';
+        }
+
+        // Image
+        const imgHTML = p.imageUrl
+            ? '<img src="' + escapeAttr(p.imageUrl) + '" alt="" loading="lazy" draggable="false" oncontextmenu="return false;" onerror="this.style.display=\'none\';this.parentElement.innerHTML=\'<i class=&quot;fas fa-box&quot;></i>\';">'
+            : '<i class="fas fa-box"></i>';
+
+        // Sederhanakan seller name
+        const sellerName = p.sellerName || p.sellerId || 'Seller';
+        const sellerShort = String(sellerName).substring(0, 15);
+
+        return '<div class="mini-product-card" onclick="openProductInToko(\'' + escapeAttr(p.id) + '\')">' +
+            stockBadge + newBadge +
+            '<div class="mini-product-image">' + imgHTML + '</div>' +
+            '<div class="mini-product-info">' +
+                '<div class="mini-product-name">' + escapeHTML(p.name || p.productName || 'Produk') + '</div>' +
+                '<div class="mini-product-price">' + formatRupiahMini(price) + '</div>' +
+                '<div class="mini-product-seller"><i class="fas fa-store"></i> ' + escapeHTML(sellerShort) + '</div>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+
+    grid.innerHTML = html;
+}
+
+/**
+ * Format Rupiah ringkas
+ */
+function formatRupiahMini(num) {
+    const n = Number(num || 0);
+    if (n >= 1000000) {
+        return 'Rp ' + (n / 1000000).toFixed(1).replace('.0', '') + 'jt';
+    }
+    if (n >= 1000) {
+        return 'Rp ' + (n / 1000).toFixed(0) + 'rb';
+    }
+    return 'Rp ' + n.toLocaleString('id-ID');
+}
+
+// ====================================================================
+// 52. MINI ORDERS — Load 3 Pesanan Terakhir User
+// ====================================================================
+async function loadMiniOrders() {
+    const listEl = document.getElementById('miniOrderList');
+    const sectionEl = document.getElementById('miniOrdersSection');
+    if (!listEl || !sectionEl) {
+        console.warn('⚠️ [MiniOrders] Elemen tidak ditemukan');
+        return;
+    }
+
+    // Kalau belum login, sembunyikan section
+    if (!currentUser || !currentUser.username) {
+        sectionEl.style.display = 'none';
+        return;
+    }
+
+    // ⭐ Timeout guard
+    const timeoutId = setTimeout(() => {
+        console.warn('⚠️ [MiniOrders] Timeout 8s');
+        sectionEl.style.display = 'block';
+        listEl.innerHTML = '<div class="mini-empty-text"><i class="fas fa-receipt"></i><div>Belum ada pesanan</div></div>';
+    }, 8000);
+
+    try {
+        const r = await apiCall('get_transactions');
+        clearTimeout(timeoutId);
+
+        let transactions = (r.status === 'success' && Array.isArray(r.data)) ? r.data : [];
+
+        console.log('📋 [MiniOrders] Loaded', transactions.length, 'transactions');
+
+        // ⭐ Filter: hanya pesanan milik user (sebagai buyer)
+        const myUsername = currentUser.username.toLowerCase();
+        const myFullName = (currentUser.fullName || '').toLowerCase();
+
+        transactions = transactions.filter(t => {
+            if (!t) return false;
+            const buyerId = String(t.buyerId || '').trim().toLowerCase();
+            const buyerName = String(t.buyerName || '').trim().toLowerCase();
+            return buyerId === myUsername || buyerName === myFullName;
+        });
+
+        // Sort by createdAt DESC
+        transactions.sort((a, b) => {
+            const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
+            const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
+            return dateB - dateA;
+        });
+
+        // Ambil 3 terakhir
+        const recent = transactions.slice(0, MINI_ORDER_COUNT);
+
+        miniAllTransactions = transactions;
+
+        console.log('📋 [MiniOrders] Showing', recent.length, 'recent orders');
+        renderMiniOrders(recent);
+
+    } catch (e) {
+        clearTimeout(timeoutId);
+        console.error('❌ [MiniOrders] Load error:', e);
+
+        // Coba dari cache
+        try {
+            const cached = JSON.parse(localStorage.getItem('salink_mini_orders_cache') || '[]');
+            if (cached.length > 0) {
+                renderMiniOrders(cached);
+                return;
+            }
+        } catch(e2) {}
+
+        sectionEl.style.display = 'block';
+        listEl.innerHTML = '<div class="mini-empty-text"><i class="fas fa-exclamation-triangle"></i><div>Gagal memuat pesanan</div></div>';
+    }
+}
+
+/**
+ * Render 3 pesanan terakhir
+ */
+function renderMiniOrders(orders) {
+    const listEl = document.getElementById('miniOrderList');
+    const sectionEl = document.getElementById('miniOrdersSection');
+    if (!listEl || !sectionEl) return;
+
+    if (!orders || orders.length === 0) {
+        sectionEl.style.display = 'block';
+        listEl.innerHTML = '<div class="mini-empty-text"><i class="fas fa-receipt"></i><div>Belum ada pesanan</div></div>';
+        return;
+    }
+
+    sectionEl.style.display = 'block';
+
+    const html = orders.map(t => {
+        const status = t.status || t.paymentStatus || 'pending';
+        const statusClass = getMiniOrderStatusClass(status);
+        const statusLabel = getMiniOrderStatusLabel(status);
+        const trxId = t.id || '';
+        const timeAgo = getTimeAgo(new Date(t.createdAt || Date.now()).getTime());
+        const productName = t.productName || 'Produk';
+        const quantity = t.quantity || 1;
+        const totalPrice = t.totalPrice || 0;
+        const sellerName = t.sellerName || 'Seller';
+
+        return '<div class="mini-order-card ' + statusClass + '" onclick="openOrderTracking(\'' + escapeAttr(trxId) + '\')">' +
+            '<div class="mini-order-icon">🛒</div>' +
+            '<div class="mini-order-content">' +
+                '<div class="mini-order-title">' + escapeHTML(productName) + '</div>' +
+                '<div class="mini-order-meta">' +
+                    '<span>' + quantity + 'x</span>' +
+                    '<span>•</span>' +
+                    '<span class="mini-order-price">' + formatRupiahMini(totalPrice) + '</span>' +
+                '</div>' +
+                '<div class="mini-order-meta">' +
+                    '<i class="fas fa-store" style="font-size:0.5rem;color:#3b82f6;"></i>' +
+                    '<span>' + escapeHTML(sellerName) + '</span>' +
+                    '<span>•</span>' +
+                    '<span>' + timeAgo + '</span>' +
+                '</div>' +
+            '</div>' +
+            '<div class="mini-order-status-badge ' + statusClass + '">' + statusLabel + '</div>' +
+        '</div>';
+    }).join('');
+
+    listEl.innerHTML = html;
+
+    // Cache
+    try {
+        localStorage.setItem('salink_mini_orders_cache', JSON.stringify(orders));
+    } catch(e) {}
+}
+
+function getMiniOrderStatusClass(status) {
+    const s = String(status || '').toLowerCase();
+    if (s === 'pending' || s === 'unpaid') return 'pending';
+    if (s === 'paid' || s === 'confirmed') return 'paid';
+    if (s === 'shipped' || s === 'shipping') return 'shipped';
+    if (s === 'received' || s === 'completed') return 'received';
+    if (s === 'cancelled' || s === 'rejected') return 'cancelled';
+    return 'pending';
+}
+
+function getMiniOrderStatusLabel(status) {
+    const s = String(status || '').toLowerCase();
+    const labels = {
+        'pending': '⏳ Menunggu',
+        'unpaid': '⏳ Belum Bayar',
+        'paid': '💳 Dibayar',
+        'confirmed': '✅ Dikonfirmasi',
+        'shipped': '📦 Dikirim',
+        'shipping': '📦 Dikirim',
+        'received': '🎉 Diterima',
+        'completed': '✅ Selesai',
+        'cancelled': '❌ Dibatalkan',
+        'rejected': '❌ Ditolak'
+    };
+    return labels[s] || '⏳ Menunggu';
+}
+
+// ====================================================================
+// 53. NAVIGASI MARKETPLACE
+// ====================================================================
+function openProductInToko(productId) {
+    if (!productId) return;
+    if (isPreviewMode) { showPreviewOverlay(); return; }
+
+    console.log('🛍️ [MiniMarket] Open product:', productId);
+    window.location.href = 'toko.html?id=' + encodeURIComponent(productId);
+}
+
+function openOrderTracking(trxId) {
+    if (!trxId) return;
+    if (isPreviewMode) { showPreviewOverlay(); return; }
+    console.log('📋 [MiniOrders] Open order:', trxId);
+    window.location.href = 'order-tracking.html?id=' + encodeURIComponent(trxId);
+}
+
+async function refreshMiniMarketplace() {
+    const btn = event ? event.currentTarget : null;
+    if (btn) {
+        const icon = btn.querySelector('i');
+        if (icon) icon.classList.add('fa-spin');
+    }
+
+    try {
+        await Promise.all([
+            loadMiniProducts(),
+            loadMiniOrders()
+        ]);
+        showToast('✅', 'Marketplace diperbarui', 'fa-check-circle');
+    } catch (e) {
+        showToast('⚠️', 'Gagal refresh', 'fa-exclamation-triangle');
+    } finally {
+        if (btn) {
+            const icon = btn.querySelector('i');
+            if (icon) icon.classList.remove('fa-spin');
+        }
+    }
+}
+
+// ====================================================================
+// 54. RENDER NOTIF UNIVERSAL (Emergency + Sosial + E-Commerce)
+// ====================================================================
+function renderNotifItemUniversal(n) {
+    const notifType = n.notifType || n.type || 'social_post';
+    const t = String(notifType).toLowerCase();
+
+    // ⭐ Mapping ikon & warna
+    let icon = '🔔';
+    let iconClass = 'regular';
+    let borderClass = '';
+
+    if (t.indexOf('emergency_') === 0) {
+        const emergencyIcons = { 'emergency_fire': '🔥', 'emergency_medical': '🚑', 'emergency_crime': '🚓', 'emergency_disaster': '🌪️' };
+        icon = emergencyIcons[t] || '🚨';
+        iconClass = 'emergency';
+        borderClass = 'emergency';
+    } else if (t === 'social_comment') { icon = '💬'; iconClass = 'social'; borderClass = 'social-comment'; }
+    else if (t === 'social_like') { icon = '❤️'; iconClass = 'social'; borderClass = 'social-like'; }
+    else if (t === 'social_post') { icon = '📝'; iconClass = 'social'; borderClass = 'social-post'; }
+    else if (t === 'social_invite') { icon = '👥'; iconClass = 'social'; borderClass = 'social-invite'; }
+    else if (t === 'social_invite_accepted') { icon = '✅'; iconClass = 'success'; borderClass = 'social-invite'; }
+    else if (t === 'social_message') { icon = '✉️'; iconClass = 'social'; borderClass = 'social-message'; }
+    else if (t === 'ecom_order_new') { icon = '🛒'; iconClass = 'ecom'; borderClass = 'ecom-order'; }
+    else if (t === 'ecom_payment_success' || t === 'ecom_payment_confirmed') { icon = '💳'; iconClass = 'success'; borderClass = 'ecom-payment'; }
+    else if (t === 'ecom_shipping') { icon = '📦'; iconClass = 'ecom'; borderClass = 'ecom-shipping'; }
+    else if (t === 'ecom_received') { icon = '✅'; iconClass = 'success'; borderClass = 'ecom-payment'; }
+    else if (t === 'ecom_rating') { icon = '⭐'; iconClass = 'ecom'; borderClass = 'ecom-order'; }
+    else if (t === 'ecom_stock_out') { icon = '⚠️'; iconClass = 'ecom'; borderClass = 'ecom-order'; }
+    else if (t === 'ecom_order_cancelled') { icon = '❌'; iconClass = 'emergency'; borderClass = 'emergency'; }
+    // Fallback untuk emergency tanpa prefix
+    else if (n.type === 'emergency' || n.emergencyType) {
+        const et = n.emergencyType || 'fire';
+        const emergencyIcons = { 'fire': '🔥', 'medical': '🚑', 'crime': '🚓', 'disaster': '🌪️' };
+        icon = emergencyIcons[et] || '🚨';
+        iconClass = 'emergency';
+        borderClass = 'emergency';
+    }
+
+    const unreadClass = n.read ? '' : 'unread';
+    const safeId = escapeAttr(n.id || '');
+    const safeType = escapeAttr(notifType);
+    const safeLink = escapeAttr(n.link || '');
+
+    return '<div class="notif-item ' + unreadClass + ' ' + borderClass + '" onclick="handleNotifClick(\'' + safeId + '\', \'' + safeType + '\', \'' + safeLink + '\')">' +
+        '<div class="notif-item-icon ' + iconClass + '">' + icon + '</div>' +
+        '<div class="notif-item-content">' +
+            '<div class="notif-item-title">' + escapeHTML(n.title || 'Notifikasi') + '</div>' +
+            '<div class="notif-item-message">' + escapeHTML(n.message || '') + '</div>' +
+            '<div class="notif-item-time"><i class="fas fa-clock"></i> ' + getTimeAgo(n.timestamp || Date.now()) + (n.sender ? ' • ' + escapeHTML(n.sender) : '') + '</div>' +
+        '</div>' +
+    '</div>';
+}
+
+function handleNotifClick(notifId, notifType, link) {
+    if (notifId) markNotifRead(notifId);
+
+    if (link) {
+        if (link.startsWith('http')) window.open(link, '_blank');
+        else window.location.href = link;
+    } else if (notifType && notifType.indexOf('emergency_') === 0 && notifId) {
+        window.location.href = 'detail-emergency.html?id=' + encodeURIComponent(notifId);
+    } else if (notifType && (notifType === 'emergency' || notifType.indexOf('emergency') === 0) && notifId) {
+        window.location.href = 'detail-emergency.html?id=' + encodeURIComponent(notifId);
+    }
+
+    closeModal('notifModal');
+}
+
+// ====================================================================
+// 55. OVERRIDE renderNotifList() — Pakai Universal Renderer
+// ====================================================================
+// Simpan referensi fungsi lama (jika ada)
+const _originalRenderNotifList = window.renderNotifList;
+
+window.renderNotifList = function() {
+    const listEl = document.getElementById('notifList');
+    if (!listEl) return;
+
+    let allNotifs = getAllNotifications();
+    let filtered = allNotifs;
+    if (notifFilter === 'unread') filtered = allNotifs.filter(n => !n.read);
+    else if (notifFilter === 'emergency') filtered = allNotifs.filter(n => n.type === 'emergency' || (n.notifType && n.notifType.indexOf('emergency_') === 0));
+    else if (notifFilter === 'regular') filtered = allNotifs.filter(n => n.type === 'regular' || (n.notifType && n.notifType.indexOf('emergency_') !== 0));
+
+    const unreadCount = allNotifs.filter(n => !n.read).length;
+    const statsEl = document.getElementById('notifStatsText');
+    if (statsEl) statsEl.textContent = allNotifs.length + ' total • ' + unreadCount + ' belum dibaca';
+    updateNotifBadge(unreadCount);
+
+    if (filtered.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center;padding:30px;color:#6b7688;"><i class="fas fa-bell-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada notifikasi</p></div>';
+        return;
+    }
+
+    listEl.innerHTML = filtered.map(n => renderNotifItemUniversal(n)).join('');
+};
+
+console.log('✅ [Notif] Universal renderer loaded & applied');
+
+// ⭐ Export ke global
+window.initEcommerce = initEcommerce;
+window.loadProducts = loadProducts;
+window.loadMyOrders = loadMyOrders;
+window.loadMiniProducts = loadMiniProducts;
+window.renderMiniProducts = renderMiniProducts;
+window.formatRupiahMini = formatRupiahMini;
+window.loadMiniOrders = loadMiniOrders;
+window.renderMiniOrders = renderMiniOrders;
+window.getMiniOrderStatusClass = getMiniOrderStatusClass;
+window.getMiniOrderStatusLabel = getMiniOrderStatusLabel;
+window.openProductInToko = openProductInToko;
+window.openOrderTracking = openOrderTracking;
+window.refreshMiniMarketplace = refreshMiniMarketplace;
+window.renderNotifItemUniversal = renderNotifItemUniversal;
+window.handleNotifClick = handleNotifClick;
+
+console.log('✅ [MiniMarket] Loaded — Opsi C Custom');
+console.log('✅ [Ecom] Initialized');
+            
     </script>
 
     <!-- ============================================================ -->
-    <!-- 51. HERO CAROUSEL IMAGES LOADER                                   -->
+    <!-- 56. HERO CAROUSEL IMAGES LOADER                                   -->
     <!-- ============================================================ -->
     <script>
     (function() {
@@ -6333,7 +6815,7 @@ console.log('✅ SALINK Dashboard v11.0 Script Loaded — ALL FIXED');
     </script>
 
     <!-- ============================================================ -->
-    <!-- 52. FCM SETUP SALINK + EMERGENCY ALERT                            -->
+    <!-- 57. FCM SETUP SALINK + EMERGENCY ALERT                            -->
     <!-- ============================================================ -->
     <script src="/firebase-config.js"></script>
     <script src="/fcm-client.js"></script>
