@@ -1,99 +1,77 @@
 // ================================================================
 // SALINK - SERVICE WORKER
-// Versi: 2.0.0
-// Fungsi: Cache offline, notifikasi push, dan performa
-// NEW v2.0: PWA Lock Screen Optimized — custom sound, actions, badge
+// Versi: 3.0.0
+// Fungsi: Cache offline + push handler + multi-jenis notif
 // ================================================================
 
-const CACHE_VERSION = 'salink-v2.0.0';
+const CACHE_VERSION = 'salink-v3.0.0';
 const CACHE_NAME = CACHE_VERSION;
 const OFFLINE_URL = 'dashboard.html';
 
-// ⭐ Custom sound mapping
-const SOUND_MAP = {
-  'fire':     '/Music/Kebakaran.mp3',
-  'medical':  '/Music/kematian.mp3',
-  'crime':    '/Music/pencurian.mp3',
-  'disaster': '/Music/bencana_tsunami.mp3'
+const VIBRATE_PATTERNS = {
+  'emergency_fire':     [500, 100, 500, 100, 500, 100, 1000],
+  'emergency_medical':  [300, 200, 300, 200, 300, 200, 800],
+  'emergency_crime':    [200, 100, 200, 100, 200, 100, 600],
+  'emergency_disaster': [800, 300, 800, 300, 800, 300, 1500],
+  'social_comment':     [200, 100, 200],
+  'social_like':        [100, 50, 100],
+  'social_post':        [200, 100, 200],
+  'social_invite':      [300, 150, 300, 150, 300],
+  'social_invite_accepted': [300, 150, 300, 150, 300],
+  'social_message':     [300, 150, 300],
+  'ecom_order_new':     [400, 200, 400, 200, 400],
+  'ecom_payment_success': [300, 150, 300, 150, 300],
+  'ecom_payment_confirmed': [300, 150, 300, 150, 300],
+  'ecom_shipping':      [200, 100, 200],
+  'ecom_received':      [200, 100, 200],
+  'ecom_rating':        [200, 100, 200],
+  'ecom_stock_out':     [400, 200, 400, 200, 400],
+  'ecom_order_cancelled': [400, 200, 400, 200, 400]
 };
 
-// ================================================================
-// FILE YANG DI-CACHE (Agar bisa offline)
-// ================================================================
 const urlsToCache = [
   'dashboard.html',
   'api.js',
   'manifest.json',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-regular-400.woff2',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-brands-400.woff2'
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
 
-// ================================================================
-// INSTALL EVENT - Cache semua file
-// ================================================================
 self.addEventListener('install', event => {
-  console.log('📦 [SW] Installing...', CACHE_VERSION);
+  console.log('📦 [SW v3.0] Installing...', CACHE_VERSION);
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        console.log('📦 [SW] Meng-cache file...');
-        return cache.addAll(urlsToCache);
-      })
-      .then(() => {
-        console.log('✅ [SW] Cache berhasil!');
-        return self.skipWaiting();
-      })
-      .catch(error => {
-        console.error('❌ [SW] Gagal cache:', error);
-      })
+      .then(cache => cache.addAll(urlsToCache))
+      .then(() => self.skipWaiting())
+      .catch(error => console.error('❌ [SW v3.0] Cache error:', error))
   );
 });
 
-// ================================================================
-// ACTIVATE EVENT - Hapus cache lama
-// ================================================================
 self.addEventListener('activate', event => {
-  console.log('🔧 [SW] Activating...', CACHE_VERSION);
-  const cacheWhitelist = [CACHE_NAME];
+  console.log('🔧 [SW v3.0] Activating...');
   event.waitUntil(
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheWhitelist.indexOf(cacheName) === -1) {
-            console.log('🗑️ [SW] Hapus cache lama:', cacheName);
+          if (cacheName !== CACHE_NAME) {
+            console.log('🗑️ [SW v3.0] Delete old cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
-    })
-    .then(() => {
-      console.log('✅ [SW] Siap digunakan!');
-      return self.clients.claim();
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
-// ================================================================
-// FETCH EVENT - Ambil dari cache, lalu dari network
-// ================================================================
 self.addEventListener('fetch', event => {
   const requestUrl = new URL(event.request.url);
 
-  // API request - jangan di-cache
-  if (requestUrl.hostname.includes('script.google.com')) {
+  if (requestUrl.hostname.includes('script.google.com') ||
+      requestUrl.hostname.includes('firebase') ||
+      requestUrl.hostname.includes('gstatic')) {
     event.respondWith(fetch(event.request));
     return;
   }
 
-  // FCM / Firebase — jangan di-cache
-  if (requestUrl.hostname.includes('firebase') || requestUrl.hostname.includes('gstatic')) {
-    event.respondWith(fetch(event.request));
-    return;
-  }
-
-  // Gambar - stale-while-revalidate
   if (event.request.destination === 'image') {
     event.respondWith(
       caches.open(CACHE_NAME).then(cache => {
@@ -109,217 +87,90 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // HTML, CSS, JS - cache dulu, fallback ke offline
   event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        if (response) return response;
-
-        return fetch(event.request)
-          .then(networkResponse => {
-            if (networkResponse && networkResponse.status === 200) {
-              const responseToCache = networkResponse.clone();
-              caches.open(CACHE_NAME).then(cache => {
-                cache.put(event.request, responseToCache);
-              });
-            }
-            return networkResponse;
-          })
-          .catch(() => {
-            if (event.request.mode === 'navigate') {
-              return caches.match(OFFLINE_URL);
-            }
-          });
-      })
+    caches.match(event.request).then(response => {
+      if (response) return response;
+      return fetch(event.request).then(networkResponse => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, responseToCache));
+        }
+        return networkResponse;
+      }).catch(() => {
+        if (event.request.mode === 'navigate') return caches.match(OFFLINE_URL);
+      });
+    })
   );
 });
 
-// ================================================================
-// PUSH NOTIFICATION — v2.0 LOCK SCREEN OPTIMIZED
-// ================================================================
 self.addEventListener('push', event => {
-  console.log('🔔 [SW] Push event diterima');
+  console.log('🔔 [SW v3.0] Push event');
 
   let data = {};
   try {
     data = event.data ? event.data.json() : {};
   } catch (e) {
-    console.error('❌ [SW] Push data bukan JSON:', e);
     data = { title: 'SALINK', body: 'Ada notifikasi baru' };
   }
-
-  console.log('🔔 [SW] Push payload:', data);
 
   const notification = data.notification || {};
   const dataPayload = data.data || {};
 
-  const title = notification.title || '🚨 SALINK EMERGENCY';
-  const body = notification.body || 'Ada peringatan darurat';
-  const emergencyType = String(dataPayload.emergencyType || 'fire').toLowerCase();
-  const emergencyId = String(dataPayload.emergencyId || 'salink-emergency-' + Date.now());
-  const soundUrl = SOUND_MAP[emergencyType] || '/Music/smsblackber_4a537f155087133.mp3';
+  const notifType = String(dataPayload.notifType || dataPayload.type || 'social_post').toLowerCase();
+  const title = notification.title || '🔔 SALINK';
+  const body = notification.body || 'Ada notifikasi baru';
+
+  let vibratePattern = VIBRATE_PATTERNS[notifType] || [200, 100, 200];
+  if (dataPayload.vibratePattern) {
+    try {
+      const parsed = JSON.parse(dataPayload.vibratePattern);
+      if (Array.isArray(parsed) && parsed.length > 0) vibratePattern = parsed;
+    } catch(e) {}
+  }
+
+  const notifTag = String(dataPayload.tag || 'salink-notif') + '-' + (dataPayload.emergencyId || dataPayload.postId || dataPayload.transactionId || Date.now());
+  const isEmergency = notifType.indexOf('emergency_') === 0;
+
+  let targetUrl = '/dashboard.html';
+  if (dataPayload.mapsURL) targetUrl = dataPayload.mapsURL;
+  else if (dataPayload.emergencyId) targetUrl = '/detail-emergency.html?id=' + encodeURIComponent(dataPayload.emergencyId);
+  else if (dataPayload.postId) targetUrl = '/dashboard.html#post-' + dataPayload.postId;
+  else if (dataPayload.transactionId) targetUrl = '/dashboard.html#transactions';
+  else if (dataPayload.link) targetUrl = dataPayload.link;
 
   const options = {
     body: body,
     icon: '/icon-192.png',
     badge: '/badge-72.png',
-    image: dataPayload.imageUrl || undefined,
-
-    // ⭐ Lock screen visibility
-    requireInteraction: true,
-
-    // ⭐ Vibrate pattern agresif
-    vibrate: [500, 200, 500, 200, 500, 200, 1000],
-
-    // ⭐ Tag + renotify
-    tag: 'salink-emergency-' + emergencyId,
+    requireInteraction: isEmergency || notifType === 'social_message',
+    vibrate: vibratePattern,
+    tag: notifTag,
     renotify: true,
-
-    // ⭐ Silent = false
     silent: false,
-
-    // ⭐ Data untuk handling click
-    data: {
-      url: dataPayload.mapsURL || dataPayload.url || '/dashboard.html?id=' + encodeURIComponent(emergencyId),
-      emergencyId: emergencyId,
-      emergencyType: emergencyType,
-      latitude: dataPayload.latitude || '',
-      longitude: dataPayload.longitude || '',
-      sender: dataPayload.sender || '',
-      timestamp: dataPayload.timestamp || Date.now()
-    },
-
-    // ⭐ Actions
-    actions: [
-      { action: 'open',    title: '🔍 Lihat Detail' },
-      { action: 'dismiss', title: '❌ Tutup' }
-    ],
-
+    data: { url: targetUrl, notifType: notifType, emergencyId: dataPayload.emergencyId || '' },
+    actions: [{ action: 'open', title: '👁️ Buka' }, { action: 'dismiss', title: '❌ Tutup' }],
     timestamp: Date.now()
   };
 
-  event.waitUntil(
-    (async () => {
-      try {
-        // ⭐ Tampilkan notifikasi
-        await self.registration.showNotification(title, options);
-        console.log('✅ [SW] Notif ditampilkan:', emergencyId);
-
-        // ⭐ Set app badge
-        if ('setAppBadge' in self.navigator) {
-          await self.navigator.setAppBadge(1).catch(() => {});
-        }
-
-        // ⭐ Kirim pesan ke semua client SALINK yang aktif
-        const allClients = await self.clients.matchAll({
-          type: 'window',
-          includeUncontrolled: true
-        });
-
-        allClients.forEach(client => {
-          client.postMessage({
-            type: 'EMERGENCY_PUSH_RECEIVED',
-            emergency: {
-              id: emergencyId,
-              type: emergencyType,
-              sender: dataPayload.sender || 'Sistem',
-              location: dataPayload.location || dataPayload.address || 'Lokasi tidak diketahui',
-              text: body,
-              timestamp: Date.now()
-            }
-          });
-        });
-
-        console.log('✅ [SW] Broadcast ke', allClients.length, 'clients');
-      } catch (err) {
-        console.error('❌ [SW] Push handler error:', err);
-      }
-    })()
-  );
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
-// ================================================================
-// NOTIFICATION CLICK — v2.0
-// ================================================================
 self.addEventListener('notificationclick', event => {
-  console.log('👆 [SW] Notif diklik:', event.action, event.notification.data);
   event.notification.close();
-
-  // ⭐ Handle dismiss
-  if (event.action === 'dismiss') {
-    console.log('❌ [SW] User dismiss notif');
-    return;
-  }
-
-  const data = event.notification.data || {};
-  const targetUrl = data.url || '/dashboard.html';
-  const emergencyId = data.emergencyId;
-
+  if (event.action === 'dismiss') return;
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/dashboard.html';
   event.waitUntil(
-    (async () => {
-      try {
-        const allClients = await clients.matchAll({
-          type: 'window',
-          includeUncontrolled: true
-        });
-
-        // ⭐ Cari tab SALINK yang sudah terbuka
-        for (let client of allClients) {
-          if (client.url.includes('salink') || client.url.includes('dashboard')) {
-            await client.focus();
-
-            client.postMessage({
-              type: 'EMERGENCY_NOTIFICATION_CLICK',
-              emergencyId: emergencyId,
-              emergencyType: data.emergencyType,
-              url: targetUrl
-            });
-
-            console.log('✅ [SW] Fokus ke tab existing');
-            return;
-          }
-        }
-
-        // ⭐ Buka tab baru
-        if (clients.openWindow) {
-          await clients.openWindow(targetUrl);
-          console.log('✅ [SW] Buka tab baru:', targetUrl);
-        }
-      } catch (err) {
-        console.error('❌ [SW] Notification click error:', err);
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      for (let client of windowClients) {
+        if (client.url.includes('salink') || client.url.includes('dashboard')) return client.focus();
       }
-    })()
+      if (clients.openWindow) return clients.openWindow(targetUrl);
+    })
   );
 });
 
-// ================================================================
-// NOTIFICATION CLOSE — v2.0
-// ================================================================
-self.addEventListener('notificationclose', event => {
-  console.log('🔕 [SW] Notif ditutup tanpa tap');
-});
-
-// ================================================================
-// MESSAGE HANDLER — v2.0
-// ================================================================
 self.addEventListener('message', event => {
-  const data = event.data || {};
-  console.log('📨 [SW] Message dari client:', data.type || data);
-
-  if (data === 'SKIP_WAITING') {
-    self.skipWaiting();
-    return;
-  }
-
-  if (data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
-// ================================================================
-// LOG
-// ================================================================
-console.log('✅ [SW] Service Worker SALINK v2.0.0 loaded');
-console.log('📦 [SW] Cache:', CACHE_VERSION);
-console.log('🚨 [SW] Emergency push handler aktif');
-console.log('🎵 [SW] Custom sounds:', Object.keys(SOUND_MAP).join(', '));
+console.log('✅ [SW v3.0] Loaded — Multi-jenis notification support');
