@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>SALINK - Kontak Darurat</title>
+    <title>Kontak Darurat - SALINK</title>
 
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0a0e1a" id="themeColorMeta">
@@ -18,14 +18,7 @@
 
     <style>
         /* ==================================================================
-           SALINK KONTAK-DARURAT v15.0 — HYBRID FINAL
-           ==================================================================
-           Strategi:
-           - Fetch get_contacts → SEMUA kontak langsung tampil
-           - GPS auto-detect background → sort by distance (kalau ada)
-           - Kalau GPS gagal → tampil tanpa jarak (urutan default)
-           - Header + Bottom Nav + Sidebar + Modal = INDUK (konsisten)
-           - Tema Merah Telkomsel
+           SALINK KONTAK-DARURAT v13.1 — FINAL (KONSISTEN LOKASI-BANTUAN)
            ================================================================== */
 
         /* ============ ROOT VARIABLES ============ */
@@ -66,7 +59,6 @@
             --emergency-medical: #4fc3f7;
             --emergency-crime: #f0d080;
             --emergency-disaster: #c792ea;
-            --emergency-general: #3fb950;
 
             --toggle-bg: rgba(255,255,255,0.1);
             --toggle-thumb: #e60012;
@@ -85,7 +77,6 @@
             --success: #3fb950;
             --warning: #f0d080;
             --info: #e60012;
-            --whatsapp: #25D366;
         }
 
         [data-theme="light"] {
@@ -125,24 +116,20 @@
             overflow-x: hidden;
             transition: background 0.3s ease, color 0.3s ease;
             -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
             display: flex;
             justify-content: center;
             font-size: 14px;
             line-height: 1.5;
         }
-
         h1, h2, h3, h4, h5, h6 {
             font-family: 'Poppins', 'Inter', sans-serif;
             font-weight: 700;
             letter-spacing: -0.02em;
         }
-
         ::-webkit-scrollbar { width: 3px; }
         ::-webkit-scrollbar-track { background: rgba(0,0,0,0.15); }
         ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 3px; }
 
-        /* ============ APP SHELL ============ */
         .app-shell {
             width: 100%;
             max-width: 430px;
@@ -167,7 +154,6 @@
         @keyframes fabRing { 0% { transform: scale(.9); opacity: .8; } 100% { transform: scale(1.3); opacity: 0; } }
         @keyframes rippleAnim { to { transform: scale(4); opacity: 0; } }
         @keyframes floatingNotifIn { from { transform: translateX(-50%) translateY(-100px) scale(0.8); opacity: 0; } to { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; } }
-        @keyframes pulse-red { 0%, 100% { box-shadow: 0 0 0 0 rgba(248,81,73,0.7); } 70% { box-shadow: 0 0 0 15px rgba(248,81,73,0); } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 
         /* ============ LOGO BLINK ============ */
@@ -178,7 +164,7 @@
             line-height: 1;
         }
 
-        /* ============ HEADER (INDUK) ============ */
+        /* ============ HEADER ============ */
         .app-bar {
             position: fixed;
             top: 0;
@@ -247,6 +233,7 @@
         }
         .user-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
         .user-btn .user-initials { font-size: 0.85rem; font-weight: 700; color: #fff; }
+        .refresh-btn.loading i { animation: spin 1s linear infinite; }
 
         #headerNotifBtn { position: relative; }
         #headerNotifBtn #notifBadge {
@@ -299,15 +286,17 @@
         .theme-toggle.active .toggle-thumb { left: 22px; }
         .theme-toggle .toggle-thumb i { color: #fff; }
 
-        /* ============ SIDEBAR (INDUK) ============ */
+        /* ============ SIDEBAR ============ */
         .sidebar-overlay-bg {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             background: rgba(0,0,0,0.6);
             z-index: 1099;
             display: none;
             backdrop-filter: blur(3px);
-            -webkit-backdrop-filter: blur(3px);
             opacity: 0;
             transition: opacity 0.3s ease;
         }
@@ -315,7 +304,8 @@
 
         .sidebar {
             position: fixed;
-            top: 0; left: 0;
+            top: 0;
+            left: 0;
             width: 285px;
             max-width: 85%;
             height: 100vh;
@@ -340,7 +330,8 @@
             position: absolute;
             top: calc(14px + env(safe-area-inset-top, 0px));
             right: 14px;
-            width: 34px; height: 34px;
+            width: 34px;
+            height: 34px;
             border-radius: 50%;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
@@ -365,7 +356,8 @@
             position: relative;
         }
         .sidebar-user-avatar {
-            width: 64px; height: 64px;
+            width: 64px;
+            height: 64px;
             border-radius: 50%;
             background: var(--accent-blue-gradient);
             display: flex;
@@ -469,56 +461,35 @@
             justify-content: space-between;
             gap: 12px;
             margin-bottom: 14px;
-            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            background: var(--bg-card);
             padding: 14px 16px;
             border-radius: var(--radius);
-            border: 1px solid rgba(59,130,246,0.3);
-            box-shadow: 0 8px 24px rgba(59,130,246,0.3);
-            color: #fff;
-            position: relative;
-            overflow: hidden;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 15px var(--shadow-light);
         }
-        .brand-section::before {
-            content: '';
-            position: absolute;
-            top: -40px; right: -40px;
-            width: 140px; height: 140px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(255,255,255,0.15), transparent 70%);
-            pointer-events: none;
-        }
-        .brand-left { display: flex; align-items: center; gap: 12px; position: relative; z-index: 2; }
-        .brand-icon { font-size: 2rem; line-height: 1; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2)); }
+        .brand-left { display: flex; align-items: center; gap: 12px; }
+        .brand-icon { font-size: 2rem; line-height: 1; }
         .brand-title {
             font-size: 1.05rem;
             font-weight: 800;
-            color: #ffffff;
+            color: var(--text-primary);
             font-family: 'Poppins', sans-serif;
             margin-bottom: 2px;
         }
         .brand-subtitle {
             font-size: 0.6rem;
-            color: rgba(255,255,255,0.85);
+            color: var(--text-muted);
             font-weight: 600;
             letter-spacing: 0.5px;
             text-transform: uppercase;
-        }
-        .brand-gps-info {
-            font-size: 0.62rem;
-            color: rgba(255,255,255,0.9);
-            margin-top: 4px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            font-family: 'Courier New', monospace;
         }
         .back-home-btn {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            background: rgba(255,255,255,0.15);
-            border: 1px solid rgba(255,255,255,0.25);
-            color: #fff;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
             padding: 7px 14px;
             border-radius: 10px;
             font-size: 0.7rem;
@@ -527,235 +498,115 @@
             text-decoration: none;
             font-weight: 600;
             font-family: inherit;
-            position: relative;
-            z-index: 2;
         }
-        .back-home-btn:active { transform: scale(0.95); background: rgba(255,255,255,0.25); }
+        .back-home-btn:active { transform: scale(0.95); border-color: var(--primary); }
 
-        /* ============ GPS STATUS PANEL ============ */
-        .gps-panel {
+        /* ============ HERO ============ */
+        .hero {
+            background: var(--accent-blue-gradient);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            margin-bottom: 14px;
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(230,0,18,0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: -30px;
+            right: -30px;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,255,255,0.15), transparent 70%);
+            pointer-events: none;
+        }
+        .hero-icon { font-size: 2rem; margin-bottom: 6px; line-height: 1; }
+        .hero h1 { font-size: 1.2rem; font-weight: 800; font-family: 'Poppins', sans-serif; margin-bottom: 4px; }
+        .hero p { font-size: 0.72rem; opacity: 0.9; line-height: 1.5; max-width: 500px; }
+
+        /* ============ CONTROL CARD (Search + Filter) ============ */
+        .control-card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: var(--radius);
             padding: 14px 16px;
             margin-bottom: 14px;
             box-shadow: 0 4px 15px var(--shadow-light);
-            transition: all 0.3s;
         }
-        .gps-panel.loading { border-color: var(--primary); background: rgba(230,0,18,0.05); }
-        .gps-panel.success { border-color: rgba(63,185,80,0.4); background: rgba(63,185,80,0.05); }
-        .gps-panel.info { border-color: rgba(59,130,246,0.4); background: rgba(59,130,246,0.05); }
-
-        .gps-row {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            margin-bottom: 10px;
+        .search-box { position: relative; margin-bottom: 12px; }
+        .search-box .search-icon {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            pointer-events: none;
         }
-        .gps-icon-wrap {
-            width: 42px; height: 42px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--bg-input);
-            font-size: 1.4rem;
-            flex-shrink: 0;
-        }
-        .gps-text { flex: 1; min-width: 0; }
-        .gps-title {
-            font-size: 0.82rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 3px;
-        }
-        .gps-detail {
-            font-size: 0.68rem;
-            color: var(--text-secondary);
-            line-height: 1.4;
-            word-break: break-word;
-        }
-
-        .location-btn {
+        .search-box input {
             width: 100%;
-            padding: 11px 16px;
-            border: none;
-            border-radius: 12px;
-            background: var(--accent-blue-gradient);
-            color: #fff;
-            font-size: 0.78rem;
-            font-weight: 800;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
+            padding: 10px 14px 10px 38px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 0.75rem;
             font-family: inherit;
             transition: all 0.3s;
-            box-shadow: 0 4px 14px rgba(230,0,18,0.3);
         }
-        .location-btn:active { transform: scale(0.97); }
-        .location-btn:disabled { opacity: 0.7; cursor: not-allowed; }
-        .location-btn.loading { pointer-events: none; }
-        .location-btn.success { background: linear-gradient(135deg, #10b981, #059669); }
-
-        /* ============ LOCAL SEARCH ============ */
-        .local-search {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius);
-            padding: 12px 14px;
-            margin-bottom: 14px;
-            box-shadow: 0 4px 15px var(--shadow-light);
-        }
-        .local-search i { color: var(--text-muted); font-size: 0.9rem; }
-        .local-search input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            color: var(--text-primary);
-            font-size: 0.78rem;
-            font-family: inherit;
+        .search-box input:focus {
             outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(230,0,18,0.1);
         }
-        .local-search input::placeholder { color: var(--text-muted); }
+        .search-box input::placeholder { color: var(--text-muted); }
 
-        /* ============ CATEGORY FILTER ============ */
-        .category-filter-wrap {
-            margin-bottom: 14px;
-        }
-        .category-filter-label {
-            font-size: 0.72rem;
+        .filter-title {
+            font-size: 0.68rem;
             font-weight: 700;
             color: var(--text-primary);
             margin-bottom: 8px;
-            display: block;
         }
-        .category-filter {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 6px;
-            flex-wrap: wrap;
-        }
-        .cat-btn {
-            padding: 7px 14px;
-            background: var(--bg-input);
+        .filter-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+        .filter-btn {
+            padding: 6px 12px;
+            border-radius: 16px;
             border: 1px solid var(--border-color);
-            border-radius: 20px;
+            background: var(--bg-input);
             color: var(--text-muted);
-            font-size: 0.65rem;
+            font-size: 0.62rem;
             font-weight: 700;
             cursor: pointer;
-            font-family: inherit;
-            white-space: nowrap;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .cat-btn:active { transform: scale(0.96); }
-        .cat-btn.active {
-            background: var(--accent-blue-gradient);
-            color: #fff;
-            border-color: var(--primary);
-            box-shadow: 0 4px 12px rgba(230,0,18,0.3);
-        }
-
-        /* ============ RADIUS FILTER ============ */
-        .radius-panel {
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius);
-            padding: 12px 14px;
-            margin-bottom: 14px;
-            box-shadow: 0 4px 15px var(--shadow-light);
             transition: all 0.3s;
-        }
-        .radius-panel.disabled {
-            opacity: 0.5;
-            pointer-events: none;
-        }
-        .radius-label {
-            font-size: 0.72rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .radius-label .hint {
-            font-size: 0.55rem;
-            color: var(--text-muted);
-            font-weight: 500;
-            margin-left: auto;
-        }
-        .radius-buttons {
-            display: flex;
-            gap: 6px;
-            flex-wrap: nowrap;
-            overflow-x: auto;
-            scrollbar-width: none;
-            -ms-overflow-style: none;
-            padding-bottom: 2px;
-        }
-        .radius-buttons::-webkit-scrollbar { display: none; }
-        .radius-btn {
-            flex: 1;
-            min-width: 64px;
-            padding: 8px 10px;
-            border-radius: 10px;
-            border: 1px solid var(--border-color);
-            background: var(--bg-input);
-            color: var(--text-muted);
-            font-size: 0.62rem;
-            font-weight: 700;
-            cursor: pointer;
             font-family: inherit;
-            white-space: nowrap;
-            text-align: center;
-            transition: all 0.2s;
         }
-        .radius-btn:active { transform: scale(0.95); }
-        .radius-btn.active {
+        .filter-btn:active { transform: scale(0.95); }
+        .filter-btn.active {
             background: var(--accent-blue-gradient);
             color: #fff;
             border-color: var(--primary);
-            box-shadow: 0 4px 12px rgba(230,0,18,0.3);
+            box-shadow: 0 2px 12px rgba(230,0,18,0.3);
         }
 
-        /* ============ RESULTS HEADER ============ */
-        .results-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            margin-bottom: 12px;
-            padding: 0 4px;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        .results-title {
-            font-size: 0.95rem;
-            font-weight: 800;
-            color: var(--text-primary);
-            font-family: 'Poppins', sans-serif;
+        /* ============ SUMMARY ============ */
+        .summary {
             display: flex;
             align-items: center;
-            gap: 6px;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 0 4px;
         }
-        .results-subtitle {
-            font-size: 0.62rem;
-            color: var(--text-muted);
-            margin-top: 3px;
-            font-weight: 600;
-        }
-        .refresh-small {
+        .summary-title { font-size: 0.92rem; font-weight: 800; color: var(--text-primary); font-family: 'Poppins', sans-serif; }
+        .summary-count { font-size: 0.62rem; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
+        .refresh-btn {
             background: var(--bg-input);
             border: 1px solid var(--border-color);
-            border-radius: 10px;
+            border-radius: 8px;
             padding: 7px 12px;
             color: var(--text-muted);
             font-size: 0.62rem;
@@ -763,66 +614,56 @@
             cursor: pointer;
             transition: all 0.3s;
             font-family: inherit;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
         }
-        .refresh-small:active { transform: scale(0.95); border-color: var(--primary); color: var(--primary); }
+        .refresh-btn:active { transform: scale(0.95); border-color: var(--primary); color: var(--primary); }
 
-        /* ============ CONTACT GRID (1 COLUMN) ============ */
+        /* ============ CONTACT GRID ============ */
         .contact-grid {
             display: flex;
             flex-direction: column;
             gap: 12px;
-            margin-bottom: 18px;
         }
         .contact-card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: var(--radius);
-            padding: 0;
-            box-shadow: 0 6px 20px var(--shadow-light);
+            padding: 14px 16px;
+            box-shadow: 0 4px 15px var(--shadow-light);
             transition: all 0.3s;
             animation: fadeIn 0.3s ease;
-            overflow: hidden;
-            position: relative;
         }
-        .contact-card.fire { border-left: 4px solid var(--emergency-fire); }
-        .contact-card.medical { border-left: 4px solid var(--emergency-medical); }
-        .contact-card.crime { border-left: 4px solid var(--emergency-crime); }
-        .contact-card.disaster { border-left: 4px solid var(--emergency-disaster); }
-        .contact-card.general { border-left: 4px solid var(--emergency-general); }
-
-        .contact-card-inner {
-            padding: 14px 16px;
-        }
-        .contact-card-top {
+        .contact-card:active { transform: scale(0.99); border-color: var(--primary); }
+        .contact-top {
             display: flex;
+            justify-content: space-between;
             align-items: flex-start;
             gap: 10px;
             margin-bottom: 10px;
         }
         .contact-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 14px;
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
-            flex-shrink: 0;
+            font-size: 1.4rem;
             background: var(--bg-input);
-            border: 2px solid var(--border-color);
+            flex-shrink: 0;
         }
-        .contact-icon.fire { background: rgba(248,81,73,0.15); border-color: rgba(248,81,73,0.3); }
-        .contact-icon.medical { background: rgba(79,195,247,0.15); border-color: rgba(79,195,247,0.3); }
-        .contact-icon.crime { background: rgba(240,208,128,0.15); border-color: rgba(240,208,128,0.3); }
-        .contact-icon.disaster { background: rgba(199,146,234,0.15); border-color: rgba(199,146,234,0.3); }
-        .contact-icon.general { background: rgba(63,185,80,0.15); border-color: rgba(63,185,80,0.3); }
-
-        .contact-info { flex: 1; min-width: 0; }
+        .contact-level {
+            font-size: 0.5rem;
+            padding: 3px 9px;
+            border-radius: 10px;
+            background: var(--bg-input);
+            color: var(--text-muted);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid var(--border-color);
+        }
         .contact-name {
-            font-size: 0.92rem;
+            font-size: 0.88rem;
             font-weight: 800;
             color: var(--text-primary);
             font-family: 'Poppins', sans-serif;
@@ -830,107 +671,66 @@
             margin-bottom: 3px;
         }
         .contact-category {
-            font-size: 0.65rem;
+            font-size: 0.62rem;
             color: var(--text-muted);
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 5px;
+            margin-bottom: 8px;
         }
-        .contact-badge-area {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            background: var(--bg-input);
-            color: var(--text-muted);
-            font-size: 0.55rem;
-            font-weight: 700;
-            padding: 3px 9px;
-            border-radius: 8px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            border: 1px solid var(--border-color);
-        }
-        .contact-address {
-            font-size: 0.72rem;
-            color: var(--text-secondary);
-            line-height: 1.5;
+        .contact-location {
             display: flex;
             align-items: flex-start;
             gap: 6px;
             padding: 8px 0;
             border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            margin: 8px 0;
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
         }
-        .contact-address i {
-            color: var(--primary);
-            margin-top: 2px;
-            flex-shrink: 0;
-            font-size: 0.75rem;
-        }
-        .distance-badge {
+        .contact-location .loc-icon { flex-shrink: 0; }
+        .contact-distance {
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            background: rgba(59,130,246,0.12);
-            color: #3b82f6;
-            padding: 5px 10px;
+            background: rgba(230,0,18,0.1);
+            color: var(--primary);
+            padding: 4px 10px;
             border-radius: 10px;
-            font-size: 0.65rem;
-            font-weight: 800;
-            border: 1px solid rgba(59,130,246,0.25);
-            margin-top: 6px;
+            font-size: 0.62rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            border: 1px solid rgba(230,0,18,0.2);
         }
-
-        .contact-actions-grid {
+        .contact-actions {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(2, 1fr);
             gap: 6px;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px solid var(--border-color);
         }
         .contact-action {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
-            padding: 9px 8px;
-            border-radius: 10px;
+            gap: 4px;
+            padding: 8px;
+            border-radius: 8px;
             border: 1px solid var(--border-color);
             background: var(--bg-input);
-            color: var(--text-primary);
-            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-size: 0.62rem;
             font-weight: 700;
             text-decoration: none;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.3s;
             font-family: inherit;
-            white-space: nowrap;
         }
-        .contact-action:active { transform: scale(0.96); }
-        .contact-action i { font-size: 0.75rem; }
-        .contact-action.phone {
-            color: var(--primary);
-            border-color: rgba(230,0,18,0.3);
-        }
-        .contact-action.whatsapp {
-            color: var(--whatsapp);
-            border-color: rgba(37,211,102,0.3);
-        }
-        .contact-action.maps {
-            color: #3b82f6;
-            border-color: rgba(59,130,246,0.3);
-        }
-        .contact-action.detail {
-            color: var(--text-secondary);
-        }
-        .contact-action.disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-            pointer-events: none;
-        }
+        .contact-action:active { transform: scale(0.95); }
+        .contact-action.phone { color: var(--success); border-color: rgba(63,185,80,0.3); }
+        .contact-action.whatsapp { color: #25D366; border-color: rgba(37,211,102,0.3); }
+        .contact-action.maps { color: var(--primary); border-color: rgba(230,0,18,0.3); }
+        .contact-action.detail { color: var(--text-muted); }
+        .contact-action.unavailable { opacity: 0.4; cursor: not-allowed; }
 
-        /* ============ EMPTY STATE ============ */
+        /* ============ STATE CARD ============ */
         .state-card {
             background: var(--bg-card);
             border-radius: var(--radius);
@@ -939,16 +739,14 @@
             border: 1px solid var(--border-color);
             box-shadow: 0 4px 15px var(--shadow-light);
         }
-        .state-card .state-icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.5; display: block; }
+        .state-card .state-icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.5; }
         .state-card .state-title { font-size: 0.95rem; font-weight: 800; color: var(--text-primary); margin-bottom: 6px; font-family: 'Poppins', sans-serif; }
         .state-card .state-text { font-size: 0.72rem; color: var(--text-secondary); line-height: 1.6; max-width: 320px; margin: 0 auto; }
         .state-card .state-text b { color: var(--primary); font-weight: 700; }
-        .state-card.warning { border-color: var(--warning); background: rgba(240,208,128,0.05); }
-        .state-card.error { border-color: var(--accent-red); background: rgba(248,81,73,0.05); }
         .spinner {
             display: inline-block;
-            width: 32px;
-            height: 32px;
+            width: 36px;
+            height: 36px;
             border: 3px solid var(--border-color);
             border-radius: 50%;
             border-top-color: var(--primary);
@@ -956,42 +754,7 @@
             margin-bottom: 12px;
         }
 
-        /* ============ DETAIL MODAL (table) ============ */
-        .detail-table {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-top: 8px;
-        }
-        .detail-row {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            padding: 8px 10px;
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            font-size: 0.72rem;
-        }
-        .detail-row .detail-label {
-            color: var(--text-muted);
-            font-weight: 600;
-            flex-shrink: 0;
-            min-width: 90px;
-        }
-        .detail-row .detail-value {
-            color: var(--text-primary);
-            font-weight: 500;
-            word-break: break-word;
-            flex: 1;
-        }
-        .detail-row .detail-value.coords {
-            font-family: 'Courier New', monospace;
-            color: var(--primary);
-            font-size: 0.7rem;
-        }
-
-        /* ============ BOTTOM NAV (INDUK) ============ */
+        /* ============ BOTTOM NAV ============ */
         .bottom-nav {
             position: fixed;
             bottom: 0;
@@ -1048,7 +811,8 @@
         }
         .nav-item-bottom .badge {
             position: absolute;
-            top: 2px; right: 8px;
+            top: 2px;
+            right: 8px;
             background: var(--accent-red);
             color: white;
             font-size: 0.55rem;
@@ -1075,7 +839,8 @@
         .nav-fab {
             position: absolute;
             top: -36px;
-            width: 70px; height: 70px;
+            width: 70px;
+            height: 70px;
             border-radius: 50%;
             background: linear-gradient(135deg, #e60012 0%, #ff0033 50%, #ff6b3d 100%);
             border: 4px solid var(--bg-primary);
@@ -1214,6 +979,28 @@
             color: var(--primary);
         }
 
+        /* Detail Modal Rows */
+        .detail-row {
+            display: flex;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.72rem;
+            gap: 8px;
+        }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-label {
+            color: var(--text-muted);
+            width: 110px;
+            flex-shrink: 0;
+            font-weight: 600;
+        }
+        .detail-value {
+            color: var(--text-primary);
+            word-break: break-word;
+            flex: 1;
+            font-weight: 500;
+        }
+
         /* ============ SEARCH MODAL ============ */
         .search-modal-content { max-width: 500px; max-height: 90vh; }
         .search-input-wrapper { position: relative; margin-bottom: 12px; }
@@ -1261,76 +1048,31 @@
             box-shadow: 0 0 0 3px rgba(230,0,18,0.1);
         }
         #searchInput::placeholder { color: var(--text-muted); }
-
-        .search-tabs {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 12px;
-            flex-wrap: wrap;
-        }
+        .search-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
         .search-tab {
             flex: 1;
-            min-width: 0;
-            padding: 8px 6px;
+            min-width: 80px;
+            padding: 8px 10px;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             color: var(--text-muted);
-            font-size: 0.6rem;
+            font-size: 0.62rem;
             font-weight: 700;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 3px;
+            gap: 4px;
             font-family: inherit;
             transition: all 0.2s;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
-        .search-tab i { font-size: 0.6rem; flex-shrink: 0; }
         .search-tab.active {
             background: var(--accent-blue-gradient);
             color: #fff;
             border-color: var(--primary);
             box-shadow: 0 4px 12px rgba(230,0,18,0.3);
         }
-
-        .search-filter-row {
-            display: flex;
-            gap: 6px;
-            margin-bottom: 10px;
-            flex-wrap: nowrap;
-            overflow-x: auto;
-            scrollbar-width: none;
-            -ms-overflow-style: none;
-            padding-bottom: 4px;
-        }
-        .search-filter-row::-webkit-scrollbar { display: none; }
-        .search-filter-chip {
-            flex: 1;
-            min-width: 70px;
-            padding: 5px 8px;
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            border-radius: 999px;
-            color: var(--text-muted);
-            font-size: 0.58rem;
-            font-weight: 700;
-            cursor: pointer;
-            font-family: inherit;
-            white-space: nowrap;
-            text-align: center;
-            transition: all 0.2s;
-        }
-        .search-filter-chip:active { transform: scale(0.96); }
-        .search-filter-chip.active {
-            background: rgba(230,0,18,0.15);
-            border-color: var(--primary);
-            color: var(--primary);
-        }
-
         .search-section-title {
             font-size: 0.68rem;
             font-weight: 800;
@@ -1364,7 +1106,8 @@
         }
         .search-result-item:active { transform: scale(0.98); border-color: var(--primary); }
         .search-result-item .result-icon {
-            width: 40px; height: 40px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -1380,7 +1123,8 @@
         .search-result-item .result-icon.disaster { border-color: var(--emergency-disaster); color: var(--emergency-disaster); }
         .search-result-item .result-icon.post { border-color: var(--primary); color: var(--primary); }
         .search-result-item .result-avatar {
-            width: 40px; height: 40px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             background: var(--accent-blue-gradient);
             display: flex;
@@ -1442,7 +1186,8 @@
         .notif-item.unread { background: rgba(230,0,18,0.1); border-left: 3px solid var(--primary); }
         .notif-item.emergency { border-left: 3px solid var(--accent-red); }
         .notif-item-icon {
-            width: 36px; height: 36px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -1519,8 +1264,10 @@
         .fab-modal-header p { font-size: 0.68rem; color: var(--text-muted); line-height: 1.5; }
         .fab-modal-close {
             position: absolute;
-            top: 4px; right: 4px;
-            width: 32px; height: 32px;
+            top: 4px;
+            right: 4px;
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
@@ -1588,7 +1335,8 @@
             padding: 16px 14px;
         }
         .map-modal-title-icon {
-            width: 30px; height: 30px;
+            width: 30px;
+            height: 30px;
             border-radius: 8px;
             background: var(--accent-blue-gradient);
             display: flex;
@@ -1702,7 +1450,8 @@
             gap: 10px;
         }
         .map-owner-avatar {
-            width: 36px; height: 36px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             background: var(--accent-blue-gradient);
             display: flex;
@@ -1875,7 +1624,8 @@
             animation: modalIn 0.4s ease;
         }
         .preview-overlay-content .overlay-icon {
-            width: 64px; height: 64px;
+            width: 64px;
+            height: 64px;
             margin: 0 auto 16px;
             display: flex;
             align-items: center;
@@ -1943,7 +1693,8 @@
         .floating-notification.hide { animation: toastOut 0.5s ease; }
         .floating-notification.emergency-notif { border-color: var(--accent-red); box-shadow: 0 0 30px rgba(248,81,73,0.5); }
         .floating-notification .notif-icon {
-            width: 36px; height: 36px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -1956,7 +1707,13 @@
         .floating-notification .notif-icon.regular { background: rgba(230,0,18,0.15); color: var(--primary); }
         .floating-notification .notif-content { flex: 1; min-width: 0; }
         .floating-notification .notif-content .notif-title { font-size: 0.78rem; font-weight: 700; color: #ffffff; }
-        .floating-notification .notif-content .notif-message { font-size: 0.65rem; color: #a8b2c1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .floating-notification .notif-content .notif-message {
+            font-size: 0.65rem;
+            color: #a8b2c1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         .floating-notification .notif-content .notif-subtitle { font-size: 0.58rem; color: #6b7688; }
         .floating-notification .notif-action {
             padding: 5px 14px;
@@ -2005,7 +1762,8 @@
         }
         .toast.hide { animation: toastOut 0.4s ease forwards; }
         .toast .toast-icon {
-            width: 32px; height: 32px;
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -2015,9 +1773,23 @@
             color: var(--primary);
         }
         .toast .toast-content { flex: 1; }
-        .toast .toast-title { font-size: 0.72rem; font-weight: 700; color: var(--text-primary); }
-        .toast .toast-message { font-size: 0.68rem; color: var(--text-secondary); }
-        .toast .toast-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; padding: 4px; }
+        .toast .toast-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .toast .toast-message {
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+        }
+        .toast .toast-close {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.8rem;
+            padding: 4px;
+        }
 
         /* ============ UTILITIES ============ */
         .ripple { position: relative; overflow: hidden; }
@@ -2031,7 +1803,10 @@
         }
         .shake-element { animation: shake 0.3s ease; }
 
-        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+        :focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
         button:focus:not(:focus-visible) { outline: none; }
 
         /* ============ RESPONSIVE ============ */
@@ -2044,13 +1819,16 @@
         }
 
         @media (max-width: 480px) {
-            .main-content { padding: calc(var(--header-height) + 10px) 10px calc(var(--footer-height) + 20px); }
+            .main-content {
+                padding: calc(var(--header-height) + 10px) 10px calc(var(--footer-height) + 20px);
+            }
             .sidebar { width: 85%; }
             .header-center { gap: 4px; }
             .header-left { gap: 4px; }
             .header-right { gap: 4px; }
-            .contact-actions-grid { gap: 5px; }
-            .contact-action { font-size: 0.6rem; padding: 8px 6px; }
+            .contact-grid { gap: 10px; }
+            .hero { padding: 16px; }
+            .hero h1 { font-size: 1.1rem; }
         }
 
         @media (max-width: 360px) {
@@ -2062,16 +1840,14 @@
             .header-center { gap: 3px; }
             .nav-fab { width: 64px; height: 64px; }
             .nav-fab .fab-emoji { font-size: 1.7rem; }
-            .contact-icon { width: 42px; height: 42px; font-size: 1.3rem; }
-            .contact-name { font-size: 0.82rem; }
-            .contact-action { font-size: 0.58rem; padding: 7px 5px; }
         }
 
         /* ================================================================
            PATCH UNIVERSAL — FIX WARNA HEADER + MODAL THEME
            ================================================================ */
-
-        body, body * { transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease; }
+        body, body * {
+            transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
+        }
         body { color: var(--text-primary) !important; }
         h1, h2, h3, h4, h5, h6 { color: var(--text-primary) !important; }
         p, span, div, li, td, th, label, strong, em, small, b, i { color: inherit; }
@@ -2079,12 +1855,28 @@
         a { color: var(--primary); text-decoration: none; transition: color 0.2s ease; }
         a:hover { color: var(--primary-glow); }
 
-        input, textarea, select, button { color: var(--text-primary); font-family: inherit; }
-        input::placeholder, textarea::placeholder { color: var(--text-muted) !important; opacity: 1; }
-        input:focus, textarea:focus, select:focus { color: var(--text-primary); background: var(--bg-input); border-color: var(--primary); }
-        select option { background: var(--bg-card); color: var(--text-primary); }
+        input, textarea, select, button {
+            color: var(--text-primary);
+            font-family: inherit;
+        }
+        input::placeholder, textarea::placeholder {
+            color: var(--text-muted) !important;
+            opacity: 1;
+        }
+        input:focus, textarea:focus, select:focus {
+            color: var(--text-primary);
+            background: var(--bg-input);
+            border-color: var(--primary);
+        }
+        select option {
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
 
-        [style*="color: #fff"], [style*="color:#fff"], [style*="color: white"], [style*="color:white"] { color: var(--text-primary) !important; }
+        [style*="color: #fff"], [style*="color:#fff"],
+        [style*="color: white"], [style*="color:white"] {
+            color: var(--text-primary) !important;
+        }
 
         .app-bar { background: var(--header-bg) !important; border-bottom: 1px solid var(--border-color) !important; }
         .app-title, .app-title .title-text { color: var(--text-white) !important; }
@@ -2184,13 +1976,199 @@
         * { -webkit-text-fill-color: currentColor; }
         ::-webkit-scrollbar-thumb { background: var(--primary); }
         :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+                /* ============ 🆘 KONTAK DARURAT NASIONAL ============ */
+        .national-emergency-section {
+            background: linear-gradient(160deg, #2a0a15 0%, #4a0a15 100%);
+            border: 1px solid rgba(230, 0, 18, 0.3);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            margin-bottom: 14px;
+            box-shadow: 0 6px 24px rgba(74, 10, 21, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+        .national-emergency-section::before {
+            content: '';
+            position: absolute;
+            top: -40px;
+            right: -40px;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(230, 0, 18, 0.3), transparent 70%);
+            pointer-events: none;
+        }
+        .national-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            z-index: 1;
+        }
+        .national-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
+        }
+        .national-icon {
+            font-size: 1.5rem;
+            line-height: 1;
+            animation: notifPulse 1.5s ease-in-out infinite;
+            flex-shrink: 0;
+        }
+        .national-title-text {
+            font-size: 0.88rem;
+            font-weight: 800;
+            color: #ffffff;
+            font-family: 'Poppins', sans-serif;
+            margin-bottom: 2px;
+        }
+        .national-title-sub {
+            font-size: 0.58rem;
+            color: rgba(255, 255, 255, 0.65);
+            font-weight: 500;
+        }
+        .national-toggle-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+            transition: all 0.3s;
+        }
+        .national-toggle-btn:active { transform: scale(0.9); }
+        .national-toggle-btn i { transition: transform 0.3s; }
+        .national-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            position: relative;
+            z-index: 1;
+            transition: max-height 0.4s ease, opacity 0.3s ease;
+            overflow: hidden;
+        }
+        .national-grid.collapsed {
+            max-height: 0;
+            opacity: 0;
+            margin: 0;
+        }
+        .national-card {
+            background: rgba(10, 14, 26, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 10px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.25s;
+            text-decoration: none;
+            color: #ffffff;
+            position: relative;
+            overflow: hidden;
+            min-height: 60px;
+        }
+        .national-card:active { transform: scale(0.97); }
+        .national-card:hover {
+            border-color: var(--primary);
+            background: rgba(230, 0, 18, 0.15);
+            box-shadow: 0 4px 14px rgba(230, 0, 18, 0.3);
+        }
+        .national-card-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            flex-shrink: 0;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .national-card-icon.fire { background: rgba(248,81,73,0.15); border-color: rgba(248,81,73,0.3); }
+        .national-card-icon.medical { background: rgba(79,195,247,0.15); border-color: rgba(79,195,247,0.3); }
+        .national-card-icon.crime { background: rgba(240,208,128,0.15); border-color: rgba(240,208,128,0.3); }
+        .national-card-icon.disaster { background: rgba(199,146,234,0.15); border-color: rgba(199,146,234,0.3); }
+        .national-card-icon.general { background: rgba(230,0,18,0.15); border-color: rgba(230,0,18,0.3); }
+        .national-card-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .national-card-label {
+            font-size: 0.62rem;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.85);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 2px;
+        }
+        .national-card-number {
+            font-size: 0.82rem;
+            font-weight: 800;
+            color: #ffffff;
+            font-family: 'Poppins', sans-serif;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .national-card-number.hotline {
+            color: #ff6b7a;
+        }
+        .national-card-actions {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .national-card-action {
+            width: 26px;
+            height: 26px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #fff;
+            font-size: 0.65rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+        .national-card-action:active { transform: scale(0.9); }
+        .national-card-action.phone { color: #3fb950; border-color: rgba(63,185,80,0.3); }
+        .national-card-action.phone:hover { background: rgba(63,185,80,0.2); }
+        .national-card-action.whatsapp { color: #25D366; border-color: rgba(37,211,102,0.3); }
+        .national-card-action.whatsapp:hover { background: rgba(37,211,102,0.2); }
+        .national-card-action.website { color: var(--primary); border-color: rgba(230,0,18,0.3); }
+        .national-card-action.website:hover { background: rgba(230,0,18,0.2); }
+
+        @media (max-width: 360px) {
+            .national-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
     </style>
 </head>
 <body>
 
-    <!-- ============================================================ -->
-    <!-- APP SHELL                                                     -->
-    <!-- ============================================================ -->
     <div class="app-shell">
 
     <!-- FLOATING NOTIFICATION -->
@@ -2365,12 +2343,8 @@
             <div class="brand-left">
                 <div class="brand-icon">📞</div>
                 <div>
-                    <div class="brand-title">Kontak Darurat</div>
-                    <div class="brand-subtitle">Direktori Kontak Resmi SALINK</div>
-                    <div class="brand-gps-info" id="brandGpsInfo">
-                        <i class="fas fa-map-marker-alt"></i>
-                        <span id="brandGpsText">Memuat kontak...</span>
-                    </div>
+                    <div class="brand-title">SALINK</div>
+                    <div class="brand-subtitle">Kontak Darurat</div>
                 </div>
             </div>
             <button class="back-home-btn" id="backHomeBtn" type="button">
@@ -2378,93 +2352,72 @@
             </button>
         </div>
 
-        <!-- GPS PANEL (Background auto-detect, non-blocking) -->
-        <section class="gps-panel info" id="gpsPanel">
-            <div class="gps-row">
-                <div class="gps-icon-wrap" id="gpsIconWrap">📡</div>
-                <div class="gps-text">
-                    <div class="gps-title" id="gpsTitle">Mendeteksi lokasi Anda...</div>
-                    <div class="gps-detail" id="gpsDetail">
-                        Kontak tetap tampil meski GPS belum aktif. Klik tombol untuk urutkan berdasarkan jarak.
-                    </div>
-                </div>
-            </div>
-            <button class="location-btn" id="locationBtn" type="button">
-                <i class="fas fa-location-arrow"></i>
-                <span id="locationBtnText">📍 Gunakan Lokasi Saya</span>
-            </button>
+        <!-- HERO -->
+        <section class="hero">
+            <div class="hero-icon">📞</div>
+            <h1>Kontak Darurat</h1>
+            <p>
+                Hubungi instansi atau layanan darurat yang tersedia secara langsung.
+                Nomor telepon dan WhatsApp diambil dari database kontak SALINK.
+                <span id="gpsStatusText" style="display:block;font-size:0.65rem;margin-top:6px;opacity:0.85;"></span>
+            </p>
         </section>
 
-        <!-- LOCAL SEARCH -->
-        <div class="local-search">
-            <i class="fas fa-search"></i>
-            <input type="text" id="localSearchInput" placeholder="Cari instansi, desa, kecamatan..." autocomplete="off">
-        </div>
-
-        <!-- CATEGORY FILTER -->
-        <div class="category-filter-wrap">
-            <label class="category-filter-label">Pilih jenis layanan</label>
-            <div class="category-filter" id="categoryFilter">
-                <button class="cat-btn active" data-cat="all" type="button">
-                    <span>🆘</span> Semua
-                </button>
-                <button class="cat-btn" data-cat="fire" type="button">
-                    <span>🔥</span> Kebakaran
-                </button>
-                <button class="cat-btn" data-cat="medical" type="button">
-                    <span>🚑</span> Medis
-                </button>
-                <button class="cat-btn" data-cat="crime" type="button">
-                    <span>🚓</span> Kriminal
-                </button>
-                <button class="cat-btn" data-cat="disaster" type="button">
-                    <span>🌪️</span> Bencana
-                </button>
-                <button class="cat-btn" data-cat="general" type="button">
-                    <span>🏛️</span> Umum
-                </button>
-            </div>
-        </div>
-
-        <!-- RADIUS FILTER (Disabled kalau GPS tidak ada) -->
-        <div class="radius-panel disabled" id="radiusPanel">
-            <div class="radius-label">
-                <span>📏</span>
-                <span>Jangkauan Pencarian</span>
-                <span class="hint" id="radiusHint">(GPS diperlukan)</span>
-            </div>
-            <div class="radius-buttons" id="radiusButtons">
-                <button class="radius-btn" data-radius="1.5" type="button">1.5 km</button>
-                <button class="radius-btn" data-radius="3" type="button">3 km</button>
-                <button class="radius-btn" data-radius="5" type="button">5 km</button>
-                <button class="radius-btn" data-radius="10" type="button">10 km</button>
-                <button class="radius-btn active" data-radius="0" type="button">🌍 Semua Pos</button>
-            </div>
-        </div>
-
-        <!-- RESULTS HEADER -->
-        <div class="results-header">
-            <div>
-                <div class="results-title">
-                    <i class="fas fa-building" style="color:var(--primary);font-size:0.8rem;"></i>
-                    <span>Direktori Kontak</span>
+        <!-- 🆘 KONTAK DARURAT NASIONAL (SECTION BARU) -->
+        <section class="national-emergency-section" id="nationalEmergencySection">
+            <div class="national-header">
+                <div class="national-title">
+                    <span class="national-icon">🆘</span>
+                    <div>
+                        <div class="national-title-text">Kontak Darurat Nasional</div>
+                        <div class="national-title-sub">Hotline 24 Jam — Bisa langsung ditelepon</div>
+                    </div>
                 </div>
-                <div class="results-subtitle" id="resultsCount">Memuat data...</div>
+                <button class="national-toggle-btn" id="nationalToggleBtn" type="button" aria-label="Toggle">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
             </div>
-            <button class="refresh-small" id="refreshBtn" type="button">
+            <div class="national-grid" id="nationalGrid">
+                <!-- Akan di-render via JavaScript -->
+            </div>
+        </section>
+
+        <!-- CONTROL CARD (Search + Filter) -->
+        <section class="control-card">
+            <div class="search-box">
+                <span class="search-icon">🔎</span>
+                <input id="searchInput" type="search" placeholder="Cari instansi, desa, kecamatan..." autocomplete="off">
+            </div>
+            <div class="filter-title">Pilih jenis layanan</div>
+            <div class="filter-buttons" id="filterContainer">
+                <button class="filter-btn active" data-type="" type="button">🆘 Semua</button>
+                <button class="filter-btn" data-type="fire" type="button">🔥 Kebakaran</button>
+                <button class="filter-btn" data-type="medical" type="button">🚑 Medis</button>
+                <button class="filter-btn" data-type="crime" type="button">🚓 Keamanan</button>
+                <button class="filter-btn" data-type="disaster" type="button">🌪️ Bencana</button>
+                <button class="filter-btn" data-type="general" type="button">🏛️ Umum</button>
+            </div>
+        </section>
+
+        <!-- SUMMARY -->
+        <div class="summary">
+            <div>
+                <div class="summary-title">📇 Direktori Kontak Wilayah</div>
+                <div class="summary-count" id="summaryCount">Memuat data...</div>
+            </div>
+            <button class="refresh-btn" id="refreshContactsBtn" type="button">
                 <i class="fas fa-sync-alt"></i> Perbarui
             </button>
         </div>
 
-        <!-- CONTACT LIST -->
-        <div class="contact-grid" id="contactContainer">
+        <!-- CONTACT GRID -->
+        <section class="contact-grid" id="contactContainer">
             <div class="state-card">
-                <span class="spinner"></span>
+                <div class="spinner"></div>
                 <div class="state-title">Memuat kontak darurat...</div>
-                <div class="state-text">Mengambil data dari server SALINK</div>
+                <div class="state-text">SALINK sedang mengambil data dari database.</div>
             </div>
-        </div>
-
+        </section>
     </main>
 
     <!-- BOTTOM NAV -->
@@ -2495,30 +2448,7 @@
 
     </div> <!-- /app-shell -->
 
-    <!-- ============================================================ -->
-    <!-- DETAIL MODAL KONTAK (Tabel info)                              -->
-    <!-- ============================================================ -->
-    <div class="modal-overlay" id="detailModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">
-                    <i class="fas fa-info-circle"></i>
-                    <span id="detailModalTitle">Detail Kontak</span>
-                </div>
-                <button class="modal-close" id="detailModalClose" type="button" aria-label="Tutup">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body" id="detailModalBody"></div>
-            <div class="modal-footer">
-                <button class="btn-close-modal" id="detailModalFooterClose" type="button">Tutup</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============================================================ -->
-    <!-- MODAL SEARCH (Universal)                                      -->
-    <!-- ============================================================ -->
+    <!-- MODAL SEARCH -->
     <div class="modal-overlay" id="searchModal">
         <div class="modal-content search-modal-content">
             <div class="modal-header">
@@ -2533,12 +2463,11 @@
             <div class="modal-body">
                 <div class="search-input-wrapper">
                     <i class="fas fa-search search-icon"></i>
-                    <input type="text" id="searchInput" placeholder="Ketik nama, postingan, lokasi, atau emergency..." autocomplete="off">
+                    <input type="text" id="searchInputGlobal" placeholder="Ketik nama, postingan, lokasi, atau emergency..." autocomplete="off">
                     <button class="clear-search-btn" id="clearSearchBtn" type="button" aria-label="Bersihkan">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
-
                 <div class="search-tabs">
                     <button class="search-tab active" data-tab="all" type="button">
                         <i class="fas fa-globe"></i> Semua
@@ -2553,15 +2482,6 @@
                         <i class="fas fa-exclamation-triangle"></i> Emergency
                     </button>
                 </div>
-
-                <div class="search-filter-row" id="emergencyFilters" style="display:none;">
-                    <button class="search-filter-chip active" data-filter="all" type="button">🎯 Semua</button>
-                    <button class="search-filter-chip" data-filter="fire" type="button">🔥 Kebakaran</button>
-                    <button class="search-filter-chip" data-filter="medical" type="button">🚑 Medis</button>
-                    <button class="search-filter-chip" data-filter="crime" type="button">🚓 Kriminal</button>
-                    <button class="search-filter-chip" data-filter="disaster" type="button">🌪️ Bencana</button>
-                </div>
-
                 <div id="searchResultsBody">
                     <div id="searchDefaultView">
                         <div class="search-empty-state">
@@ -2580,9 +2500,7 @@
         </div>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- MODAL NOTIFIKASI                                              -->
-    <!-- ============================================================ -->
+    <!-- MODAL NOTIFIKASI -->
     <div class="modal-overlay" id="notifModal">
         <div class="modal-content" style="max-width:460px;">
             <div class="modal-header">
@@ -2627,9 +2545,7 @@
         </div>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- FAB MODAL                                                     -->
-    <!-- ============================================================ -->
+    <!-- FAB MODAL -->
     <div class="fab-modal-overlay" id="fabModalOverlay">
         <div class="fab-modal-content" id="fabModalContent">
             <button class="fab-modal-close" id="fabModalClose" type="button" aria-label="Tutup">
@@ -2672,9 +2588,7 @@
         </div>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- MODAL PETA DARURAT                                            -->
-    <!-- ============================================================ -->
+    <!-- MODAL PETA DARURAT -->
     <div class="modal-overlay" id="mapModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -2774,24 +2688,47 @@
         </div>
     </div>
 
+    <!-- MODAL DETAIL KONTAK -->
+    <div class="modal-overlay" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-info-circle"></i>
+                    <span id="detailModalTitle">Detail Kontak</span>
+                </div>
+                <button class="modal-close" id="detailModalClose" type="button" aria-label="Tutup">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="detailModalBody"></div>
+            <div class="modal-footer">
+                <button class="btn-close-modal" id="detailModalFooterClose" type="button">Tutup</button>
+            </div>
+        </div>
+    </div>
+
     <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
         <!-- ============================================================ -->
-    <!-- SCRIPT — LOKASI-BANTUAN v13.1 — GPS REAL-TIME ACCURATE        -->
+    <!-- SCRIPT — KONTAK-DARURAT v13.1 — FINAL + KONTAK NASIONAL       -->
     <!-- ============================================================ -->
     <script>
 /* ====================================================================
- * SALINK LOKASI-BANTUAN v13.1 — FINAL + GPS FIX
+ * SALINK KONTAK-DARURAT v13.1 — FINAL
  * ====================================================================
- * PERUBAHAN UTAMA v13.1:
- *   ✅ GPS AKURAT REAL-TIME (identik Google Maps)
- *   ✅ Retry otomatis 2x kalau timeout/gagal
- *   ✅ Tidak auto-load lokasi lama yang mungkin IP-based
- *   ✅ Indikator akurasi (Excellent/Good/Fair/Poor)
- *   ✅ Error handling detail per kode error
- *   ✅ Modal Notif + Filter + Mark Read (v13.0)
- *   ✅ Modal Search + Tombol Tutup (v13.0)
+ * Fitur:
+ *   - 12 Kontak Darurat Nasional (hardcoded, valid)
+ *   - Kontak dari Google Sheets (dinamis)
+ *   - Tema Universal (dark/light)
+ *   - PWA Install
+ *   - Header dengan Back button
+ *   - Sidebar dengan #sidebarMapBtn
+ *   - Modal Peta Darurat (GPS akurat)
+ *   - Modal Search + TOMBOL TUTUP
+ *   - Modal Notif LENGKAP: filter + tandai semua + mark read
+ *   - Modal Detail Kontak
+ *   - FAB Modal 2×2 → dashboard.html?emergency=TYPE
  * ==================================================================== */
 (function() {
     'use strict';
@@ -2804,18 +2741,18 @@
     const DASHBOARD_URL = 'dashboard.html';
     const PROFILE_URL = 'profil.html';
     const DETAIL_URL = 'detail-emergency.html';
-    const EMERGENCY_PAGE = 'lokasi-bantuan.html';
+    const EMERGENCY_PAGE = 'kontak-darurat.html';
     const EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
     const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
 
-    // ⭐ GPS CONFIG — identik dengan Google Maps
+    // ⭐ GPS CONFIG
     const GPS_CONFIG = {
-        enableHighAccuracy: true,   // WAJIB: pakai GPS device
-        timeout: 10000,              // 10s — Google Maps juga segini
-        maximumAge: 0                // Selalu fresh, tidak pakai cache
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
     };
-    const GPS_MAX_RETRY = 2;         // Retry 2x kalau timeout/gagal
-    const GPS_FRESH_THRESHOLD = 5 * 60 * 1000; // Lokasi dianggap fresh kalau < 5 menit
+    const GPS_MAX_RETRY = 2;
+    const GPS_FRESH_THRESHOLD = 5 * 60 * 1000;
 
     const EMERGENCY_LABELS = {
         fire: '🔥 Kebakaran',
@@ -2828,17 +2765,155 @@
     };
 
     // ================================================================
-    // 2. STATE
+    // 2. ⭐⭐ 12 KONTAK DARURAT NASIONAL (HARDCODED, VALID)
+    // ================================================================
+    const NATIONAL_EMERGENCY_CONTACTS = [
+        {
+            id: 'nat-112',
+            name: 'Nomor Tunggal Darurat Terpadu',
+            label: 'Nomor Darurat Terpadu',
+            number: '112',
+            category: 'general',
+            icon: '🆘',
+            desc: 'Semua jenis darurat (bebas pulsa)',
+            phone: '112',
+            website: ''
+        },
+        {
+            id: 'nat-110',
+            name: 'Call Center Polri',
+            label: 'Polisi',
+            number: '110',
+            category: 'crime',
+            icon: '🚓',
+            desc: 'Keamanan & kriminal',
+            phone: '110',
+            website: ''
+        },
+        {
+            id: 'nat-118',
+            name: 'Ambulans',
+            label: 'Ambulans',
+            number: '118',
+            category: 'medical',
+            icon: '🚑',
+            desc: 'Layanan ambulans nasional',
+            phone: '118',
+            website: ''
+        },
+        {
+            id: 'nat-119',
+            name: 'PSC 119 — Medis Darurat',
+            label: 'PSC 119 (Kemenkes)',
+            number: '119',
+            category: 'medical',
+            icon: '🏥',
+            desc: 'Public Safety Center Kemenkes',
+            phone: '119',
+            website: 'https://psc119.kemkes.go.id/'
+        },
+        {
+            id: 'nat-113',
+            name: 'Pemadam Kebakaran',
+            label: 'Pemadam Kebakaran',
+            number: '113',
+            category: 'fire',
+            icon: '🔥',
+            desc: 'Layanan DAMKAR nasional',
+            phone: '113',
+            website: ''
+        },
+        {
+            id: 'nat-115',
+            name: 'Basarnas — SAR',
+            label: 'Basarnas (SAR)',
+            number: '115',
+            category: 'disaster',
+            icon: '🛟',
+            desc: 'Search & Rescue 24 jam',
+            phone: '115',
+            website: 'https://www.basarnas.go.id/'
+        },
+        {
+            id: 'nat-117',
+            name: 'BNPB — Bencana',
+            label: 'BNPB (Bencana)',
+            number: '117',
+            category: 'disaster',
+            icon: '🌪️',
+            desc: 'Badan Nasional Penanggulangan Bencana',
+            phone: '117',
+            website: 'https://bnpb.go.id/'
+        },
+        {
+            id: 'nat-pmi',
+            name: 'PMI — Palang Merah Indonesia',
+            label: 'PMI Pusat',
+            number: '021-7992325',
+            category: 'medical',
+            icon: '🩸',
+            desc: 'Palang Merah Indonesia',
+            phone: '021-7992325',
+            website: 'https://www.pmi.or.id/'
+        },
+        {
+            id: 'nat-kemenkes',
+            name: 'Halo Kemenkes',
+            label: 'Kemenkes',
+            number: '1500-567',
+            category: 'medical',
+            icon: '☎️',
+            desc: 'Layanan informasi kesehatan',
+            phone: '1500567',
+            website: 'https://www.kemkes.go.id/'
+        },
+        {
+            id: 'nat-pln',
+            name: 'PLN — Gangguan Listrik',
+            label: 'PLN (Listrik)',
+            number: '123',
+            category: 'general',
+            icon: '⚡',
+            desc: 'Gangguan listrik nasional',
+            phone: '123',
+            website: 'https://www.pln.co.id/'
+        },
+        {
+            id: 'nat-kpai',
+            name: 'KPAI — Perlindungan Anak',
+            label: 'KPAI (Anak)',
+            number: '021-31901556',
+            category: 'general',
+            icon: '👶',
+            desc: 'Komisi Perlindungan Anak Indonesia',
+            phone: '02131901556',
+            website: 'https://www.kpai.go.id/'
+        },
+        {
+            id: 'nat-komnas-perempuan',
+            name: 'Komnas Perempuan',
+            label: 'Komnas Perempuan',
+            number: '021-3903963',
+            category: 'general',
+            icon: '👩',
+            desc: 'Komisi Nasional Anti Kekerasan terhadap Perempuan',
+            phone: '0213903963',
+            website: 'https://komnasperempuan.go.id/'
+        }
+    ];
+
+    // ================================================================
+    // 3. STATE
     // ================================================================
     var currentUser = null;
     var isPreviewMode = true;
     var currentTheme = 'dark';
+    var allContacts = [];
     var userLat = null;
     var userLng = null;
     var userAccuracy = null;
-    var contactsData = [];
-    var currentFilter = '';
-    var currentRadius = 1.5;
+    var activeFilter = '';
+    var searchQuery = '';
     var isSidebarOpen = false;
     var isLoading = false;
     var deferredPrompt = null;
@@ -2849,12 +2924,13 @@
     var mapCurrentLng = null;
     var mapCurrentAccuracy = null;
     var _salinkSetup = false;
+    var nationalCollapsed = false;
 
     var notifFilter = 'all';
     var readNotifs = {};
 
     // ================================================================
-    // 3. HELPERS
+    // 4. HELPERS
     // ================================================================
     function escapeHTML(str) {
         if (!str) return '';
@@ -2868,21 +2944,32 @@
         if (!value) return '';
         return String(value).trim().replace(/[^\d+]/g, '');
     }
-    function normalizeWhatsApp(value) {
+    function cleanPhoneForTel(value) {
         if (!value) return '';
-        var raw = String(value).trim();
-        if (raw.indexOf('https://wa.me/') === 0 || raw.indexOf('https://api.whatsapp.com/') === 0) return raw;
-        var number = raw.replace(/\D/g, '');
-        if (number.indexOf('0') === 0) number = '62' + number.substring(1);
-        if (!number) return '';
-        return 'https://wa.me/' + number;
+        return String(value).replace(/[^\d+]/g, '');
+    }
+    function buildWhatsAppURL(phone) {
+        if (!phone) return '';
+        var n = String(phone).replace(/[^\d]/g, '');
+        if (n.indexOf('0') === 0) n = '62' + n.substring(1);
+        return n ? 'https://wa.me/' + n : '';
     }
     function buildMapsURL(lat, lng) {
         if (!lat || !lng || isNaN(lat) || isNaN(lng)) return '';
         return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(lat + ',' + lng);
     }
+    function toRad(d) { return d * Math.PI / 180; }
+    function calcDistance(lat1, lon1, lat2, lon2) {
+        if (lat1 == null || lon1 == null || lat2 == null || lon2 == null) return null;
+        if (!isFinite(lat1) || !isFinite(lon1) || !isFinite(lat2) || !isFinite(lon2)) return null;
+        var R = 6371;
+        var dLat = toRad(lat2 - lat1);
+        var dLon = toRad(lon2 - lon1);
+        var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
     function formatDistance(km) {
-        if (!km || !Number.isFinite(km)) return '';
+        if (km == null || !isFinite(km)) return '';
         if (km < 1) return Math.round(km * 1000) + ' m';
         return km.toFixed(2) + ' km';
     }
@@ -2900,21 +2987,19 @@
         return new Date(ts).toLocaleDateString('id-ID');
     }
     function log(msg) {
-        console.log('[SALINK LokasiBantuan v13.1] ' + msg);
+        console.log('[SALINK KontakDarurat] ' + msg);
     }
-
-    // ⭐ Helper: klasifikasi akurasi GPS
     function getAccuracyLabel(acc) {
         if (!acc && acc !== 0) return { text: '', color: '' };
         if (acc <= 10) return { text: 'Excellent', color: '#3fb950' };
         if (acc <= 50) return { text: 'Good', color: '#3fb950' };
         if (acc <= 200) return { text: 'Fair', color: '#f0d080' };
         if (acc <= 1000) return { text: 'Poor', color: '#f85149' };
-        return { text: 'IP-based (tidak akurat)', color: '#f85149' };
+        return { text: 'IP-based', color: '#f85149' };
     }
 
     // ================================================================
-    // 4. TOAST
+    // 5. TOAST
     // ================================================================
     function showToast(title, message, icon) {
         icon = icon || 'fa-info-circle';
@@ -2942,7 +3027,7 @@
     }
 
     // ================================================================
-    // 5. THEME
+    // 6. THEME
     // ================================================================
     function loadTheme() {
         var savedTheme = localStorage.getItem('salink_theme') || 'dark';
@@ -2985,7 +3070,7 @@
     }
 
     // ================================================================
-    // 6. PWA
+    // 7. PWA
     // ================================================================
     function setupPWA() {
         if ('serviceWorker' in navigator) {
@@ -3036,7 +3121,7 @@
     }
 
     // ================================================================
-    // 7. FLOATING NOTIFICATION
+    // 8. FLOATING NOTIFICATION
     // ================================================================
     function showFloatingNotification(type, title, message, subtitle, actionText, actionCallback) {
         var notif = document.getElementById('floatingNotification');
@@ -3090,7 +3175,7 @@
     }
 
     // ================================================================
-    // 8. PREVIEW MODE
+    // 9. PREVIEW MODE
     // ================================================================
     function showPreviewOverlay() {
         var o = document.getElementById('previewOverlay');
@@ -3111,7 +3196,7 @@
     }
 
     // ================================================================
-    // 9. LOGIN GUARD
+    // 10. LOGIN GUARD
     // ================================================================
     function setupLoginGuard() {
         document.addEventListener('click', function(e) {
@@ -3143,7 +3228,7 @@
     }
 
     // ================================================================
-    // 10. SIDEBAR
+    // 11. SIDEBAR
     // ================================================================
     function toggleSidebar() {
         if (isSidebarOpen) closeSidebar();
@@ -3167,19 +3252,32 @@
     }
 
     // ================================================================
-    // 11. USER MANAGEMENT
+    // 12. USER MANAGEMENT
     // ================================================================
     function loadCurrentUser() {
         try {
             var savedUser = localStorage.getItem('salink_user');
             if (savedUser) {
                 currentUser = JSON.parse(savedUser);
-                if (currentUser && currentUser.username) {
-                    isPreviewMode = false;
-                }
+                if (currentUser && currentUser.username) isPreviewMode = false;
             }
         } catch (e) { currentUser = null; }
         if (!currentUser) isPreviewMode = true;
+
+        try {
+            var savedLat = localStorage.getItem('salink_user_lat');
+            var savedLng = localStorage.getItem('salink_user_lng');
+            if (savedLat && savedLng) {
+                userLat = parseFloat(savedLat);
+                userLng = parseFloat(savedLng);
+                var gpsEl = document.getElementById('gpsStatusText');
+                if (gpsEl) gpsEl.textContent = '📍 GPS aktif: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6);
+            } else {
+                var gpsEl2 = document.getElementById('gpsStatusText');
+                if (gpsEl2) gpsEl2.textContent = '💡 GPS belum aktif. Buka dashboard untuk aktivasi.';
+            }
+        } catch(e) {}
+
         updateUserUI();
         updateSidebar();
         applyPreviewMode();
@@ -3223,331 +3321,295 @@
     }
 
     // ================================================================
-    // 12. GO HOME
+    // 13. GO HOME
     // ================================================================
     function goHome() { window.location.href = DASHBOARD_URL; }
 
     // ================================================================
-    // 13. ⭐⭐ GPS HELPER — REAL-TIME ACCURATE (IDENTIK GOOGLE MAPS)
+    // 14. ⭐ RENDER KONTAK DARURAT NASIONAL
     // ================================================================
-    /**
-     * Ambil posisi GPS dengan retry otomatis.
-     * Return Promise<{lat, lng, accuracy}>
-     * @param {number} attempt - Counter retry (internal)
-     */
-    function getGPSPosition(attempt) {
-        attempt = attempt || 0;
-        return new Promise(function(resolve, reject) {
-            if (!navigator.geolocation) {
-                reject({ code: 0, message: 'GPS tidak didukung browser' });
-                return;
-            }
-            log('📍 [GPS] Request attempt #' + (attempt + 1));
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    var lat = position.coords.latitude;
-                    var lng = position.coords.longitude;
-                    var accuracy = Math.round(position.coords.accuracy || 0);
-                    log('✅ [GPS] Success: ' + lat.toFixed(6) + ', ' + lng.toFixed(6) + ' (±' + accuracy + 'm)');
-                    resolve({ lat: lat, lng: lng, accuracy: accuracy });
-                },
-                function(error) {
-                    console.warn('⚠️ [GPS] Error attempt #' + (attempt + 1) + ':', error.code, error.message);
-                    // Retry kalau timeout atau position unavailable
-                    if ((error.code === 2 || error.code === 3) && attempt < GPS_MAX_RETRY) {
-                        log('🔄 [GPS] Retry #' + (attempt + 2) + '...');
-                        setTimeout(function() {
-                            getGPSPosition(attempt + 1).then(resolve).catch(reject);
-                        }, 1500);
-                        return;
-                    }
-                    reject(error);
-                },
-                GPS_CONFIG
-            );
-        });
+    function renderNationalContacts() {
+        var grid = document.getElementById('nationalGrid');
+        if (!grid) return;
+        var html = NATIONAL_EMERGENCY_CONTACTS.map(function(c) {
+            var phoneNum = c.phone || c.number;
+            var telHref = 'tel:' + cleanPhoneForTel(phoneNum);
+            var waURL = c.whatsapp ? buildWhatsAppURL(c.whatsapp) : '';
+            var websiteURL = c.website || '';
+            var iconClass = c.category || 'general';
+            return '<div class="national-card" data-national-id="' + escapeAttr(c.id) + '">' +
+                '<div class="national-card-icon ' + iconClass + '">' + c.icon + '</div>' +
+                '<div class="national-card-info">' +
+                    '<div class="national-card-label">' + escapeHTML(c.label) + '</div>' +
+                    '<div class="national-card-number hotline">' + escapeHTML(c.number) + '</div>' +
+                '</div>' +
+                '<div class="national-card-actions">' +
+                    '<a href="' + escapeAttr(telHref) + '" class="national-card-action phone" title="Telepon" onclick="event.stopPropagation()">' +
+                        '<i class="fas fa-phone-alt"></i>' +
+                    '</a>' +
+                    (waURL ?
+                        '<a href="' + escapeAttr(waURL) + '" target="_blank" rel="noopener" class="national-card-action whatsapp" title="WhatsApp" onclick="event.stopPropagation()">' +
+                            '<i class="fab fa-whatsapp"></i>' +
+                        '</a>' : '') +
+                    (websiteURL ?
+                        '<a href="' + escapeAttr(websiteURL) + '" target="_blank" rel="noopener" class="national-card-action website" title="Website" onclick="event.stopPropagation()">' +
+                            '<i class="fas fa-external-link-alt"></i>' +
+                        '</a>' : '') +
+                '</div>' +
+            '</div>';
+        }).join('');
+        grid.innerHTML = html;
     }
-
-    /**
-     * Ambil alamat lengkap dari koordinat via Nominatim.
-     * Return Promise<string> (display_name)
-     */
-    function reverseGeocodeAddress(lat, lng) {
-        return new Promise(function(resolve) {
-            try {
-                var url = NOMINATIM_URL + '?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id';
-                fetch(url, {
-                    method: 'GET',
-                    headers: { 'User-Agent': 'SALINK-App/13.1' }
-                })
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    if (data && data.display_name) resolve(data.display_name);
-                    else resolve('');
-                })
-                .catch(function() { resolve(''); });
-            } catch(e) { resolve(''); }
-        });
-    }
-
-    // ================================================================
-    // 14. ⭐⭐ GPS — untuk halaman utama (Gunakan Lokasi Saya)
-    // ================================================================
-    function getMyLocation() {
-        log('getMyLocation() called');
-        var btn = document.getElementById('locationBtn');
-        var btnText = document.getElementById('locationBtnText');
-
-        if (isPreviewMode) {
-            showPreviewOverlay();
-            return;
+    function toggleNationalSection() {
+        var grid = document.getElementById('nationalGrid');
+        var btn = document.getElementById('nationalToggleBtn');
+        if (!grid || !btn) return;
+        nationalCollapsed = !nationalCollapsed;
+        if (nationalCollapsed) {
+            grid.classList.add('collapsed');
+            btn.querySelector('i').className = 'fas fa-chevron-down';
+        } else {
+            grid.classList.remove('collapsed');
+            btn.querySelector('i').className = 'fas fa-chevron-up';
         }
-
-        if (btn) { btn.disabled = true; btn.classList.add('loading'); }
-        if (btnText) btnText.textContent = '📡 Mengambil GPS...';
-        setGPSStatus('loading', 'Mencari sinyal GPS...', 'Mohon tunggu, butuh 5-15 detik untuk lock GPS.');
-
-        getGPSPosition(0).then(function(pos) {
-            userLat = pos.lat;
-            userLng = pos.lng;
-            userAccuracy = pos.accuracy;
-
-            // ⭐ Simpan dengan timestamp
-            try {
-                localStorage.setItem('salink_user_lat', pos.lat);
-                localStorage.setItem('salink_user_lng', pos.lng);
-                localStorage.setItem('salink_user_lat_time', Date.now());
-                localStorage.setItem('salink_user_lat_acc', pos.accuracy);
-            } catch(e) {}
-
-            var accLabel = getAccuracyLabel(pos.accuracy);
-            setGPSStatus('success',
-                '✅ Lokasi ditemukan (±' + pos.accuracy + 'm)',
-                'Koordinat: ' + pos.lat.toFixed(6) + ', ' + pos.lng.toFixed(6) + ' • Akurasi: ' + accLabel.text);
-
-            showToast('📍 GPS Akurat', '±' + pos.accuracy + 'm — ' + accLabel.text, 'fa-location-arrow');
-
-            // Reverse geocode → update gps detail dengan alamat
-            reverseGeocodeAddress(pos.lat, pos.lng).then(function(addr) {
-                if (addr) {
-                    setGPSStatus('success',
-                        '✅ Lokasi ditemukan (±' + pos.accuracy + 'm)',
-                        '📍 ' + addr);
-                }
-            });
-
-            if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
-            if (btnText) btnText.textContent = 'Gunakan Lokasi Saya';
-
-            // Load kontak
-            loadContacts();
-        }).catch(function(error) {
-            var errMsg = 'Gagal mengambil GPS. ';
-            switch(error.code) {
-                case 1:
-                    errMsg = 'Izin lokasi DITOLAK. Aktifkan di pengaturan browser.';
-                    break;
-                case 2:
-                    errMsg = 'Sinyal GPS tidak tersedia. Coba di area terbuka.';
-                    break;
-                case 3:
-                    errMsg = 'GPS timeout. Nyalakan GPS device & coba lagi.';
-                    break;
-                default:
-                    errMsg = error.message || 'Coba lagi.';
-            }
-            setGPSStatus('error', '⚠️ Gagal Ambil GPS', errMsg);
-            showToast('⚠️ GPS Gagal', errMsg, 'fa-exclamation-triangle');
-
-            if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
-            if (btnText) btnText.textContent = 'Coba Lagi';
-        });
-    }
-
-    function setGPSStatus(type, title, detail) {
-        var status = document.getElementById('gpsStatus');
-        var titleEl = document.getElementById('gpsTitle');
-        var detailEl = document.getElementById('gpsDetail');
-        if (!status || !titleEl || !detailEl) return;
-        status.classList.remove('loading', 'success', 'error');
-        if (type) status.classList.add(type);
-        titleEl.textContent = title;
-        detailEl.textContent = detail;
     }
 
     // ================================================================
-    // 15. LOAD CONTACTS
+    // 15. API CALL
     // ================================================================
-    function apiGetNearbyContacts(lat, lng, type, radiusKm) {
-        type = type || '';
-        radiusKm = radiusKm || 1.5;
-        var urlParams = new URLSearchParams({
-            action: 'get_nearby_contacts',
-            latitude: lat,
-            longitude: lng,
-            type: type,
-            radiusKm: radiusKm,
-            timestamp: Date.now()
-        });
-        var url = API_URL + '?' + urlParams.toString();
-        return fetch(url, {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' },
-            cache: 'no-store'
-        })
-        .then(function(response) {
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            return response.json();
-        })
-        .then(function(result) {
-            if (result && result.status === 'success' && Array.isArray(result.data)) {
-                return result.data;
+    async function apiCall(action, data) {
+        data = data || {};
+        try {
+            if (action.indexOf('get_') === 0) {
+                var params = new URLSearchParams(Object.assign({ action: action, timestamp: Date.now() }, data));
+                var response = await fetch(API_URL + '?' + params.toString(), {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-store'
+                });
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return await response.json();
+            } else {
+                var response2 = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: action, data: data, timestamp: Date.now() })
+                });
+                if (!response2.ok) throw new Error('HTTP ' + response2.status);
+                return await response2.json();
             }
-            return [];
-        })
-        .catch(function(error) {
-            console.error('❌ Gagal nearby contacts:', error);
-            return [];
-        });
+        } catch (error) {
+            console.error('❌ API Error:', error);
+            return { status: 'error', message: error.message };
+        }
+    }
+    async function apiGetContacts() {
+        var r = await apiCall('get_contacts');
+        if (r.status === 'success' && Array.isArray(r.data)) {
+            try { localStorage.setItem('salink_contacts', JSON.stringify(r.data)); } catch(e) {}
+            return r.data;
+        }
+        try { return JSON.parse(localStorage.getItem('salink_contacts') || '[]'); } catch(e) { return []; }
     }
 
+    // ================================================================
+    // 16. LOAD CONTACTS (Google Sheets)
+    // ================================================================
     async function loadContacts() {
         if (isLoading) return;
         isLoading = true;
-        if (!userLat || !userLng) {
-            showState('📍', 'Lokasi belum tersedia', 'Silakan gunakan lokasi Anda terlebih dahulu.');
-            isLoading = false;
-            return;
-        }
-        showToast('🔄 Memuat', 'Mencari bantuan terdekat...', 'fa-spinner');
+        var container = document.getElementById('contactContainer');
+        var count = document.getElementById('summaryCount');
+
+        container.innerHTML = '<div class="state-card"><div class="spinner"></div><div class="state-title">Memuat kontak darurat...</div><div class="state-text">Menghubungkan ke database SALINK.</div></div>';
+        count.textContent = 'Mengambil data...';
+
         try {
-            var radius = currentRadius === 0 ? 100 : currentRadius;
-            var data = await apiGetNearbyContacts(userLat, userLng, currentFilter, radius);
+            var data = await apiGetContacts();
             if (data && data.length > 0) {
-                contactsData = data;
-                renderContacts(contactsData);
-                var radiusText = currentRadius === 0 ? 'semua pos' : currentRadius + ' km';
-                var rc = document.getElementById('resultsCount');
-                if (rc) rc.textContent = contactsData.length + ' bantuan ditemukan dalam radius ' + radiusText;
-                showToast('✅ Berhasil', 'Data bantuan dimuat!', 'fa-check-circle');
-            } else {
-                if (currentRadius === 1.5) {
-                    var fallbackData = await apiGetNearbyContacts(userLat, userLng, currentFilter, 5);
-                    if (fallbackData && fallbackData.length > 0) {
-                        contactsData = fallbackData;
-                        renderContacts(contactsData);
-                        var rc2 = document.getElementById('resultsCount');
-                        if (rc2) rc2.textContent = contactsData.length + ' bantuan ditemukan dalam radius 5 km (fallback)';
-                        showToast('ℹ️ Info', 'Dalam 1.5 km kosong, menampilkan radius 5 km.', 'fa-info-circle');
-                        isLoading = false;
-                        return;
-                    }
+                allContacts = data;
+                // Sort by distance kalau ada GPS
+                if (userLat !== null && userLng !== null) {
+                    allContacts = allContacts.map(function(c) {
+                        var d = calcDistance(userLat, userLng, parseFloat(c.latitude), parseFloat(c.longitude));
+                        if (d !== null && isFinite(d)) {
+                            var cc = Object.assign({}, c, { distanceKm: d, distanceText: formatDistance(d) });
+                            return cc;
+                        }
+                        return c;
+                    });
+                    allContacts.sort(function(a, b) {
+                        var da = (a.distanceKm === undefined || a.distanceKm === null) ? Infinity : a.distanceKm;
+                        var db = (b.distanceKm === undefined || b.distanceKm === null) ? Infinity : b.distanceKm;
+                        return da - db;
+                    });
                 }
-                contactsData = [];
-                var radiusTxt = currentRadius === 0 ? 'semua pos' : currentRadius + ' km';
-                showState('🏢', 'Belum ada bantuan di sekitar Anda', 'Tidak ditemukan instansi dalam radius ' + radiusTxt + '.', 'warning');
-                var rc3 = document.getElementById('resultsCount');
-                if (rc3) rc3.textContent = 'Tidak ada bantuan terdaftar';
-                showToast('ℹ️ Info', 'Belum ada data bantuan terdaftar.', 'fa-info-circle');
+                renderContacts();
+                showToast('✅ Berhasil', 'Data kontak berhasil dimuat!', 'fa-check-circle');
+            } else {
+                allContacts = [];
+                container.innerHTML = '<div class="state-card"><div class="state-icon">📭</div><div class="state-title">Belum ada kontak wilayah</div><div class="state-text">Database kontak wilayah masih kosong. Kontak dapat ditambahkan melalui Google Spreadsheet.</div></div>';
+                count.textContent = '0 kontak wilayah tersedia';
             }
         } catch (error) {
-            console.error('❌ Error loadContacts:', error);
-            showState('⚠️', 'Gagal mengambil data', 'Periksa koneksi internet Anda.', 'error');
-            showToast('⚠️ Error', 'Gagal memuat data bantuan.', 'fa-exclamation-triangle');
+            console.error('❌ Error:', error);
+            container.innerHTML = '<div class="state-card"><div class="state-icon">⚠️</div><div class="state-title">Gagal mengambil data</div><div class="state-text">' + escapeHTML(error.message || 'Terjadi kesalahan') + '<br><br>Tekan <b>Perbarui</b> untuk mencoba lagi.</div></div>';
+            count.textContent = 'Data tidak tersedia';
+            showToast('⚠️ Error', 'Gagal memuat data kontak.', 'fa-exclamation-triangle');
         }
         isLoading = false;
     }
 
     // ================================================================
-    // 16. FILTER & RADIUS
+    // 17. FILTER & SEARCH
     // ================================================================
-    function setEmergencyFilter(btn) {
+    function setFilter(button) {
         document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        currentFilter = btn.dataset.type || '';
-        if (userLat && userLng) loadContacts();
-        else showState('📍', 'Lokasi belum tersedia', 'Gunakan lokasi Anda terlebih dahulu.');
+        button.classList.add('active');
+        activeFilter = button.dataset.type || '';
+        renderContacts();
     }
-    function setRadius(btn) {
-        document.querySelectorAll('.radius-btn').forEach(function(b) { b.classList.remove('active'); });
-        btn.classList.add('active');
-        currentRadius = parseFloat(btn.dataset.radius) || 1.5;
-        if (userLat && userLng) loadContacts();
-        else showState('📍', 'Lokasi belum tersedia', 'Gunakan lokasi Anda terlebih dahulu.');
+    function matchesType(c, filter) {
+        var text = [c.type, c.category, c.name, c.serviceArea].map(function(v) { return String(v || '').toLowerCase(); }).join(' ');
+        var map = {
+            fire: ['fire', 'damkar', 'pemadam', 'kebakaran'],
+            medical: ['medical', 'medis', 'puskesmas', 'rumah sakit', 'rumahsakit', 'ambulance', 'ambulans', 'kesehatan'],
+            crime: ['crime', 'kriminal', 'polisi', 'polsek', 'polres', 'keamanan'],
+            disaster: ['disaster', 'bencana', 'bpbd', 'basarnas', 'sar'],
+            general: ['general', 'umum', 'emergency', 'darurat', 'desa', 'kecamatan', 'kabupaten', 'provinsi']
+        };
+        if (!map[filter]) return false;
+        return map[filter].some(function(k) { return text.indexOf(k) !== -1; });
+    }
+    function getContactIcon(c) {
+        var text = [c.type, c.category, c.name].map(function(v) { return String(v || '').toLowerCase(); }).join(' ');
+        if (text.indexOf('fire') !== -1 || text.indexOf('damkar') !== -1 || text.indexOf('kebakaran') !== -1) return '🔥';
+        if (text.indexOf('medical') !== -1 || text.indexOf('medis') !== -1 || text.indexOf('rumah sakit') !== -1 || text.indexOf('ambulance') !== -1) return '🚑';
+        if (text.indexOf('crime') !== -1 || text.indexOf('polisi') !== -1 || text.indexOf('polres') !== -1) return '🚓';
+        if (text.indexOf('disaster') !== -1 || text.indexOf('bencana') !== -1 || text.indexOf('bpbd') !== -1) return '🌪️';
+        return '🏛️';
     }
 
     // ================================================================
-    // 17. RENDER CONTACTS
+    // 18. RENDER CONTACTS
     // ================================================================
-    function renderContacts(contacts) {
+    function renderContacts() {
         var container = document.getElementById('contactContainer');
-        if (!container) return;
-        container.innerHTML = '';
-        if (!contacts || contacts.length === 0) {
-            showState('🏢', 'Belum ada bantuan di sekitar Anda', 'Tidak ditemukan instansi dalam radius yang dipilih.', 'warning');
+        var count = document.getElementById('summaryCount');
+        var searchInput = document.getElementById('searchInput');
+        var search = (searchInput ? searchInput.value : searchQuery || '').trim().toLowerCase();
+
+        var filtered = allContacts.filter(function(c) {
+            if (activeFilter && !matchesType(c, activeFilter)) return false;
+            if (!search) return true;
+            var searchable = [c.name, c.category, c.type, c.level, c.province, c.city, c.district, c.village, c.address, c.serviceArea]
+                .map(function(v) { return String(v || '').toLowerCase(); }).join(' ');
+            return searchable.indexOf(search) !== -1;
+        });
+
+        count.textContent = filtered.length + ' kontak wilayah tersedia' + (userLat !== null ? ' (urut jarak)' : '');
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<div class="state-card"><div class="state-icon">🔎</div><div class="state-title">Kontak tidak ditemukan</div><div class="state-text">Belum ada kontak yang sesuai dengan pencarian atau filter Anda.</div></div>';
             return;
         }
-        contacts.forEach(function(contact) {
-            var card = document.createElement('div');
-            card.className = 'contact-card';
-            var name = contact.name || 'Instansi Darurat';
-            var category = contact.category || contact.type || 'Layanan Darurat';
-            var level = contact.level || '';
-            var address = contact.address || [contact.village, contact.district, contact.city, contact.province].filter(Boolean).join(', ');
-            var distance = contact.distanceText || formatDistance(contact.distanceKm);
-            var phone = normalizePhone(contact.phone);
-            var whatsapp = normalizeWhatsApp(contact.whatsapp);
-            var mapsURL = contact.mapsURL || buildMapsURL(contact.latitude, contact.longitude);
-
-            var html = '';
-            html += '<div class="contact-top">';
-            html += '<div>';
-            html += '<div class="contact-name">' + escapeHTML(name) + '</div>';
-            html += '<div class="contact-category">' + escapeHTML(category) + (level ? ' • ' + escapeHTML(level) : '') + '</div>';
-            html += '</div>';
-            if (distance) html += '<div class="distance-badge">' + escapeHTML(distance) + '</div>';
-            html += '</div>';
-            html += '<div class="contact-info">';
-            if (address) html += '<div class="info-row"><span class="info-label">📍</span><span>' + escapeHTML(address) + '</span></div>';
-            if (contact.serviceArea) html += '<div class="info-row"><span class="info-label">🏘️</span><span>Melayani: ' + escapeHTML(contact.serviceArea) + '</span></div>';
-            if (contact.operationalHours) html += '<div class="info-row"><span class="info-label">🕐</span><span>' + escapeHTML(contact.operationalHours) + '</span></div>';
-            html += '</div>';
-            html += '<div class="contact-actions">';
-            if (phone) html += '<a class="contact-action phone" href="tel:' + escapeAttr(phone) + '"><i class="fas fa-phone-alt"></i> Telepon</a>';
-            else html += '<span class="contact-action unavailable"><i class="fas fa-phone-alt"></i> N/A</span>';
-            if (whatsapp) html += '<a class="contact-action whatsapp" href="' + escapeAttr(whatsapp) + '" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> WA</a>';
-            else html += '<span class="contact-action unavailable"><i class="fab fa-whatsapp"></i> N/A</span>';
-            if (mapsURL) html += '<a class="contact-action maps" href="' + escapeAttr(mapsURL) + '" target="_blank" rel="noopener"><i class="fas fa-map-marked-alt"></i> Maps</a>';
-            else html += '<span class="contact-action unavailable"><i class="fas fa-map-marked-alt"></i> N/A</span>';
-            html += '</div>';
-
-            card.innerHTML = html;
-            container.appendChild(card);
-        });
+        container.innerHTML = filtered.map(renderContactCard).join('');
     }
+    function renderContactCard(contact) {
+        var name = escapeHTML(contact.name || 'Instansi Darurat');
+        var category = escapeHTML(contact.category || contact.type || 'Layanan Darurat');
+        var level = escapeHTML(contact.level || 'Umum');
+        var location = buildLocationText(contact);
+        var phone = normalizePhone(contact.phone);
+        var whatsapp = normalizePhone(contact.whatsapp);
+        var mapsURL = contact.mapsURL || buildMapsURL(contact.latitude, contact.longitude);
+        var distance = contact.distanceText || '';
 
-    function showState(icon, title, text, type) {
-        var container = document.getElementById('contactContainer');
-        if (!container) return;
-        container.innerHTML = '<div class="state-card ' + (type || '') + '">' +
-            '<div class="state-icon">' + icon + '</div>' +
-            '<div class="state-title">' + escapeHTML(title) + '</div>' +
-            '<div class="state-text">' + escapeHTML(text) + '</div>' +
-        '</div>';
-        var rc = document.getElementById('resultsCount');
-        if (rc) rc.textContent = 'Belum mencari lokasi';
+        var phoneBtn = phone
+            ? '<a class="contact-action phone" href="tel:' + escapeAttr(cleanPhoneForTel(phone)) + '"><i class="fas fa-phone-alt"></i> Telepon</a>'
+            : '<span class="contact-action unavailable"><i class="fas fa-phone-alt"></i> Telepon</span>';
+        var waBtn = whatsapp
+            ? '<a class="contact-action whatsapp" href="' + escapeAttr(buildWhatsAppURL(whatsapp)) + '" target="_blank" rel="noopener"><i class="fab fa-whatsapp"></i> WhatsApp</a>'
+            : '<span class="contact-action unavailable"><i class="fab fa-whatsapp"></i> WhatsApp</span>';
+        var mapsBtn = mapsURL
+            ? '<a class="contact-action maps" href="' + escapeAttr(mapsURL) + '" target="_blank" rel="noopener"><i class="fas fa-map-marked-alt"></i> Maps</a>'
+            : '<span class="contact-action unavailable"><i class="fas fa-map-marked-alt"></i> Maps</span>';
+
+        var contactIndex = allContacts.indexOf(contact);
+
+        return '<article class="contact-card">' +
+            '<div class="contact-top">' +
+                '<div class="contact-icon">' + getContactIcon(contact) + '</div>' +
+                '<div class="contact-level">' + level + '</div>' +
+            '</div>' +
+            '<div class="contact-name">' + name + '</div>' +
+            '<div class="contact-category">' + category + '</div>' +
+            '<div class="contact-location">' +
+                '<span class="loc-icon">📍</span>' +
+                '<span>' + location + '</span>' +
+            '</div>' +
+            (distance ? '<div class="contact-distance"><i class="fas fa-route"></i> ' + escapeHTML(distance) + '</div>' : '') +
+            '<div class="contact-actions">' +
+                phoneBtn +
+                waBtn +
+                mapsBtn +
+                '<button class="contact-action detail" onclick="showContactDetail(' + contactIndex + ')" type="button">' +
+                    '<i class="fas fa-info-circle"></i> Detail' +
+                '</button>' +
+            '</div>' +
+        '</article>';
     }
-
-    // ================================================================
-    // 18. REFRESH
-    // ================================================================
-    function refreshContacts() {
-        if (userLat && userLng) loadContacts();
-        else getMyLocation();
+    function buildLocationText(c) {
+        var parts = [c.address, c.village, c.district, c.city, c.province]
+            .map(function(v) { return String(v || '').trim(); })
+            .filter(Boolean);
+        return parts.length ? escapeHTML(parts.join(', ')) : 'Lokasi belum dicantumkan';
     }
 
     // ================================================================
-    // 19. MODAL HELPERS
+    // 19. DETAIL MODAL
+    // ================================================================
+    function showContactDetail(index) {
+        var contact = allContacts[index];
+        if (!contact) return;
+        var modal = document.getElementById('detailModal');
+        var title = document.getElementById('detailModalTitle');
+        var body = document.getElementById('detailModalBody');
+        if (title) title.textContent = contact.name || 'Detail Kontak';
+        var fields = [
+            { label: 'Nama', value: contact.name },
+            { label: 'Kategori', value: contact.category || contact.type },
+            { label: 'Level', value: contact.level },
+            { label: 'Wilayah Layanan', value: contact.serviceArea },
+            { label: 'Jam Operasional', value: contact.operationalHours },
+            { label: 'Telepon', value: contact.phone },
+            { label: 'WhatsApp', value: contact.whatsapp },
+            { label: 'Alamat', value: buildLocationText(contact) },
+            { label: 'Provinsi', value: contact.province },
+            { label: 'Kab/Kota', value: contact.city },
+            { label: 'Kecamatan', value: contact.district },
+            { label: 'Desa/Kelurahan', value: contact.village }
+        ].filter(function(f) { return f.value; });
+        if (body) {
+            body.innerHTML = fields.map(function(f) {
+                var label = escapeHTML(f.label);
+                var value = f.label === 'Alamat' ? f.value : escapeHTML(f.value);
+                return '<div class="detail-row"><span class="detail-label">' + label + '</span><span class="detail-value">' + value + '</span></div>';
+            }).join('');
+        }
+        if (modal) {
+            modal.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+    }
+    function closeDetailModal() {
+        var modal = document.getElementById('detailModal');
+        if (modal) modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    // ================================================================
+    // 20. MODAL HELPERS
     // ================================================================
     function openModalById(id) {
         var m = document.getElementById(id);
@@ -3565,7 +3627,7 @@
     }
 
     // ================================================================
-    // 20. NOTIF MODAL
+    // 21. NOTIF MODAL
     // ================================================================
     function loadReadNotifs() {
         try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); }
@@ -3574,7 +3636,6 @@
     function saveReadNotifs() {
         try { localStorage.setItem('salink_read_notifs', JSON.stringify(readNotifs)); } catch(e) {}
     }
-
     function getAllNotifications() {
         var list = [];
         try {
@@ -3611,7 +3672,6 @@
         list.sort(function(a, b) { return b.timestamp - a.timestamp; });
         return list;
     }
-
     function updateNotifBadge() {
         var all = getAllNotifications();
         var unread = all.filter(function(n) { return !n.read; }).length;
@@ -3623,21 +3683,15 @@
         var nmb = document.getElementById('notifModalBadge');
         if (nmb) nmb.textContent = unread;
     }
-
     function renderNotifList() {
         var listEl = document.getElementById('notifList');
         if (!listEl) return;
 
         var all = getAllNotifications();
         var filtered = all;
-
-        if (notifFilter === 'unread') {
-            filtered = all.filter(function(n) { return !n.read; });
-        } else if (notifFilter === 'emergency') {
-            filtered = all.filter(function(n) { return n.type === 'emergency'; });
-        } else if (notifFilter === 'regular') {
-            filtered = all.filter(function(n) { return n.type === 'regular'; });
-        }
+        if (notifFilter === 'unread') filtered = all.filter(function(n) { return !n.read; });
+        else if (notifFilter === 'emergency') filtered = all.filter(function(n) { return n.type === 'emergency'; });
+        else if (notifFilter === 'regular') filtered = all.filter(function(n) { return n.type === 'regular'; });
 
         var unreadCount = all.filter(function(n) { return !n.read; }).length;
         var statsEl = document.getElementById('notifStatsText');
@@ -3654,7 +3708,6 @@
                 '<p style="font-size:0.75rem;">Tidak ada notifikasi</p></div>';
             return;
         }
-
         listEl.innerHTML = filtered.slice(0, 30).map(function(n) {
             var iconHtml = n.type === 'emergency'
                 ? '<div class="notif-item-icon emergency">' + (EMERGENCY_ICONS[n.emergencyType] || '🚨') + '</div>'
@@ -3671,7 +3724,6 @@
             '</div>';
         }).join('');
     }
-
     function setupNotifFilters() {
         document.querySelectorAll('.notif-filter-btn').forEach(function(btn) {
             btn.onclick = function() {
@@ -3693,14 +3745,12 @@
             };
         }
     }
-
     function markNotifRead(id) {
         if (!id) return;
         readNotifs[id] = true;
         saveReadNotifs();
         updateNotifBadge();
     }
-
     function openNotifModal() {
         if (isPreviewMode) { showPreviewOverlay(); return; }
         loadReadNotifs();
@@ -3712,9 +3762,7 @@
         setupNotifFilters();
         renderNotifList();
     }
-
     function closeNotifModal() { closeModalById('notifModal'); }
-
     function openNotifDetail(id, type) {
         if (id) markNotifRead(id);
         closeNotifModal();
@@ -3726,12 +3774,12 @@
     }
 
     // ================================================================
-    // 21. SEARCH MODAL
+    // 22. SEARCH MODAL
     // ================================================================
     function openSearchModal() {
         if (isPreviewMode) { showPreviewOverlay(); return; }
         openModalById('searchModal');
-        var input = document.getElementById('searchInput');
+        var input = document.getElementById('searchInputGlobal');
         if (input) { input.value = ''; setTimeout(function() { input.focus(); }, 200); }
         var cb = document.getElementById('clearSearchBtn');
         if (cb) cb.classList.remove('visible');
@@ -3746,7 +3794,7 @@
     }
     function closeSearchModal() { closeModalById('searchModal'); }
     function clearSearch() {
-        var input = document.getElementById('searchInput');
+        var input = document.getElementById('searchInputGlobal');
         if (input) input.value = '';
         var cb = document.getElementById('clearSearchBtn');
         if (cb) cb.classList.remove('visible');
@@ -3759,7 +3807,7 @@
         searchTab = tab;
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         btnEl.classList.add('active');
-        var input = document.getElementById('searchInput');
+        var input = document.getElementById('searchInputGlobal');
         if (input && input.value.trim()) performSearch(input.value.trim());
     }
     function performSearch(query) {
@@ -3870,7 +3918,7 @@
     }
 
     // ================================================================
-    // 22. FAB MODAL
+    // 23. FAB MODAL
     // ================================================================
     function openFabModal() {
         var overlay = document.getElementById('fabModalOverlay');
@@ -3933,10 +3981,52 @@
     }
 
     // ================================================================
-    // 23. ⭐⭐ MAP MODAL — PETA DARURAT v13.1 (GPS AKURAT)
+    // 24. GPS HELPER (REAL-TIME ACCURATE)
+    // ================================================================
+    function getGPSPosition(attempt) {
+        attempt = attempt || 0;
+        return new Promise(function(resolve, reject) {
+            if (!navigator.geolocation) {
+                reject({ code: 0, message: 'GPS tidak didukung browser' });
+                return;
+            }
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    resolve({
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                        accuracy: Math.round(position.coords.accuracy || 0)
+                    });
+                },
+                function(error) {
+                    if ((error.code === 2 || error.code === 3) && attempt < GPS_MAX_RETRY) {
+                        setTimeout(function() {
+                            getGPSPosition(attempt + 1).then(resolve).catch(reject);
+                        }, 1500);
+                        return;
+                    }
+                    reject(error);
+                },
+                GPS_CONFIG
+            );
+        });
+    }
+    function reverseGeocodeAddress(lat, lng) {
+        return new Promise(function(resolve) {
+            try {
+                var url = NOMINATIM_URL + '?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id';
+                fetch(url, { method: 'GET', headers: { 'User-Agent': 'SALINK-App/13.1' } })
+                .then(function(r) { return r.json(); })
+                .then(function(data) { resolve((data && data.display_name) ? data.display_name : ''); })
+                .catch(function() { resolve(''); });
+            } catch(e) { resolve(''); }
+        });
+    }
+
+    // ================================================================
+    // 25. MAP MODAL
     // ================================================================
     function openMapModal() {
-        log('openMapModal() called');
         var modal = document.getElementById('mapModal');
         if (!modal) return;
         modal.classList.add('active');
@@ -3944,19 +4034,16 @@
         if (navigator.vibrate) navigator.vibrate(30);
         updateMapOwnerInfo();
     }
-
     function closeMapModal() {
         var modal = document.getElementById('mapModal');
         if (!modal) return;
         modal.classList.remove('active');
         document.body.style.overflow = '';
     }
-
     function updateMapOwnerInfo() {
         var ownerNameEl = document.getElementById('mapOwnerName');
         var ownerLocEl = document.getElementById('mapOwnerLoc');
         var ownerAvatarEl = document.getElementById('mapOwnerAvatar');
-
         if (currentUser) {
             var name = currentUser.fullName || currentUser.username || 'User';
             var city = currentUser.city || '';
@@ -3977,14 +4064,11 @@
             if (ownerAvatarEl) ownerAvatarEl.innerHTML = '<i class="fas fa-user"></i>';
         }
 
-        // ⭐ Pakai lokasi tersimpan hanya kalau < 5 menit
         var savedLat = localStorage.getItem('salink_user_lat');
         var savedLng = localStorage.getItem('salink_user_lng');
         var savedTime = parseInt(localStorage.getItem('salink_user_lat_time') || '0', 10);
         var savedAcc = parseInt(localStorage.getItem('salink_user_lat_acc') || '0', 10);
-        var now = Date.now();
-        var isFresh = savedTime > 0 && (now - savedTime) < GPS_FRESH_THRESHOLD;
-
+        var isFresh = savedTime > 0 && (Date.now() - savedTime) < GPS_FRESH_THRESHOLD;
         if (savedLat && savedLng && isFresh) {
             mapCurrentLat = parseFloat(savedLat);
             mapCurrentLng = parseFloat(savedLng);
@@ -4001,25 +4085,17 @@
             if (statusIcon) statusIcon.textContent = '📍';
         }
     }
-
     function applyMapCoords(lat, lng, accuracy) {
         var coordsEl = document.getElementById('mapCoords');
         if (coordsEl) coordsEl.textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
-
         var regionEl = document.getElementById('mapRegion');
         if (regionEl) regionEl.textContent = '🔄 Mengambil...';
-
         var addressEl = document.getElementById('mapAddressValue');
         if (addressEl) addressEl.textContent = lat.toFixed(4) + ', ' + lng.toFixed(4);
-
         var iframe = document.getElementById('mapIframe');
-        if (iframe) {
-            iframe.src = 'https://www.google.com/maps?q=' + lat + ',' + lng + '&z=16&output=embed';
-        }
+        if (iframe) iframe.src = 'https://www.google.com/maps?q=' + lat + ',' + lng + '&z=16&output=embed';
         var gmapsBtn = document.getElementById('mapOpenGmaps');
-        if (gmapsBtn) {
-            gmapsBtn.href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
-        }
+        if (gmapsBtn) gmapsBtn.href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
 
         var statusCard = document.getElementById('mapStatusCard');
         var statusTitle = document.getElementById('mapStatusTitle');
@@ -4028,9 +4104,7 @@
         if (statusCard) statusCard.classList.add('detected');
         if (statusTitle) statusTitle.textContent = '✅ Lokasi terdeteksi';
         if (statusDesc) {
-            var accText = (accuracy !== undefined && accuracy !== null && accuracy > 0)
-                ? ' • Akurasi: ±' + accuracy + 'm'
-                : '';
+            var accText = (accuracy !== undefined && accuracy !== null && accuracy > 0) ? ' • Akurasi: ±' + accuracy + 'm' : '';
             statusDesc.textContent = 'Koordinat: ' + lat.toFixed(6) + ', ' + lng.toFixed(6) + accText;
         }
         if (statusIcon) statusIcon.textContent = '✅';
@@ -4040,12 +4114,9 @@
             if (addressEl && addr) addressEl.textContent = addr;
         });
     }
-
     function activateMapGps() {
-        log('activateMapGps() called');
         var btn = document.getElementById('mapLocationBtn');
         var btnText = document.getElementById('mapLocationBtnText');
-
         if (!navigator.geolocation) {
             showToast('⚠️ GPS Tidak Tersedia', 'Browser tidak mendukung GPS', 'fa-exclamation-triangle');
             return;
@@ -4057,51 +4128,37 @@
             mapCurrentLat = pos.lat;
             mapCurrentLng = pos.lng;
             mapCurrentAccuracy = pos.accuracy;
-
             try {
                 localStorage.setItem('salink_user_lat', pos.lat);
                 localStorage.setItem('salink_user_lng', pos.lng);
                 localStorage.setItem('salink_user_lat_time', Date.now());
                 localStorage.setItem('salink_user_lat_acc', pos.accuracy);
             } catch(e) {}
-
             if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
             if (btnText) btnText.textContent = '✅ Refresh Lokasi GPS';
-
             applyMapCoords(pos.lat, pos.lng, pos.accuracy);
-
             var accLabel = getAccuracyLabel(pos.accuracy);
             showToast('📍 GPS Akurat', '±' + pos.accuracy + 'm — ' + accLabel.text, 'fa-location-arrow');
             if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
         }).catch(function(error) {
             var errMsg = 'Gagal mengambil lokasi GPS. ';
             switch(error.code) {
-                case 1:
-                    errMsg = 'Izin lokasi DITOLAK. Aktifkan di pengaturan browser.';
-                    break;
-                case 2:
-                    errMsg = 'Sinyal GPS tidak tersedia. Coba di area terbuka.';
-                    break;
-                case 3:
-                    errMsg = 'GPS timeout. Nyalakan GPS device & coba lagi.';
-                    break;
-                default:
-                    errMsg = error.message || 'Coba lagi.';
+                case 1: errMsg = 'Izin lokasi DITOLAK. Aktifkan di pengaturan browser.'; break;
+                case 2: errMsg = 'Sinyal GPS tidak tersedia. Coba di area terbuka.'; break;
+                case 3: errMsg = 'GPS timeout. Nyalakan GPS device & coba lagi.'; break;
+                default: errMsg = error.message || 'Coba lagi.';
             }
             if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
             if (btnText) btnText.textContent = '📍 Coba Lagi';
-
             var statusTitle = document.getElementById('mapStatusTitle');
             var statusDesc = document.getElementById('mapStatusDesc');
             var statusIcon = document.getElementById('mapStatusIcon');
             if (statusTitle) statusTitle.textContent = '⚠️ Gagal Ambil GPS';
             if (statusDesc) statusDesc.textContent = errMsg;
             if (statusIcon) statusIcon.textContent = '⚠️';
-
             showToast('⚠️ GPS Gagal', errMsg, 'fa-exclamation-triangle');
         });
     }
-
     function mapSearchService(searchQuery) {
         var lat = mapCurrentLat;
         var lng = mapCurrentLng;
@@ -4115,7 +4172,7 @@
     }
 
     // ================================================================
-    // 24. LOGOUT
+    // 26. LOGOUT
     // ================================================================
     function handleLogout() {
         if (confirm('Apakah Anda yakin ingin keluar?')) {
@@ -4131,7 +4188,7 @@
     }
 
     // ================================================================
-    // 25. RIPPLE
+    // 27. RIPPLE
     // ================================================================
     function initRipple() {
         document.addEventListener('click', function(e) {
@@ -4152,7 +4209,7 @@
     }
 
     // ================================================================
-    // 26. STORAGE EVENTS
+    // 28. STORAGE EVENTS
     // ================================================================
     function initStorageEvents() {
         window.addEventListener('storage', function(e) {
@@ -4163,13 +4220,14 @@
     }
 
     // ================================================================
-    // 27. EVENT LISTENERS
+    // 29. EVENT LISTENERS
     // ================================================================
     function setupEventListeners() {
         if (_salinkSetup) return;
         _salinkSetup = true;
         log('Setting up event listeners...');
 
+        // HEADER MENU
         var menuBtn = document.getElementById('menuBtn');
         if (menuBtn) {
             menuBtn.addEventListener('click', function(e) {
@@ -4179,6 +4237,7 @@
             });
         }
 
+        // SIDEBAR CLOSE + OVERLAY
         var sidebarClose = document.getElementById('sidebarClose');
         if (sidebarClose) {
             sidebarClose.addEventListener('click', function(e) {
@@ -4189,6 +4248,7 @@
         var sidebarOverlay = document.getElementById('sidebarOverlay');
         if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
 
+        // SIDEBAR MAP BUTTON
         var sidebarMapBtn = document.getElementById('sidebarMapBtn');
         if (sidebarMapBtn) {
             sidebarMapBtn.addEventListener('click', function(e) {
@@ -4198,6 +4258,7 @@
             });
         }
 
+        // LOGOUT
         var logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', function(e) {
@@ -4207,6 +4268,7 @@
             });
         }
 
+        // HEADER SEARCH
         var headerSearchBtn = document.getElementById('headerSearchBtn');
         if (headerSearchBtn) {
             headerSearchBtn.addEventListener('click', function(e) {
@@ -4215,6 +4277,7 @@
             });
         }
 
+        // HEADER NOTIF
         var headerNotifBtn = document.getElementById('headerNotifBtn');
         if (headerNotifBtn) {
             headerNotifBtn.addEventListener('click', function(e) {
@@ -4223,6 +4286,7 @@
             });
         }
 
+        // THEME TOGGLE
         var themeToggle = document.getElementById('themeToggle');
         if (themeToggle) {
             themeToggle.addEventListener('click', function(e) {
@@ -4231,45 +4295,52 @@
             });
         }
 
+        // BACK HOME
         var backHomeBtn = document.getElementById('backHomeBtn');
         if (backHomeBtn) backHomeBtn.addEventListener('click', goHome);
 
-        var locationBtn = document.getElementById('locationBtn');
-        if (locationBtn) {
-            locationBtn.addEventListener('click', function(e) {
-                e.preventDefault(); e.stopPropagation();
-                getMyLocation();
-            });
-        }
-
-        var refreshBtn = document.getElementById('refreshBtn');
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', function(e) {
+        // REFRESH CONTACTS
+        var refreshContactsBtn = document.getElementById('refreshContactsBtn');
+        if (refreshContactsBtn) {
+            refreshContactsBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                var self = this;
-                var icon = self.querySelector('i');
+                var icon = this.querySelector('i');
                 if (icon) icon.classList.add('fa-spin');
-                refreshContacts();
+                loadContacts();
                 setTimeout(function() { if (icon) icon.classList.remove('fa-spin'); }, 2000);
             });
         }
 
+        // SEARCH INPUT (lokal, untuk filter kontak wilayah)
+        var searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                searchQuery = this.value.trim();
+                renderContacts();
+            });
+        }
+
+        // FILTER BUTTONS
         document.querySelectorAll('.filter-btn').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
-                setEmergencyFilter(this);
+                setFilter(this);
             });
         });
 
-        document.querySelectorAll('.radius-btn').forEach(function(btn) {
-            btn.addEventListener('click', function(e) {
+        // NATIONAL TOGGLE
+        var nationalToggleBtn = document.getElementById('nationalToggleBtn');
+        if (nationalToggleBtn) {
+            nationalToggleBtn.addEventListener('click', function(e) {
                 e.preventDefault();
-                setRadius(this);
+                toggleNationalSection();
             });
-        });
+        }
 
+        // FAB MODAL
         initFabModal();
 
+        // MAP MODAL CLOSE
         var mapModalCloseBtn = document.getElementById('mapModalCloseBtn');
         if (mapModalCloseBtn) {
             mapModalCloseBtn.addEventListener('click', function(e) {
@@ -4291,6 +4362,7 @@
             });
         }
 
+        // MAP GPS BUTTON
         var mapLocationBtn = document.getElementById('mapLocationBtn');
         if (mapLocationBtn) {
             mapLocationBtn.addEventListener('click', function(e) {
@@ -4299,6 +4371,7 @@
             });
         }
 
+        // MAP SERVICE CARDS
         document.querySelectorAll('.map-service-card[data-search]').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -4308,6 +4381,7 @@
             });
         });
 
+        // SEARCH MODAL CLOSE
         var searchModalCloseBtn = document.getElementById('searchModalCloseBtn');
         if (searchModalCloseBtn) searchModalCloseBtn.addEventListener('click', closeSearchModal);
         var searchModalFooterCloseBtn = document.getElementById('searchModalFooterCloseBtn');
@@ -4330,9 +4404,9 @@
                 switchSearchTab(this.getAttribute('data-tab'), this);
             });
         });
-        var searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-            searchInput.addEventListener('input', function() {
+        var searchInputGlobal = document.getElementById('searchInputGlobal');
+        if (searchInputGlobal) {
+            searchInputGlobal.addEventListener('input', function() {
                 var val = this.value.trim();
                 var cb = document.getElementById('clearSearchBtn');
                 if (val) { if (cb) cb.classList.add('visible'); }
@@ -4340,11 +4414,12 @@
                 clearTimeout(searchDebounceTimer);
                 searchDebounceTimer = setTimeout(function() { performSearch(val); }, 250);
             });
-            searchInput.addEventListener('keydown', function(e) {
+            searchInputGlobal.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape') closeSearchModal();
             });
         }
 
+        // NOTIF MODAL CLOSE
         var notifModalCloseBtn = document.getElementById('notifModalCloseBtn');
         if (notifModalCloseBtn) notifModalCloseBtn.addEventListener('click', closeNotifModal);
         var notifModalFooterCloseBtn = document.getElementById('notifModalFooterCloseBtn');
@@ -4361,6 +4436,24 @@
             });
         }
 
+        // DETAIL MODAL CLOSE
+        var detailModalClose = document.getElementById('detailModalClose');
+        if (detailModalClose) detailModalClose.addEventListener('click', closeDetailModal);
+        var detailModalFooterClose = document.getElementById('detailModalFooterClose');
+        if (detailModalFooterClose) {
+            detailModalFooterClose.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                closeDetailModal();
+            });
+        }
+        var detailModal = document.getElementById('detailModal');
+        if (detailModal) {
+            detailModal.addEventListener('click', function(e) {
+                if (e.target === detailModal) closeDetailModal();
+            });
+        }
+
+        // PREVIEW OVERLAY
         var overlayLoginBtn = document.getElementById('overlayLoginBtn');
         if (overlayLoginBtn) overlayLoginBtn.addEventListener('click', redirectToLogin);
         var overlayCancelBtn = document.getElementById('overlayCancelBtn');
@@ -4379,6 +4472,24 @@
             });
         }
 
+        // BOTTOM NAV
+        var bottomInviteNav = document.getElementById('bottomInviteNav');
+        if (bottomInviteNav) {
+            bottomInviteNav.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (isPreviewMode) { showPreviewOverlay(); return; }
+                showToast('📨 Invite', 'Buka dashboard untuk invite', 'fa-user-plus');
+            });
+        }
+        var bottomNotifNav = document.getElementById('bottomNotifNav');
+        if (bottomNotifNav) {
+            bottomNotifNav.addEventListener('click', function(e) {
+                e.preventDefault();
+                openNotifModal();
+            });
+        }
+
+        // KEYBOARD SHORTCUTS
         document.addEventListener('keydown', function(e) {
             if (e.key === '/' && !e.target.matches('input, textarea, select')) {
                 e.preventDefault();
@@ -4390,6 +4501,7 @@
                 closeFabModal();
                 closeMapModal();
                 closeSidebar();
+                closeDetailModal();
             }
         });
 
@@ -4397,10 +4509,10 @@
     }
 
     // ================================================================
-    // 28. INIT
+    // 30. INIT
     // ================================================================
     function init() {
-        log('Initializing Lokasi Bantuan v13.1 FINAL + GPS ACCURATE...');
+        log('Initializing Kontak Darurat v13.1 FINAL...');
 
         loadTheme();
         loadReadNotifs();
@@ -4411,36 +4523,22 @@
         initRipple();
         initStorageEvents();
 
+        // Render National Contacts
+        renderNationalContacts();
+
+        // Update badge
         updateNotifBadge();
         setInterval(updateNotifBadge, 30000);
 
-        // Cek lokasi tersimpan — hanya kalau FRESH (< 5 menit)
-        var savedLat = localStorage.getItem('salink_user_lat');
-        var savedLng = localStorage.getItem('salink_user_lng');
-        var savedTime = parseInt(localStorage.getItem('salink_user_lat_time') || '0', 10);
-        var savedAcc = parseInt(localStorage.getItem('salink_user_lat_acc') || '0', 10);
-        var now = Date.now();
-        var isFresh = savedTime > 0 && (now - savedTime) < GPS_FRESH_THRESHOLD;
-
-        if (savedLat && savedLng && isFresh) {
-            userLat = parseFloat(savedLat);
-            userLng = parseFloat(savedLng);
-            userAccuracy = savedAcc;
-            setGPSStatus('success',
-                '✅ Lokasi tersimpan (±' + savedAcc + 'm)',
-                'Koordinat: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6) + ' • ' + Math.round((now - savedTime) / 1000) + 's lalu');
-            loadContacts();
-        } else {
-            // Jangan auto-load lokasi lama yang mungkin IP-based
-            setGPSStatus('', 'Lokasi belum tersedia',
-                'Tekan "Gunakan Lokasi Saya" untuk mengambil GPS real-time.');
-        }
+        // Load contacts dari Google Sheets
+        loadContacts();
 
         if (isPreviewMode) setTimeout(function() { showPreviewOverlay(); }, 1200);
 
-        log('✓ Lokasi Bantuan v13.1 Ready!');
+        log('✓ Kontak Darurat v13.1 Ready!');
         log('  Mode: ' + (isPreviewMode ? 'PREVIEW' : 'FULL'));
         log('  User: ' + (currentUser ? currentUser.username : 'Guest'));
+        log('  National Contacts: ' + NATIONAL_EMERGENCY_CONTACTS.length);
     }
 
     if (document.readyState === 'loading') {
@@ -4450,13 +4548,13 @@
     }
 
     // ================================================================
-    // 29. EXPOSE GLOBAL
+    // 31. EXPOSE GLOBAL
     // ================================================================
     window.goHome = goHome;
-    window.getMyLocation = getMyLocation;
-    window.refreshContacts = refreshContacts;
-    window.setEmergencyFilter = setEmergencyFilter;
-    window.setRadius = setRadius;
+    window.loadContacts = loadContacts;
+    window.setFilter = setFilter;
+    window.showContactDetail = showContactDetail;
+    window.closeDetailModal = closeDetailModal;
     window.showToast = showToast;
     window.openSidebar = openSidebar;
     window.closeSidebar = closeSidebar;
@@ -4478,6 +4576,9 @@
     window.openMapModal = openMapModal;
     window.closeMapModal = closeMapModal;
     window.toggleTheme = toggleTheme;
+    window.toggleNationalSection = toggleNationalSection;
+    window.renderNationalContacts = renderNationalContacts;
+    window.NATIONAL_EMERGENCY_CONTACTS = NATIONAL_EMERGENCY_CONTACTS;
     window.showFloatingNotification = showFloatingNotification;
     window.hideFloatingNotification = hideFloatingNotification;
     window.showInstallPrompt = showInstallPrompt;
@@ -4485,10 +4586,9 @@
     window.hidePreviewOverlay = hidePreviewOverlay;
     window.activateMapGps = activateMapGps;
     window.mapSearchService = mapSearchService;
-    window.loadContacts = loadContacts;
     window.getGPSPosition = getGPSPosition;
 
-    log('✓ Lokasi Bantuan v13.1 Script Loaded');
+    log('✓ Kontak Darurat v13.1 Script Loaded');
 })();
     </script>
 
