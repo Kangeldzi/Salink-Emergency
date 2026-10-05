@@ -18,14 +18,14 @@
 
     <style>
         /* ==================================================================
-           SALINK LOKASI-BANTUAN v13.0 — FINAL (INDUK)
+           SALINK LOKASI-BANTUAN v13.1 — FINAL (INDUK)
            ==================================================================
            File ini adalah INDUK untuk semua file SALINK
            - Tema warna universal (dark/light)
            - Header dengan Back button + Menu hamburger
            - Sidebar dengan #sidebarMapBtn data-action="open-map"
            - Modal Peta Darurat
-           - Modal Search + TOMBOL TUTUP di footer
+           - Modal Search + TOMBOL TUTUP footer (4 tab 1 baris + chips 1 baris)
            - Modal Notif + FILTER + TANDAI SEMUA + MARK READ
            - Bottom Nav + FAB universal
            ================================================================== */
@@ -1113,6 +1113,8 @@
             box-shadow: 0 0 0 3px rgba(230,0,18,0.1);
         }
         #searchInput::placeholder { color: var(--text-muted); }
+
+        /* ============ SEARCH TABS (4 TAB, 1 BARIS) ============ */
         .search-tabs {
             display: flex;
             gap: 6px;
@@ -1121,28 +1123,68 @@
         }
         .search-tab {
             flex: 1;
-            min-width: 80px;
-            padding: 8px 10px;
+            min-width: 0;
+            padding: 8px 6px;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             color: var(--text-muted);
-            font-size: 0.62rem;
+            font-size: 0.6rem;
             font-weight: 700;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 4px;
+            gap: 3px;
             font-family: inherit;
             transition: all 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
+        .search-tab i { font-size: 0.6rem; flex-shrink: 0; }
         .search-tab.active {
             background: var(--accent-blue-gradient);
             color: #fff;
             border-color: var(--primary);
             box-shadow: 0 4px 12px rgba(230,0,18,0.3);
         }
+
+        /* ============ SEARCH FILTER CHIPS (1 BARIS, SCROLLABLE) ============ */
+        .search-filter-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding-bottom: 4px;
+        }
+        .search-filter-row::-webkit-scrollbar { display: none; }
+        .search-filter-chip {
+            flex: 1;
+            min-width: 70px;
+            padding: 5px 8px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            color: var(--text-muted);
+            font-size: 0.58rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .search-filter-chip:active { transform: scale(0.96); }
+        .search-filter-chip.active {
+            background: rgba(230,0,18,0.15);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
         .search-section-title {
             font-size: 0.68rem;
             font-weight: 800;
@@ -2180,6 +2222,7 @@
         :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
     </style>
 </head>
+
 <body>
 
     <!-- ============================================================ -->
@@ -2224,7 +2267,7 @@
         <span class="login-link" id="badgeLoginLink">Masuk untuk berinteraksi</span>
     </div>
 
-    <!-- HEADER — KONSISTEN DENGAN ALERT-SEKITAR -->
+    <!-- HEADER — KONSISTEN DENGAN SEMUA FILE -->
     <header class="app-bar" id="appBar">
         <div class="header-left">
             <button class="menu-btn" id="menuBtn" type="button" title="Menu" aria-label="Menu">
@@ -2475,7 +2518,7 @@
     </div> <!-- /app-shell -->
 
     <!-- ============================================================ -->
-    <!-- MODAL SEARCH — DENGAN TOMBOL TUTUP                            -->
+    <!-- MODAL SEARCH — 4 TAB 1 BARIS + FILTER CHIPS SCROLLABLE         -->
     <!-- ============================================================ -->
     <div class="modal-overlay" id="searchModal">
         <div class="modal-content search-modal-content">
@@ -2496,6 +2539,8 @@
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
+
+                <!-- 4 TAB DALAM 1 BARIS (Semua/Pengguna/Postingan/Emergency) -->
                 <div class="search-tabs">
                     <button class="search-tab active" data-tab="all" type="button">
                         <i class="fas fa-globe"></i> Semua
@@ -2510,6 +2555,16 @@
                         <i class="fas fa-exclamation-triangle"></i> Emergency
                     </button>
                 </div>
+
+                <!-- FILTER CHIPS — SELALU 1 BARIS, SCROLLABLE -->
+                <div class="search-filter-row" id="emergencyFilters" style="display:none;">
+                    <button class="search-filter-chip active" data-filter="all" type="button">🎯 Semua</button>
+                    <button class="search-filter-chip" data-filter="fire" type="button">🔥 Kebakaran</button>
+                    <button class="search-filter-chip" data-filter="medical" type="button">🚑 Medis</button>
+                    <button class="search-filter-chip" data-filter="crime" type="button">🚓 Kriminal</button>
+                    <button class="search-filter-chip" data-filter="disaster" type="button">🌪️ Bencana</button>
+                </div>
+
                 <div id="searchResultsBody">
                     <div id="searchDefaultView">
                         <div class="search-empty-state">
@@ -2728,13 +2783,13 @@
     <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <!-- ============================================================ -->
-    <!-- SCRIPT — LOKASI-BANTUAN JAVASCRIPT v13.0                      -->
+        <!-- ============================================================ -->
+    <!-- SCRIPT — LOKASI-BANTUAN JAVASCRIPT v13.1                      -->
     <!-- Konsisten dengan alert-sekitar.html + Dashboard INDUK         -->
     <!-- ============================================================ -->
     <script>
 /* ====================================================================
- * SALINK LOKASI-BANTUAN v13.0 — FINAL
+ * SALINK LOKASI-BANTUAN v13.1 — FINAL
  * ====================================================================
  * Fitur:
  *   - Tema Universal (dark/light)
@@ -2742,7 +2797,7 @@
  *   - Header dengan Back button
  *   - Sidebar dengan #sidebarMapBtn
  *   - Modal Peta Darurat
- *   - Modal Search + TOMBOL TUTUP footer
+ *   - Modal Search + TOMBOL TUTUP footer (4 tab 1 baris + chips scrollable)
  *   - Modal Notif LENGKAP: filter + tandai semua + mark read persistent
  *   - GPS + Kontak Bantuan Terdekat
  *   - FAB Modal 2×2 → dashboard.html?emergency=TYPE
@@ -3455,7 +3510,6 @@
 
     function getAllNotifications() {
         var list = [];
-        // Emergency notifications
         try {
             var allEmergencies = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
             allEmergencies.forEach(function(em) {
@@ -3475,7 +3529,6 @@
                 });
             });
         } catch(e) {}
-        // Regular notifications
         try {
             var notifs = JSON.parse(localStorage.getItem('salink_notifications') || '[]');
             notifs.forEach(function(n) {
@@ -3639,6 +3692,12 @@
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         var allTab = document.querySelector('.search-tab[data-tab="all"]');
         if (allTab) allTab.classList.add('active');
+        var ef = document.getElementById('emergencyFilters');
+        if (ef) ef.style.display = 'none';
+        searchEmergencyFilter = 'all';
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
+        var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
+        if (allChip) allChip.classList.add('active');
     }
     function closeSearchModal() { closeModalById('searchModal'); }
     function clearSearch() {
@@ -3654,6 +3713,16 @@
     function switchSearchTab(tab, btnEl) {
         searchTab = tab;
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
+        btnEl.classList.add('active');
+        var ef = document.getElementById('emergencyFilters');
+        if (ef) ef.style.display = (tab === 'emergency') ? 'flex' : 'none';
+        var input = document.getElementById('searchInput');
+        if (input && input.value.trim()) performSearch(input.value.trim());
+    }
+    var searchEmergencyFilter = 'all';
+    function setSearchEmergencyFilter(filter, btnEl) {
+        searchEmergencyFilter = filter;
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
         btnEl.classList.add('active');
         var input = document.getElementById('searchInput');
         if (input && input.value.trim()) performSearch(input.value.trim());
@@ -3920,7 +3989,7 @@
 
         if (regionEl) {
             fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id', {
-                headers: { 'User-Agent': 'SALINK-App/13.0' }
+                headers: { 'User-Agent': 'SALINK-App/13.1' }
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -4236,6 +4305,11 @@
                 switchSearchTab(this.getAttribute('data-tab'), this);
             });
         });
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) {
+            c.addEventListener('click', function() {
+                setSearchEmergencyFilter(this.getAttribute('data-filter'), this);
+            });
+        });
         var searchInput = document.getElementById('searchInput');
         if (searchInput) {
             searchInput.addEventListener('input', function() {
@@ -4310,7 +4384,7 @@
     // 28. INIT
     // ================================================================
     function init() {
-        log('Initializing Lokasi Bantuan v13.0 FINAL...');
+        log('Initializing Lokasi Bantuan v13.1 FINAL...');
 
         loadTheme();
         loadReadNotifs();
@@ -4324,7 +4398,6 @@
         updateNotifBadge();
         setInterval(updateNotifBadge, 30000);
 
-        // Cek lokasi tersimpan
         var savedLat = localStorage.getItem('salink_user_lat');
         var savedLng = localStorage.getItem('salink_user_lng');
         if (savedLat && savedLng) {
@@ -4336,7 +4409,7 @@
 
         if (isPreviewMode) setTimeout(function() { showPreviewOverlay(); }, 1200);
 
-        log('✓ Lokasi Bantuan v13.0 Ready!');
+        log('✓ Lokasi Bantuan v13.1 Ready!');
         log('  Mode: ' + (isPreviewMode ? 'PREVIEW' : 'FULL'));
         log('  User: ' + (currentUser ? currentUser.username : 'Guest'));
     }
@@ -4363,6 +4436,7 @@
     window.closeSearchModal = closeSearchModal;
     window.clearSearch = clearSearch;
     window.switchSearchTab = switchSearchTab;
+    window.setSearchEmergencyFilter = setSearchEmergencyFilter;
     window.performSearch = performSearch;
     window.openNotifModal = openNotifModal;
     window.closeNotifModal = closeNotifModal;
@@ -4385,7 +4459,7 @@
     window.mapSearchService = mapSearchService;
     window.loadContacts = loadContacts;
 
-    log('✓ Lokasi Bantuan v13.0 Script Loaded');
+    log('✓ Lokasi Bantuan v13.1 Script Loaded');
 })();
     </script>
 
