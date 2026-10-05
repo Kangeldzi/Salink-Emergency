@@ -18,12 +18,16 @@
 
     <style>
         /* ==================================================================
-           SALINK LOKASI-BANTUAN v10.1 — TELKOMSEL REDESIGN
+           SALINK LOKASI-BANTUAN v13.0 — FINAL (INDUK)
            ==================================================================
-           Tema    : Dark Navy #0a0e1a + Telkomsel Red #e60012
-           Font    : Inter (body) + Poppins (heading)
-           Layout  : Mobile-first, max 430px, centered
-           Fix     : Sidebar & Modal Peta Darurat — sesuai konsep user
+           File ini adalah INDUK untuk semua file SALINK
+           - Tema warna universal (dark/light)
+           - Header dengan Back button + Menu hamburger
+           - Sidebar dengan #sidebarMapBtn data-action="open-map"
+           - Modal Peta Darurat
+           - Modal Search + TOMBOL TUTUP di footer
+           - Modal Notif + FILTER + TANDAI SEMUA + MARK READ
+           - Bottom Nav + FAB universal
            ================================================================== */
 
         /* ============ ROOT VARIABLES ============ */
@@ -94,8 +98,6 @@
             --text-primary: #0a0e1a;
             --text-secondary: #4a5568;
             --text-muted: #9aa0ab;
-            --text-dark: #0a0e1a;
-            --text-white: #ffffff;
 
             --border-color: rgba(0,0,0,0.08);
             --border-light: rgba(0,0,0,0.06);
@@ -561,6 +563,7 @@
         }
         .primary-btn:active { transform: scale(0.97); }
         .primary-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+        .primary-btn.loading { pointer-events: none; opacity: 0.7; }
         .secondary-btn {
             display: inline-flex;
             align-items: center;
@@ -1029,6 +1032,37 @@
         .modal-close:active { transform: scale(0.9); }
         .modal-body { font-size: 0.75rem; }
 
+        /* ============ MODAL FOOTER (TUTUP) ============ */
+        .modal-footer {
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            position: sticky;
+            bottom: 0;
+            background: var(--modal-bg);
+            z-index: 2;
+        }
+        .modal-footer .btn-close-modal {
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 9px 26px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .modal-footer .btn-close-modal:active {
+            transform: scale(0.96);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
         /* ============ SEARCH MODAL ============ */
         .search-modal-content { max-width: 500px; max-height: 90vh; }
         .search-input-wrapper {
@@ -1294,6 +1328,14 @@
             color: var(--text-muted);
         }
 
+        /* ============ NOTIF FILTER BUTTONS ============ */
+        .notif-filter-btn.active {
+            background: var(--accent-blue-gradient) !important;
+            color: #fff !important;
+            border-color: var(--primary) !important;
+        }
+        .notif-filter-btn:active { transform: scale(0.96); }
+
         /* ============ FAB MODAL ============ */
         .fab-modal-overlay {
             position: fixed;
@@ -1413,28 +1455,16 @@
             font-weight: 500;
         }
         .fab-emergency-card.fire { border-color: rgba(248,81,73,0.4); }
-        .fab-emergency-card.fire:active {
-            background: rgba(248,81,73,0.15);
-            border-color: var(--emergency-fire);
-        }
+        .fab-emergency-card.fire:active { background: rgba(248,81,73,0.15); border-color: var(--emergency-fire); }
         .fab-emergency-card.fire .fab-card-label { color: var(--emergency-fire); }
         .fab-emergency-card.medical { border-color: rgba(79,195,247,0.4); }
-        .fab-emergency-card.medical:active {
-            background: rgba(79,195,247,0.15);
-            border-color: var(--emergency-medical);
-        }
+        .fab-emergency-card.medical:active { background: rgba(79,195,247,0.15); border-color: var(--emergency-medical); }
         .fab-emergency-card.medical .fab-card-label { color: var(--emergency-medical); }
         .fab-emergency-card.crime { border-color: rgba(240,208,128,0.4); }
-        .fab-emergency-card.crime:active {
-            background: rgba(240,208,128,0.15);
-            border-color: var(--emergency-crime);
-        }
+        .fab-emergency-card.crime:active { background: rgba(240,208,128,0.15); border-color: var(--emergency-crime); }
         .fab-emergency-card.crime .fab-card-label { color: var(--emergency-crime); }
         .fab-emergency-card.disaster { border-color: rgba(199,146,234,0.4); }
-        .fab-emergency-card.disaster:active {
-            background: rgba(199,146,234,0.15);
-            border-color: var(--emergency-disaster);
-        }
+        .fab-emergency-card.disaster:active { background: rgba(199,146,234,0.15); border-color: var(--emergency-disaster); }
         .fab-emergency-card.disaster .fab-card-label { color: var(--emergency-disaster); }
         .fab-modal-footer {
             text-align: center;
@@ -2011,499 +2041,11 @@
             .nav-fab { width: 64px; height: 64px; }
             .nav-fab .fab-emoji { font-size: 1.7rem; }
         }
-        /* ================================================================
-   PATCH UNIVERSAL v11.0 — AUTO COLOR THEME (DARK/LIGHT)
-   ================================================================
-   Integrasi dengan Dashboard: Toggle Switch 🌙/☀️ mengubah
-   semua warna teks, background, border secara otomatis.
-   ================================================================ */
-
-/* ─── 1. TRANSISI GLOBAL ─── */
-body, body * {
-    transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
-}
-
-/* ─── 2. BODY & BASE TEXT ─── */
-body {
-    color: var(--text-primary) !important;
-}
-
-h1, h2, h3, h4, h5, h6 {
-    color: var(--text-primary) !important;
-}
-
-p, span, div, li, td, th, label, strong, em, small, b, i {
-    color: inherit;
-}
-
-/* ─── 3. LINKS ─── */
-a {
-    color: var(--primary);
-    text-decoration: none;
-    transition: color 0.2s ease;
-}
-a:hover { color: var(--primary-glow); }
-
-/* ─── 4. INPUT & FORM ─── */
-input,
-textarea,
-select,
-button {
-    color: var(--text-primary);
-    font-family: inherit;
-}
-
-input::placeholder,
-textarea::placeholder {
-    color: var(--text-muted) !important;
-    opacity: 1;
-}
-
-input:focus,
-textarea:focus,
-select:focus {
-    color: var(--text-primary);
-    background: var(--bg-input);
-    border-color: var(--primary);
-}
-
-select option {
-    background: var(--bg-card);
-    color: var(--text-primary);
-}
-
-/* ─── 5. FORCE FIX HARDBROKEN COLORS ─── */
-[style*="color: #fff"],
-[style*="color:#fff"],
-[style*="color: white"],
-[style*="color:white"] {
-    color: var(--text-primary) !important;
-}
-
-/* ─── 6. HEADER (app-bar) ─── */
-.app-title,
-.app-title .title-text {
-    color: var(--text-white) !important;
-}
-
-[data-theme="light"] .app-title,
-[data-theme="light"] .app-title .title-text {
-    color: var(--text-primary) !important;
-}
-
-[data-theme="light"] .user-btn,
-[data-theme="light"] .search-btn,
-[data-theme="light"] .menu-btn,
-[data-theme="light"] .back-btn,
-[data-theme="light"] .refresh-btn {
-    color: var(--text-primary) !important;
-    background: rgba(0,0,0,0.06);
-    border-color: rgba(0,0,0,0.1);
-}
-
-[data-theme="light"] .app-bar {
-    background: rgba(255,255,255,0.92);
-}
-
-/* ─── 7. SIDEBAR ─── */
-.sidebar {
-    color: var(--text-primary);
-    background: var(--bg-secondary) !important;
-}
-
-.sidebar-user-name { color: var(--text-primary); }
-.sidebar-user-email { color: var(--text-muted); }
-
-.nav-link { color: var(--text-primary); }
-.nav-link i { color: var(--accent-gold); }
-.nav-link.active { color: var(--primary); }
-.nav-link.active i { color: var(--primary); }
-
-[data-theme="light"] .sidebar {
-    background: #ffffff !important;
-}
-
-/* ─── 8. BOTTOM NAV ─── */
-.nav-item-bottom {
-    color: var(--text-muted);
-}
-
-.nav-item-bottom.active .nav-label {
-    color: var(--primary);
-}
-
-[data-theme="light"] .bottom-nav {
-    background: rgba(255,255,255,0.98);
-}
-
-[data-theme="light"] .nav-item-bottom .badge {
-    border-color: var(--footer-bg);
-}
-
-/* ─── 9. BRAND SECTION ─── */
-.brand-title { color: var(--text-primary) !important; }
-.brand-subtitle { color: var(--text-muted) !important; }
-.back-home-btn { color: var(--text-primary); }
-
-/* ─── 10. LOCATION PANEL ─── */
-.location-title { color: var(--text-primary) !important; }
-.location-description { color: var(--text-secondary) !important; }
-
-/* ─── 11. GPS STATUS ─── */
-.gps-title { color: var(--text-primary) !important; }
-.gps-detail { color: var(--text-secondary) !important; }
-
-/* ─── 12. FILTER & RADIUS ─── */
-.filter-title,
-.radius-title { color: var(--text-primary) !important; }
-
-.filter-btn,
-.radius-btn { color: var(--text-muted); }
-
-.filter-btn.active,
-.radius-btn.active {
-    color: #ffffff !important;
-}
-
-/* ─── 13. RESULTS ─── */
-.results-title { color: var(--text-primary) !important; }
-.results-count { color: var(--text-muted) !important; }
-
-/* ─── 14. CONTACT CARDS ─── */
-.contact-name { color: var(--text-primary) !important; }
-.contact-category { color: var(--text-muted) !important; }
-.info-row { color: var(--text-secondary) !important; }
-
-.contact-action { color: var(--text-muted); }
-.contact-action.phone { color: var(--success) !important; }
-.contact-action.whatsapp { color: #25D366 !important; }
-.contact-action.maps { color: var(--primary) !important; }
-
-/* ─── 15. STATE CARD ─── */
-.state-card .state-title { color: var(--text-primary) !important; }
-.state-card .state-text { color: var(--text-secondary) !important; }
-
-/* ─── 16. MODAL ─── */
-.modal-content,
-.modal-body,
-.modal-title { color: var(--text-primary) !important; }
-
-.modal-body p,
-.modal-body span,
-.modal-body div { color: var(--text-primary); }
-
-[data-theme="light"] .modal-content {
-    background: #ffffff !important;
-    color: var(--text-primary);
-}
-
-[data-theme="light"] .modal-header {
-    background: #ffffff;
-}
-
-/* ─── 17. SEARCH MODAL ─── */
-.search-section-title { color: var(--text-secondary) !important; }
-
-.search-result-item .result-title { color: var(--text-primary) !important; }
-.search-result-item .result-sub { color: var(--text-secondary) !important; }
-.search-result-item .result-arrow { color: var(--text-muted) !important; }
-
-.search-result-item mark {
-    background: rgba(240,208,128,0.3);
-    color: var(--text-primary);
-}
-
-.search-empty-state { color: var(--text-muted); }
-.search-empty-state h4 { color: var(--text-secondary); }
-
-/* ─── 18. NOTIF MODAL ─── */
-.notif-item { color: var(--text-primary); }
-.notif-item-title { color: var(--text-primary) !important; }
-.notif-item-message { color: var(--text-secondary) !important; }
-.notif-item-time { color: var(--text-muted) !important; }
-
-/* ─── 19. MAP MODAL ─── */
-.map-status-title { color: var(--text-primary) !important; }
-.map-status-desc { color: var(--text-muted) !important; }
-
-.map-info-row { color: var(--text-secondary) !important; }
-.map-info-row .info-label { color: var(--text-muted) !important; }
-.map-info-row .info-value { color: var(--text-primary) !important; }
-.map-info-row .info-value.coords {
-    color: var(--text-primary) !important;
-    font-family: 'Courier New', monospace;
-}
-
-.map-owner-name { color: var(--text-primary) !important; }
-.map-owner-loc { color: var(--text-muted) !important; }
-
-.map-address-row { color: var(--text-muted) !important; }
-.map-address-row .map-address-value { color: var(--text-primary) !important; }
-
-.map-services-label { color: var(--text-secondary) !important; }
-.map-service-card .service-label { color: inherit; }
-.map-service-card .service-desc { color: var(--text-muted) !important; }
-
-/* ─── 20. FAB MODAL (BARU) ─── */
-.fab-modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.9);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    z-index: 3000;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-.fab-modal-overlay.active {
-    display: flex !important;
-    opacity: 1;
-}
-
-.fab-modal-content {
-    background: var(--modal-bg);
-    border-radius: 24px;
-    max-width: 400px;
-    width: 100%;
-    max-height: 88vh;
-    overflow-y: auto;
-    padding: 22px 18px;
-    border: 1px solid var(--border-color);
-    animation: modalIn 0.35s cubic-bezier(.34,1.56,.64,1);
-    box-shadow: 0 0 60px rgba(230,0,18,0.3);
-    position: relative;
-    color: var(--text-primary);
-}
-
-.fab-modal-header {
-    text-align: center;
-    margin-bottom: 18px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid var(--border-color);
-    position: relative;
-}
-
-.fab-modal-header .fab-modal-siren {
-    font-size: 2.8rem;
-    display: inline-block;
-    animation: blink 1s ease-in-out infinite;
-    filter: drop-shadow(0 0 16px currentColor);
-    margin-bottom: 8px;
-    line-height: 1;
-}
-
-.fab-modal-header h3 {
-    font-size: 1.05rem;
-    font-weight: 800;
-    color: var(--text-primary);
-    letter-spacing: 0.3px;
-    margin-bottom: 4px;
-}
-
-.fab-modal-header p {
-    font-size: 0.68rem;
-    color: var(--text-muted);
-    line-height: 1.5;
-}
-
-.fab-modal-close {
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
-    color: var(--text-primary);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.85rem;
-    transition: transform 0.2s;
-    font-family: inherit;
-}
-
-.fab-modal-close:active { transform: scale(0.9); }
-
-.fab-emergency-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    margin-bottom: 14px;
-}
-
-.fab-emergency-card {
-    aspect-ratio: 1/1;
-    border-radius: 16px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    padding: 12px;
-    cursor: pointer;
-    border: 2px solid var(--border-color);
-    background: var(--bg-input);
-    transition: all 0.25s ease;
-    position: relative;
-    overflow: hidden;
-    font-family: inherit;
-}
-
-.fab-emergency-card:active { transform: scale(0.95); }
-
-.fab-emergency-card .fab-card-icon {
-    font-size: 2.2rem;
-    line-height: 1;
-    filter: drop-shadow(0 4px 12px currentColor);
-}
-
-.fab-emergency-card .fab-card-label {
-    font-size: 0.7rem;
-    font-weight: 800;
-    letter-spacing: 0.3px;
-    text-align: center;
-    line-height: 1.2;
-}
-
-.fab-emergency-card .fab-card-desc {
-    font-size: 0.55rem;
-    color: var(--text-muted);
-    text-align: center;
-    font-weight: 500;
-}
-
-.fab-emergency-card.fire { border-color: rgba(248,81,73,0.4); }
-.fab-emergency-card.fire:active {
-    background: rgba(248,81,73,0.15);
-    border-color: var(--emergency-fire);
-}
-.fab-emergency-card.fire .fab-card-label { color: var(--emergency-fire); }
-
-.fab-emergency-card.medical { border-color: rgba(79,195,247,0.4); }
-.fab-emergency-card.medical:active {
-    background: rgba(79,195,247,0.15);
-    border-color: var(--emergency-medical);
-}
-.fab-emergency-card.medical .fab-card-label { color: var(--emergency-medical); }
-
-.fab-emergency-card.crime { border-color: rgba(240,208,128,0.4); }
-.fab-emergency-card.crime:active {
-    background: rgba(240,208,128,0.15);
-    border-color: var(--emergency-crime);
-}
-.fab-emergency-card.crime .fab-card-label { color: var(--emergency-crime); }
-
-.fab-emergency-card.disaster { border-color: rgba(199,146,234,0.4); }
-.fab-emergency-card.disaster:active {
-    background: rgba(199,146,234,0.15);
-    border-color: var(--emergency-disaster);
-}
-.fab-emergency-card.disaster .fab-card-label { color: var(--emergency-disaster); }
-
-.fab-modal-footer {
-    text-align: center;
-    font-size: 0.62rem;
-    color: var(--text-muted);
-    padding-top: 12px;
-    border-top: 1px dashed var(--border-color);
-    line-height: 1.5;
-}
-
-/* ─── 21. FLOATING NOTIFICATION ─── */
-.floating-notification .notif-title { color: var(--text-primary); }
-.floating-notification .notif-message { color: var(--text-secondary); }
-.floating-notification .notif-subtitle { color: var(--text-muted); }
-
-[data-theme="light"] .floating-notification {
-    background: #ffffff;
-}
-
-/* ─── 22. TOAST ─── */
-.toast .toast-title { color: var(--text-primary); }
-.toast .toast-message { color: var(--text-secondary); }
-
-[data-theme="light"] .toast {
-    background: #ffffff;
-}
-
-/* ─── 23. PREVIEW OVERLAY ─── */
-.preview-overlay-content { color: var(--text-primary); }
-.preview-overlay-content h2 { color: var(--text-primary); }
-.preview-overlay-content p { color: var(--text-secondary); }
-
-[data-theme="light"] .preview-overlay-content {
-    background: #ffffff;
-}
-
-/* ─── 24. ANIMASI DARI DASHBOARD (untuk blink FAB) ─── */
-@keyframes blink {
-    0%, 100% {
-        color: #ff0000;
-        text-shadow: 0 0 16px rgba(255,0,0,0.8);
-        transform: scale(1);
-    }
-    50% {
-        color: #00C2FF;
-        text-shadow: 0 0 16px rgba(0,194,255,0.8);
-        transform: scale(1.08);
-    }
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-@keyframes fabFloat {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-4px); }
-}
-
-@keyframes fabRing {
-    0% { transform: scale(.9); opacity: .8; }
-    100% { transform: scale(1.3); opacity: 0; }
-}
-
-@keyframes modalIn {
-    from { transform: scale(0.9) translateY(30px); opacity: 0; }
-    to { transform: scale(1) translateY(0); opacity: 1; }
-}
-
-/* ─── 25. FIX: FAB ICON EMOJI ─── */
-.nav-fab .fab-emoji {
-    display: inline-block;
-    animation: blink 1s ease-in-out infinite;
-    filter: drop-shadow(0 0 8px currentColor);
-    font-size: 1.9rem;
-    line-height: 1;
-}
-
-/* ─── 26. RESPONSIVE FIX ─── */
-@media (max-width: 360px) {
-    .fab-emergency-card .fab-card-icon { font-size: 1.9rem; }
-    .fab-emergency-card .fab-card-label { font-size: 0.62rem; }
-    .fab-emergency-card .fab-card-desc { font-size: 0.5rem; }
-}
-
-/* ─── 27. FINAL SAFETY NET ─── */
-* { -webkit-text-fill-color: currentColor; }
-::-webkit-scrollbar-thumb { background: var(--primary); }
-:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
         /* ================================================================
-           PATCH v12.1 — FIX WARNA HEADER UNIVERSAL (KONSISTEN DENGAN
-           dashboard.html & lokasi-bantuan.html) + MODAL FOOTER TUTUP
+           PATCH UNIVERSAL — FIX WARNA HEADER + MODAL THEME
            ================================================================ */
 
-        /* ─── 1. TRANSISI GLOBAL ─── */
         body, body * {
             transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
         }
@@ -2511,11 +2053,9 @@ select option {
         h1, h2, h3, h4, h5, h6 { color: var(--text-primary) !important; }
         p, span, div, li, td, th, label, strong, em, small, b, i { color: inherit; }
 
-        /* ─── 2. LINKS ─── */
         a { color: var(--primary); text-decoration: none; transition: color 0.2s ease; }
         a:hover { color: var(--primary-glow); }
 
-        /* ─── 3. INPUT & FORM ─── */
         input, textarea, select, button {
             color: var(--text-primary);
             font-family: inherit;
@@ -2534,25 +2074,14 @@ select option {
             color: var(--text-primary);
         }
 
-        /* ─── 4. FORCE FIX HARDBROKEN COLORS ─── */
         [style*="color: #fff"], [style*="color:#fff"],
         [style*="color: white"], [style*="color:white"] {
             color: var(--text-primary) !important;
         }
 
-        /* ─── 5. HEADER (app-bar) — FIX UTAMA ─── */
-        .app-bar {
-            background: var(--header-bg) !important;
-            border-bottom: 1px solid var(--border-color) !important;
-        }
+        .app-bar { background: var(--header-bg) !important; border-bottom: 1px solid var(--border-color) !important; }
+        .app-title, .app-title .title-text { color: var(--text-white) !important; }
 
-        /* Logo & Title */
-        .app-title,
-        .app-title .title-text {
-            color: var(--text-white) !important;
-        }
-
-        /* Tombol header (menu, search, notif, user, back) — DARK THEME */
         .user-btn, .search-btn, .menu-btn, .back-btn, .refresh-btn {
             color: var(--text-white) !important;
             background: rgba(255,255,255,0.08) !important;
@@ -2565,14 +2094,9 @@ select option {
             background: rgba(230,0,18,0.2) !important;
         }
 
-        /* Tombol header — LIGHT THEME */
-        [data-theme="light"] .app-bar {
-            background: rgba(255,255,255,0.92) !important;
-        }
+        [data-theme="light"] .app-bar { background: rgba(255,255,255,0.92) !important; }
         [data-theme="light"] .app-title,
-        [data-theme="light"] .app-title .title-text {
-            color: var(--text-primary) !important;
-        }
+        [data-theme="light"] .app-title .title-text { color: var(--text-primary) !important; }
         [data-theme="light"] .user-btn,
         [data-theme="light"] .search-btn,
         [data-theme="light"] .menu-btn,
@@ -2583,19 +2107,10 @@ select option {
             border-color: rgba(0,0,0,0.1) !important;
         }
 
-        /* Badge notif di header */
-        #headerNotifBtn #notifBadge {
-            border-color: var(--header-bg) !important;
-        }
-        [data-theme="light"] #headerNotifBtn #notifBadge {
-            border-color: var(--header-bg) !important;
-        }
+        #headerNotifBtn #notifBadge { border-color: var(--header-bg) !important; }
+        [data-theme="light"] #headerNotifBtn #notifBadge { border-color: var(--header-bg) !important; }
 
-        /* ─── 6. SIDEBAR — KONSISTEN TEMA ─── */
-        .sidebar {
-            background: var(--bg-secondary) !important;
-            color: var(--text-primary);
-        }
+        .sidebar { background: var(--bg-secondary) !important; color: var(--text-primary); }
         .sidebar-user-name { color: var(--text-primary); }
         .sidebar-user-email { color: var(--text-muted); }
         .nav-link { color: var(--text-primary); }
@@ -2604,97 +2119,40 @@ select option {
         .nav-link.active i { color: var(--primary); }
         [data-theme="light"] .sidebar { background: #ffffff !important; }
 
-        /* ─── 7. BOTTOM NAV — KONSISTEN TEMA ─── */
         .nav-item-bottom { color: var(--text-muted); }
         .nav-item-bottom.active .nav-label { color: var(--primary); }
-        [data-theme="light"] .bottom-nav {
-            background: rgba(255,255,255,0.98) !important;
-        }
-        [data-theme="light"] .nav-item-bottom .badge {
-            border-color: var(--footer-bg) !important;
-        }
+        [data-theme="light"] .bottom-nav { background: rgba(255,255,255,0.98) !important; }
+        [data-theme="light"] .nav-item-bottom .badge { border-color: var(--footer-bg) !important; }
 
-        /* ─── 8. MODAL — KONSISTEN TEMA ─── */
-        .modal-content, .modal-body, .modal-title {
-            color: var(--text-primary) !important;
-        }
-        .modal-body p, .modal-body span, .modal-body div {
-            color: var(--text-primary);
-        }
-        [data-theme="light"] .modal-content {
-            background: #ffffff !important;
-            color: var(--text-primary);
-        }
-        [data-theme="light"] .modal-header {
-            background: #ffffff;
-        }
-
-        /* ─── 9. MODAL FOOTER + TOMBOL TUTUP (SESUAI DASHBOARD) ─── */
-        .modal-footer {
-            margin-top: 14px;
-            padding-top: 12px;
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            position: sticky;
-            bottom: 0;
-            background: var(--modal-bg);
-            z-index: 2;
-        }
-        .modal-footer .btn-close-modal {
-            background: var(--bg-input);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 9px 26px;
-            font-size: 0.72rem;
-            font-weight: 700;
-            cursor: pointer;
-            font-family: inherit;
-            transition: all 0.2s;
-        }
-        .modal-footer .btn-close-modal:active {
-            transform: scale(0.96);
-            border-color: var(--primary);
-            color: var(--primary);
-        }
-        [data-theme="light"] .modal-footer {
-            background: #ffffff;
-        }
+        .modal-content, .modal-body, .modal-title { color: var(--text-primary) !important; }
+        .modal-body p, .modal-body span, .modal-body div { color: var(--text-primary); }
+        [data-theme="light"] .modal-content { background: #ffffff !important; color: var(--text-primary); }
+        [data-theme="light"] .modal-header { background: #ffffff; }
+        [data-theme="light"] .modal-footer { background: #ffffff; }
         [data-theme="light"] .modal-footer .btn-close-modal {
             background: rgba(0,0,0,0.04);
             color: var(--text-primary);
             border-color: rgba(0,0,0,0.1);
         }
 
-        /* ─── 10. SEARCH MODAL — FIX TEXT COLOR ─── */
         .search-section-title { color: var(--text-secondary) !important; }
         .search-result-item .result-title { color: var(--text-primary) !important; }
         .search-result-item .result-sub { color: var(--text-secondary) !important; }
         .search-result-item .result-arrow { color: var(--text-muted) !important; }
-        .search-result-item mark {
-            background: rgba(240,208,128,0.3);
-            color: var(--text-primary);
-        }
+        .search-result-item mark { background: rgba(240,208,128,0.3); color: var(--text-primary); }
         .search-empty-state { color: var(--text-muted); }
         .search-empty-state h4 { color: var(--text-secondary); }
 
-        /* ─── 11. NOTIF MODAL — FIX TEXT COLOR ─── */
         .notif-item { color: var(--text-primary); }
         .notif-item-title { color: var(--text-primary) !important; }
         .notif-item-message { color: var(--text-secondary) !important; }
         .notif-item-time { color: var(--text-muted) !important; }
 
-        /* ─── 12. PREVIEW OVERLAY ─── */
         .preview-overlay-content { color: var(--text-primary); }
         .preview-overlay-content h2 { color: var(--text-primary); }
         .preview-overlay-content p { color: var(--text-secondary); }
-        [data-theme="light"] .preview-overlay-content {
-            background: #ffffff;
-        }
+        [data-theme="light"] .preview-overlay-content { background: #ffffff; }
 
-        /* ─── 13. TOAST & FLOATING ─── */
         .toast .toast-title { color: var(--text-primary); }
         .toast .toast-message { color: var(--text-secondary); }
         [data-theme="light"] .toast { background: #ffffff; }
@@ -2704,16 +2162,12 @@ select option {
         .floating-notification .notif-subtitle { color: var(--text-muted); }
         [data-theme="light"] .floating-notification { background: #ffffff; }
 
-        /* ─── 14. MAP MODAL — FIX COLOR ─── */
         .map-status-title { color: var(--text-primary) !important; }
         .map-status-desc { color: var(--text-muted) !important; }
         .map-info-row { color: var(--text-secondary) !important; }
         .map-info-row .info-label { color: var(--text-muted) !important; }
         .map-info-row .info-value { color: var(--text-primary) !important; }
-        .map-info-row .info-value.coords {
-            color: var(--text-primary) !important;
-            font-family: 'Courier New', monospace;
-        }
+        .map-info-row .info-value.coords { color: var(--text-primary) !important; font-family: 'Courier New', monospace; }
         .map-owner-name { color: var(--text-primary) !important; }
         .map-owner-loc { color: var(--text-muted) !important; }
         .map-address-row { color: var(--text-muted) !important; }
@@ -2721,12 +2175,10 @@ select option {
         .map-services-label { color: var(--text-secondary) !important; }
         .map-service-card .service-desc { color: var(--text-muted) !important; }
 
-        /* ─── 15. FINAL SAFETY NET ─── */
         * { -webkit-text-fill-color: currentColor; }
         ::-webkit-scrollbar-thumb { background: var(--primary); }
         :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-
-</style>
+    </style>
 </head>
 <body>
 
@@ -2735,9 +2187,7 @@ select option {
     <!-- ============================================================ -->
     <div class="app-shell">
 
-    <!-- ============================================================ -->
-    <!-- FLOATING NOTIFICATION                                         -->
-    <!-- ============================================================ -->
+    <!-- FLOATING NOTIFICATION -->
     <div class="floating-notification" id="floatingNotification">
         <div class="notif-icon" id="floatingIcon"><i class="fas fa-bell"></i></div>
         <div class="notif-content">
@@ -2751,9 +2201,7 @@ select option {
         </button>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- PREVIEW OVERLAY                                               -->
-    <!-- ============================================================ -->
+    <!-- PREVIEW OVERLAY -->
     <div class="preview-overlay" id="previewOverlay">
         <div class="preview-overlay-content">
             <div class="overlay-icon"><i class="fas fa-lock"></i></div>
@@ -2776,12 +2224,8 @@ select option {
         <span class="login-link" id="badgeLoginLink">Masuk untuk berinteraksi</span>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- HEADER — KONSISTEN DASHBOARD                                  -->
-    <!-- [☰ Menu] [🚨 SALINK] [🔍] [🔔] [🌙] [👤] [← Back]              -->
-    <!-- ============================================================ -->
+    <!-- HEADER — KONSISTEN DENGAN ALERT-SEKITAR -->
     <header class="app-bar" id="appBar">
-        <!-- KIRI: Menu ☰ + Logo 🚨 -->
         <div class="header-left">
             <button class="menu-btn" id="menuBtn" type="button" title="Menu" aria-label="Menu">
                 <i class="fas fa-bars"></i>
@@ -2792,7 +2236,6 @@ select option {
             </a>
         </div>
 
-        <!-- TENGAH: Search 🔍 + Notif 🔔 -->
         <div class="header-center">
             <button class="search-btn" id="headerSearchBtn" type="button" title="Cari" aria-label="Cari">
                 <i class="fas fa-search"></i>
@@ -2803,7 +2246,6 @@ select option {
             </button>
         </div>
 
-        <!-- KANAN: Theme Toggle + User + Back -->
         <div class="header-right">
             <div class="theme-toggle" id="themeToggle" role="button" aria-label="Ganti tema" tabindex="0">
                 <div class="toggle-thumb" id="toggleThumb">
@@ -2819,9 +2261,7 @@ select option {
         </div>
     </header>
 
-    <!-- ============================================================ -->
-    <!-- SIDEBAR HAMBURGER — SLIDE FROM LEFT                           -->
-    <!-- ============================================================ -->
+    <!-- SIDEBAR -->
     <div class="sidebar-overlay-bg" id="sidebarOverlay"></div>
     <div class="sidebar" id="sidebar" role="navigation" aria-label="Menu Utama">
         <button class="sidebar-close" id="sidebarClose" type="button" aria-label="Tutup Menu">
@@ -2837,7 +2277,6 @@ select option {
         </div>
 
         <ul class="nav-menu">
-            <!-- MENU UTAMA -->
             <li class="nav-item">
                 <a href="dashboard.html" class="nav-link">
                     <i class="fas fa-home"></i>
@@ -2851,7 +2290,6 @@ select option {
                 </a>
             </li>
 
-            <!-- MENU DARURAT -->
             <div class="nav-section-title">🚨 MENU DARURAT</div>
             <li class="nav-item">
                 <button type="button" class="nav-link" id="sidebarMapBtn" data-action="open-map">
@@ -2884,7 +2322,6 @@ select option {
                 </a>
             </li>
 
-            <!-- STATISTIK -->
             <div class="nav-section-title">📊 STATISTIK</div>
             <li class="nav-item">
                 <a href="statistik-emergency.html" class="nav-link">
@@ -2905,7 +2342,6 @@ select option {
                 </a>
             </li>
 
-            <!-- LOGOUT -->
             <li class="nav-item nav-logout" id="logoutNavItem" style="display:none;">
                 <a href="#" class="nav-link" id="logoutBtn">
                     <i class="fas fa-sign-out-alt"></i>
@@ -2915,9 +2351,7 @@ select option {
         </ul>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- MAIN CONTENT                                                  -->
-    <!-- ============================================================ -->
+    <!-- MAIN CONTENT -->
     <main class="main-content">
 
         <!-- BRAND SECTION -->
@@ -2944,7 +2378,7 @@ select option {
             <div class="location-actions">
                 <button class="primary-btn" id="locationBtn" type="button">
                     <i class="fas fa-map-marker-alt"></i>
-                    <span>Gunakan Lokasi Saya</span>
+                    <span id="locationBtnText">Gunakan Lokasi Saya</span>
                 </button>
                 <button class="secondary-btn" id="refreshBtn" type="button">
                     <i class="fas fa-sync-alt"></i>
@@ -3012,9 +2446,7 @@ select option {
 
     </main>
 
-    <!-- ============================================================ -->
-    <!-- BOTTOM NAVIGATION                                             -->
-    <!-- ============================================================ -->
+    <!-- BOTTOM NAV -->
     <nav class="bottom-nav" id="sl-bottom-nav" role="navigation" aria-label="Main Navigation">
         <a href="dashboard.html" class="nav-item-bottom" data-workspace="home" aria-label="Home">
             <span class="nav-icon">🏠</span>
@@ -3043,7 +2475,7 @@ select option {
     </div> <!-- /app-shell -->
 
     <!-- ============================================================ -->
-    <!-- MODAL SEARCH — DENGAN TOMBOL TUTUP (KONSISTEN DASHBOARD)      -->
+    <!-- MODAL SEARCH — DENGAN TOMBOL TUTUP                            -->
     <!-- ============================================================ -->
     <div class="modal-overlay" id="searchModal">
         <div class="modal-content search-modal-content">
@@ -3078,13 +2510,6 @@ select option {
                         <i class="fas fa-exclamation-triangle"></i> Emergency
                     </button>
                 </div>
-                <div class="search-filter-row" id="emergencyFilters" style="display:none;">
-                    <button class="search-filter-chip active" data-filter="all" type="button">🎯 Semua</button>
-                    <button class="search-filter-chip" data-filter="fire" type="button">🔥 Kebakaran</button>
-                    <button class="search-filter-chip" data-filter="medical" type="button">🚑 Medis</button>
-                    <button class="search-filter-chip" data-filter="crime" type="button">🚓 Kriminal</button>
-                    <button class="search-filter-chip" data-filter="disaster" type="button">🌪️ Bencana</button>
-                </div>
                 <div id="searchResultsBody">
                     <div id="searchDefaultView">
                         <div class="search-empty-state">
@@ -3102,9 +2527,9 @@ select option {
             </div>
         </div>
     </div>
-    
+
     <!-- ============================================================ -->
-    <!-- MODAL NOTIFIKASI — DENGAN TOMBOL TUTUP (KONSISTEN DASHBOARD)  -->
+    <!-- MODAL NOTIFIKASI — LENGKAP DENGAN FILTER + TANDAI SEMUA       -->
     <!-- ============================================================ -->
     <div class="modal-overlay" id="notifModal">
         <div class="modal-content" style="max-width:460px;">
@@ -3119,12 +2544,32 @@ select option {
                 </button>
             </div>
             <div class="modal-body">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:7px 10px;background:var(--bg-input);border-radius:10px;">
-                    <span style="font-size:0.62rem;color:var(--text-secondary);">
+                <!-- FILTER TABS -->
+                <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+                    <button class="notif-filter-btn active" data-filter="all" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                        <i class="fas fa-list"></i> Semua
+                    </button>
+                    <button class="notif-filter-btn" data-filter="unread" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                        <i class="fas fa-circle"></i> Belum
+                    </button>
+                    <button class="notif-filter-btn" data-filter="emergency" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                        <i class="fas fa-exclamation-triangle"></i> Darurat
+                    </button>
+                    <button class="notif-filter-btn" data-filter="regular" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                        <i class="fas fa-bell"></i> Biasa
+                    </button>
+                </div>
+                <!-- STATISTIK + TANDAI SEMUA -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:7px 10px;background:rgba(255,255,255,0.04);border-radius:10px;">
+                    <span style="font-size:0.62rem;color:#a8b2c1;">
                         <i class="fas fa-info-circle" style="color:var(--primary);"></i>
                         <span id="notifStatsText">0 notifikasi</span>
                     </span>
+                    <button id="markAllReadBtn" type="button" style="padding:5px 12px;background:var(--accent-blue-gradient);color:#fff;border:none;border-radius:8px;font-size:0.6rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                        <i class="fas fa-check-double"></i> Tandai Semua
+                    </button>
                 </div>
+                <!-- LIST NOTIF -->
                 <div id="notifList" style="max-height:380px;overflow-y:auto;"></div>
             </div>
             <div class="modal-footer">
@@ -3133,9 +2578,8 @@ select option {
         </div>
     </div>
 
-        <!-- ============================================================ -->
-    <!-- FAB MODAL — GRID 2x2 EMERGENCY (INTEGRASI DASHBOARD)         -->
-    <!-- Trigger: FAB 🚨 di Bottom Nav → Modal → Redirect ke Dashboard -->
+    <!-- ============================================================ -->
+    <!-- FAB MODAL — GRID 2×2 EMERGENCY                                -->
     <!-- ============================================================ -->
     <div class="fab-modal-overlay" id="fabModalOverlay">
         <div class="fab-modal-content" id="fabModalContent">
@@ -3180,8 +2624,7 @@ select option {
     </div>
 
     <!-- ============================================================ -->
-    <!-- 🗺️ MODAL PETA DARURAT                                        -->
-    <!-- Dibuka dari Sidebar → Menu "Peta Darurat"                     -->
+    <!-- MODAL PETA DARURAT                                            -->
     <!-- ============================================================ -->
     <div class="modal-overlay" id="mapModal">
         <div class="modal-content">
@@ -3196,7 +2639,6 @@ select option {
             </div>
             <div class="modal-body">
 
-                <!-- Card 1: Status Lokasi -->
                 <div class="map-status-card" id="mapStatusCard">
                     <span class="map-status-icon" id="mapStatusIcon">📍</span>
                     <div class="map-status-title" id="mapStatusTitle">Lokasi belum terdeteksi</div>
@@ -3209,7 +2651,6 @@ select option {
                     </button>
                 </div>
 
-                <!-- Card 2: Info Wilayah + Koordinat -->
                 <div class="map-info-card">
                     <div class="map-info-row">
                         <span class="info-icon">🏠</span>
@@ -3227,7 +2668,6 @@ select option {
                     </div>
                 </div>
 
-                <!-- Card 3: Pemilik Akun -->
                 <div class="map-owner-card">
                     <div class="map-owner-avatar" id="mapOwnerAvatar">
                         <i class="fas fa-user"></i>
@@ -3238,7 +2678,6 @@ select option {
                     </div>
                 </div>
 
-                <!-- Peta Google Maps -->
                 <div class="map-iframe-wrap">
                     <iframe id="mapIframe" src="about:blank" loading="lazy" allowfullscreen></iframe>
                 </div>
@@ -3247,7 +2686,6 @@ select option {
                     <span class="map-address-value" id="mapAddressValue">🗺️ Menunggu lokasi...</span>
                 </div>
 
-                <!-- Grid 2x2 Bantuan -->
                 <div class="map-services-label">🚨 Bantuan Terdekat</div>
                 <div class="map-services-grid">
                     <button type="button" class="map-service-card fire" data-search="DAMKAR terdekat">
@@ -3272,7 +2710,6 @@ select option {
                     </button>
                 </div>
 
-                <!-- Tombol Action -->
                 <div class="map-actions-row">
                     <a href="#" class="map-action-btn primary" id="mapOpenGmaps" target="_blank" rel="noopener">
                         <i class="fas fa-external-link-alt"></i>
@@ -3288,30 +2725,28 @@ select option {
         </div>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- TOAST CONTAINER                                               -->
-    <!-- ============================================================ -->
+    <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
+    <!-- ============================================================ -->
+    <!-- SCRIPT — LOKASI-BANTUAN JAVASCRIPT v13.0                      -->
+    <!-- Konsisten dengan alert-sekitar.html + Dashboard INDUK         -->
+    <!-- ============================================================ -->
     <script>
-
 /* ====================================================================
- * SALINK LOKASI-BANTUAN v12.0 — INTEGRATED WITH DASHBOARD
+ * SALINK LOKASI-BANTUAN v13.0 — FINAL
  * ====================================================================
- * Perubahan dari v10.1:
- * - ✅ Tema warna universal (toggle switch friendly)
- * - ✅ FAB 🚨 → Modal 2×2 → redirect dashboard.html?emergency=TYPE
- * - ✅ Expose semua fungsi ke global (untuk onclick HTML)
- * - ✅ Handler notifikasi lengkap (badge + mark read)
- * - ✅ Sinkronisasi tema dengan dashboard.html
- * - ✅ PWA Install + Notif + Search + Sidebar (dipertahankan)
- *
- * Yang TIDAK diubah:
- * - Struktur design UI/UX, tata letak, warna, bentuk
- * - Sistem GPS, filter, radius, contact cards
- * - Modal Peta Darurat (design & sistem)
- * - Sidebar Hamburger (semua menu)
- * - FCM setup (dipertahankan)
+ * Fitur:
+ *   - Tema Universal (dark/light)
+ *   - PWA Install
+ *   - Header dengan Back button
+ *   - Sidebar dengan #sidebarMapBtn
+ *   - Modal Peta Darurat
+ *   - Modal Search + TOMBOL TUTUP footer
+ *   - Modal Notif LENGKAP: filter + tandai semua + mark read persistent
+ *   - GPS + Kontak Bantuan Terdekat
+ *   - FAB Modal 2×2 → dashboard.html?emergency=TYPE
+ *   - Bottom Nav + FAB universal
  * ==================================================================== */
 (function() {
     'use strict';
@@ -3325,6 +2760,8 @@ select option {
     const PROFILE_URL = 'profil.html';
     const DETAIL_URL = 'detail-emergency.html';
     const EMERGENCY_PAGE = 'lokasi-bantuan.html';
+    const EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
+    const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
 
     const EMERGENCY_LABELS = {
         fire: '🔥 Kebakaran',
@@ -3334,6 +2771,9 @@ select option {
     };
     const EMERGENCY_ICONS = {
         fire: '🔥', medical: '🚑', crime: '🚓', disaster: '🌪️'
+    };
+    const EMERGENCY_CSS_CLASS = {
+        fire: 'fire', medical: 'medical', crime: 'crime', disaster: 'disaster'
     };
 
     // ================================================================
@@ -3356,6 +2796,10 @@ select option {
     var mapCurrentLat = null;
     var mapCurrentLng = null;
     var _salinkSetup = false;
+
+    // Notif state
+    var notifFilter = 'all';
+    var readNotifs = {};
 
     // ================================================================
     // 3. HELPERS
@@ -3391,6 +2835,7 @@ select option {
         return km.toFixed(2) + ' km';
     }
     function getTimeAgo(ts) {
+        if (!ts) return '-';
         var diff = Date.now() - ts;
         var sec = Math.floor(diff / 1000);
         var min = Math.floor(sec / 60);
@@ -3435,13 +2880,12 @@ select option {
     }
 
     // ================================================================
-    // 5. THEME — UNIVERSAL (TOGGLE SWITCH FRIENDLY)
+    // 5. THEME
     // ================================================================
     function loadTheme() {
         var savedTheme = localStorage.getItem('salink_theme') || 'dark';
         applyTheme(savedTheme);
     }
-
     function applyTheme(theme) {
         if (theme === 'light') {
             currentTheme = 'light';
@@ -3461,23 +2905,19 @@ select option {
             updateThemeColorMeta('dark');
         }
     }
-
     function updateThemeColorMeta(theme) {
         var meta = document.getElementById('themeColorMeta');
         if (meta) {
             meta.setAttribute('content', theme === 'light' ? '#f5f7fa' : '#0a0e1a');
         }
     }
-
     function toggleTheme() {
         var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
         applyTheme(newTheme);
         localStorage.setItem('salink_theme', newTheme);
-        // Broadcast ke tab lain
         try {
             window.dispatchEvent(new StorageEvent('storage', {
-                key: 'salink_theme',
-                newValue: newTheme
+                key: 'salink_theme', newValue: newTheme
             }));
         } catch(e) {}
     }
@@ -3515,7 +2955,6 @@ select option {
             showToast('🎉 Selamat!', 'Aplikasi SALINK berhasil diinstall!', 'fa-rocket');
         });
     }
-
     function showInstallPrompt() {
         if (deferredPrompt) {
             deferredPrompt.prompt();
@@ -3578,7 +3017,6 @@ select option {
         notif.classList.add('active');
         floatingNotifTimeout = setTimeout(function() { hideFloatingNotification(); }, 10000);
     }
-
     function hideFloatingNotification() {
         var notif = document.getElementById('floatingNotification');
         if (notif) {
@@ -3624,8 +3062,10 @@ select option {
                     showPreviewOverlay();
                     return;
                 }
-                e.preventDefault(); e.stopPropagation();
-                window.location.href = PROFILE_URL;
+                if (target.id === 'userBtn') {
+                    e.preventDefault(); e.stopPropagation();
+                    window.location.href = PROFILE_URL;
+                }
                 return;
             }
             if (action === 'login') {
@@ -3688,7 +3128,6 @@ select option {
         updateSidebar();
         applyPreviewMode();
     }
-
     function updateUserUI() {
         var userBtn = document.getElementById('userBtn');
         if (!userBtn) return;
@@ -3703,7 +3142,6 @@ select option {
             userBtn.innerHTML = '<i class="fas ' + icon + '"></i>';
         }
     }
-
     function updateSidebar() {
         var nameEl = document.getElementById('sidebarUserName');
         var emailEl = document.getElementById('sidebarUserEmail');
@@ -3775,6 +3213,7 @@ select option {
     function getMyLocation() {
         log('getMyLocation() called');
         var btn = document.getElementById('locationBtn');
+        var btnText = document.getElementById('locationBtnText');
         if (isPreviewMode) {
             log('Preview mode ON — showing overlay');
             showPreviewOverlay();
@@ -3782,15 +3221,18 @@ select option {
         }
         if (btn) {
             btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mendapatkan...';
+            btn.classList.add('loading');
         }
+        if (btnText) btnText.textContent = 'Mendapatkan...';
+
         if (!navigator.geolocation) {
             showToast('⚠️ Error', 'Perangkat tidak mendukung GPS.', 'fa-exclamation-triangle');
             setGPSStatus('error', 'GPS tidak tersedia', 'Perangkat tidak mendukung layanan lokasi.');
             if (btn) {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-map-marker-alt"></i> Gunakan Lokasi Saya';
+                btn.classList.remove('loading');
             }
+            if (btnText) btnText.textContent = 'Gunakan Lokasi Saya';
             return;
         }
         log('Requesting GPS position...');
@@ -3799,14 +3241,17 @@ select option {
                 userLat = position.coords.latitude;
                 userLng = position.coords.longitude;
                 log('GPS success: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6));
-                localStorage.setItem('salink_user_lat', userLat);
-                localStorage.setItem('salink_user_lng', userLng);
+                try {
+                    localStorage.setItem('salink_user_lat', userLat);
+                    localStorage.setItem('salink_user_lng', userLng);
+                } catch(e) {}
                 setGPSStatus('success', 'Lokasi berhasil ditemukan', 'Koordinat GPS: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6));
                 showToast('✅ Berhasil', 'Lokasi Anda berhasil didapatkan!', 'fa-check-circle');
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-map-marker-alt"></i> Gunakan Lokasi Saya';
+                    btn.classList.remove('loading');
                 }
+                if (btnText) btnText.textContent = 'Gunakan Lokasi Saya';
                 loadContacts();
             },
             function(error) {
@@ -3819,8 +3264,9 @@ select option {
                 showToast('⚠️ Error', message, 'fa-exclamation-triangle');
                 if (btn) {
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-map-marker-alt"></i> Gunakan Lokasi Saya';
+                    btn.classList.remove('loading');
                 }
+                if (btnText) btnText.textContent = 'Gunakan Lokasi Saya';
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
         );
@@ -3976,23 +3422,7 @@ select option {
     }
 
     // ================================================================
-    // 19. LOGOUT
-    // ================================================================
-    function handleLogout() {
-        if (confirm('Apakah Anda yakin ingin keluar?')) {
-            currentUser = null;
-            ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies','salink_last_emergency_check_lokasi'].forEach(function(k) {
-                localStorage.removeItem(k);
-            });
-            updateUserUI();
-            updateSidebar();
-            showToast('👋 Logout Berhasil', 'Anda telah keluar dari akun', 'fa-sign-out-alt');
-            setTimeout(function() { window.location.href = DASHBOARD_URL + '?logout=1'; }, 500);
-        }
-    }
-
-    // ================================================================
-    // 20. MODAL HELPERS
+    // 19. MODAL HELPERS
     // ================================================================
     function openModalById(id) {
         var m = document.getElementById(id);
@@ -4010,40 +3440,61 @@ select option {
     }
 
     // ================================================================
-    // 21. NOTIF BADGE + MODAL
+    // 20. NOTIF MODAL — LENGKAP DENGAN FILTER + MARK READ
     // ================================================================
+    function loadReadNotifs() {
+        try {
+            readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}');
+        } catch(e) { readNotifs = {}; }
+    }
+    function saveReadNotifs() {
+        try {
+            localStorage.setItem('salink_read_notifs', JSON.stringify(readNotifs));
+        } catch(e) {}
+    }
+
     function getAllNotifications() {
         var list = [];
+        // Emergency notifications
         try {
             var allEmergencies = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
             allEmergencies.forEach(function(em) {
                 var ts = em.timestamp ? new Date(em.timestamp).getTime() : Date.now();
+                var isRead = readNotifs[em.id] === true;
                 list.push({
                     id: em.id,
                     type: 'emergency',
-                    emergencyType: em.type,
+                    emergencyType: em.type || em.emergencyType,
                     title: (EMERGENCY_ICONS[em.type] || '🚨') + ' ' + (EMERGENCY_LABELS[em.type] || 'Emergency'),
                     message: em.text || em.description || (em.sender + ' melaporkan darurat di ' + (em.location || '-')),
                     sender: em.sender || 'Sistem',
+                    senderUsername: em.senderUsername || '',
+                    location: em.location || em.address || '-',
                     timestamp: ts,
-                    read: false
+                    read: isRead
                 });
             });
         } catch(e) {}
+        // Regular notifications
         try {
             var notifs = JSON.parse(localStorage.getItem('salink_notifications') || '[]');
             notifs.forEach(function(n) {
+                var ts = n.timestamp ? new Date(n.timestamp).getTime() : Date.now();
+                var isRead = readNotifs[n.id] === true || n.read === 'TRUE' || n.read === true;
                 list.push({
                     id: n.id,
                     type: 'regular',
+                    notifType: n.type || n.soundKey || 'info',
                     title: n.title || 'Notifikasi',
-                    message: n.message || '',
+                    message: n.message || n.text || '',
                     sender: n.sender || 'Sistem',
-                    timestamp: n.timestamp ? new Date(n.timestamp).getTime() : Date.now(),
-                    read: n.read === 'TRUE' || n.read === true
+                    senderUsername: n.senderUsername || '',
+                    link: n.link || '',
+                    timestamp: ts,
+                    read: isRead
                 });
             });
-        } catch(e) {}
+        } catch (e) {}
         list.sort(function(a, b) { return b.timestamp - a.timestamp; });
         return list;
     }
@@ -4051,33 +3502,53 @@ select option {
     function updateNotifBadge() {
         var all = getAllNotifications();
         var unread = all.filter(function(n) { return !n.read; }).length;
-        var badge = document.getElementById('notifBadge');
-        if (badge) {
-            badge.textContent = unread > 99 ? '99+' : unread;
-            if (unread > 0) badge.classList.add('show');
-            else badge.classList.remove('show');
+        var nb = document.getElementById('notifBadge');
+        if (nb) {
+            nb.textContent = unread > 99 ? '99+' : unread;
+            nb.classList.toggle('show', unread > 0);
         }
-        var modalBadge = document.getElementById('notifModalBadge');
-        if (modalBadge) modalBadge.textContent = unread;
+        var nmb = document.getElementById('notifModalBadge');
+        if (nmb) nmb.textContent = unread;
     }
 
     function renderNotifList() {
         var listEl = document.getElementById('notifList');
         if (!listEl) return;
+
         var all = getAllNotifications();
-        if (all.length === 0) {
+        var filtered = all;
+
+        if (notifFilter === 'unread') {
+            filtered = all.filter(function(n) { return !n.read; });
+        } else if (notifFilter === 'emergency') {
+            filtered = all.filter(function(n) { return n.type === 'emergency'; });
+        } else if (notifFilter === 'regular') {
+            filtered = all.filter(function(n) { return n.type === 'regular'; });
+        }
+
+        var unreadCount = all.filter(function(n) { return !n.read; }).length;
+        var statsEl = document.getElementById('notifStatsText');
+        if (statsEl) statsEl.textContent = all.length + ' total • ' + unreadCount + ' belum dibaca';
+
+        var badgeEl = document.getElementById('notifModalBadge');
+        if (badgeEl) badgeEl.textContent = unreadCount;
+
+        updateNotifBadge();
+
+        if (filtered.length === 0) {
             listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">' +
                 '<i class="fas fa-bell-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i>' +
                 '<p style="font-size:0.75rem;">Tidak ada notifikasi</p></div>';
             return;
         }
-        listEl.innerHTML = all.slice(0, 30).map(function(n) {
+
+        listEl.innerHTML = filtered.slice(0, 30).map(function(n) {
             var iconHtml = n.type === 'emergency'
                 ? '<div class="notif-item-icon emergency">' + (EMERGENCY_ICONS[n.emergencyType] || '🚨') + '</div>'
                 : '<div class="notif-item-icon regular"><i class="fas fa-bell"></i></div>';
             var unreadClass = n.read ? '' : 'unread';
             var typeClass = n.type === 'emergency' ? 'emergency' : '';
-            return '<div class="notif-item ' + unreadClass + ' ' + typeClass + '" data-notif-id="' + escapeAttr(n.id) + '" data-notif-type="' + escapeAttr(n.type) + '">' +
+            return '<div class="notif-item ' + unreadClass + ' ' + typeClass + '" onclick="openNotifDetail(\'' + escapeAttr(n.id) + '\',\'' + escapeAttr(n.type) + '\')">' +
                 iconHtml +
                 '<div class="notif-item-content">' +
                     '<div class="notif-item-title">' + escapeHTML(n.title) + '</div>' +
@@ -4088,24 +3559,76 @@ select option {
         }).join('');
     }
 
+    function setupNotifFilters() {
+        document.querySelectorAll('.notif-filter-btn').forEach(function(btn) {
+            btn.onclick = function() {
+                document.querySelectorAll('.notif-filter-btn').forEach(function(b) {
+                    b.classList.remove('active');
+                });
+                this.classList.add('active');
+                notifFilter = this.dataset.filter || 'all';
+                renderNotifList();
+            };
+        });
+
+        var markAllBtn = document.getElementById('markAllReadBtn');
+        if (markAllBtn) {
+            markAllBtn.onclick = function() {
+                var allNotifs = getAllNotifications();
+                allNotifs.forEach(function(n) {
+                    readNotifs[n.id] = true;
+                });
+                saveReadNotifs();
+                renderNotifList();
+                updateNotifBadge();
+                showToast('✅', 'Semua notifikasi ditandai dibaca', 'fa-check-double');
+            };
+        }
+    }
+
+    function markNotifRead(id) {
+        if (!id) return;
+        readNotifs[id] = true;
+        saveReadNotifs();
+        updateNotifBadge();
+    }
+
     function openNotifModal() {
+        if (isPreviewMode) { showPreviewOverlay(); return; }
+        loadReadNotifs();
         openModalById('notifModal');
+        notifFilter = 'all';
+        document.querySelectorAll('.notif-filter-btn').forEach(function(b) {
+            b.classList.remove('active');
+        });
+        var allBtn = document.querySelector('.notif-filter-btn[data-filter="all"]');
+        if (allBtn) allBtn.classList.add('active');
+        setupNotifFilters();
         renderNotifList();
     }
-    function closeNotifModal() {
-        closeModalById('notifModal');
+
+    function closeNotifModal() { closeModalById('notifModal'); }
+
+    function openNotifDetail(id, type) {
+        if (id) {
+            markNotifRead(id);
+        }
+        closeNotifModal();
+        if (type === 'emergency' && id) {
+            setTimeout(function() {
+                window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(id);
+            }, 200);
+        }
     }
 
     // ================================================================
-    // 22. SEARCH MODAL
+    // 21. SEARCH MODAL
     // ================================================================
     function openSearchModal() {
+        if (isPreviewMode) { showPreviewOverlay(); return; }
         openModalById('searchModal');
         var input = document.getElementById('searchInput');
-        if (input) {
-            input.value = '';
-            setTimeout(function() { input.focus(); }, 200);
-        }
+        if (input) { input.value = ''; setTimeout(function() { input.focus(); }, 200); }
         var cb = document.getElementById('clearSearchBtn');
         if (cb) cb.classList.remove('visible');
         var sar = document.getElementById('searchActiveResults');
@@ -4128,11 +3651,10 @@ select option {
         var sdv = document.getElementById('searchDefaultView');
         if (sdv) sdv.style.display = 'block';
     }
-    function switchSearchTab(tab) {
+    function switchSearchTab(tab, btnEl) {
         searchTab = tab;
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
-        var activeTab = document.querySelector('.search-tab[data-tab="' + tab + '"]');
-        if (activeTab) activeTab.classList.add('active');
+        btnEl.classList.add('active');
         var input = document.getElementById('searchInput');
         if (input && input.value.trim()) performSearch(input.value.trim());
     }
@@ -4145,10 +3667,10 @@ select option {
             if (sdv) sdv.style.display = 'block';
             return;
         }
-        var sdv = document.getElementById('searchDefaultView');
-        if (sdv) sdv.style.display = 'none';
-        var sar = document.getElementById('searchActiveResults');
-        if (sar) sar.style.display = 'block';
+        var sdv2 = document.getElementById('searchDefaultView');
+        if (sdv2) sdv2.style.display = 'none';
+        var sar2 = document.getElementById('searchActiveResults');
+        if (sar2) sar2.style.display = 'block';
         var cb = document.getElementById('clearSearchBtn');
         if (cb) cb.classList.add('visible');
 
@@ -4219,10 +3741,10 @@ select option {
         if (totalCount === 0) {
             html = '<div class="search-empty-state"><div class="empty-big-icon">🔍</div><h4>Tidak ditemukan hasil</h4><p>Coba kata kunci lain.</p></div>';
         }
-        if (sar) sar.innerHTML = html;
+        if (sar2) sar2.innerHTML = html;
 
-        if (sar) {
-            sar.querySelectorAll('[data-user]').forEach(function(el) {
+        if (sar2) {
+            sar2.querySelectorAll('[data-user]').forEach(function(el) {
                 el.addEventListener('click', function() {
                     var username = this.getAttribute('data-user');
                     closeSearchModal();
@@ -4231,7 +3753,7 @@ select option {
                     }, 200);
                 });
             });
-            sar.querySelectorAll('[data-emergency-id]').forEach(function(el) {
+            sar2.querySelectorAll('[data-emergency-id]').forEach(function(el) {
                 el.addEventListener('click', function() {
                     var eid = this.getAttribute('data-emergency-id');
                     closeSearchModal();
@@ -4244,7 +3766,7 @@ select option {
     }
 
     // ================================================================
-    // 23. FAB MODAL — SAMA SEPERTI DASHBOARD
+    // 22. FAB MODAL
     // ================================================================
     function openFabModal() {
         var overlay = document.getElementById('fabModalOverlay');
@@ -4256,14 +3778,12 @@ select option {
         document.body.style.overflow = 'hidden';
         if (navigator.vibrate) navigator.vibrate(50);
     }
-
     function closeFabModal() {
         var overlay = document.getElementById('fabModalOverlay');
         if (!overlay) return;
         overlay.classList.remove('active');
         document.body.style.overflow = '';
     }
-
     function initFabModal() {
         var scanFab = document.getElementById('scanFab');
         var fabModalOverlay = document.getElementById('fabModalOverlay');
@@ -4276,9 +3796,7 @@ select option {
                 e.stopPropagation();
                 openFabModal();
             });
-            log('✓ scanFab listener attached');
         }
-
         if (fabModalClose) {
             fabModalClose.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -4286,51 +3804,38 @@ select option {
                 closeFabModal();
             });
         }
-
         if (fabModalOverlay) {
             fabModalOverlay.addEventListener('click', function(e) {
                 if (e.target === fabModalOverlay) closeFabModal();
             });
         }
-
-        // ⭐ INTI: Klik kartu emergency → redirect ke dashboard.html?emergency=TYPE
         fabEmergencyCards.forEach(function(card) {
             card.addEventListener('click', function(e) {
                 e.preventDefault();
                 e.stopPropagation();
                 var type = card.dataset.fabType;
                 if (!type) return;
-
-                log('🚨 FAB Emergency clicked: ' + type);
-
                 if (isPreviewMode) {
                     closeFabModal();
                     showPreviewOverlay();
                     return;
                 }
-
                 closeFabModal();
-
-                // Redirect ke dashboard.html dengan parameter emergency
                 setTimeout(function() {
                     window.location.href = DASHBOARD_URL + '?emergency=' + encodeURIComponent(type);
                 }, 250);
-
                 if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             });
         });
-
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape' && fabModalOverlay && fabModalOverlay.classList.contains('active')) {
                 closeFabModal();
             }
         });
-
-        log('✓ initFabModal() ready');
     }
 
     // ================================================================
-    // 24. MAP MODAL — PETA DARURAT
+    // 23. MAP MODAL — PETA DARURAT
     // ================================================================
     function openMapModal() {
         log('openMapModal() called');
@@ -4344,9 +3849,7 @@ select option {
         document.body.style.overflow = 'hidden';
         if (navigator.vibrate) navigator.vibrate(30);
         updateMapOwnerInfo();
-        log('Map modal opened');
     }
-
     function closeMapModal() {
         log('closeMapModal() called');
         var modal = document.getElementById('mapModal');
@@ -4354,7 +3857,6 @@ select option {
         modal.classList.remove('active');
         document.body.style.overflow = '';
     }
-
     function updateMapOwnerInfo() {
         var ownerNameEl = document.getElementById('mapOwnerName');
         var ownerLocEl = document.getElementById('mapOwnerLoc');
@@ -4365,7 +3867,6 @@ select option {
             var city = currentUser.city || '';
             var province = currentUser.province || '';
             var location = [city, province].filter(Boolean).join(', ') || 'Lokasi tidak diketahui';
-
             if (ownerNameEl) ownerNameEl.textContent = name;
             if (ownerLocEl) ownerLocEl.textContent = location;
             if (ownerAvatarEl) {
@@ -4389,7 +3890,6 @@ select option {
             applyMapCoords(mapCurrentLat, mapCurrentLng);
         }
     }
-
     function applyMapCoords(lat, lng) {
         var coordsEl = document.getElementById('mapCoords');
         if (coordsEl) coordsEl.textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
@@ -4404,7 +3904,6 @@ select option {
         if (iframe) {
             iframe.src = 'https://www.google.com/maps?q=' + lat + ',' + lng + '&z=15&output=embed';
         }
-
         var gmapsBtn = document.getElementById('mapOpenGmaps');
         if (gmapsBtn) {
             gmapsBtn.href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
@@ -4421,7 +3920,7 @@ select option {
 
         if (regionEl) {
             fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id', {
-                headers: { 'User-Agent': 'SALINK-App/12.0' }
+                headers: { 'User-Agent': 'SALINK-App/13.0' }
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -4437,7 +3936,6 @@ select option {
             });
         }
     }
-
     function activateMapGps() {
         log('activateMapGps() called');
         var btn = document.getElementById('mapLocationBtn');
@@ -4447,11 +3945,7 @@ select option {
             showToast('⚠️ GPS Tidak Tersedia', 'Browser tidak mendukung GPS', 'fa-exclamation-triangle');
             return;
         }
-
-        if (btn) {
-            btn.classList.add('loading');
-            btn.disabled = true;
-        }
+        if (btn) { btn.classList.add('loading'); btn.disabled = true; }
         if (btnText) btnText.textContent = '📍 Mengambil lokasi...';
 
         navigator.geolocation.getCurrentPosition(
@@ -4465,10 +3959,7 @@ select option {
                 localStorage.setItem('salink_user_lat', lat);
                 localStorage.setItem('salink_user_lng', lng);
 
-                if (btn) {
-                    btn.classList.remove('loading');
-                    btn.disabled = false;
-                }
+                if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
                 if (btnText) btnText.textContent = '✅ Refresh Lokasi';
 
                 applyMapCoords(lat, lng);
@@ -4483,17 +3974,13 @@ select option {
                     case 3: errMsg += 'Timeout. Coba lagi.'; break;
                     default: errMsg += error.message || 'Coba lagi.';
                 }
-                if (btn) {
-                    btn.classList.remove('loading');
-                    btn.disabled = false;
-                }
+                if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
                 if (btnText) btnText.textContent = '📍 Ambil Lokasi Saya';
                 showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle');
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
     }
-
     function mapSearchService(searchQuery) {
         var lat = mapCurrentLat;
         var lng = mapCurrentLng;
@@ -4504,6 +3991,22 @@ select option {
             url = 'https://www.google.com/maps/search/' + encodeURIComponent(searchQuery);
         }
         window.open(url, '_blank');
+    }
+
+    // ================================================================
+    // 24. LOGOUT
+    // ================================================================
+    function handleLogout() {
+        if (confirm('Apakah Anda yakin ingin keluar?')) {
+            currentUser = null;
+            ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies','salink_logged_in','salink_user_lat','salink_user_lng'].forEach(function(k) {
+                try { localStorage.removeItem(k); } catch(e) {}
+            });
+            updateUserUI();
+            updateSidebar();
+            showToast('👋 Logout Berhasil', 'Anda telah keluar dari akun', 'fa-sign-out-alt');
+            setTimeout(function() { window.location.href = DASHBOARD_URL + '?logout=1'; }, 500);
+        }
     }
 
     // ================================================================
@@ -4528,7 +4031,7 @@ select option {
     }
 
     // ================================================================
-    // 26. STORAGE EVENTS (Sinkronisasi dengan Dashboard)
+    // 26. STORAGE EVENTS
     // ================================================================
     function initStorageEvents() {
         window.addEventListener('storage', function(e) {
@@ -4552,7 +4055,7 @@ select option {
         _salinkSetup = true;
         log('Setting up event listeners...');
 
-        // === HEADER MENU ===
+        // HEADER MENU
         var menuBtn = document.getElementById('menuBtn');
         if (menuBtn) {
             menuBtn.addEventListener('click', function(e) {
@@ -4563,21 +4066,18 @@ select option {
             });
         }
 
-        // === SIDEBAR CLOSE ===
+        // SIDEBAR CLOSE + OVERLAY
         var sidebarClose = document.getElementById('sidebarClose');
         if (sidebarClose) {
             sidebarClose.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
+                e.preventDefault(); e.stopPropagation();
                 closeSidebar();
             });
         }
         var sidebarOverlay = document.getElementById('sidebarOverlay');
-        if (sidebarOverlay) {
-            sidebarOverlay.addEventListener('click', closeSidebar);
-        }
+        if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
 
-        // === SIDEBAR MAP BUTTON ===
+        // SIDEBAR MAP BUTTON
         var sidebarMapBtn = document.getElementById('sidebarMapBtn');
         if (sidebarMapBtn) {
             sidebarMapBtn.addEventListener('click', function(e) {
@@ -4589,18 +4089,7 @@ select option {
             });
         }
 
-        // Event delegation fallback
-        document.addEventListener('click', function(e) {
-            var mapBtn = e.target.closest('#sidebarMapBtn');
-            if (mapBtn) {
-                e.preventDefault();
-                e.stopPropagation();
-                closeSidebar();
-                setTimeout(function() { openMapModal(); }, 400);
-            }
-        });
-
-        // === LOGOUT ===
+        // LOGOUT
         var logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', function(e) {
@@ -4610,54 +4099,47 @@ select option {
             });
         }
 
-        // === HEADER SEARCH ===
+        // HEADER SEARCH
         var headerSearchBtn = document.getElementById('headerSearchBtn');
         if (headerSearchBtn) {
             headerSearchBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
+                e.preventDefault(); e.stopPropagation();
                 openSearchModal();
             });
         }
 
-        // === HEADER NOTIF ===
+        // HEADER NOTIF
         var headerNotifBtn = document.getElementById('headerNotifBtn');
         if (headerNotifBtn) {
             headerNotifBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
+                e.preventDefault(); e.stopPropagation();
                 openNotifModal();
             });
         }
 
-        // === THEME TOGGLE ===
+        // THEME TOGGLE
         var themeToggle = document.getElementById('themeToggle');
         if (themeToggle) {
             themeToggle.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
+                e.preventDefault(); e.stopPropagation();
                 toggleTheme();
             });
         }
 
-        // === BACK HOME ===
+        // BACK HOME
         var backHomeBtn = document.getElementById('backHomeBtn');
-        if (backHomeBtn) {
-            backHomeBtn.addEventListener('click', goHome);
-        }
+        if (backHomeBtn) backHomeBtn.addEventListener('click', goHome);
 
-        // === LOCATION BUTTON ===
+        // LOCATION BUTTON
         var locationBtn = document.getElementById('locationBtn');
         if (locationBtn) {
             locationBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                log('✓ locationBtn clicked');
+                e.preventDefault(); e.stopPropagation();
                 getMyLocation();
             });
         }
 
-        // === REFRESH BUTTON ===
+        // REFRESH BUTTON
         var refreshBtn = document.getElementById('refreshBtn');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', function(e) {
@@ -4666,13 +4148,11 @@ select option {
                 var icon = self.querySelector('i');
                 if (icon) icon.classList.add('fa-spin');
                 refreshContacts();
-                setTimeout(function() {
-                    if (icon) icon.classList.remove('fa-spin');
-                }, 2000);
+                setTimeout(function() { if (icon) icon.classList.remove('fa-spin'); }, 2000);
             });
         }
 
-        // === FILTER BUTTONS ===
+        // FILTER BUTTONS
         document.querySelectorAll('.filter-btn').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -4680,7 +4160,7 @@ select option {
             });
         });
 
-        // === RADIUS BUTTONS ===
+        // RADIUS BUTTONS
         document.querySelectorAll('.radius-btn').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -4688,23 +4168,21 @@ select option {
             });
         });
 
-        // === FAB MODAL ===
+        // FAB MODAL
         initFabModal();
 
-        // === MAP MODAL CLOSE ===
+        // MAP MODAL CLOSE
         var mapModalCloseBtn = document.getElementById('mapModalCloseBtn');
         if (mapModalCloseBtn) {
             mapModalCloseBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
+                e.preventDefault(); e.stopPropagation();
                 closeMapModal();
             });
         }
         var mapModalCloseFooter = document.getElementById('mapModalCloseFooter');
         if (mapModalCloseFooter) {
             mapModalCloseFooter.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
+                e.preventDefault(); e.stopPropagation();
                 closeMapModal();
             });
         }
@@ -4715,17 +4193,16 @@ select option {
             });
         }
 
-        // === MAP GPS BUTTON ===
+        // MAP GPS BUTTON
         var mapLocationBtn = document.getElementById('mapLocationBtn');
         if (mapLocationBtn) {
             mapLocationBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
+                e.preventDefault(); e.stopPropagation();
                 activateMapGps();
             });
         }
 
-        // === MAP SERVICE CARDS ===
+        // MAP SERVICE CARDS
         document.querySelectorAll('.map-service-card[data-search]').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -4735,10 +4212,9 @@ select option {
             });
         });
 
-        // === SEARCH MODAL ===
+        // SEARCH MODAL CLOSE
         var searchModalCloseBtn = document.getElementById('searchModalCloseBtn');
         if (searchModalCloseBtn) searchModalCloseBtn.addEventListener('click', closeSearchModal);
-                /* ─── FOOTER TOMBOL TUTUP SEARCH MODAL ─── */
         var searchModalFooterCloseBtn = document.getElementById('searchModalFooterCloseBtn');
         if (searchModalFooterCloseBtn) {
             searchModalFooterCloseBtn.addEventListener('click', function(e) {
@@ -4757,7 +4233,7 @@ select option {
         }
         document.querySelectorAll('.search-tab').forEach(function(t) {
             t.addEventListener('click', function() {
-                switchSearchTab(this.getAttribute('data-tab'));
+                switchSearchTab(this.getAttribute('data-tab'), this);
             });
         });
         var searchInput = document.getElementById('searchInput');
@@ -4775,10 +4251,9 @@ select option {
             });
         }
 
-        // === NOTIF MODAL ===
+        // NOTIF MODAL CLOSE
         var notifModalCloseBtn = document.getElementById('notifModalCloseBtn');
         if (notifModalCloseBtn) notifModalCloseBtn.addEventListener('click', closeNotifModal);
-                /* ─── FOOTER TOMBOL TUTUP NOTIF MODAL ─── */
         var notifModalFooterCloseBtn = document.getElementById('notifModalFooterCloseBtn');
         if (notifModalFooterCloseBtn) {
             notifModalFooterCloseBtn.addEventListener('click', function(e) {
@@ -4793,23 +4268,8 @@ select option {
                 if (e.target === notifModal) closeNotifModal();
             });
         }
-        var notifList = document.getElementById('notifList');
-        if (notifList) {
-            notifList.addEventListener('click', function(e) {
-                var item = e.target.closest('.notif-item');
-                if (!item) return;
-                var id = item.getAttribute('data-notif-id');
-                var type = item.getAttribute('data-notif-type');
-                closeNotifModal();
-                if (type === 'emergency' && id) {
-                    setTimeout(function() {
-                        window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(id);
-                    }, 200);
-                }
-            });
-        }
 
-        // === PREVIEW OVERLAY ===
+        // PREVIEW OVERLAY
         var overlayLoginBtn = document.getElementById('overlayLoginBtn');
         if (overlayLoginBtn) overlayLoginBtn.addEventListener('click', redirectToLogin);
         var overlayCancelBtn = document.getElementById('overlayCancelBtn');
@@ -4828,17 +4288,7 @@ select option {
             });
         }
 
-        // === BOTTOM INVITE NAV ===
-        var bottomInviteNav = document.getElementById('bottomInviteNav');
-        if (bottomInviteNav) {
-            bottomInviteNav.addEventListener('click', function(e) {
-                e.preventDefault();
-                if (isPreviewMode) { showPreviewOverlay(); return; }
-                showToast('📨 Invite', 'Buka dashboard untuk invite', 'fa-user-plus');
-            });
-        }
-
-        // === KEYBOARD SHORTCUTS ===
+        // KEYBOARD SHORTCUTS
         document.addEventListener('keydown', function(e) {
             if (e.key === '/' && !e.target.matches('input, textarea, select')) {
                 e.preventDefault();
@@ -4860,11 +4310,10 @@ select option {
     // 28. INIT
     // ================================================================
     function init() {
-        log('Initializing Lokasi Bantuan v12.0 (Integrated)...');
+        log('Initializing Lokasi Bantuan v13.0 FINAL...');
 
-        // Tema dulu (supaya warna benar sebelum render)
         loadTheme();
-
+        loadReadNotifs();
         setupPWA();
         loadCurrentUser();
         setupLoginGuard();
@@ -4872,7 +4321,6 @@ select option {
         initRipple();
         initStorageEvents();
 
-        // Update notif badge + interval
         updateNotifBadge();
         setInterval(updateNotifBadge, 30000);
 
@@ -4886,15 +4334,13 @@ select option {
             loadContacts();
         }
 
-        // Show preview overlay kalau belum login
         if (isPreviewMode) setTimeout(function() { showPreviewOverlay(); }, 1200);
 
-        log('✓ Lokasi Bantuan v12.0 Ready!');
+        log('✓ Lokasi Bantuan v13.0 Ready!');
         log('  Mode: ' + (isPreviewMode ? 'PREVIEW' : 'FULL'));
         log('  User: ' + (currentUser ? currentUser.username : 'Guest'));
     }
 
-    // Bootstrap
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
@@ -4902,7 +4348,7 @@ select option {
     }
 
     // ================================================================
-    // 29. EXPOSE GLOBAL (untuk onclick="" di HTML)
+    // 29. EXPOSE GLOBAL
     // ================================================================
     window.goHome = goHome;
     window.getMyLocation = getMyLocation;
@@ -4912,12 +4358,19 @@ select option {
     window.showToast = showToast;
     window.openSidebar = openSidebar;
     window.closeSidebar = closeSidebar;
+    window.toggleSidebar = toggleSidebar;
     window.openSearchModal = openSearchModal;
     window.closeSearchModal = closeSearchModal;
     window.clearSearch = clearSearch;
     window.switchSearchTab = switchSearchTab;
+    window.performSearch = performSearch;
     window.openNotifModal = openNotifModal;
     window.closeNotifModal = closeNotifModal;
+    window.renderNotifList = renderNotifList;
+    window.openNotifDetail = openNotifDetail;
+    window.updateNotifBadge = updateNotifBadge;
+    window.markNotifRead = markNotifRead;
+    window.setupNotifFilters = setupNotifFilters;
     window.openFabModal = openFabModal;
     window.closeFabModal = closeFabModal;
     window.openMapModal = openMapModal;
@@ -4930,8 +4383,9 @@ select option {
     window.hidePreviewOverlay = hidePreviewOverlay;
     window.activateMapGps = activateMapGps;
     window.mapSearchService = mapSearchService;
+    window.loadContacts = loadContacts;
 
-    log('✓ Lokasi Bantuan v12.0 Script Loaded');
+    log('✓ Lokasi Bantuan v13.0 Script Loaded');
 })();
     </script>
 
@@ -5042,5 +4496,3 @@ select option {
     </script>
 </body>
 </html>
-
-    
