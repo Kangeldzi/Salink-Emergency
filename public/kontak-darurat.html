@@ -18,15 +18,14 @@
 
     <style>
         /* ==================================================================
-           SALINK KONTAK-DARURAT v14.0 — FINAL (INDUK-COMPLIANT)
+           SALINK KONTAK-DARURAT v14.1 — FINAL (GPS 4-Layer Fallback)
            ==================================================================
            Fitur:
            - Auto-detect GPS saat buka halaman
+           - GPS 4-layer fallback (High → Low → Cache → IP-based)
            - Fetch kontak dari Google Spreadsheet (get_nearby_contacts)
            - Filter radius: 1.5/3/5/10 km / Semua Pos
            - Filter kategori: fire/medical/crime/disaster/general
-           - Fallback: tombol "Gunakan Lokasi Saya"
-           - Auto-expand radius kalau kosong
            - Section terpisah: Kontak Lokal + Nomor Nasional
            - Tema universal (dark/light) — konsisten INDUK
            ================================================================== */
@@ -668,7 +667,7 @@
             box-shadow: 0 4px 12px rgba(230,0,18,0.3);
         }
 
-        /* ============ RADIUS FILTER (BARU) ============ */
+        /* ============ RADIUS FILTER ============ */
         .radius-panel {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
@@ -982,7 +981,7 @@
             border-radius: 10px;
         }
 
-        /* ============ NATIONAL CONTACT (compact) ============ */
+        /* ============ NATIONAL CONTACT ============ */
         .national-contact-item {
             display: flex;
             align-items: center;
@@ -2457,7 +2456,7 @@
             </button>
         </div>
 
-        <!-- GPS STATUS PANEL — Auto-detect -->
+        <!-- GPS STATUS PANEL -->
         <section class="gps-panel loading" id="gpsPanel">
             <div class="gps-row">
                 <div class="gps-icon-wrap" id="gpsIconWrap">📡</div>
@@ -2505,7 +2504,7 @@
             </div>
         </div>
 
-        <!-- RADIUS FILTER (BARU) -->
+        <!-- RADIUS FILTER -->
         <div class="radius-panel">
             <div class="radius-label">
                 <span>📏</span>
@@ -2534,7 +2533,7 @@
             </button>
         </div>
 
-        <!-- CONTACT LIST — dari Google Spreadsheet -->
+        <!-- CONTACT LIST -->
         <div class="contact-grid" id="contactContainer">
             <div class="state-card">
                 <span class="spinner"></span>
@@ -2543,9 +2542,7 @@
             </div>
         </div>
 
-        <!-- ============================================================ -->
-        <!-- SECTION: NOMOR DARURAT NASIONAL (Fallback / Referensi)        -->
-        <!-- ============================================================ -->
+        <!-- SECTION: NOMOR DARURAT NASIONAL -->
         <div class="section-divider-header" id="nationalSectionHeader" style="display:none;">
             <i class="fas fa-flag"></i>
             <h3>Nomor Darurat Nasional</h3>
@@ -2553,9 +2550,7 @@
             <span class="section-count" id="nationalCount">0</span>
         </div>
 
-        <div id="nationalContainer" style="display:none;">
-            <!-- Diisi oleh JavaScript -->
-        </div>
+        <div id="nationalContainer" style="display:none;"></div>
 
     </main>
 
@@ -2667,7 +2662,6 @@
                 </button>
             </div>
             <div class="modal-body">
-                <!-- FILTER TABS -->
                 <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
                     <button class="notif-filter-btn active" data-filter="all" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
                         <i class="fas fa-list"></i> Semua
@@ -2682,7 +2676,6 @@
                         <i class="fas fa-bell"></i> Biasa
                     </button>
                 </div>
-                <!-- STATISTIK + TANDAI SEMUA -->
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:7px 10px;background:rgba(255,255,255,0.04);border-radius:10px;">
                     <span style="font-size:0.62rem;color:#a8b2c1;">
                         <i class="fas fa-info-circle" style="color:var(--primary);"></i>
@@ -2692,7 +2685,6 @@
                         <i class="fas fa-check-double"></i> Tandai Semua
                     </button>
                 </div>
-                <!-- LIST NOTIF -->
                 <div id="notifList" style="max-height:380px;overflow-y:auto;"></div>
             </div>
             <div class="modal-footer">
@@ -2851,27 +2843,28 @@
     <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
-    
         <!-- ============================================================ -->
-    <!-- SCRIPT — KONTAK DARURAT JAVASCRIPT v14.0 FINAL                -->
-    <!-- Konsisten dengan lokasi-bantuan.html + alert-sekitar.html     -->
+    <!-- SCRIPT — KONTAK DARURAT JAVASCRIPT v14.1 FINAL                -->
+    <!-- GPS 4-Layer Fallback (fix "Gunakan Lokasi Saya" gagal)        -->
     <!-- ============================================================ -->
     <script>
 /* ====================================================================
- * SALINK KONTAK-DARURAT v14.0 — FINAL
+ * SALINK KONTAK-DARURAT v14.1 — FINAL
  * ====================================================================
+ * FIX UTAMA v14.1:
+ *   - GPS 4-layer fallback: High → Low → Cache → IP-based
+ *   - Safety timeout (fix Chrome Mobile hang tanpa callback)
+ *   - Modal Peta Darurat juga pakai fallback berlapis
+ *   - Pesan error informatif per kode (1/2/3/0)
+ *
  * Fitur:
- *   - Auto-detect GPS saat buka halaman (Layer 1)
- *   - Fallback tombol "Gunakan Lokasi Saya" (Layer 2)
+ *   - Auto-detect GPS saat buka halaman
  *   - Fetch kontak dari Google Spreadsheet (get_nearby_contacts)
  *   - Filter radius: 1.5/3/5/10 km / Semua Pos
  *   - Filter kategori: fire/medical/crime/disaster/general
  *   - Auto-expand radius kalau kosong (1.5 → 3 → 5 → 10 → Semua)
- *   - Section "Kontak Lokal" (dari Spreadsheet) — utama
  *   - Section "Nomor Darurat Nasional" — fallback/referensi
  *   - Tema Universal (dark/light)
- *   - Header + Bottom Nav + FAB + Sidebar + Modal Peta Darurat
- *   - Modal Search + Notif lengkap
  *   - PWA + FCM
  * ==================================================================== */
 (function() {
@@ -2888,7 +2881,8 @@
     const EMERGENCY_PAGE = 'kontak-darurat.html';
     const EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
     const DEFAULT_RADIUS = 1.5;
-    const AUTO_EXPAND_RADII = [1.5, 3, 5, 10, 0]; // 0 = Semua Pos
+    const AUTO_EXPAND_RADII = [1.5, 3, 5, 10, 0];
+    const CACHE_MAX_AGE_MS = 30 * 60 * 1000; // 30 menit
 
     const EMERGENCY_LABELS = {
         fire: '🔥 Kebakaran',
@@ -2912,7 +2906,7 @@
     };
 
     // ================================================================
-    // 2. DATA NOMOR DARURAT NASIONAL (fallback/referensi)
+    // 2. DATA NOMOR DARURAT NASIONAL
     // ================================================================
     const NATIONAL_CONTACTS = [
         { id: 'nat-polisi-110', name: 'Polisi (Darurat)', number: '110', category: 'crime', icon: '🚓', description: 'Layanan darurat Polri 24 jam' },
@@ -2940,14 +2934,14 @@
     var userLng = null;
     var userAddress = '';
 
-    var allContactsFromSheet = [];       // Kontak dari Spreadsheet
-    var filteredContacts = [];            // Setelah filter
-    var currentCategory = 'all';          // 'all' | fire | medical | crime | disaster | general
-    var currentRadius = DEFAULT_RADIUS;   // 1.5 default
+    var allContactsFromSheet = [];
+    var filteredContacts = [];
+    var currentCategory = 'all';
+    var currentRadius = DEFAULT_RADIUS;
     var localSearchQuery = '';
 
     var isLoading = false;
-    var autoExpandIndex = 0;              // Untuk auto-expand radius
+    var autoExpandIndex = 0;
 
     var isSidebarOpen = false;
     var deferredPrompt = null;
@@ -2962,6 +2956,11 @@
     // Notif state
     var notifFilter = 'all';
     var readNotifs = {};
+
+    // GPS state
+    var _gpsAttempt = 0;
+    var _gpsHighAccuracy = true;
+    var _ipFallbackTried = false;
 
     // ================================================================
     // 4. HELPERS
@@ -3328,7 +3327,7 @@
     function goHome() { window.location.href = DASHBOARD_URL; }
 
     // ================================================================
-    // 14. GPS — Auto-detect + Manual
+    // 14. GPS — 4-LAYER FALLBACK STRATEGY
     // ================================================================
     function setGPSStatus(type, title, detail) {
         var panel = document.getElementById('gpsPanel');
@@ -3353,7 +3352,7 @@
             var url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id';
             fetch(url, {
                 method: 'GET',
-                headers: { 'User-Agent': 'SALINK-KontakDarurat/14.0' }
+                headers: { 'User-Agent': 'SALINK-KontakDarurat/14.1' }
             })
             .then(function(res) { return res.json(); })
             .then(function(data) {
@@ -3377,36 +3376,100 @@
         if (el) el.textContent = text;
     }
 
-    /**
-     * Auto-detect GPS — Layer 1
-     */
     function autoDetectLocation() {
-        log('autoDetectLocation() called');
+        log('autoDetectLocation() called — START');
+        _gpsAttempt = 0;
+        _gpsHighAccuracy = true;
+        _ipFallbackTried = false;
+        attemptGeolocation();
+    }
+
+    function getMyLocation() {
+        log('getMyLocation() called — MANUAL');
+        _gpsAttempt = 0;
+        _gpsHighAccuracy = true;
+        _ipFallbackTried = false;
+        autoExpandIndex = 0;
+        attemptGeolocation();
+    }
+
+    function attemptGeolocation() {
         var btn = document.getElementById('locationBtn');
         var btnText = document.getElementById('locationBtnText');
-        if (btn) btn.classList.add('loading');
-        if (btnText) btnText.textContent = '📍 Mendeteksi lokasi...';
-        setGPSStatus('loading', 'Mendeteksi lokasi Anda...', 'Mohon izinkan akses lokasi untuk menampilkan kontak darurat terdekat.');
 
         if (!navigator.geolocation) {
-            log('Geolocation not supported');
-            setGPSStatus('error', 'GPS tidak tersedia', 'Browser Anda tidak mendukung layanan lokasi. Silakan gunakan tombol manual.');
-            if (btn) btn.classList.remove('loading');
-            if (btnText) btnText.textContent = '📍 Gunakan Lokasi Saya';
-            renderEmptyContactState('no_gps');
+            log('❌ Geolocation API tidak tersedia');
+            _ipFallbackTried = false;
+            fallbackIpLocation();
             return;
         }
 
+        var isSecure = (window.isSecureContext === true) ||
+                       location.protocol === 'https:' ||
+                       location.hostname === 'localhost' ||
+                       location.hostname === '127.0.0.1';
+        if (!isSecure) {
+            log('❌ Bukan secure context');
+            handleGPSFailure({
+                code: 0,
+                message: 'Halaman harus diakses via HTTPS. Saat ini: ' + location.protocol
+            });
+            return;
+        }
+
+        _gpsAttempt++;
+        var high = _gpsHighAccuracy;
+
+        if (btn) {
+            btn.classList.add('loading');
+            btn.classList.remove('success');
+        }
+        if (btnText) {
+            btnText.textContent = high
+                ? '📍 Mencari sinyal GPS...'
+                : '📍 Mode cepat...';
+        }
+
+        setGPSStatus(
+            'loading',
+            high ? 'Mendeteksi lokasi (mode akurasi tinggi)...' : 'Mendeteksi lokasi (mode cepat)...',
+            high
+                ? 'Butuh 5-15 detik. Mohon tunggu sambil tetap di tempat.'
+                : 'Cek cepat via WiFi & sinyal seluler...'
+        );
+
+        var options = {
+            enableHighAccuracy: high,
+            timeout: high ? 10000 : 7000,
+            maximumAge: high ? 0 : 120000
+        };
+
+        log('🎯 Requesting GPS: attempt=' + _gpsAttempt + ' highAccuracy=' + high + ' timeout=' + options.timeout);
+
+        var _didRespond = false;
+        var _safetyTimeout = setTimeout(function() {
+            if (_didRespond) return;
+            log('⚠️ Safety timeout fired (Chrome hung) — force fallback');
+            _didRespond = true;
+            _handleGpsError({ code: 3, message: 'Browser timeout (safety)' });
+        }, options.timeout + 2000);
+
         navigator.geolocation.getCurrentPosition(
             function(position) {
+                if (_didRespond) return;
+                _didRespond = true;
+                clearTimeout(_safetyTimeout);
+
+                log('✅ GPS success: ' + position.coords.latitude.toFixed(6) + ', ' + position.coords.longitude.toFixed(6));
+
                 userLat = position.coords.latitude;
                 userLng = position.coords.longitude;
                 var accuracy = Math.round(position.coords.accuracy || 0);
-                log('Auto GPS success: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6));
 
                 try {
                     localStorage.setItem('salink_user_lat', userLat);
                     localStorage.setItem('salink_user_lng', userLng);
+                    localStorage.setItem('salink_user_lat_ts', String(Date.now()));
                 } catch(e) {}
 
                 updateBrandGpsInfo('GPS aktif: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6));
@@ -3422,40 +3485,152 @@
                 }
                 if (btnText) btnText.textContent = '✅ Refresh Lokasi';
 
-                // ⭐ Fetch kontak dari Spreadsheet
+                showToast('📍 Lokasi Ditemukan', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
+
                 autoExpandIndex = 0;
                 loadContactsFromSheet(true);
             },
             function(error) {
-                log('Auto GPS error: ' + error.code);
-                var errMsg = 'Gagal mengambil lokasi';
-                if (error.code === 1) errMsg = 'Izin lokasi ditolak. Silakan gunakan tombol manual.';
-                else if (error.code === 2) errMsg = 'Lokasi tidak tersedia. Coba di tempat terbuka.';
-                else if (error.code === 3) errMsg = 'Timeout. Coba lagi.';
-
-                setGPSStatus('error', '⚠️ Gagal Mendeteksi Lokasi', errMsg);
-                updateBrandGpsInfo('Lokasi belum tersedia');
-
-                if (btn) btn.classList.remove('loading');
-                if (btnText) btnText.textContent = '📍 Gunakan Lokasi Saya';
-
-                renderEmptyContactState('error');
+                if (_didRespond) return;
+                _didRespond = true;
+                clearTimeout(_safetyTimeout);
+                log('❌ GPS error code=' + error.code + ' msg=' + (error.message || ''));
+                _handleGpsError(error);
             },
-            {
-                enableHighAccuracy: true,
-                timeout: 15000,
-                maximumAge: 0
-            }
+            options
         );
     }
 
-    /**
-     * Manual location trigger — Layer 2
-     */
-    function getMyLocation() {
-        log('getMyLocation() called');
-        autoExpandIndex = 0;
-        autoDetectLocation();
+    function _handleGpsError(error) {
+        // Layer 1 → Layer 2: kalau high-accuracy gagal (kecuali permission denied), retry low-accuracy
+        if (_gpsHighAccuracy && _gpsAttempt < 2 && error.code !== 1) {
+            log('🔄 Retry Layer 2: enableHighAccuracy=false (lebih cepat)');
+            _gpsHighAccuracy = false;
+
+            var btnText = document.getElementById('locationBtnText');
+            if (btnText) btnText.textContent = '📍 Coba mode cepat...';
+            setGPSStatus('loading', 'Mencoba mode cepat...', 'Menggunakan WiFi & sinyal seluler (lebih cepat)');
+
+            setTimeout(function() {
+                attemptGeolocation();
+            }, 400);
+            return;
+        }
+
+        // Layer 3: Cache dari localStorage (< 30 menit)
+        var cachedLat = localStorage.getItem('salink_user_lat');
+        var cachedLng = localStorage.getItem('salink_user_lng');
+        var cachedTs = localStorage.getItem('salink_user_lat_ts');
+        var cacheAge = cachedTs ? (Date.now() - parseInt(cachedTs, 10)) : Infinity;
+
+        if (cachedLat && cachedLng && cacheAge < CACHE_MAX_AGE_MS) {
+            log('✅ Pakai cache (age: ' + Math.round(cacheAge / 1000) + 's)');
+            userLat = parseFloat(cachedLat);
+            userLng = parseFloat(cachedLng);
+
+            setGPSStatus('success', '📍 Lokasi (dari cache)', 'Koordinat: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6) + ' (data 30 menit terakhir)');
+            updateBrandGpsInfo('GPS (cache): ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6));
+
+            var btn = document.getElementById('locationBtn');
+            var btnText2 = document.getElementById('locationBtnText');
+            if (btn) { btn.classList.remove('loading'); btn.classList.add('success'); }
+            if (btnText2) btnText2.textContent = '✅ Pakai Lokasi Cache';
+
+            showToast('📍 Pakai Lokasi Cache', 'GPS tidak tersedia, pakai lokasi terakhir', 'fa-history');
+
+            loadContactsFromSheet(true);
+            return;
+        }
+
+        // Layer 4: Fallback IP-based location
+        if (!_ipFallbackTried) {
+            _ipFallbackTried = true;
+            log('🌐 Layer 4: Coba IP-based location...');
+            var btnText3 = document.getElementById('locationBtnText');
+            if (btnText3) btnText3.textContent = '🌐 Coba lokasi via IP...';
+            setGPSStatus('loading', 'Coba lokasi via IP...', 'GPS tidak tersedia, mencoba perkiraan via jaringan internet');
+            setTimeout(fallbackIpLocation, 300);
+            return;
+        }
+
+        // Semua layer gagal
+        handleGPSFailure(error);
+    }
+
+    function fallbackIpLocation() {
+        log('🌐 fallbackIpLocation() called');
+
+        fetch('https://ipapi.co/json/', { cache: 'no-store' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (!data || !data.latitude || !data.longitude) {
+                    throw new Error('IP API tidak mengembalikan koordinat');
+                }
+
+                userLat = parseFloat(data.latitude);
+                userLng = parseFloat(data.longitude);
+
+                log('✅ IP location: ' + userLat + ', ' + userLng + ' (' + (data.city || '?') + ')');
+
+                var locText = [data.city, data.region, data.country_name].filter(Boolean).join(', ');
+                setGPSStatus('success', '📍 Lokasi (perkiraan IP)', locText + ' — akurasi rendah');
+                updateBrandGpsInfo('GPS via IP: ' + (data.city || '') + ', ' + (data.region || ''));
+
+                var btn = document.getElementById('locationBtn');
+                var btnText = document.getElementById('locationBtnText');
+                if (btn) { btn.classList.remove('loading'); btn.classList.add('success'); }
+                if (btnText) btnText.textContent = '✅ Pakai Lokasi IP';
+
+                showToast('🌐 Lokasi via IP', 'Akurasi rendah (kota-level), tapi cukup untuk kontak terdekat', 'fa-globe');
+
+                autoExpandIndex = 0;
+                loadContactsFromSheet(true);
+            })
+            .catch(function(err) {
+                log('❌ IP location gagal: ' + err.message);
+                handleGPSFailure({
+                    code: 2,
+                    message: 'Semua metode GPS dan IP gagal'
+                });
+            });
+    }
+
+    function handleGPSFailure(error) {
+        var btn = document.getElementById('locationBtn');
+        var btnText = document.getElementById('locationBtnText');
+
+        var errMsg = 'Gagal mengambil lokasi';
+        var hint = '';
+        var icon = '⚠️';
+
+        if (!error || error.code === 0) {
+            errMsg = (error && error.message) ? error.message : 'GPS tidak tersedia';
+            hint = 'Pastikan halaman diakses via HTTPS dan browser mendukung GPS.';
+        } else if (error.code === 1) {
+            errMsg = 'Izin lokasi DITOLAK';
+            hint = 'Buka ikon 🔒 di address bar → Location → Allow → Refresh halaman.';
+        } else if (error.code === 2) {
+            errMsg = 'Sinyal GPS tidak tersedia';
+            hint = 'Coba di area terbuka, nyalakan GPS HP, dan aktifkan mode High Accuracy.';
+        } else if (error.code === 3) {
+            errMsg = 'Timeout mengambil lokasi';
+            hint = 'Koneksi lambat atau sinyal lemah. Coba lagi atau pindah ke area dengan sinyal lebih baik.';
+        }
+
+        log('❌ [Final] GPS failure: ' + errMsg + ' | ' + hint);
+
+        setGPSStatus('error', icon + ' ' + errMsg, hint);
+        updateBrandGpsInfo('Lokasi belum tersedia');
+
+        if (btn) {
+            btn.classList.remove('loading');
+            btn.classList.remove('success');
+        }
+        if (btnText) btnText.textContent = '🔄 Coba Lagi';
+
+        showToast(icon + ' ' + errMsg, hint, 'fa-exclamation-triangle');
+
+        renderEmptyContactState('error');
     }
 
     // ================================================================
@@ -3495,7 +3670,7 @@
     }
 
     // ================================================================
-    // 16. LOAD CONTACTS FROM SHEET (dengan auto-expand radius)
+    // 16. LOAD CONTACTS FROM SHEET (auto-expand radius)
     // ================================================================
     async function loadContactsFromSheet(isAuto) {
         if (isLoading) return;
@@ -3508,7 +3683,6 @@
         showLoadingState();
 
         try {
-            // Radius → 0 = Semua Pos (kirim radius besar)
             var radiusToSend = currentRadius === 0 ? 100 : currentRadius;
             var typeToSend = currentCategory === 'all' ? '' : currentCategory;
 
@@ -3526,16 +3700,13 @@
                 var rc = document.getElementById('resultsCount');
                 if (rc) rc.textContent = data.length + ' kontak tersedia (radius ' + radiusText + ')';
 
-                // ⭐ Update section "Nomor Darurat Nasional" — TAMPILKAN
                 renderNationalSection(true);
             } else {
-                // ⭐ Auto-expand radius kalau kosong
                 if (isAuto && autoExpandIndex < AUTO_EXPAND_RADII.length - 1) {
                     autoExpandIndex++;
                     var nextRadius = AUTO_EXPAND_RADII[autoExpandIndex];
                     log('Auto-expand radius to: ' + nextRadius + ' km');
 
-                    // Update UI radius button
                     document.querySelectorAll('.radius-btn').forEach(function(b) {
                         b.classList.toggle('active', parseFloat(b.dataset.radius) === nextRadius);
                     });
@@ -3545,7 +3716,6 @@
                     var rc2 = document.getElementById('resultsCount');
                     if (rc2) rc2.textContent = 'Kosong di radius sebelumnya — mencoba ' + nextLabel + '...';
 
-                    // Delay sebelum coba radius berikutnya
                     await new Promise(function(resolve) { setTimeout(resolve, 800); });
 
                     isLoading = false;
@@ -3553,14 +3723,12 @@
                     return;
                 }
 
-                // Semua radius sudah dicoba, tetap kosong
                 allContactsFromSheet = [];
                 applyFiltersAndRender();
 
                 var rc3 = document.getElementById('resultsCount');
                 if (rc3) rc3.textContent = 'Tidak ada bantuan terdaftar';
 
-                // ⭐ Tampilkan section nasional sebagai fallback
                 renderNationalSection(true);
             }
         } catch (error) {
@@ -3572,12 +3740,11 @@
     }
 
     // ================================================================
-    // 17. FILTER & RENDER KONTAK DARI SHEET
+    // 17. FILTER & RENDER
     // ================================================================
     function applyFiltersAndRender() {
         var filtered = allContactsFromSheet.slice();
 
-        // Filter kategori
         if (currentCategory !== 'all') {
             filtered = filtered.filter(function(c) {
                 var cat = String(c.category || c.type || '').toLowerCase();
@@ -3585,7 +3752,6 @@
             });
         }
 
-        // Filter local search
         if (localSearchQuery && localSearchQuery.trim()) {
             var q = localSearchQuery.toLowerCase().trim();
             filtered = filtered.filter(function(c) {
@@ -3598,7 +3764,6 @@
             });
         }
 
-        // Sort by distance (ascending)
         filtered.sort(function(a, b) {
             var da = parseFloat(a.distanceKm) || 99999;
             var db = parseFloat(b.distanceKm) || 99999;
@@ -3648,12 +3813,10 @@
             html2 += '<div class="contact-card ' + catClass + '" data-id="' + escapeAttr(c.id || '') + '">';
             html2 += '<div class="contact-card-inner">';
 
-            // Badge level (Desa/Kecamatan/Kota) di kanan atas
             if (level) {
                 html2 += '<div class="contact-badge-area">' + escapeHTML(String(level).toUpperCase()) + '</div>';
             }
 
-            // Top: icon + info
             html2 += '<div class="contact-card-top">';
             html2 += '<div class="contact-icon ' + catClass + '">' + catIcon + '</div>';
             html2 += '<div class="contact-info">';
@@ -3662,7 +3825,6 @@
             html2 += '</div>';
             html2 += '</div>';
 
-            // Address
             if (address) {
                 html2 += '<div class="contact-address">';
                 html2 += '<i class="fas fa-map-marker-alt"></i>';
@@ -3670,7 +3832,6 @@
                 html2 += '</div>';
             }
 
-            // Distance badge
             if (distance) {
                 html2 += '<div class="distance-badge">';
                 html2 += '<i class="fas fa-route"></i>';
@@ -3678,7 +3839,6 @@
                 html2 += '</div>';
             }
 
-            // Actions grid 2x2
             html2 += '<div class="contact-actions-grid">';
 
             if (phone) {
@@ -3705,9 +3865,9 @@
             html2 += '<button class="contact-action detail" onclick="showContactDetail(\'' + escapeAttr(c.id || '') + '\')">' +
                      '<i class="fas fa-info-circle"></i><span>Detail</span></button>';
 
-            html2 += '</div>'; // /contact-actions-grid
-            html2 += '</div>'; // /contact-card-inner
-            html2 += '</div>'; // /contact-card
+            html2 += '</div>';
+            html2 += '</div>';
+            html2 += '</div>';
 
             html += html2;
         });
@@ -3751,12 +3911,11 @@
                 '<div class="state-text">' + text + '</div>' +
             '</div>';
 
-        // Tampilkan nomor darurat nasional sebagai fallback
         renderNationalSection(true);
     }
 
     // ================================================================
-    // 18. RENDER SECTION NOMOR DARURAT NASIONAL
+    // 18. RENDER NOMOR DARURAT NASIONAL
     // ================================================================
     function renderNationalSection(show) {
         var header = document.getElementById('nationalSectionHeader');
@@ -3856,13 +4015,11 @@
         currentCategory = btn.dataset.cat || 'all';
         if (navigator.vibrate) navigator.vibrate(10);
 
-        // Reset auto-expand index
         autoExpandIndex = 0;
 
         if (userLat && userLng) {
             loadContactsFromSheet(true);
         } else {
-            // Kalau belum ada lokasi, tetap filter data yang ada (kalau ada)
             applyFiltersAndRender();
         }
     }
@@ -4319,7 +4476,7 @@
     }
 
     // ================================================================
-    // 25. MAP MODAL
+    // 25. MAP MODAL — GPS 4-layer fallback JUGA
     // ================================================================
     function openMapModal() {
         var modal = document.getElementById('mapModal');
@@ -4401,7 +4558,7 @@
 
         if (regionEl) {
             fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id', {
-                headers: { 'User-Agent': 'SALINK-App/14.0' }
+                headers: { 'User-Agent': 'SALINK-App/14.1' }
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -4417,7 +4574,9 @@
             });
         }
     }
+
     function activateMapGps() {
+        log('activateMapGps() called — 4-layer fallback');
         var btn = document.getElementById('mapLocationBtn');
         var btnText = document.getElementById('mapLocationBtnText');
 
@@ -4425,42 +4584,116 @@
             showToast('⚠️ GPS Tidak Tersedia', 'Browser tidak mendukung GPS', 'fa-exclamation-triangle');
             return;
         }
+
         if (btn) { btn.classList.add('loading'); btn.disabled = true; }
         if (btnText) btnText.textContent = '📍 Mengambil lokasi...';
 
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                var lat = position.coords.latitude;
-                var lng = position.coords.longitude;
-                var accuracy = Math.round(position.coords.accuracy || 0);
-                mapCurrentLat = lat;
-                mapCurrentLng = lng;
+        var _mapAttempt = 0;
+        var _mapHigh = true;
 
-                localStorage.setItem('salink_user_lat', lat);
-                localStorage.setItem('salink_user_lng', lng);
+        function tryMapGps() {
+            _mapAttempt++;
+            log('🗺️ Map GPS attempt=' + _mapAttempt + ' high=' + _mapHigh);
 
+            var options = {
+                enableHighAccuracy: _mapHigh,
+                timeout: _mapHigh ? 10000 : 7000,
+                maximumAge: _mapHigh ? 0 : 120000
+            };
+
+            var _didRespond = false;
+            var _safetyTimeout = setTimeout(function() {
+                if (_didRespond) return;
+                _didRespond = true;
+                onMapError({ code: 3, message: 'Browser timeout (safety)' });
+            }, options.timeout + 2000);
+
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    if (_didRespond) return;
+                    _didRespond = true;
+                    clearTimeout(_safetyTimeout);
+
+                    var lat = position.coords.latitude;
+                    var lng = position.coords.longitude;
+                    var accuracy = Math.round(position.coords.accuracy || 0);
+                    mapCurrentLat = lat;
+                    mapCurrentLng = lng;
+
+                    try {
+                        localStorage.setItem('salink_user_lat', lat);
+                        localStorage.setItem('salink_user_lng', lng);
+                        localStorage.setItem('salink_user_lat_ts', String(Date.now()));
+                    } catch(e) {}
+
+                    if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
+                    if (btnText) btnText.textContent = '✅ Refresh Lokasi';
+
+                    applyMapCoords(lat, lng);
+                    showToast('📍 Lokasi Ditemukan', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
+                    if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+                },
+                function(error) {
+                    if (_didRespond) return;
+                    _didRespond = true;
+                    clearTimeout(_safetyTimeout);
+                    onMapError(error);
+                },
+                options
+            );
+        }
+
+        function onMapError(error) {
+            if (_mapHigh && _mapAttempt < 2 && error.code !== 1) {
+                _mapHigh = false;
+                log('🔄 Map retry Layer 2');
+                if (btnText) btnText.textContent = '📍 Mode cepat...';
+                setTimeout(tryMapGps, 400);
+                return;
+            }
+
+            var cachedLat = localStorage.getItem('salink_user_lat');
+            var cachedLng = localStorage.getItem('salink_user_lng');
+            var cachedTs = localStorage.getItem('salink_user_lat_ts');
+            var cacheAge = cachedTs ? (Date.now() - parseInt(cachedTs, 10)) : Infinity;
+
+            if (cachedLat && cachedLng && cacheAge < CACHE_MAX_AGE_MS) {
+                log('✅ Map pakai cache');
+                mapCurrentLat = parseFloat(cachedLat);
+                mapCurrentLng = parseFloat(cachedLng);
                 if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
-                if (btnText) btnText.textContent = '✅ Refresh Lokasi';
+                if (btnText) btnText.textContent = '✅ Pakai Cache';
+                applyMapCoords(mapCurrentLat, mapCurrentLng);
+                showToast('📍 Pakai Cache', 'GPS tidak tersedia, pakai lokasi terakhir', 'fa-history');
+                return;
+            }
 
-                applyMapCoords(lat, lng);
-                showToast('📍 Lokasi Ditemukan', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
-                if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
-            },
-            function(error) {
-                var errMsg = 'Gagal mengambil lokasi. ';
-                switch(error.code) {
-                    case 1: errMsg += 'Izin lokasi ditolak.'; break;
-                    case 2: errMsg += 'Lokasi tidak tersedia.'; break;
-                    case 3: errMsg += 'Timeout. Coba lagi.'; break;
-                    default: errMsg += error.message || 'Coba lagi.';
-                }
-                if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
-                if (btnText) btnText.textContent = '📍 Ambil Lokasi Saya';
-                showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle');
-            },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-        );
+            fetch('https://ipapi.co/json/', { cache: 'no-store' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data || !data.latitude || !data.longitude) throw new Error('no IP data');
+                    mapCurrentLat = parseFloat(data.latitude);
+                    mapCurrentLng = parseFloat(data.longitude);
+                    if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
+                    if (btnText) btnText.textContent = '✅ Pakai Lokasi IP';
+                    applyMapCoords(mapCurrentLat, mapCurrentLng);
+                    showToast('🌐 Lokasi via IP', 'Akurasi rendah (kota-level)', 'fa-globe');
+                })
+                .catch(function() {
+                    var errMsg = 'Gagal mengambil lokasi';
+                    if (error.code === 1) errMsg = 'Izin lokasi ditolak';
+                    else if (error.code === 2) errMsg = 'Lokasi tidak tersedia';
+                    else if (error.code === 3) errMsg = 'Timeout';
+
+                    if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
+                    if (btnText) btnText.textContent = '📍 Coba Lagi';
+                    showToast('⚠️ Gagal', errMsg + ' — coba lagi atau nyalakan GPS', 'fa-exclamation-triangle');
+                });
+        }
+
+        tryMapGps();
     }
+
     function mapSearchService(searchQuery) {
         var lat = mapCurrentLat;
         var lng = mapCurrentLng;
@@ -4479,7 +4712,7 @@
     function handleLogout() {
         if (confirm('Apakah Anda yakin ingin keluar?')) {
             currentUser = null;
-            ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies','salink_logged_in','salink_user_lat','salink_user_lng'].forEach(function(k) {
+            ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies','salink_logged_in','salink_user_lat','salink_user_lng','salink_user_lat_ts'].forEach(function(k) {
                 try { localStorage.removeItem(k); } catch(e) {}
             });
             updateUserUI();
@@ -4531,7 +4764,6 @@
         _salinkSetup = true;
         log('Setting up event listeners...');
 
-        // HEADER MENU
         var menuBtn = document.getElementById('menuBtn');
         if (menuBtn) {
             menuBtn.addEventListener('click', function(e) {
@@ -4542,7 +4774,6 @@
             });
         }
 
-        // SIDEBAR CLOSE
         var sidebarClose = document.getElementById('sidebarClose');
         if (sidebarClose) {
             sidebarClose.addEventListener('click', function(e) {
@@ -4553,7 +4784,6 @@
         var sidebarOverlay = document.getElementById('sidebarOverlay');
         if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
 
-        // SIDEBAR MAP
         var sidebarMapBtn = document.getElementById('sidebarMapBtn');
         if (sidebarMapBtn) {
             sidebarMapBtn.addEventListener('click', function(e) {
@@ -4564,7 +4794,6 @@
             });
         }
 
-        // LOGOUT
         var logoutBtn = document.getElementById('logoutBtn');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', function(e) {
@@ -4574,7 +4803,6 @@
             });
         }
 
-        // HEADER SEARCH
         var headerSearchBtn = document.getElementById('headerSearchBtn');
         if (headerSearchBtn) {
             headerSearchBtn.addEventListener('click', function(e) {
@@ -4583,7 +4811,6 @@
             });
         }
 
-        // HEADER NOTIF
         var headerNotifBtn = document.getElementById('headerNotifBtn');
         if (headerNotifBtn) {
             headerNotifBtn.addEventListener('click', function(e) {
@@ -4592,7 +4819,6 @@
             });
         }
 
-        // THEME TOGGLE
         var themeToggle = document.getElementById('themeToggle');
         if (themeToggle) {
             themeToggle.addEventListener('click', function(e) {
@@ -4601,11 +4827,9 @@
             });
         }
 
-        // BACK HOME
         var backHomeBtn = document.getElementById('backHomeBtn');
         if (backHomeBtn) backHomeBtn.addEventListener('click', goHome);
 
-        // LOCATION BUTTON (Manual)
         var locationBtn = document.getElementById('locationBtn');
         if (locationBtn) {
             locationBtn.addEventListener('click', function(e) {
@@ -4614,7 +4838,6 @@
             });
         }
 
-        // REFRESH BUTTON
         var refreshBtn = document.getElementById('refreshBtn');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', function(e) {
@@ -4627,7 +4850,6 @@
             });
         }
 
-        // LOCAL SEARCH
         var localSearchInput = document.getElementById('localSearchInput');
         if (localSearchInput) {
             localSearchInput.addEventListener('input', function() {
@@ -4636,7 +4858,6 @@
             });
         }
 
-        // CATEGORY FILTER
         document.querySelectorAll('.cat-btn').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -4644,7 +4865,6 @@
             });
         });
 
-        // RADIUS FILTER
         document.querySelectorAll('.radius-btn').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -4652,10 +4872,8 @@
             });
         });
 
-        // FAB MODAL
         initFabModal();
 
-        // MAP MODAL CLOSE
         var mapModalCloseBtn = document.getElementById('mapModalCloseBtn');
         if (mapModalCloseBtn) {
             mapModalCloseBtn.addEventListener('click', function(e) {
@@ -4677,7 +4895,6 @@
             });
         }
 
-        // MAP GPS BUTTON
         var mapLocationBtn = document.getElementById('mapLocationBtn');
         if (mapLocationBtn) {
             mapLocationBtn.addEventListener('click', function(e) {
@@ -4686,7 +4903,6 @@
             });
         }
 
-        // MAP SERVICE CARDS
         document.querySelectorAll('.map-service-card[data-search]').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -4696,7 +4912,6 @@
             });
         });
 
-        // SEARCH MODAL CLOSE
         var searchModalCloseBtn = document.getElementById('searchModalCloseBtn');
         if (searchModalCloseBtn) searchModalCloseBtn.addEventListener('click', closeSearchModal);
         var searchModalFooterCloseBtn = document.getElementById('searchModalFooterCloseBtn');
@@ -4739,7 +4954,6 @@
             });
         }
 
-        // NOTIF MODAL CLOSE
         var notifModalCloseBtn = document.getElementById('notifModalCloseBtn');
         if (notifModalCloseBtn) notifModalCloseBtn.addEventListener('click', closeNotifModal);
         var notifModalFooterCloseBtn = document.getElementById('notifModalFooterCloseBtn');
@@ -4756,7 +4970,6 @@
             });
         }
 
-        // PREVIEW OVERLAY
         var overlayLoginBtn = document.getElementById('overlayLoginBtn');
         if (overlayLoginBtn) overlayLoginBtn.addEventListener('click', redirectToLogin);
         var overlayCancelBtn = document.getElementById('overlayCancelBtn');
@@ -4775,7 +4988,6 @@
             });
         }
 
-        // KEYBOARD SHORTCUTS
         document.addEventListener('keydown', function(e) {
             if (e.key === '/' && !e.target.matches('input, textarea, select')) {
                 e.preventDefault();
@@ -4797,7 +5009,7 @@
     // 30. INIT
     // ================================================================
     function init() {
-        log('Initializing Kontak Darurat v14.0 FINAL...');
+        log('Initializing Kontak Darurat v14.1 FINAL (GPS 4-layer)...');
 
         loadTheme();
         loadReadNotifs();
@@ -4811,15 +5023,13 @@
         updateNotifBadge();
         setInterval(updateNotifBadge, 30000);
 
-        // ⭐ Auto-detect GPS saat buka halaman
-        // Delay 800ms supaya UI fully rendered dulu
         setTimeout(function() {
             autoDetectLocation();
         }, 800);
 
         if (isPreviewMode) setTimeout(function() { showPreviewOverlay(); }, 1200);
 
-        log('✓ Kontak Darurat v14.0 Ready!');
+        log('✓ Kontak Darurat v14.1 Ready!');
         log('  Mode: ' + (isPreviewMode ? 'PREVIEW' : 'FULL'));
         log('  User: ' + (currentUser ? currentUser.username : 'Guest'));
     }
@@ -4873,8 +5083,9 @@
     window.loadContactsFromSheet = loadContactsFromSheet;
     window.applyFiltersAndRender = applyFiltersAndRender;
     window.renderNationalSection = renderNationalSection;
+    window.fallbackIpLocation = fallbackIpLocation;
 
-    log('✓ Kontak Darurat v14.0 Script Loaded');
+    log('✓ Kontak Darurat v14.1 Script Loaded');
 })();
     </script>
 
