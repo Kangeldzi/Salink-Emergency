@@ -18,14 +18,7 @@
 
     <style>
         /* ==================================================================
-           SALINK ALERT SEKITAR v12.0 — INTEGRATED WITH LOKASI-BANTUAN
-           ==================================================================
-           Konsisten 100% dengan lokasi-bantuan.html sebagai file INDUK
-           - Tema warna universal (dark/light)
-           - Header dengan Back button
-           - Sidebar dengan #sidebarMapBtn data-action="open-map"
-           - Modal Peta Darurat SAMA PERSIS
-           - Bottom Nav + FAB universal
+           SALINK ALERT SEKITAR v12.1 — FIXED PATCH POSITION
            ================================================================== */
 
         /* ============ ROOT VARIABLES ============ */
@@ -1120,6 +1113,23 @@
             font-size: 0.55rem;
             font-family: monospace;
         }
+        .search-filter-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+        .search-filter-chip {
+            padding: 5px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            color: var(--text-muted);
+            font-size: 0.6rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .search-filter-chip.active {
+            background: rgba(230,0,18,0.15);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
 
         /* ============ NOTIF MODAL ============ */
         .notif-item {
@@ -1273,7 +1283,7 @@
             line-height: 1.5;
         }
 
-        /* ============ 🗺️ MODAL PETA DARURAT (SAMA PERSIS LOKASI-BANTUAN) ============ */
+        /* ============ MAP MODAL ============ */
         #mapModal .modal-content {
             max-width: 430px;
             padding: 16px 14px;
@@ -1789,8 +1799,9 @@
             .nav-fab .fab-emoji { font-size: 1.7rem; }
             .summary-value { font-size: 1rem; }
             .summary-label { font-size: 0.52rem; }
+        }
 
-            /* ================================================================
+        /* ================================================================
            PATCH v12.1 — FIX WARNA HEADER UNIVERSAL (KONSISTEN DENGAN
            dashboard.html & lokasi-bantuan.html) + MODAL FOOTER TUTUP
            ================================================================ */
@@ -2017,16 +2028,13 @@
         * { -webkit-text-fill-color: currentColor; }
         ::-webkit-scrollbar-thumb { background: var(--primary); }
         :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-        
     </style>
 </head>
 <body>
 
     <div class="app-shell">
 
-    <!-- ============================================================ -->
-    <!-- FLOATING NOTIFICATION                                         -->
-    <!-- ============================================================ -->
+    <!-- FLOATING NOTIFICATION -->
     <div class="floating-notification" id="floatingNotification">
         <div class="notif-icon" id="floatingIcon"><i class="fas fa-bell"></i></div>
         <div class="notif-content">
@@ -2040,9 +2048,7 @@
         </button>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- PREVIEW OVERLAY                                               -->
-    <!-- ============================================================ -->
+    <!-- PREVIEW OVERLAY -->
     <div class="preview-overlay" id="previewOverlay">
         <div class="preview-overlay-content">
             <div class="overlay-icon"><i class="fas fa-lock"></i></div>
@@ -2065,9 +2071,7 @@
         <span class="login-link" id="badgeLoginLink">Masuk untuk berinteraksi</span>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- HEADER — KONSISTEN LOKASI-BANTUAN                             -->
-    <!-- ============================================================ -->
+    <!-- HEADER -->
     <header class="app-bar" id="appBar">
         <div class="header-left">
             <button class="menu-btn" id="menuBtn" type="button" title="Menu" aria-label="Menu">
@@ -2104,9 +2108,7 @@
         </div>
     </header>
 
-    <!-- ============================================================ -->
-    <!-- SIDEBAR HAMBURGER — SAMA PERSIS LOKASI-BANTUAN                -->
-    <!-- ============================================================ -->
+    <!-- SIDEBAR -->
     <div class="sidebar-overlay-bg" id="sidebarOverlay"></div>
     <div class="sidebar" id="sidebar" role="navigation" aria-label="Menu Utama">
         <button class="sidebar-close" id="sidebarClose" type="button" aria-label="Tutup Menu">
@@ -2196,12 +2198,9 @@
         </ul>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- MAIN CONTENT — KONTEN ALERT SEKITAR                           -->
-    <!-- ============================================================ -->
+    <!-- MAIN CONTENT -->
     <main class="main-content">
 
-        <!-- BRAND SECTION -->
         <div class="brand-section">
             <div class="brand-left">
                 <div class="brand-icon">📢</div>
@@ -2215,7 +2214,6 @@
             </button>
         </div>
 
-        <!-- GPS CARD -->
         <section class="gps-top">
             <div class="gps-icon">📍</div>
             <div>
@@ -2226,7 +2224,6 @@
             </div>
         </section>
 
-        <!-- GPS ACTIONS -->
         <div class="gps-actions">
             <button class="primary-btn" id="locationBtn" type="button">
                 <i class="fas fa-map-marker-alt"></i>
@@ -2238,7 +2235,6 @@
             </button>
         </div>
 
-        <!-- FILTER PANEL -->
         <div class="control-title">🔎 Filter Jenis Emergency</div>
         <div class="filters" id="filterContainer">
             <button class="filter-btn active" data-type="" type="button">🆘 Semua</button>
@@ -2248,7 +2244,6 @@
             <button class="filter-btn" data-type="disaster" type="button">🌪️ Bencana</button>
         </div>
 
-        <!-- SUMMARY GRID -->
         <div class="summary-grid">
             <div class="summary-card">
                 <div class="summary-label">Emergency sekitar</div>
@@ -2264,7 +2259,6 @@
             </div>
         </div>
 
-        <!-- RESULTS HEADER -->
         <div class="results-header">
             <div>
                 <div class="results-title">🚨 Emergency di Sekitar Anda</div>
@@ -2275,7 +2269,6 @@
             </button>
         </div>
 
-        <!-- ALERT GRID -->
         <div class="alert-grid" id="alertContainer">
             <div class="state-card">
                 <div class="state-icon">📍</div>
@@ -2287,9 +2280,7 @@
         </div>
     </main>
 
-    <!-- ============================================================ -->
-    <!-- BOTTOM NAVIGATION — SAMA PERSIS LOKASI-BANTUAN                -->
-    <!-- ============================================================ -->
+    <!-- BOTTOM NAV -->
     <nav class="bottom-nav" id="sl-bottom-nav" role="navigation" aria-label="Main Navigation">
         <a href="dashboard.html" class="nav-item-bottom" data-workspace="home" aria-label="Home">
             <span class="nav-icon">🏠</span>
@@ -2315,11 +2306,9 @@
         </a>
     </nav>
 
-    </div> <!-- /app-shell -->
+    </div>
 
-    <!-- ============================================================ -->
-    <!-- MODAL SEARCH — DENGAN TOMBOL TUTUP (KONSISTEN DASHBOARD)      -->
-    <!-- ============================================================ -->
+    <!-- MODAL SEARCH -->
     <div class="modal-overlay" id="searchModal">
         <div class="modal-content search-modal-content">
             <div class="modal-header">
@@ -2377,10 +2366,8 @@
             </div>
         </div>
     </div>
-    
-    <!-- ============================================================ -->
-    <!-- MODAL NOTIFIKASI — DENGAN TOMBOL TUTUP (KONSISTEN DASHBOARD)  -->
-    <!-- ============================================================ -->
+
+    <!-- MODAL NOTIFIKASI -->
     <div class="modal-overlay" id="notifModal">
         <div class="modal-content" style="max-width:460px;">
             <div class="modal-header">
@@ -2406,11 +2393,9 @@
                 <button class="btn-close-modal" id="notifModalFooterCloseBtn" type="button">Tutup</button>
             </div>
         </div>
-    </div>  
-    
-    <!-- ============================================================ -->
-    <!-- FAB MODAL — GRID 2×2 EMERGENCY (SAMA DASHBOARD)               -->
-    <!-- ============================================================ -->
+    </div>
+
+    <!-- FAB MODAL -->
     <div class="fab-modal-overlay" id="fabModalOverlay">
         <div class="fab-modal-content" id="fabModalContent">
             <button class="fab-modal-close" id="fabModalClose" type="button" aria-label="Tutup">
@@ -2453,10 +2438,7 @@
         </div>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- 🗺️ MODAL PETA DARURAT — SAMA PERSIS LOKASI-BANTUAN            -->
-    <!-- Dibuka dari Sidebar → Menu "Peta Darurat"                     -->
-    <!-- ============================================================ -->
+    <!-- MODAL PETA DARURAT -->
     <div class="modal-overlay" id="mapModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -2470,7 +2452,6 @@
             </div>
             <div class="modal-body">
 
-                <!-- Card 1: Status Lokasi -->
                 <div class="map-status-card" id="mapStatusCard">
                     <span class="map-status-icon" id="mapStatusIcon">📍</span>
                     <div class="map-status-title" id="mapStatusTitle">Lokasi belum terdeteksi</div>
@@ -2483,7 +2464,6 @@
                     </button>
                 </div>
 
-                <!-- Card 2: Info Wilayah + Koordinat -->
                 <div class="map-info-card">
                     <div class="map-info-row">
                         <span class="info-icon">🏠</span>
@@ -2501,7 +2481,6 @@
                     </div>
                 </div>
 
-                <!-- Card 3: Pemilik Akun -->
                 <div class="map-owner-card">
                     <div class="map-owner-avatar" id="mapOwnerAvatar">
                         <i class="fas fa-user"></i>
@@ -2512,7 +2491,6 @@
                     </div>
                 </div>
 
-                <!-- Peta Google Maps -->
                 <div class="map-iframe-wrap">
                     <iframe id="mapIframe" src="about:blank" loading="lazy" allowfullscreen></iframe>
                 </div>
@@ -2521,7 +2499,6 @@
                     <span class="map-address-value" id="mapAddressValue">🗺️ Menunggu lokasi...</span>
                 </div>
 
-                <!-- Grid 2x2 Bantuan -->
                 <div class="map-services-label">🚨 Bantuan Terdekat</div>
                 <div class="map-services-grid">
                     <button type="button" class="map-service-card fire" data-search="DAMKAR terdekat">
@@ -2546,7 +2523,6 @@
                     </button>
                 </div>
 
-                <!-- Tombol Action -->
                 <div class="map-actions-row">
                     <a href="#" class="map-action-btn primary" id="mapOpenGmaps" target="_blank" rel="noopener">
                         <i class="fas fa-external-link-alt"></i>
