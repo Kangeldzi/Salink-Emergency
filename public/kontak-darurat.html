@@ -18,9 +18,17 @@
 
     <style>
         /* ==================================================================
-           SALINK KONTAK-DARURAT v13.1 — FINAL
+           SALINK KONTAK-DARURAT v14.0 — FINAL (INDUK-COMPLIANT)
            ==================================================================
-           Konsisten 100% dengan lokasi-bantuan.html (INDUK)
+           Fitur:
+           - Auto-detect GPS saat buka halaman
+           - Fetch kontak dari Google Spreadsheet (get_nearby_contacts)
+           - Filter radius: 1.5/3/5/10 km / Semua Pos
+           - Filter kategori: fire/medical/crime/disaster/general
+           - Fallback: tombol "Gunakan Lokasi Saya"
+           - Auto-expand radius kalau kosong
+           - Section terpisah: Kontak Lokal + Nomor Nasional
+           - Tema universal (dark/light) — konsisten INDUK
            ================================================================== */
 
         /* ============ ROOT VARIABLES ============ */
@@ -61,6 +69,7 @@
             --emergency-medical: #4fc3f7;
             --emergency-crime: #f0d080;
             --emergency-disaster: #c792ea;
+            --emergency-general: #3fb950;
 
             --toggle-bg: rgba(255,255,255,0.1);
             --toggle-thumb: #e60012;
@@ -241,6 +250,7 @@
         }
         .user-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
         .user-btn .user-initials { font-size: 0.85rem; font-weight: 700; color: #fff; }
+        .refresh-btn.loading i { animation: spin 1s linear infinite; }
 
         #headerNotifBtn { position: relative; }
         #headerNotifBtn #notifBadge {
@@ -296,10 +306,7 @@
         /* ============ SIDEBAR ============ */
         .sidebar-overlay-bg {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.6);
             z-index: 1099;
             display: none;
@@ -312,8 +319,7 @@
 
         .sidebar {
             position: fixed;
-            top: 0;
-            left: 0;
+            top: 0; left: 0;
             width: 285px;
             max-width: 85%;
             height: 100vh;
@@ -338,8 +344,7 @@
             position: absolute;
             top: calc(14px + env(safe-area-inset-top, 0px));
             right: 14px;
-            width: 34px;
-            height: 34px;
+            width: 34px; height: 34px;
             border-radius: 50%;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
@@ -364,8 +369,7 @@
             position: relative;
         }
         .sidebar-user-avatar {
-            width: 64px;
-            height: 64px;
+            width: 64px; height: 64px;
             border-radius: 50%;
             background: var(--accent-blue-gradient);
             display: flex;
@@ -469,35 +473,56 @@
             justify-content: space-between;
             gap: 12px;
             margin-bottom: 14px;
-            background: var(--bg-card);
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
             padding: 14px 16px;
             border-radius: var(--radius);
-            border: 1px solid var(--border-color);
-            box-shadow: 0 4px 15px var(--shadow-light);
+            border: 1px solid rgba(59,130,246,0.3);
+            box-shadow: 0 8px 24px rgba(59,130,246,0.3);
+            color: #fff;
+            position: relative;
+            overflow: hidden;
         }
-        .brand-left { display: flex; align-items: center; gap: 12px; }
-        .brand-icon { font-size: 2rem; line-height: 1; }
+        .brand-section::before {
+            content: '';
+            position: absolute;
+            top: -40px; right: -40px;
+            width: 140px; height: 140px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,255,255,0.15), transparent 70%);
+            pointer-events: none;
+        }
+        .brand-left { display: flex; align-items: center; gap: 12px; position: relative; z-index: 2; }
+        .brand-icon { font-size: 2rem; line-height: 1; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2)); }
         .brand-title {
             font-size: 1.05rem;
             font-weight: 800;
-            color: var(--text-primary);
+            color: #ffffff;
             font-family: 'Poppins', sans-serif;
             margin-bottom: 2px;
         }
         .brand-subtitle {
             font-size: 0.6rem;
-            color: var(--text-muted);
+            color: rgba(255,255,255,0.85);
             font-weight: 600;
             letter-spacing: 0.5px;
             text-transform: uppercase;
+        }
+        .brand-gps-info {
+            font-size: 0.62rem;
+            color: rgba(255,255,255,0.9);
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-family: 'Courier New', monospace;
         }
         .back-home-btn {
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.25);
+            color: #fff;
             padding: 7px 14px;
             border-radius: 10px;
             font-size: 0.7rem;
@@ -506,22 +531,91 @@
             text-decoration: none;
             font-weight: 600;
             font-family: inherit;
+            position: relative;
+            z-index: 2;
         }
-        .back-home-btn:active { transform: scale(0.95); border-color: var(--primary); }
+        .back-home-btn:active { transform: scale(0.95); background: rgba(255,255,255,0.25); }
 
-        /* ============ SEARCH BAR ============ */
-        .local-search {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        /* ============ GPS STATUS PANEL ============ */
+        .gps-panel {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: var(--radius);
-            padding: 10px 14px;
+            padding: 14px 16px;
+            margin-bottom: 14px;
+            box-shadow: 0 4px 15px var(--shadow-light);
+            transition: all 0.3s;
+        }
+        .gps-panel.loading { border-color: var(--primary); background: rgba(230,0,18,0.05); }
+        .gps-panel.success { border-color: rgba(63,185,80,0.4); background: rgba(63,185,80,0.05); }
+        .gps-panel.error { border-color: rgba(248,81,73,0.4); background: rgba(248,81,73,0.05); }
+
+        .gps-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        .gps-icon-wrap {
+            width: 42px; height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-input);
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+        .gps-text { flex: 1; min-width: 0; }
+        .gps-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 3px;
+        }
+        .gps-detail {
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        .location-btn {
+            width: 100%;
+            padding: 11px 16px;
+            border: none;
+            border-radius: 12px;
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            font-size: 0.78rem;
+            font-weight: 800;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-family: inherit;
+            transition: all 0.3s;
+            box-shadow: 0 4px 14px rgba(230,0,18,0.3);
+        }
+        .location-btn:active { transform: scale(0.97); }
+        .location-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+        .location-btn.loading { pointer-events: none; }
+        .location-btn.success { background: linear-gradient(135deg, #10b981, #059669); }
+
+        /* ============ LOCAL SEARCH ============ */
+        .local-search {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 12px 14px;
             margin-bottom: 14px;
             box-shadow: 0 4px 15px var(--shadow-light);
         }
-        .local-search i { color: var(--primary); font-size: 0.9rem; }
+        .local-search i { color: var(--text-muted); font-size: 0.9rem; }
         .local-search input {
             flex: 1;
             background: transparent;
@@ -534,37 +628,38 @@
         .local-search input::placeholder { color: var(--text-muted); }
 
         /* ============ CATEGORY FILTER ============ */
+        .category-filter-wrap {
+            margin-bottom: 14px;
+        }
+        .category-filter-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            display: block;
+        }
         .category-filter {
             display: flex;
             gap: 6px;
-            margin-bottom: 14px;
-            overflow-x: auto;
-            scrollbar-width: none;
-            -ms-overflow-style: none;
-            padding-bottom: 4px;
+            margin-bottom: 6px;
+            flex-wrap: wrap;
         }
-        .category-filter::-webkit-scrollbar { display: none; }
         .cat-btn {
-            flex: 1;
-            min-width: 70px;
-            padding: 8px 10px;
-            background: var(--bg-card);
+            padding: 7px 14px;
+            background: var(--bg-input);
             border: 1px solid var(--border-color);
-            border-radius: 12px;
+            border-radius: 20px;
             color: var(--text-muted);
-            font-size: 0.6rem;
+            font-size: 0.65rem;
             font-weight: 700;
             cursor: pointer;
             font-family: inherit;
             white-space: nowrap;
-            text-align: center;
             transition: all 0.2s;
-            display: flex;
-            flex-direction: column;
+            display: inline-flex;
             align-items: center;
-            gap: 3px;
+            gap: 4px;
         }
-        .cat-btn .cat-icon { font-size: 1.1rem; line-height: 1; }
         .cat-btn:active { transform: scale(0.96); }
         .cat-btn.active {
             background: var(--accent-blue-gradient);
@@ -573,27 +668,133 @@
             box-shadow: 0 4px 12px rgba(230,0,18,0.3);
         }
 
+        /* ============ RADIUS FILTER (BARU) ============ */
+        .radius-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 12px 14px;
+            margin-bottom: 14px;
+            box-shadow: 0 4px 15px var(--shadow-light);
+        }
+        .radius-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .radius-buttons {
+            display: flex;
+            gap: 6px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding-bottom: 2px;
+        }
+        .radius-buttons::-webkit-scrollbar { display: none; }
+        .radius-btn {
+            flex: 1;
+            min-width: 64px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-input);
+            color: var(--text-muted);
+            font-size: 0.62rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .radius-btn:active { transform: scale(0.95); }
+        .radius-btn.active {
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(230,0,18,0.3);
+        }
+
+        /* ============ RESULTS HEADER ============ */
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 12px;
+            padding: 0 4px;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .results-title {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            font-family: 'Poppins', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .results-subtitle {
+            font-size: 0.62rem;
+            color: var(--text-muted);
+            margin-top: 3px;
+            font-weight: 600;
+        }
+        .refresh-small {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 7px 12px;
+            color: var(--text-muted);
+            font-size: 0.62rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .refresh-small:active { transform: scale(0.95); border-color: var(--primary); color: var(--primary); }
+
         /* ============ CONTACT GRID ============ */
         .contact-grid {
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            margin-bottom: 16px;
+            gap: 12px;
+            margin-bottom: 18px;
         }
         .contact-card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
             border-radius: var(--radius);
-            padding: 14px;
-            box-shadow: 0 4px 15px var(--shadow-light);
+            padding: 0;
+            box-shadow: 0 6px 20px var(--shadow-light);
             transition: all 0.3s;
             animation: fadeIn 0.3s ease;
-            display: flex;
-            align-items: center;
-            gap: 12px;
+            overflow: hidden;
+            position: relative;
         }
-        .contact-card:active { transform: scale(0.99); border-color: var(--primary); }
+        .contact-card.fire { border-left: 4px solid var(--emergency-fire); }
+        .contact-card.medical { border-left: 4px solid var(--emergency-medical); }
+        .contact-card.crime { border-left: 4px solid var(--emergency-crime); }
+        .contact-card.disaster { border-left: 4px solid var(--emergency-disaster); }
+        .contact-card.general { border-left: 4px solid var(--emergency-general); }
 
+        .contact-card-inner {
+            padding: 14px 16px;
+        }
+        .contact-card-top {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
         .contact-icon {
             width: 48px;
             height: 48px;
@@ -601,7 +802,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.4rem;
+            font-size: 1.5rem;
             flex-shrink: 0;
             background: var(--bg-input);
             border: 2px solid var(--border-color);
@@ -610,104 +811,119 @@
         .contact-icon.medical { background: rgba(79,195,247,0.15); border-color: rgba(79,195,247,0.3); }
         .contact-icon.crime { background: rgba(240,208,128,0.15); border-color: rgba(240,208,128,0.3); }
         .contact-icon.disaster { background: rgba(199,146,234,0.15); border-color: rgba(199,146,234,0.3); }
-        .contact-icon.utility { background: rgba(63,185,80,0.15); border-color: rgba(63,185,80,0.3); }
-        .contact-icon.transport { background: rgba(230,0,18,0.15); border-color: rgba(230,0,18,0.3); }
+        .contact-icon.general { background: rgba(63,185,80,0.15); border-color: rgba(63,185,80,0.3); }
 
         .contact-info { flex: 1; min-width: 0; }
         .contact-name {
-            font-size: 0.85rem;
-            font-weight: 700;
+            font-size: 0.92rem;
+            font-weight: 800;
             color: var(--text-primary);
             font-family: 'Poppins', sans-serif;
             line-height: 1.3;
-            margin-bottom: 2px;
-        }
-        .contact-number {
-            font-size: 0.72rem;
-            color: var(--primary);
-            font-weight: 700;
-            font-family: 'Courier New', monospace;
             margin-bottom: 3px;
-            letter-spacing: 0.5px;
         }
-        .contact-desc {
-            font-size: 0.6rem;
+        .contact-category {
+            font-size: 0.65rem;
             color: var(--text-muted);
-            line-height: 1.4;
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .contact-badge-area {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--bg-input);
+            color: var(--text-muted);
+            font-size: 0.55rem;
+            font-weight: 700;
+            padding: 3px 9px;
+            border-radius: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border: 1px solid var(--border-color);
+        }
+        .contact-address {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            padding: 8px 0;
+            border-top: 1px solid var(--border-color);
+        }
+        .contact-address i {
+            color: var(--primary);
+            margin-top: 2px;
+            flex-shrink: 0;
+            font-size: 0.75rem;
+        }
+        .distance-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(59,130,246,0.12);
+            color: #3b82f6;
+            padding: 5px 10px;
+            border-radius: 10px;
+            font-size: 0.65rem;
+            font-weight: 800;
+            border: 1px solid rgba(59,130,246,0.25);
+            margin-top: 6px;
         }
 
-        .contact-actions {
-            display: flex;
-            flex-direction: column;
+        .contact-actions-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 6px;
-            flex-shrink: 0;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--border-color);
         }
-        .contact-action-btn {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            cursor: pointer;
+        .contact-action {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.85rem;
-            transition: all 0.3s;
-            text-decoration: none;
-        }
-        .contact-action-btn.call {
-            background: var(--accent-blue-gradient);
-            color: #fff;
-            border-color: transparent;
-            box-shadow: 0 4px 12px rgba(230,0,18,0.3);
-        }
-        .contact-action-btn.call:active { transform: scale(0.92); }
-        .contact-action-btn.wa {
-            background: var(--whatsapp);
-            color: #fff;
-            border-color: var(--whatsapp);
-        }
-        .contact-action-btn.wa:active { transform: scale(0.92); }
-        .contact-action-btn.save {
-            color: var(--accent-gold);
-        }
-        .contact-action-btn.save:active { transform: scale(0.92); }
-
-        /* ============ CATEGORY TITLE ============ */
-        .category-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin: 16px 0 10px;
-            padding: 0 4px;
-            font-size: 0.75rem;
-            font-weight: 800;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            font-family: 'Poppins', sans-serif;
-        }
-        .category-title i {
-            color: var(--primary);
-            font-size: 0.85rem;
-        }
-        .category-title .count-badge {
-            margin-left: auto;
-            background: var(--bg-input);
-            color: var(--primary);
-            padding: 2px 10px;
+            gap: 6px;
+            padding: 9px 8px;
             border-radius: 10px;
-            font-size: 0.6rem;
-            font-weight: 800;
+            border: 1px solid var(--border-color);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            white-space: nowrap;
+        }
+        .contact-action:active { transform: scale(0.96); }
+        .contact-action i { font-size: 0.75rem; }
+        .contact-action.phone {
+            color: var(--primary);
+            border-color: rgba(230,0,18,0.3);
+        }
+        .contact-action.whatsapp {
+            color: var(--whatsapp);
+            border-color: rgba(37,211,102,0.3);
+        }
+        .contact-action.maps {
+            color: #3b82f6;
+            border-color: rgba(59,130,246,0.3);
+        }
+        .contact-action.detail {
+            color: var(--text-secondary);
+        }
+        .contact-action.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            pointer-events: none;
         }
 
-        /* ============ STATE CARD ============ */
+        /* ============ EMPTY STATE ============ */
         .state-card {
             background: var(--bg-card);
             border-radius: var(--radius);
@@ -716,10 +932,143 @@
             border: 1px solid var(--border-color);
             box-shadow: 0 4px 15px var(--shadow-light);
         }
-        .state-card .state-icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.5; }
+        .state-card .state-icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.5; display: block; }
         .state-card .state-title { font-size: 0.95rem; font-weight: 800; color: var(--text-primary); margin-bottom: 6px; font-family: 'Poppins', sans-serif; }
         .state-card .state-text { font-size: 0.72rem; color: var(--text-secondary); line-height: 1.6; max-width: 320px; margin: 0 auto; }
         .state-card .state-text b { color: var(--primary); font-weight: 700; }
+        .state-card.warning { border-color: var(--warning); background: rgba(240,208,128,0.05); }
+        .state-card.error { border-color: var(--accent-red); background: rgba(248,81,73,0.05); }
+        .spinner {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            border: 3px solid var(--border-color);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 12px;
+        }
+
+        /* ============ NATIONAL SECTION HEADER ============ */
+        .section-divider-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 24px 0 12px;
+            padding: 0 4px;
+        }
+        .section-divider-header i {
+            color: var(--primary);
+            font-size: 0.85rem;
+        }
+        .section-divider-header h3 {
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            font-family: 'Poppins', sans-serif;
+            margin: 0;
+        }
+        .section-divider-header .section-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border-color);
+        }
+        .section-divider-header .section-count {
+            background: var(--bg-input);
+            color: var(--text-muted);
+            font-size: 0.6rem;
+            font-weight: 700;
+            padding: 2px 10px;
+            border-radius: 10px;
+        }
+
+        /* ============ NATIONAL CONTACT (compact) ============ */
+        .national-contact-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            margin-bottom: 8px;
+            transition: all 0.2s;
+        }
+        .national-contact-item:active { transform: scale(0.98); border-color: var(--primary); }
+        .national-contact-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            flex-shrink: 0;
+            background: var(--bg-input);
+            border: 2px solid var(--border-color);
+        }
+        .national-contact-icon.fire { background: rgba(248,81,73,0.15); border-color: rgba(248,81,73,0.3); }
+        .national-contact-icon.medical { background: rgba(79,195,247,0.15); border-color: rgba(79,195,247,0.3); }
+        .national-contact-icon.crime { background: rgba(240,208,128,0.15); border-color: rgba(240,208,128,0.3); }
+        .national-contact-icon.disaster { background: rgba(199,146,234,0.15); border-color: rgba(199,146,234,0.3); }
+        .national-contact-icon.utility { background: rgba(63,185,80,0.15); border-color: rgba(63,185,80,0.3); }
+
+        .national-contact-info { flex: 1; min-width: 0; }
+        .national-contact-name {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+        .national-contact-number {
+            font-size: 0.7rem;
+            color: var(--primary);
+            font-weight: 800;
+            font-family: 'Courier New', monospace;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+        .national-contact-desc {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .national-contact-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            flex-shrink: 0;
+        }
+        .national-action-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+        .national-action-btn.call {
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 3px 10px rgba(230,0,18,0.3);
+        }
+        .national-action-btn.call:active { transform: scale(0.9); }
+        .national-action-btn.save {
+            color: var(--accent-gold);
+        }
+        .national-action-btn.save:active { transform: scale(0.9); }
 
         /* ============ BOTTOM NAV ============ */
         .bottom-nav {
@@ -762,25 +1111,10 @@
             font-family: inherit;
         }
         .nav-item-bottom:active { transform: scale(0.92); }
-        .nav-item-bottom .nav-icon {
-            font-size: 1.35rem;
-            line-height: 1.2;
-            transition: all 0.2s;
-        }
-        .nav-item-bottom .nav-label {
-            font-size: 0.58rem;
-            font-weight: 700;
-            white-space: nowrap;
-            letter-spacing: 0.1px;
-        }
-        .nav-item-bottom.active .nav-icon {
-            transform: scale(1.08);
-            filter: drop-shadow(0 0 6px var(--primary));
-        }
-        .nav-item-bottom.active .nav-label {
-            color: var(--primary);
-            font-weight: 800;
-        }
+        .nav-item-bottom .nav-icon { font-size: 1.35rem; line-height: 1.2; transition: all 0.2s; }
+        .nav-item-bottom .nav-label { font-size: 0.58rem; font-weight: 700; white-space: nowrap; letter-spacing: 0.1px; }
+        .nav-item-bottom.active .nav-icon { transform: scale(1.08); filter: drop-shadow(0 0 6px var(--primary)); }
+        .nav-item-bottom.active .nav-label { color: var(--primary); font-weight: 800; }
         .nav-item-bottom.active::before {
             content: '';
             position: absolute;
@@ -793,8 +1127,7 @@
         }
         .nav-item-bottom .badge {
             position: absolute;
-            top: 2px;
-            right: 8px;
+            top: 2px; right: 8px;
             background: var(--accent-red);
             color: white;
             font-size: 0.55rem;
@@ -821,8 +1154,7 @@
         .nav-fab {
             position: absolute;
             top: -36px;
-            width: 70px;
-            height: 70px;
+            width: 70px; height: 70px;
             border-radius: 50%;
             background: linear-gradient(135deg, #e60012 0%, #ff0033 50%, #ff6b3d 100%);
             border: 4px solid var(--bg-primary);
@@ -931,7 +1263,6 @@
         .modal-close:active { transform: scale(0.9); }
         .modal-body { font-size: 0.75rem; }
 
-        /* ============ MODAL FOOTER (TUTUP) ============ */
         .modal-footer {
             margin-top: 14px;
             padding-top: 12px;
@@ -1112,8 +1443,7 @@
         }
         .search-result-item:active { transform: scale(0.98); border-color: var(--primary); }
         .search-result-item .result-icon {
-            width: 40px;
-            height: 40px;
+            width: 40px; height: 40px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -1129,8 +1459,7 @@
         .search-result-item .result-icon.disaster { border-color: var(--emergency-disaster); color: var(--emergency-disaster); }
         .search-result-item .result-icon.post { border-color: var(--primary); color: var(--primary); }
         .search-result-item .result-avatar {
-            width: 40px;
-            height: 40px;
+            width: 40px; height: 40px;
             border-radius: 50%;
             background: var(--accent-blue-gradient);
             display: flex;
@@ -1192,8 +1521,7 @@
         .notif-item.unread { background: rgba(230,0,18,0.1); border-left: 3px solid var(--primary); }
         .notif-item.emergency { border-left: 3px solid var(--accent-red); }
         .notif-item-icon {
-            width: 36px;
-            height: 36px;
+            width: 36px; height: 36px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -1208,7 +1536,6 @@
         .notif-item-message { font-size: 0.65rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 4px; }
         .notif-item-time { font-size: 0.55rem; color: var(--text-muted); }
 
-        /* ============ NOTIF FILTER ============ */
         .notif-filter-btn.active {
             background: var(--accent-blue-gradient) !important;
             color: #fff !important;
@@ -1271,10 +1598,8 @@
         .fab-modal-header p { font-size: 0.68rem; color: var(--text-muted); line-height: 1.5; }
         .fab-modal-close {
             position: absolute;
-            top: 4px;
-            right: 4px;
-            width: 32px;
-            height: 32px;
+            top: 4px; right: 4px;
+            width: 32px; height: 32px;
             border-radius: 50%;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
@@ -1342,8 +1667,7 @@
             padding: 16px 14px;
         }
         .map-modal-title-icon {
-            width: 30px;
-            height: 30px;
+            width: 30px; height: 30px;
             border-radius: 8px;
             background: var(--accent-blue-gradient);
             display: flex;
@@ -1457,8 +1781,7 @@
             gap: 10px;
         }
         .map-owner-avatar {
-            width: 36px;
-            height: 36px;
+            width: 36px; height: 36px;
             border-radius: 50%;
             background: var(--accent-blue-gradient);
             display: flex;
@@ -1631,8 +1954,7 @@
             animation: modalIn 0.4s ease;
         }
         .preview-overlay-content .overlay-icon {
-            width: 64px;
-            height: 64px;
+            width: 64px; height: 64px;
             margin: 0 auto 16px;
             display: flex;
             align-items: center;
@@ -1700,8 +2022,7 @@
         .floating-notification.hide { animation: toastOut 0.5s ease; }
         .floating-notification.emergency-notif { border-color: var(--accent-red); box-shadow: 0 0 30px rgba(248,81,73,0.5); }
         .floating-notification .notif-icon {
-            width: 36px;
-            height: 36px;
+            width: 36px; height: 36px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -1763,8 +2084,7 @@
         }
         .toast.hide { animation: toastOut 0.4s ease forwards; }
         .toast .toast-icon {
-            width: 32px;
-            height: 32px;
+            width: 32px; height: 32px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -1803,13 +2123,13 @@
         }
 
         @media (max-width: 480px) {
-            .main-content {
-                padding: calc(var(--header-height) + 10px) 10px calc(var(--footer-height) + 20px);
-            }
+            .main-content { padding: calc(var(--header-height) + 10px) 10px calc(var(--footer-height) + 20px); }
             .sidebar { width: 85%; }
             .header-center { gap: 4px; }
             .header-left { gap: 4px; }
             .header-right { gap: 4px; }
+            .contact-actions-grid { gap: 5px; }
+            .contact-action { font-size: 0.6rem; padding: 8px 6px; }
         }
 
         @media (max-width: 360px) {
@@ -1821,8 +2141,9 @@
             .header-center { gap: 3px; }
             .nav-fab { width: 64px; height: 64px; }
             .nav-fab .fab-emoji { font-size: 1.7rem; }
-            .contact-icon { width: 42px; height: 42px; font-size: 1.2rem; }
-            .contact-name { font-size: 0.78rem; }
+            .contact-icon { width: 42px; height: 42px; font-size: 1.3rem; }
+            .contact-name { font-size: 0.82rem; }
+            .contact-action { font-size: 0.58rem; padding: 7px 5px; }
         }
 
         /* ================================================================
@@ -1842,8 +2163,7 @@
         input:focus, textarea:focus, select:focus { color: var(--text-primary); background: var(--bg-input); border-color: var(--primary); }
         select option { background: var(--bg-card); color: var(--text-primary); }
 
-        [style*="color: #fff"], [style*="color:#fff"],
-        [style*="color: white"], [style*="color:white"] { color: var(--text-primary) !important; }
+        [style*="color: #fff"], [style*="color:#fff"], [style*="color: white"], [style*="color:white"] { color: var(--text-primary) !important; }
 
         .app-bar { background: var(--header-bg) !important; border-bottom: 1px solid var(--border-color) !important; }
         .app-title, .app-title .title-text { color: var(--text-white) !important; }
@@ -1989,7 +2309,7 @@
         <span class="login-link" id="badgeLoginLink">Masuk untuk berinteraksi</span>
     </div>
 
-    <!-- HEADER — KONSISTEN DENGAN SEMUA FILE -->
+    <!-- HEADER -->
     <header class="app-bar" id="appBar">
         <div class="header-left">
             <button class="menu-btn" id="menuBtn" type="button" title="Menu" aria-label="Menu">
@@ -2124,8 +2444,12 @@
             <div class="brand-left">
                 <div class="brand-icon">📞</div>
                 <div>
-                    <div class="brand-title">SALINK</div>
-                    <div class="brand-subtitle">Kontak Darurat Indonesia</div>
+                    <div class="brand-title">Kontak Darurat</div>
+                    <div class="brand-subtitle">Direktori Kontak Resmi SALINK</div>
+                    <div class="brand-gps-info" id="brandGpsInfo">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span id="brandGpsText">Mendeteksi lokasi...</span>
+                    </div>
                 </div>
             </div>
             <button class="back-home-btn" id="backHomeBtn" type="button">
@@ -2133,42 +2457,103 @@
             </button>
         </div>
 
+        <!-- GPS STATUS PANEL — Auto-detect -->
+        <section class="gps-panel loading" id="gpsPanel">
+            <div class="gps-row">
+                <div class="gps-icon-wrap" id="gpsIconWrap">📡</div>
+                <div class="gps-text">
+                    <div class="gps-title" id="gpsTitle">Mendeteksi lokasi Anda...</div>
+                    <div class="gps-detail" id="gpsDetail">
+                        Mohon izinkan akses lokasi untuk menampilkan kontak darurat terdekat.
+                    </div>
+                </div>
+            </div>
+            <button class="location-btn" id="locationBtn" type="button">
+                <i class="fas fa-location-arrow"></i>
+                <span id="locationBtnText">📍 Gunakan Lokasi Saya</span>
+            </button>
+        </section>
+
         <!-- LOCAL SEARCH -->
         <div class="local-search">
             <i class="fas fa-search"></i>
-            <input type="text" id="localSearchInput" placeholder="Cari nomor darurat (polisi, ambulans, dll)..." autocomplete="off">
+            <input type="text" id="localSearchInput" placeholder="Cari instansi, desa, kecamatan..." autocomplete="off">
         </div>
 
         <!-- CATEGORY FILTER -->
-        <div class="category-filter" id="categoryFilter">
-            <button class="cat-btn active" data-cat="all" type="button">
-                <span class="cat-icon">🆘</span>
-                <span>Semua</span>
-            </button>
-            <button class="cat-btn" data-cat="police" type="button">
-                <span class="cat-icon">🚓</span>
-                <span>Polisi</span>
-            </button>
-            <button class="cat-btn" data-cat="medical" type="button">
-                <span class="cat-icon">🚑</span>
-                <span>Medis</span>
-            </button>
-            <button class="cat-btn" data-cat="fire" type="button">
-                <span class="cat-icon">🔥</span>
-                <span>Damkar</span>
-            </button>
-            <button class="cat-btn" data-cat="disaster" type="button">
-                <span class="cat-icon">🌪️</span>
-                <span>SAR</span>
-            </button>
-            <button class="cat-btn" data-cat="utility" type="button">
-                <span class="cat-icon">⚡</span>
-                <span>Utilitas</span>
+        <div class="category-filter-wrap">
+            <label class="category-filter-label">Pilih jenis layanan</label>
+            <div class="category-filter" id="categoryFilter">
+                <button class="cat-btn active" data-cat="all" type="button">
+                    <span>🆘</span> Semua
+                </button>
+                <button class="cat-btn" data-cat="fire" type="button">
+                    <span>🔥</span> Kebakaran
+                </button>
+                <button class="cat-btn" data-cat="medical" type="button">
+                    <span>🚑</span> Medis
+                </button>
+                <button class="cat-btn" data-cat="crime" type="button">
+                    <span>🚓</span> Kriminal
+                </button>
+                <button class="cat-btn" data-cat="disaster" type="button">
+                    <span>🌪️</span> Bencana
+                </button>
+                <button class="cat-btn" data-cat="general" type="button">
+                    <span>🏛️</span> Umum
+                </button>
+            </div>
+        </div>
+
+        <!-- RADIUS FILTER (BARU) -->
+        <div class="radius-panel">
+            <div class="radius-label">
+                <span>📏</span>
+                <span>Jangkauan Pencarian</span>
+            </div>
+            <div class="radius-buttons" id="radiusButtons">
+                <button class="radius-btn active" data-radius="1.5" type="button">1.5 km</button>
+                <button class="radius-btn" data-radius="3" type="button">3 km</button>
+                <button class="radius-btn" data-radius="5" type="button">5 km</button>
+                <button class="radius-btn" data-radius="10" type="button">10 km</button>
+                <button class="radius-btn" data-radius="0" type="button">🌍 Semua Pos</button>
+            </div>
+        </div>
+
+        <!-- RESULTS HEADER -->
+        <div class="results-header">
+            <div>
+                <div class="results-title">
+                    <i class="fas fa-building" style="color:var(--primary);font-size:0.8rem;"></i>
+                    <span>Direktori Kontak</span>
+                </div>
+                <div class="results-subtitle" id="resultsCount">Mendeteksi lokasi...</div>
+            </div>
+            <button class="refresh-small" id="refreshBtn" type="button">
+                <i class="fas fa-sync-alt"></i> Perbarui
             </button>
         </div>
 
-        <!-- CONTACT LIST -->
-        <div id="contactContainer">
+        <!-- CONTACT LIST — dari Google Spreadsheet -->
+        <div class="contact-grid" id="contactContainer">
+            <div class="state-card">
+                <span class="spinner"></span>
+                <div class="state-title">Memuat kontak darurat...</div>
+                <div class="state-text">Mengambil data dari server SALINK</div>
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- SECTION: NOMOR DARURAT NASIONAL (Fallback / Referensi)        -->
+        <!-- ============================================================ -->
+        <div class="section-divider-header" id="nationalSectionHeader" style="display:none;">
+            <i class="fas fa-flag"></i>
+            <h3>Nomor Darurat Nasional</h3>
+            <div class="section-line"></div>
+            <span class="section-count" id="nationalCount">0</span>
+        </div>
+
+        <div id="nationalContainer" style="display:none;">
             <!-- Diisi oleh JavaScript -->
         </div>
 
@@ -2203,7 +2588,7 @@
     </div> <!-- /app-shell -->
 
     <!-- ============================================================ -->
-    <!-- MODAL SEARCH — 4 TAB 1 BARIS + FILTER CHIPS SCROLLABLE         -->
+    <!-- MODAL SEARCH                                                  -->
     <!-- ============================================================ -->
     <div class="modal-overlay" id="searchModal">
         <div class="modal-content search-modal-content">
@@ -2225,7 +2610,6 @@
                     </button>
                 </div>
 
-                <!-- 4 TAB DALAM 1 BARIS -->
                 <div class="search-tabs">
                     <button class="search-tab active" data-tab="all" type="button">
                         <i class="fas fa-globe"></i> Semua
@@ -2241,7 +2625,6 @@
                     </button>
                 </div>
 
-                <!-- FILTER CHIPS — 1 BARIS SCROLLABLE -->
                 <div class="search-filter-row" id="emergencyFilters" style="display:none;">
                     <button class="search-filter-chip active" data-filter="all" type="button">🎯 Semua</button>
                     <button class="search-filter-chip" data-filter="fire" type="button">🔥 Kebakaran</button>
@@ -2269,7 +2652,7 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- MODAL NOTIFIKASI — LENGKAP DENGAN FILTER + TANDAI SEMUA       -->
+    <!-- MODAL NOTIFIKASI                                              -->
     <!-- ============================================================ -->
     <div class="modal-overlay" id="notifModal">
         <div class="modal-content" style="max-width:460px;">
@@ -2319,7 +2702,7 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- FAB MODAL — GRID 2×2 EMERGENCY                                -->
+    <!-- FAB MODAL                                                     -->
     <!-- ============================================================ -->
     <div class="fab-modal-overlay" id="fabModalOverlay">
         <div class="fab-modal-content" id="fabModalContent">
@@ -2468,26 +2851,28 @@
     <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
+    
         <!-- ============================================================ -->
-    <!-- SCRIPT — KONTAK DARURAT JAVASCRIPT v13.1                      -->
+    <!-- SCRIPT — KONTAK DARURAT JAVASCRIPT v14.0 FINAL                -->
     <!-- Konsisten dengan lokasi-bantuan.html + alert-sekitar.html     -->
     <!-- ============================================================ -->
     <script>
 /* ====================================================================
- * SALINK KONTAK-DARURAT v13.1 — FINAL
+ * SALINK KONTAK-DARURAT v14.0 — FINAL
  * ====================================================================
  * Fitur:
+ *   - Auto-detect GPS saat buka halaman (Layer 1)
+ *   - Fallback tombol "Gunakan Lokasi Saya" (Layer 2)
+ *   - Fetch kontak dari Google Spreadsheet (get_nearby_contacts)
+ *   - Filter radius: 1.5/3/5/10 km / Semua Pos
+ *   - Filter kategori: fire/medical/crime/disaster/general
+ *   - Auto-expand radius kalau kosong (1.5 → 3 → 5 → 10 → Semua)
+ *   - Section "Kontak Lokal" (dari Spreadsheet) — utama
+ *   - Section "Nomor Darurat Nasional" — fallback/referensi
  *   - Tema Universal (dark/light)
- *   - PWA Install
- *   - Header dengan Back button
- *   - Sidebar dengan #sidebarMapBtn
- *   - Modal Peta Darurat
- *   - Modal Search + TOMBOL TUTUP footer (4 tab 1 baris + chips scrollable)
- *   - Modal Notif LENGKAP: filter + tandai semua + mark read persistent
- *   - Daftar Kontak Darurat Indonesia (nasional + kategori)
- *   - Local Search + Category Filter
- *   - FAB Modal 2×2 → dashboard.html?emergency=TYPE
- *   - Bottom Nav + FAB universal
+ *   - Header + Bottom Nav + FAB + Sidebar + Modal Peta Darurat
+ *   - Modal Search + Notif lengkap
+ *   - PWA + FCM
  * ==================================================================== */
 (function() {
     'use strict';
@@ -2495,12 +2880,15 @@
     // ================================================================
     // 1. KONSTANTA
     // ================================================================
+    const API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
     const LOGIN_URL = 'login-register.html';
     const DASHBOARD_URL = 'dashboard.html';
     const PROFILE_URL = 'profil.html';
     const DETAIL_URL = 'detail-emergency.html';
     const EMERGENCY_PAGE = 'kontak-darurat.html';
     const EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
+    const DEFAULT_RADIUS = 1.5;
+    const AUTO_EXPAND_RADII = [1.5, 3, 5, 10, 0]; // 0 = Semua Pos
 
     const EMERGENCY_LABELS = {
         fire: '🔥 Kebakaran',
@@ -2512,210 +2900,33 @@
         fire: '🔥', medical: '🚑', crime: '🚓', disaster: '🌪️'
     };
 
+    const CATEGORY_LABELS = {
+        fire: 'Kebakaran',
+        medical: 'Medis & Kematian',
+        crime: 'Kriminal & Keamanan',
+        disaster: 'Bencana Alam',
+        general: 'Umum & Pemerintah'
+    };
+    const CATEGORY_ICONS = {
+        fire: '🔥', medical: '🚑', crime: '🚓', disaster: '🌪️', general: '🏛️'
+    };
+
     // ================================================================
-    // 2. DATA KONTAK DARURAT NASIONAL INDONESIA
+    // 2. DATA NOMOR DARURAT NASIONAL (fallback/referensi)
     // ================================================================
-    const EMERGENCY_CONTACTS = [
-        // POLISI
-        {
-            id: 'polisi-110',
-            name: 'Polisi (Darurat)',
-            number: '110',
-            category: 'police',
-            icon: '🚓',
-            iconClass: 'crime',
-            description: 'Layanan darurat Polri 24 jam — laporan kriminal, kecelakaan, keamanan'
-        },
-        {
-            id: 'polisi-112',
-            name: 'Nomor Darurat Nasional',
-            number: '112',
-            category: 'police',
-            icon: '🆘',
-            iconClass: 'crime',
-            description: 'Nomor darurat terpadu nasional (Polisi, Damkar, Ambulans) — gratis'
-        },
-        {
-            id: 'polisi-lantas',
-            name: 'Polisi Lalu Lintas',
-            number: '110',
-            category: 'police',
-            icon: '🚔',
-            iconClass: 'crime',
-            description: 'Laporan kecelakaan lalu lintas & pelanggaran'
-        },
-        {
-            id: 'bnn',
-            name: 'BNN (Narkotika)',
-            number: '184',
-            category: 'police',
-            icon: '🚨',
-            iconClass: 'crime',
-            description: 'Badan Narkotika Nasional — laporan penyalahgunaan narkoba'
-        },
-
-        // MEDIS
-        {
-            id: 'ambulans-119',
-            name: 'Ambulans / Gawat Darurat',
-            number: '119',
-            category: 'medical',
-            icon: '🚑',
-            iconClass: 'medical',
-            description: 'Layanan ambulans & gawat darurat medis 24 jam'
-        },
-        {
-            id: 'kemenkes',
-            name: 'Kemenkes Hotline',
-            number: '1500-567',
-            category: 'medical',
-            icon: '🏥',
-            iconClass: 'medical',
-            description: 'Kementerian Kesehatan RI — informasi kesehatan'
-        },
-        {
-            id: 'covid',
-            name: 'Hotline Kesehatan',
-            number: '119 ext 9',
-            category: 'medical',
-            icon: '💊',
-            iconClass: 'medical',
-            description: 'Hotline kesehatan & konsultasi medis'
-        },
-        {
-            id: 'pmk',
-            name: 'PMI (Palang Merah)',
-            number: '021-7992325',
-            category: 'medical',
-            icon: '🩸',
-            iconClass: 'medical',
-            description: 'Palang Merah Indonesia — donor darah & bantuan medis'
-        },
-
-        // DAMKAR
-        {
-            id: 'damkar-113',
-            name: 'Pemadam Kebakaran',
-            number: '113',
-            category: 'fire',
-            icon: '🔥',
-            iconClass: 'fire',
-            description: 'Dinas Pemadam Kebakaran — laporan kebakaran & penyelamatan'
-        },
-        {
-            id: 'damkar-jakarta',
-            name: 'Damkar Jakarta',
-            number: '021-3449153',
-            category: 'fire',
-            icon: '🚒',
-            iconClass: 'fire',
-            description: 'Dinas Pemadam Kebakaran DKI Jakarta'
-        },
-        {
-            id: 'damkar-surabaya',
-            name: 'Damkar Surabaya',
-            number: '031-5432211',
-            category: 'fire',
-            icon: '🚒',
-            iconClass: 'fire',
-            description: 'Dinas Pemadam Kebakaran Kota Surabaya'
-        },
-
-        // SAR / BENCANA
-        {
-            id: 'basarnas-115',
-            name: 'SAR / Basarnas',
-            number: '115',
-            category: 'disaster',
-            icon: '🆘',
-            iconClass: 'disaster',
-            description: 'Badan SAR Nasional — pencarian & pertolongan kecelakaan'
-        },
-        {
-            id: 'bnpb',
-            name: 'BNPB (Bencana)',
-            number: '021-29827742',
-            category: 'disaster',
-            icon: '🌪️',
-            iconClass: 'disaster',
-            description: 'Badan Nasional Penanggulangan Bencana'
-        },
-        {
-            id: 'bmkg',
-            name: 'BMKG (Cuaca/Gempa)',
-            number: '021-4246321',
-            category: 'disaster',
-            icon: '🌊',
-            iconClass: 'disaster',
-            description: 'Info cuaca, gempa, tsunami terkini'
-        },
-        {
-            id: 'pvmbg',
-            name: 'PVMBG (Gunung Api)',
-            number: '022-7272606',
-            category: 'disaster',
-            icon: '🌋',
-            iconClass: 'disaster',
-            description: 'Pusat Vulkanologi & Mitigasi Bencana Geologi'
-        },
-
-        // UTILITAS
-        {
-            id: 'pln-123',
-            name: 'PLN (Listrik)',
-            number: '123',
-            category: 'utility',
-            icon: '⚡',
-            iconClass: 'utility',
-            description: 'PT PLN — gangguan listrik, kebocoran, darurat listrik'
-        },
-        {
-            id: 'pdam',
-            name: 'PDAM (Air)',
-            number: '1500-567',
-            category: 'utility',
-            icon: '💧',
-            iconClass: 'utility',
-            description: 'Perusahaan Daerah Air Minum — gangguan air bersih'
-        },
-        {
-            id: 'telkom',
-            name: 'Telkom (Telepon)',
-            number: '147',
-            category: 'utility',
-            icon: '📞',
-            iconClass: 'utility',
-            description: 'PT Telkom — gangguan telepon & internet'
-        },
-        {
-            id: 'pertamina',
-            name: 'Pertamina (BBM)',
-            number: '135',
-            category: 'utility',
-            icon: '⛽',
-            iconClass: 'utility',
-            description: 'PT Pertamina — layanan BBM & gas'
-        },
-
-        // TAMBANG / EVAKUASI
-        {
-            id: 'kplp',
-            name: 'KPLP (Laut)',
-            number: '021-3519070',
-            category: 'disaster',
-            icon: '⚓',
-            iconClass: 'disaster',
-            description: 'Kesatuan Penjagaan Laut dan Pantai — kecelakaan laut'
-        },
-        {
-            id: 'kpp',
-            name: 'Kantor SAR Khusus',
-            number: '115',
-            category: 'disaster',
-            icon: '🛟',
-            iconClass: 'disaster',
-            description: 'SAR laut & udara — operasi penyelamatan'
-        }
+    const NATIONAL_CONTACTS = [
+        { id: 'nat-polisi-110', name: 'Polisi (Darurat)', number: '110', category: 'crime', icon: '🚓', description: 'Layanan darurat Polri 24 jam' },
+        { id: 'nat-darurat-112', name: 'Nomor Darurat Nasional', number: '112', category: 'general', icon: '🆘', description: 'Nomor darurat terpadu nasional — gratis' },
+        { id: 'nat-ambulans-119', name: 'Ambulans / Gawat Darurat', number: '119', category: 'medical', icon: '🚑', description: 'Layanan ambulans & gawat darurat 24 jam' },
+        { id: 'nat-damkar-113', name: 'Pemadam Kebakaran', number: '113', category: 'fire', icon: '🔥', description: 'Dinas Pemadam Kebakaran' },
+        { id: 'nat-sar-115', name: 'SAR / Basarnas', number: '115', category: 'disaster', icon: '🆘', description: 'Badan SAR Nasional — pencarian & pertolongan' },
+        { id: 'nat-bnpb', name: 'BNPB (Bencana)', number: '117', category: 'disaster', icon: '🌪️', description: 'Badan Nasional Penanggulangan Bencana' },
+        { id: 'nat-bnn', name: 'BNN (Narkotika)', number: '184', category: 'crime', icon: '🚨', description: 'Badan Narkotika Nasional' },
+        { id: 'nat-pln-123', name: 'PLN (Listrik)', number: '123', category: 'general', icon: '⚡', description: 'PT PLN — gangguan listrik' },
+        { id: 'nat-pmi', name: 'PMI (Palang Merah)', number: '021-7992325', category: 'medical', icon: '🩸', description: 'Palang Merah Indonesia' },
+        { id: 'nat-bmkg', name: 'BMKG (Cuaca/Gempa)', number: '021-4246321', category: 'disaster', icon: '🌊', description: 'Info cuaca, gempa, tsunami' },
+        { id: 'nat-pertamina', name: 'Pertamina (BBM)', number: '135', category: 'general', icon: '⛽', description: 'PT Pertamina — layanan BBM & gas' },
+        { id: 'nat-telkom', name: 'Telkom (Telepon)', number: '147', category: 'general', icon: '📞', description: 'PT Telkom — gangguan telepon & internet' }
     ];
 
     // ================================================================
@@ -2724,10 +2935,20 @@
     var currentUser = null;
     var isPreviewMode = true;
     var currentTheme = 'dark';
-    var allContacts = EMERGENCY_CONTACTS.slice();
-    var filteredContacts = EMERGENCY_CONTACTS.slice();
-    var currentCategory = 'all';
+
+    var userLat = null;
+    var userLng = null;
+    var userAddress = '';
+
+    var allContactsFromSheet = [];       // Kontak dari Spreadsheet
+    var filteredContacts = [];            // Setelah filter
+    var currentCategory = 'all';          // 'all' | fire | medical | crime | disaster | general
+    var currentRadius = DEFAULT_RADIUS;   // 1.5 default
     var localSearchQuery = '';
+
+    var isLoading = false;
+    var autoExpandIndex = 0;              // Untuk auto-expand radius
+
     var isSidebarOpen = false;
     var deferredPrompt = null;
     var searchTab = 'all';
@@ -2765,6 +2986,24 @@
         if (hr < 24) return hr + 'j lalu';
         if (day < 7) return day + 'h lalu';
         return new Date(ts).toLocaleDateString('id-ID');
+    }
+    function normalizePhone(value) {
+        if (!value) return '';
+        return String(value).trim().replace(/[^\d+]/g, '');
+    }
+    function normalizeWhatsApp(value) {
+        if (!value) return '';
+        var raw = String(value).trim();
+        if (raw.indexOf('https://wa.me/') === 0 || raw.indexOf('https://api.whatsapp.com/') === 0) return raw;
+        var number = raw.replace(/\D/g, '');
+        if (number.indexOf('0') === 0) number = '62' + number.substring(1);
+        if (!number) return '';
+        return 'https://wa.me/' + number;
+    }
+    function formatDistance(km) {
+        if (km === null || km === undefined || !isFinite(km)) return '';
+        if (km < 1) return Math.round(km * 1000) + ' m';
+        return km.toFixed(2) + ' km';
     }
     function log(msg) {
         console.log('[SALINK KontakDarurat] ' + msg);
@@ -3013,7 +3252,6 @@
         if (overlay) overlay.classList.add('active');
         isSidebarOpen = true;
         document.body.style.overflow = 'hidden';
-        log('Sidebar opened');
     }
     function closeSidebar() {
         var sidebar = document.getElementById('sidebar');
@@ -3022,7 +3260,6 @@
         if (overlay) overlay.classList.remove('active');
         isSidebarOpen = false;
         document.body.style.overflow = '';
-        log('Sidebar closed');
     }
 
     // ================================================================
@@ -3091,83 +3328,492 @@
     function goHome() { window.location.href = DASHBOARD_URL; }
 
     // ================================================================
-    // 14. RENDER KONTAK DARURAT
+    // 14. GPS — Auto-detect + Manual
     // ================================================================
-    function applyLocalFilters() {
-        var q = localSearchQuery.toLowerCase().trim();
-        filteredContacts = allContacts.filter(function(c) {
-            // Category filter
-            if (currentCategory !== 'all' && c.category !== currentCategory) return false;
-            // Search filter
-            if (q) {
-                var haystack = (c.name + ' ' + c.number + ' ' + c.description).toLowerCase();
-                if (haystack.indexOf(q) === -1) return false;
-            }
-            return true;
-        });
-        renderContacts();
+    function setGPSStatus(type, title, detail) {
+        var panel = document.getElementById('gpsPanel');
+        var titleEl = document.getElementById('gpsTitle');
+        var detailEl = document.getElementById('gpsDetail');
+        var iconEl = document.getElementById('gpsIconWrap');
+        if (panel) {
+            panel.classList.remove('loading', 'success', 'error');
+            if (type) panel.classList.add(type);
+        }
+        if (titleEl) titleEl.textContent = title;
+        if (detailEl) detailEl.textContent = detail;
+        if (iconEl) {
+            if (type === 'success') iconEl.textContent = '✅';
+            else if (type === 'error') iconEl.textContent = '⚠️';
+            else iconEl.textContent = '📡';
+        }
     }
 
-    function renderContacts() {
+    function reverseGeocode(lat, lng, callback) {
+        try {
+            var url = 'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id';
+            fetch(url, {
+                method: 'GET',
+                headers: { 'User-Agent': 'SALINK-KontakDarurat/14.0' }
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(data) {
+                if (data && data.display_name) {
+                    userAddress = data.display_name;
+                    if (typeof callback === 'function') callback(data.display_name);
+                } else {
+                    if (typeof callback === 'function') callback(lat.toFixed(4) + ', ' + lng.toFixed(4));
+                }
+            })
+            .catch(function() {
+                if (typeof callback === 'function') callback(lat.toFixed(4) + ', ' + lng.toFixed(4));
+            });
+        } catch (e) {
+            if (typeof callback === 'function') callback(lat.toFixed(4) + ', ' + lng.toFixed(4));
+        }
+    }
+
+    function updateBrandGpsInfo(text) {
+        var el = document.getElementById('brandGpsText');
+        if (el) el.textContent = text;
+    }
+
+    /**
+     * Auto-detect GPS — Layer 1
+     */
+    function autoDetectLocation() {
+        log('autoDetectLocation() called');
+        var btn = document.getElementById('locationBtn');
+        var btnText = document.getElementById('locationBtnText');
+        if (btn) btn.classList.add('loading');
+        if (btnText) btnText.textContent = '📍 Mendeteksi lokasi...';
+        setGPSStatus('loading', 'Mendeteksi lokasi Anda...', 'Mohon izinkan akses lokasi untuk menampilkan kontak darurat terdekat.');
+
+        if (!navigator.geolocation) {
+            log('Geolocation not supported');
+            setGPSStatus('error', 'GPS tidak tersedia', 'Browser Anda tidak mendukung layanan lokasi. Silakan gunakan tombol manual.');
+            if (btn) btn.classList.remove('loading');
+            if (btnText) btnText.textContent = '📍 Gunakan Lokasi Saya';
+            renderEmptyContactState('no_gps');
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                userLat = position.coords.latitude;
+                userLng = position.coords.longitude;
+                var accuracy = Math.round(position.coords.accuracy || 0);
+                log('Auto GPS success: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6));
+
+                try {
+                    localStorage.setItem('salink_user_lat', userLat);
+                    localStorage.setItem('salink_user_lng', userLng);
+                } catch(e) {}
+
+                updateBrandGpsInfo('GPS aktif: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6));
+
+                reverseGeocode(userLat, userLng, function(address) {
+                    setGPSStatus('success', '📍 Lokasi Anda terdeteksi', address + ' (±' + accuracy + 'm)');
+                    updateBrandGpsInfo(address.substring(0, 40) + (address.length > 40 ? '...' : ''));
+                });
+
+                if (btn) {
+                    btn.classList.remove('loading');
+                    btn.classList.add('success');
+                }
+                if (btnText) btnText.textContent = '✅ Refresh Lokasi';
+
+                // ⭐ Fetch kontak dari Spreadsheet
+                autoExpandIndex = 0;
+                loadContactsFromSheet(true);
+            },
+            function(error) {
+                log('Auto GPS error: ' + error.code);
+                var errMsg = 'Gagal mengambil lokasi';
+                if (error.code === 1) errMsg = 'Izin lokasi ditolak. Silakan gunakan tombol manual.';
+                else if (error.code === 2) errMsg = 'Lokasi tidak tersedia. Coba di tempat terbuka.';
+                else if (error.code === 3) errMsg = 'Timeout. Coba lagi.';
+
+                setGPSStatus('error', '⚠️ Gagal Mendeteksi Lokasi', errMsg);
+                updateBrandGpsInfo('Lokasi belum tersedia');
+
+                if (btn) btn.classList.remove('loading');
+                if (btnText) btnText.textContent = '📍 Gunakan Lokasi Saya';
+
+                renderEmptyContactState('error');
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0
+            }
+        );
+    }
+
+    /**
+     * Manual location trigger — Layer 2
+     */
+    function getMyLocation() {
+        log('getMyLocation() called');
+        autoExpandIndex = 0;
+        autoDetectLocation();
+    }
+
+    // ================================================================
+    // 15. API — FETCH KONTAK DARI SPREADSHEET
+    // ================================================================
+    function apiGetNearbyContacts(lat, lng, type, radiusKm) {
+        type = type || '';
+        radiusKm = radiusKm || DEFAULT_RADIUS;
+        var urlParams = new URLSearchParams({
+            action: 'get_nearby_contacts',
+            latitude: lat,
+            longitude: lng,
+            type: type,
+            radiusKm: radiusKm,
+            timestamp: Date.now()
+        });
+        var url = API_URL + '?' + urlParams.toString();
+        return fetch(url, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            cache: 'no-store'
+        })
+        .then(function(response) {
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return response.json();
+        })
+        .then(function(result) {
+            if (result && result.status === 'success' && Array.isArray(result.data)) {
+                return result.data;
+            }
+            return [];
+        })
+        .catch(function(error) {
+            console.error('❌ Gagal fetch nearby contacts:', error);
+            return [];
+        });
+    }
+
+    // ================================================================
+    // 16. LOAD CONTACTS FROM SHEET (dengan auto-expand radius)
+    // ================================================================
+    async function loadContactsFromSheet(isAuto) {
+        if (isLoading) return;
+        if (!userLat || !userLng) {
+            renderEmptyContactState('no_location');
+            return;
+        }
+
+        isLoading = true;
+        showLoadingState();
+
+        try {
+            // Radius → 0 = Semua Pos (kirim radius besar)
+            var radiusToSend = currentRadius === 0 ? 100 : currentRadius;
+            var typeToSend = currentCategory === 'all' ? '' : currentCategory;
+
+            log('Fetching contacts: radius=' + radiusToSend + 'km, type=' + (typeToSend || 'all'));
+
+            var data = await apiGetNearbyContacts(userLat, userLng, typeToSend, radiusToSend);
+
+            log('Received ' + (data ? data.length : 0) + ' contacts');
+
+            if (data && data.length > 0) {
+                allContactsFromSheet = data;
+                applyFiltersAndRender();
+
+                var radiusText = currentRadius === 0 ? 'semua pos' : currentRadius + ' km';
+                var rc = document.getElementById('resultsCount');
+                if (rc) rc.textContent = data.length + ' kontak tersedia (radius ' + radiusText + ')';
+
+                // ⭐ Update section "Nomor Darurat Nasional" — TAMPILKAN
+                renderNationalSection(true);
+            } else {
+                // ⭐ Auto-expand radius kalau kosong
+                if (isAuto && autoExpandIndex < AUTO_EXPAND_RADII.length - 1) {
+                    autoExpandIndex++;
+                    var nextRadius = AUTO_EXPAND_RADII[autoExpandIndex];
+                    log('Auto-expand radius to: ' + nextRadius + ' km');
+
+                    // Update UI radius button
+                    document.querySelectorAll('.radius-btn').forEach(function(b) {
+                        b.classList.toggle('active', parseFloat(b.dataset.radius) === nextRadius);
+                    });
+                    currentRadius = nextRadius;
+
+                    var nextLabel = nextRadius === 0 ? 'Semua Pos' : nextRadius + ' km';
+                    var rc2 = document.getElementById('resultsCount');
+                    if (rc2) rc2.textContent = 'Kosong di radius sebelumnya — mencoba ' + nextLabel + '...';
+
+                    // Delay sebelum coba radius berikutnya
+                    await new Promise(function(resolve) { setTimeout(resolve, 800); });
+
+                    isLoading = false;
+                    loadContactsFromSheet(true);
+                    return;
+                }
+
+                // Semua radius sudah dicoba, tetap kosong
+                allContactsFromSheet = [];
+                applyFiltersAndRender();
+
+                var rc3 = document.getElementById('resultsCount');
+                if (rc3) rc3.textContent = 'Tidak ada bantuan terdaftar';
+
+                // ⭐ Tampilkan section nasional sebagai fallback
+                renderNationalSection(true);
+            }
+        } catch (error) {
+            console.error('❌ Error loadContactsFromSheet:', error);
+            renderEmptyContactState('error');
+        }
+
+        isLoading = false;
+    }
+
+    // ================================================================
+    // 17. FILTER & RENDER KONTAK DARI SHEET
+    // ================================================================
+    function applyFiltersAndRender() {
+        var filtered = allContactsFromSheet.slice();
+
+        // Filter kategori
+        if (currentCategory !== 'all') {
+            filtered = filtered.filter(function(c) {
+                var cat = String(c.category || c.type || '').toLowerCase();
+                return cat === currentCategory;
+            });
+        }
+
+        // Filter local search
+        if (localSearchQuery && localSearchQuery.trim()) {
+            var q = localSearchQuery.toLowerCase().trim();
+            filtered = filtered.filter(function(c) {
+                var haystack = [
+                    c.name || '', c.village || '', c.district || '',
+                    c.city || '', c.province || '', c.address || '',
+                    c.category || '', c.type || '', c.phone || ''
+                ].join(' ').toLowerCase();
+                return haystack.indexOf(q) !== -1;
+            });
+        }
+
+        // Sort by distance (ascending)
+        filtered.sort(function(a, b) {
+            var da = parseFloat(a.distanceKm) || 99999;
+            var db = parseFloat(b.distanceKm) || 99999;
+            return da - db;
+        });
+
+        filteredContacts = filtered;
+        renderContacts(filtered);
+    }
+
+    function renderContacts(contacts) {
         var container = document.getElementById('contactContainer');
         if (!container) return;
 
-        if (filteredContacts.length === 0) {
+        if (!contacts || contacts.length === 0) {
             container.innerHTML =
                 '<div class="state-card">' +
-                    '<div class="state-icon">🔍</div>' +
-                    '<div class="state-title">Tidak Ada Kontak Ditemukan</div>' +
+                    '<div class="state-icon">🏢</div>' +
+                    '<div class="state-title">Belum Ada Bantuan di Sekitar Anda</div>' +
                     '<div class="state-text">' +
-                        (localSearchQuery ? 'Coba kata kunci lain atau ubah kategori.' : 'Belum ada kontak dalam kategori ini.') +
+                        'Tidak ditemukan instansi dalam radius ' +
+                        (currentRadius === 0 ? 'semua pos' : currentRadius + ' km') +
+                        '. Silakan perluas jangkauan pencarian atau hubungi nomor darurat nasional di bawah.' +
                     '</div>' +
                 '</div>';
             return;
         }
 
         var html = '';
-        filteredContacts.forEach(function(c) {
-            var cleanNumber = String(c.number).replace(/[^\d+]/g, '');
-            var telLink = 'tel:' + cleanNumber;
-            var waLink = 'https://wa.me/' + cleanNumber.replace(/^0/, '62').replace(/[^\d]/g, '');
+        contacts.forEach(function(c) {
+            var type = String(c.category || c.type || 'general').toLowerCase();
+            var catClass = CATEGORY_ICONS[type] ? type : 'general';
+            var catIcon = CATEGORY_ICONS[catClass] || '🏛️';
+            var catLabel = CATEGORY_LABELS[catClass] || 'Umum';
 
-            html +=
-                '<div class="contact-card">' +
-                    '<div class="contact-icon ' + c.iconClass + '">' + c.icon + '</div>' +
-                    '<div class="contact-info">' +
-                        '<div class="contact-name">' + escapeHTML(c.name) + '</div>' +
-                        '<div class="contact-number">📞 ' + escapeHTML(c.number) + '</div>' +
-                        '<div class="contact-desc">' + escapeHTML(c.description) + '</div>' +
-                    '</div>' +
-                    '<div class="contact-actions">' +
-                        '<a href="' + escapeAttr(telLink) + '" class="contact-action-btn call" title="Telepon">' +
-                            '<i class="fas fa-phone"></i>' +
-                        '</a>' +
-                        '<button class="contact-action-btn save" onclick="copyNumber(\'' + escapeAttr(c.number) + '\', \'' + escapeAttr(c.name) + '\')" title="Salin Nomor">' +
-                            '<i class="fas fa-copy"></i>' +
-                        '</button>' +
-                    '</div>' +
-                '</div>';
+            var name = c.name || 'Instansi Darurat';
+            var address = c.address || [c.village, c.district, c.city, c.province].filter(Boolean).join(', ');
+            var level = c.level || '';
+            var phone = normalizePhone(c.phone);
+            var whatsapp = normalizeWhatsApp(c.whatsapp || c.phone);
+            var mapsURL = c.mapsURL || (c.latitude && c.longitude
+                ? 'https://www.google.com/maps?q=' + c.latitude + ',' + c.longitude
+                : '');
+            var distance = c.distanceText || formatDistance(parseFloat(c.distanceKm));
+
+            var html2 = '';
+            html2 += '<div class="contact-card ' + catClass + '" data-id="' + escapeAttr(c.id || '') + '">';
+            html2 += '<div class="contact-card-inner">';
+
+            // Badge level (Desa/Kecamatan/Kota) di kanan atas
+            if (level) {
+                html2 += '<div class="contact-badge-area">' + escapeHTML(String(level).toUpperCase()) + '</div>';
+            }
+
+            // Top: icon + info
+            html2 += '<div class="contact-card-top">';
+            html2 += '<div class="contact-icon ' + catClass + '">' + catIcon + '</div>';
+            html2 += '<div class="contact-info">';
+            html2 += '<div class="contact-name">' + escapeHTML(name) + '</div>';
+            html2 += '<div class="contact-category">' + escapeHTML(catLabel) + '</div>';
+            html2 += '</div>';
+            html2 += '</div>';
+
+            // Address
+            if (address) {
+                html2 += '<div class="contact-address">';
+                html2 += '<i class="fas fa-map-marker-alt"></i>';
+                html2 += '<span>' + escapeHTML(address) + '</span>';
+                html2 += '</div>';
+            }
+
+            // Distance badge
+            if (distance) {
+                html2 += '<div class="distance-badge">';
+                html2 += '<i class="fas fa-route"></i>';
+                html2 += '<span>' + escapeHTML(distance) + '</span>';
+                html2 += '</div>';
+            }
+
+            // Actions grid 2x2
+            html2 += '<div class="contact-actions-grid">';
+
+            if (phone) {
+                html2 += '<a class="contact-action phone" href="tel:' + escapeAttr(phone) + '">' +
+                         '<i class="fas fa-phone-alt"></i><span>Telepon</span></a>';
+            } else {
+                html2 += '<span class="contact-action phone disabled"><i class="fas fa-phone-alt"></i><span>Telepon</span></span>';
+            }
+
+            if (whatsapp) {
+                html2 += '<a class="contact-action whatsapp" href="' + escapeAttr(whatsapp) + '" target="_blank" rel="noopener">' +
+                         '<i class="fab fa-whatsapp"></i><span>WhatsApp</span></a>';
+            } else {
+                html2 += '<span class="contact-action whatsapp disabled"><i class="fab fa-whatsapp"></i><span>WhatsApp</span></span>';
+            }
+
+            if (mapsURL) {
+                html2 += '<a class="contact-action maps" href="' + escapeAttr(mapsURL) + '" target="_blank" rel="noopener">' +
+                         '<i class="fas fa-map-marked-alt"></i><span>Maps</span></a>';
+            } else {
+                html2 += '<span class="contact-action maps disabled"><i class="fas fa-map-marked-alt"></i><span>Maps</span></span>';
+            }
+
+            html2 += '<button class="contact-action detail" onclick="showContactDetail(\'' + escapeAttr(c.id || '') + '\')">' +
+                     '<i class="fas fa-info-circle"></i><span>Detail</span></button>';
+
+            html2 += '</div>'; // /contact-actions-grid
+            html2 += '</div>'; // /contact-card-inner
+            html2 += '</div>'; // /contact-card
+
+            html += html2;
         });
 
         container.innerHTML = html;
     }
 
-    function copyNumber(number, name) {
+    function showLoadingState() {
+        var container = document.getElementById('contactContainer');
+        if (!container) return;
+        container.innerHTML =
+            '<div class="state-card">' +
+                '<span class="spinner"></span>' +
+                '<div class="state-title">Memuat kontak darurat...</div>' +
+                '<div class="state-text">Mengambil data dari server SALINK</div>' +
+            '</div>';
+    }
+
+    function renderEmptyContactState(reason) {
+        var container = document.getElementById('contactContainer');
+        if (!container) return;
+
+        var icon = '📍';
+        var title = 'Lokasi Anda Belum Diketahui';
+        var text = 'Tekan tombol <b>"Gunakan Lokasi Saya"</b> untuk mencari bantuan terdekat.';
+
+        if (reason === 'error') {
+            icon = '⚠️';
+            title = 'Gagal Mendeteksi Lokasi';
+            text = 'Silakan coba lagi atau gunakan tombol <b>"Gunakan Lokasi Saya"</b> di atas.';
+        } else if (reason === 'no_gps') {
+            icon = '⚠️';
+            title = 'GPS Tidak Tersedia';
+            text = 'Perangkat Anda tidak mendukung GPS. Silakan gunakan nomor darurat nasional di bawah.';
+        }
+
+        container.innerHTML =
+            '<div class="state-card">' +
+                '<div class="state-icon">' + icon + '</div>' +
+                '<div class="state-title">' + title + '</div>' +
+                '<div class="state-text">' + text + '</div>' +
+            '</div>';
+
+        // Tampilkan nomor darurat nasional sebagai fallback
+        renderNationalSection(true);
+    }
+
+    // ================================================================
+    // 18. RENDER SECTION NOMOR DARURAT NASIONAL
+    // ================================================================
+    function renderNationalSection(show) {
+        var header = document.getElementById('nationalSectionHeader');
+        var container = document.getElementById('nationalContainer');
+        var countEl = document.getElementById('nationalCount');
+
+        if (!header || !container) return;
+
+        if (!show) {
+            header.style.display = 'none';
+            container.style.display = 'none';
+            return;
+        }
+
+        header.style.display = 'flex';
+        container.style.display = 'block';
+        if (countEl) countEl.textContent = NATIONAL_CONTACTS.length;
+
+        var html = '';
+        NATIONAL_CONTACTS.forEach(function(c) {
+            var catClass = c.category || 'general';
+            var icon = c.icon || CATEGORY_ICONS[catClass] || '📞';
+            var phone = normalizePhone(c.number);
+
+            html += '<div class="national-contact-item">';
+            html += '<div class="national-contact-icon ' + catClass + '">' + icon + '</div>';
+            html += '<div class="national-contact-info">';
+            html += '<div class="national-contact-name">' + escapeHTML(c.name) + '</div>';
+            html += '<div class="national-contact-number">📞 ' + escapeHTML(c.number) + '</div>';
+            html += '<div class="national-contact-desc">' + escapeHTML(c.description) + '</div>';
+            html += '</div>';
+            html += '<div class="national-contact-actions">';
+            html += '<a href="tel:' + escapeAttr(phone) + '" class="national-action-btn call" title="Telepon"><i class="fas fa-phone"></i></a>';
+            html += '<button class="national-action-btn save" onclick="copyNationalNumber(\'' + escapeAttr(c.number) + '\', \'' + escapeAttr(c.name) + '\')" title="Salin Nomor"><i class="fas fa-copy"></i></button>';
+            html += '</div>';
+            html += '</div>';
+        });
+
+        container.innerHTML = html;
+    }
+
+    function copyNationalNumber(number, name) {
         try {
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(number).then(function() {
                     showToast('📋 Tersalin', name + ' — ' + number, 'fa-check-circle');
                 }).catch(function() {
-                    fallbackCopyNumber(number, name);
+                    fallbackCopy(number, name);
                 });
             } else {
-                fallbackCopyNumber(number, name);
+                fallbackCopy(number, name);
             }
-        } catch (e) {
-            fallbackCopyNumber(number, name);
+        } catch(e) {
+            fallbackCopy(number, name);
         }
     }
-    function fallbackCopyNumber(number, name) {
+    function fallbackCopy(number, name) {
         var ta = document.createElement('textarea');
         ta.value = number;
         ta.style.position = 'fixed';
@@ -3178,18 +3824,80 @@
         document.body.removeChild(ta);
         showToast('📋 Tersalin', name + ' — ' + number, 'fa-check-circle');
     }
-    window.copyNumber = copyNumber;
 
+    function showContactDetail(contactId) {
+        if (!contactId) return;
+        var contact = allContactsFromSheet.find(function(c) { return String(c.id) === String(contactId); });
+        if (!contact) return;
+
+        var msg = '🏢 ' + (contact.name || 'Instansi Darurat') + '\n\n';
+        msg += '📁 Kategori: ' + (CATEGORY_LABELS[contact.category] || contact.category || '-') + '\n';
+        if (contact.level) msg += '🏛️ Level: ' + contact.level + '\n';
+        if (contact.address) msg += '📍 Alamat: ' + contact.address + '\n';
+        if (contact.village) msg += '🏘️ Desa: ' + contact.village + '\n';
+        if (contact.district) msg += '🏘️ Kecamatan: ' + contact.district + '\n';
+        if (contact.city) msg += '🏙️ Kota/Kab: ' + contact.city + '\n';
+        if (contact.province) msg += '🗺️ Provinsi: ' + contact.province + '\n';
+        if (contact.phone) msg += '\n📞 Telepon: ' + contact.phone;
+        if (contact.whatsapp) msg += '\n💬 WhatsApp: ' + contact.whatsapp;
+        if (contact.serviceArea) msg += '\n\n🎯 Area Layanan: ' + contact.serviceArea;
+        if (contact.operationalHours) msg += '\n🕐 Jam Operasional: ' + contact.operationalHours;
+        if (contact.distanceText) msg += '\n\n📏 Jarak: ' + contact.distanceText + ' dari lokasi Anda';
+
+        alert(msg);
+    }
+
+    // ================================================================
+    // 19. SET CATEGORY & RADIUS
+    // ================================================================
     function setCategory(btn) {
         document.querySelectorAll('.cat-btn').forEach(function(b) { b.classList.remove('active'); });
         btn.classList.add('active');
         currentCategory = btn.dataset.cat || 'all';
-        applyLocalFilters();
         if (navigator.vibrate) navigator.vibrate(10);
+
+        // Reset auto-expand index
+        autoExpandIndex = 0;
+
+        if (userLat && userLng) {
+            loadContactsFromSheet(true);
+        } else {
+            // Kalau belum ada lokasi, tetap filter data yang ada (kalau ada)
+            applyFiltersAndRender();
+        }
+    }
+
+    function setRadius(btn) {
+        document.querySelectorAll('.radius-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        var r = parseFloat(btn.dataset.radius);
+        currentRadius = isNaN(r) ? DEFAULT_RADIUS : r;
+        if (navigator.vibrate) navigator.vibrate(10);
+
+        autoExpandIndex = 0;
+
+        if (userLat && userLng) {
+            loadContactsFromSheet(false);
+        } else {
+            applyFiltersAndRender();
+        }
     }
 
     // ================================================================
-    // 15. MODAL HELPERS
+    // 20. REFRESH
+    // ================================================================
+    function refreshContacts() {
+        if (userLat && userLng) {
+            autoExpandIndex = 0;
+            loadContactsFromSheet(false);
+            showToast('🔄 Memperbarui...', 'Mengambil data kontak terbaru', 'fa-sync-alt');
+        } else {
+            autoDetectLocation();
+        }
+    }
+
+    // ================================================================
+    // 21. MODAL HELPERS
     // ================================================================
     function openModalById(id) {
         var m = document.getElementById(id);
@@ -3207,7 +3915,7 @@
     }
 
     // ================================================================
-    // 16. NOTIF MODAL — LENGKAP DENGAN FILTER + MARK READ
+    // 22. NOTIF MODAL
     // ================================================================
     function loadReadNotifs() {
         try {
@@ -3383,7 +4091,7 @@
     }
 
     // ================================================================
-    // 17. SEARCH MODAL
+    // 23. SEARCH MODAL
     // ================================================================
     function openSearchModal() {
         if (isPreviewMode) { showPreviewOverlay(); return; }
@@ -3545,7 +4253,7 @@
     }
 
     // ================================================================
-    // 18. FAB MODAL
+    // 24. FAB MODAL
     // ================================================================
     function openFabModal() {
         var overlay = document.getElementById('fabModalOverlay');
@@ -3611,7 +4319,7 @@
     }
 
     // ================================================================
-    // 19. MAP MODAL — PETA DARURAT
+    // 25. MAP MODAL
     // ================================================================
     function openMapModal() {
         var modal = document.getElementById('mapModal');
@@ -3693,7 +4401,7 @@
 
         if (regionEl) {
             fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id', {
-                headers: { 'User-Agent': 'SALINK-App/13.1' }
+                headers: { 'User-Agent': 'SALINK-App/14.0' }
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -3766,7 +4474,7 @@
     }
 
     // ================================================================
-    // 20. LOGOUT
+    // 26. LOGOUT
     // ================================================================
     function handleLogout() {
         if (confirm('Apakah Anda yakin ingin keluar?')) {
@@ -3782,7 +4490,7 @@
     }
 
     // ================================================================
-    // 21. RIPPLE
+    // 27. RIPPLE
     // ================================================================
     function initRipple() {
         document.addEventListener('click', function(e) {
@@ -3803,7 +4511,7 @@
     }
 
     // ================================================================
-    // 22. STORAGE EVENTS
+    // 28. STORAGE EVENTS
     // ================================================================
     function initStorageEvents() {
         window.addEventListener('storage', function(e) {
@@ -3816,7 +4524,7 @@
     }
 
     // ================================================================
-    // 23. EVENT LISTENERS
+    // 29. EVENT LISTENERS
     // ================================================================
     function setupEventListeners() {
         if (_salinkSetup) return;
@@ -3834,7 +4542,7 @@
             });
         }
 
-        // SIDEBAR CLOSE + OVERLAY
+        // SIDEBAR CLOSE
         var sidebarClose = document.getElementById('sidebarClose');
         if (sidebarClose) {
             sidebarClose.addEventListener('click', function(e) {
@@ -3845,7 +4553,7 @@
         var sidebarOverlay = document.getElementById('sidebarOverlay');
         if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
 
-        // SIDEBAR MAP BUTTON
+        // SIDEBAR MAP
         var sidebarMapBtn = document.getElementById('sidebarMapBtn');
         if (sidebarMapBtn) {
             sidebarMapBtn.addEventListener('click', function(e) {
@@ -3897,12 +4605,34 @@
         var backHomeBtn = document.getElementById('backHomeBtn');
         if (backHomeBtn) backHomeBtn.addEventListener('click', goHome);
 
+        // LOCATION BUTTON (Manual)
+        var locationBtn = document.getElementById('locationBtn');
+        if (locationBtn) {
+            locationBtn.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                getMyLocation();
+            });
+        }
+
+        // REFRESH BUTTON
+        var refreshBtn = document.getElementById('refreshBtn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                var self = this;
+                var icon = self.querySelector('i');
+                if (icon) icon.classList.add('fa-spin');
+                refreshContacts();
+                setTimeout(function() { if (icon) icon.classList.remove('fa-spin'); }, 2000);
+            });
+        }
+
         // LOCAL SEARCH
         var localSearchInput = document.getElementById('localSearchInput');
         if (localSearchInput) {
             localSearchInput.addEventListener('input', function() {
                 localSearchQuery = this.value || '';
-                applyLocalFilters();
+                applyFiltersAndRender();
             });
         }
 
@@ -3911,6 +4641,14 @@
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
                 setCategory(this);
+            });
+        });
+
+        // RADIUS FILTER
+        document.querySelectorAll('.radius-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                setRadius(this);
             });
         });
 
@@ -4056,10 +4794,10 @@
     }
 
     // ================================================================
-    // 24. INIT
+    // 30. INIT
     // ================================================================
     function init() {
-        log('Initializing Kontak Darurat v13.1 FINAL...');
+        log('Initializing Kontak Darurat v14.0 FINAL...');
 
         loadTheme();
         loadReadNotifs();
@@ -4070,18 +4808,20 @@
         initRipple();
         initStorageEvents();
 
-        // Render contacts awal
-        applyLocalFilters();
-
         updateNotifBadge();
         setInterval(updateNotifBadge, 30000);
 
+        // ⭐ Auto-detect GPS saat buka halaman
+        // Delay 800ms supaya UI fully rendered dulu
+        setTimeout(function() {
+            autoDetectLocation();
+        }, 800);
+
         if (isPreviewMode) setTimeout(function() { showPreviewOverlay(); }, 1200);
 
-        log('✓ Kontak Darurat v13.1 Ready!');
+        log('✓ Kontak Darurat v14.0 Ready!');
         log('  Mode: ' + (isPreviewMode ? 'PREVIEW' : 'FULL'));
         log('  User: ' + (currentUser ? currentUser.username : 'Guest'));
-        log('  Contacts loaded: ' + allContacts.length);
     }
 
     if (document.readyState === 'loading') {
@@ -4091,9 +4831,12 @@
     }
 
     // ================================================================
-    // 25. EXPOSE GLOBAL
+    // 31. EXPOSE GLOBAL
     // ================================================================
     window.goHome = goHome;
+    window.getMyLocation = getMyLocation;
+    window.autoDetectLocation = autoDetectLocation;
+    window.refreshContacts = refreshContacts;
     window.showToast = showToast;
     window.openSidebar = openSidebar;
     window.closeSidebar = closeSidebar;
@@ -4124,10 +4867,14 @@
     window.activateMapGps = activateMapGps;
     window.mapSearchService = mapSearchService;
     window.setCategory = setCategory;
-    window.copyNumber = copyNumber;
-    window.EMERGENCY_CONTACTS = EMERGENCY_CONTACTS;
+    window.setRadius = setRadius;
+    window.showContactDetail = showContactDetail;
+    window.copyNationalNumber = copyNationalNumber;
+    window.loadContactsFromSheet = loadContactsFromSheet;
+    window.applyFiltersAndRender = applyFiltersAndRender;
+    window.renderNationalSection = renderNationalSection;
 
-    log('✓ Kontak Darurat v13.1 Script Loaded');
+    log('✓ Kontak Darurat v14.0 Script Loaded');
 })();
     </script>
 
