@@ -18,7 +18,14 @@
 
     <style>
         /* ==================================================================
-           SALINK ALERT SEKITAR v12.1 — FIXED PATCH POSITION
+           SALINK ALERT SEKITAR v13.0 — FINAL (KONSISTEN DASHBOARD)
+           ==================================================================
+           - Tema warna universal (dark/light) — konsisten
+           - Header dengan Back button
+           - Sidebar dengan #sidebarMapBtn data-action="open-map"
+           - Modal Peta Darurat SAMA PERSIS lokasi-bantuan.html
+           - Modal Notif LENGKAP: filter + tandai semua + mark read
+           - Bottom Nav + FAB universal
            ================================================================== */
 
         /* ============ ROOT VARIABLES ============ */
@@ -1163,6 +1170,14 @@
         .notif-item-message { font-size: 0.65rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 4px; }
         .notif-item-time { font-size: 0.55rem; color: var(--text-muted); }
 
+        /* ============ NOTIF FILTER BUTTONS ============ */
+        .notif-filter-btn.active {
+            background: var(--accent-blue-gradient) !important;
+            color: #fff !important;
+            border-color: var(--primary) !important;
+        }
+        .notif-filter-btn:active { transform: scale(0.96); }
+
         /* ============ FAB MODAL ============ */
         .fab-modal-overlay {
             position: fixed;
@@ -1763,6 +1778,37 @@
         }
         button:focus:not(:focus-visible) { outline: none; }
 
+        /* ============ MODAL FOOTER (TUTUP) ============ */
+        .modal-footer {
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            position: sticky;
+            bottom: 0;
+            background: var(--modal-bg);
+            z-index: 2;
+        }
+        .modal-footer .btn-close-modal {
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 9px 26px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .modal-footer .btn-close-modal:active {
+            transform: scale(0.96);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
         /* ============ RESPONSIVE ============ */
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
@@ -1802,11 +1848,9 @@
         }
 
         /* ================================================================
-           PATCH v12.1 — FIX WARNA HEADER UNIVERSAL (KONSISTEN DENGAN
-           dashboard.html & lokasi-bantuan.html) + MODAL FOOTER TUTUP
+           PATCH UNIVERSAL — FIX WARNA HEADER + MODAL THEME
            ================================================================ */
 
-        /* ─── 1. TRANSISI GLOBAL ─── */
         body, body * {
             transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
         }
@@ -1814,11 +1858,9 @@
         h1, h2, h3, h4, h5, h6 { color: var(--text-primary) !important; }
         p, span, div, li, td, th, label, strong, em, small, b, i { color: inherit; }
 
-        /* ─── 2. LINKS ─── */
         a { color: var(--primary); text-decoration: none; transition: color 0.2s ease; }
         a:hover { color: var(--primary-glow); }
 
-        /* ─── 3. INPUT & FORM ─── */
         input, textarea, select, button {
             color: var(--text-primary);
             font-family: inherit;
@@ -1837,25 +1879,14 @@
             color: var(--text-primary);
         }
 
-        /* ─── 4. FORCE FIX HARDBROKEN COLORS ─── */
         [style*="color: #fff"], [style*="color:#fff"],
         [style*="color: white"], [style*="color:white"] {
             color: var(--text-primary) !important;
         }
 
-        /* ─── 5. HEADER (app-bar) — FIX UTAMA ─── */
-        .app-bar {
-            background: var(--header-bg) !important;
-            border-bottom: 1px solid var(--border-color) !important;
-        }
+        .app-bar { background: var(--header-bg) !important; border-bottom: 1px solid var(--border-color) !important; }
+        .app-title, .app-title .title-text { color: var(--text-white) !important; }
 
-        /* Logo & Title */
-        .app-title,
-        .app-title .title-text {
-            color: var(--text-white) !important;
-        }
-
-        /* Tombol header (menu, search, notif, user, back) — DARK THEME */
         .user-btn, .search-btn, .menu-btn, .back-btn, .refresh-btn {
             color: var(--text-white) !important;
             background: rgba(255,255,255,0.08) !important;
@@ -1868,14 +1899,9 @@
             background: rgba(230,0,18,0.2) !important;
         }
 
-        /* Tombol header — LIGHT THEME */
-        [data-theme="light"] .app-bar {
-            background: rgba(255,255,255,0.92) !important;
-        }
+        [data-theme="light"] .app-bar { background: rgba(255,255,255,0.92) !important; }
         [data-theme="light"] .app-title,
-        [data-theme="light"] .app-title .title-text {
-            color: var(--text-primary) !important;
-        }
+        [data-theme="light"] .app-title .title-text { color: var(--text-primary) !important; }
         [data-theme="light"] .user-btn,
         [data-theme="light"] .search-btn,
         [data-theme="light"] .menu-btn,
@@ -1886,19 +1912,10 @@
             border-color: rgba(0,0,0,0.1) !important;
         }
 
-        /* Badge notif di header */
-        #headerNotifBtn #notifBadge {
-            border-color: var(--header-bg) !important;
-        }
-        [data-theme="light"] #headerNotifBtn #notifBadge {
-            border-color: var(--header-bg) !important;
-        }
+        #headerNotifBtn #notifBadge { border-color: var(--header-bg) !important; }
+        [data-theme="light"] #headerNotifBtn #notifBadge { border-color: var(--header-bg) !important; }
 
-        /* ─── 6. SIDEBAR — KONSISTEN TEMA ─── */
-        .sidebar {
-            background: var(--bg-secondary) !important;
-            color: var(--text-primary);
-        }
+        .sidebar { background: var(--bg-secondary) !important; color: var(--text-primary); }
         .sidebar-user-name { color: var(--text-primary); }
         .sidebar-user-email { color: var(--text-muted); }
         .nav-link { color: var(--text-primary); }
@@ -1907,97 +1924,41 @@
         .nav-link.active i { color: var(--primary); }
         [data-theme="light"] .sidebar { background: #ffffff !important; }
 
-        /* ─── 7. BOTTOM NAV — KONSISTEN TEMA ─── */
         .nav-item-bottom { color: var(--text-muted); }
         .nav-item-bottom.active .nav-label { color: var(--primary); }
-        [data-theme="light"] .bottom-nav {
-            background: rgba(255,255,255,0.98) !important;
-        }
-        [data-theme="light"] .nav-item-bottom .badge {
-            border-color: var(--footer-bg) !important;
-        }
+        [data-theme="light"] .bottom-nav { background: rgba(255,255,255,0.98) !important; }
+        [data-theme="light"] .nav-item-bottom .badge { border-color: var(--footer-bg) !important; }
 
-        /* ─── 8. MODAL — KONSISTEN TEMA ─── */
-        .modal-content, .modal-body, .modal-title {
-            color: var(--text-primary) !important;
-        }
-        .modal-body p, .modal-body span, .modal-body div {
-            color: var(--text-primary);
-        }
-        [data-theme="light"] .modal-content {
-            background: #ffffff !important;
-            color: var(--text-primary);
-        }
-        [data-theme="light"] .modal-header {
-            background: #ffffff;
-        }
+        .modal-content, .modal-body, .modal-title { color: var(--text-primary) !important; }
+        .modal-body p, .modal-body span, .modal-body div { color: var(--text-primary); }
+        [data-theme="light"] .modal-content { background: #ffffff !important; color: var(--text-primary); }
+        [data-theme="light"] .modal-header { background: #ffffff; }
 
-        /* ─── 9. MODAL FOOTER + TOMBOL TUTUP (SESUAI DASHBOARD) ─── */
-        .modal-footer {
-            margin-top: 14px;
-            padding-top: 12px;
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            position: sticky;
-            bottom: 0;
-            background: var(--modal-bg);
-            z-index: 2;
-        }
-        .modal-footer .btn-close-modal {
-            background: var(--bg-input);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 9px 26px;
-            font-size: 0.72rem;
-            font-weight: 700;
-            cursor: pointer;
-            font-family: inherit;
-            transition: all 0.2s;
-        }
-        .modal-footer .btn-close-modal:active {
-            transform: scale(0.96);
-            border-color: var(--primary);
-            color: var(--primary);
-        }
-        [data-theme="light"] .modal-footer {
-            background: #ffffff;
-        }
+        [data-theme="light"] .modal-footer { background: #ffffff; }
         [data-theme="light"] .modal-footer .btn-close-modal {
             background: rgba(0,0,0,0.04);
             color: var(--text-primary);
             border-color: rgba(0,0,0,0.1);
         }
 
-        /* ─── 10. SEARCH MODAL — FIX TEXT COLOR ─── */
         .search-section-title { color: var(--text-secondary) !important; }
         .search-result-item .result-title { color: var(--text-primary) !important; }
         .search-result-item .result-sub { color: var(--text-secondary) !important; }
         .search-result-item .result-arrow { color: var(--text-muted) !important; }
-        .search-result-item mark {
-            background: rgba(240,208,128,0.3);
-            color: var(--text-primary);
-        }
+        .search-result-item mark { background: rgba(240,208,128,0.3); color: var(--text-primary); }
         .search-empty-state { color: var(--text-muted); }
         .search-empty-state h4 { color: var(--text-secondary); }
 
-        /* ─── 11. NOTIF MODAL — FIX TEXT COLOR ─── */
         .notif-item { color: var(--text-primary); }
         .notif-item-title { color: var(--text-primary) !important; }
         .notif-item-message { color: var(--text-secondary) !important; }
         .notif-item-time { color: var(--text-muted) !important; }
 
-        /* ─── 12. PREVIEW OVERLAY ─── */
         .preview-overlay-content { color: var(--text-primary); }
         .preview-overlay-content h2 { color: var(--text-primary); }
         .preview-overlay-content p { color: var(--text-secondary); }
-        [data-theme="light"] .preview-overlay-content {
-            background: #ffffff;
-        }
+        [data-theme="light"] .preview-overlay-content { background: #ffffff; }
 
-        /* ─── 13. TOAST & FLOATING ─── */
         .toast .toast-title { color: var(--text-primary); }
         .toast .toast-message { color: var(--text-secondary); }
         [data-theme="light"] .toast { background: #ffffff; }
@@ -2007,16 +1968,12 @@
         .floating-notification .notif-subtitle { color: var(--text-muted); }
         [data-theme="light"] .floating-notification { background: #ffffff; }
 
-        /* ─── 14. MAP MODAL — FIX COLOR ─── */
         .map-status-title { color: var(--text-primary) !important; }
         .map-status-desc { color: var(--text-muted) !important; }
         .map-info-row { color: var(--text-secondary) !important; }
         .map-info-row .info-label { color: var(--text-muted) !important; }
         .map-info-row .info-value { color: var(--text-primary) !important; }
-        .map-info-row .info-value.coords {
-            color: var(--text-primary) !important;
-            font-family: 'Courier New', monospace;
-        }
+        .map-info-row .info-value.coords { color: var(--text-primary) !important; font-family: 'Courier New', monospace; }
         .map-owner-name { color: var(--text-primary) !important; }
         .map-owner-loc { color: var(--text-muted) !important; }
         .map-address-row { color: var(--text-muted) !important; }
@@ -2024,12 +1981,12 @@
         .map-services-label { color: var(--text-secondary) !important; }
         .map-service-card .service-desc { color: var(--text-muted) !important; }
 
-        /* ─── 15. FINAL SAFETY NET ─── */
         * { -webkit-text-fill-color: currentColor; }
         ::-webkit-scrollbar-thumb { background: var(--primary); }
         :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
     </style>
 </head>
+
 <body>
 
     <div class="app-shell">
@@ -2308,7 +2265,7 @@
 
     </div>
 
-    <!-- MODAL SEARCH -->
+    <!-- MODAL SEARCH — DENGAN TOMBOL TUTUP -->
     <div class="modal-overlay" id="searchModal">
         <div class="modal-content search-modal-content">
             <div class="modal-header">
@@ -2367,7 +2324,7 @@
         </div>
     </div>
 
-    <!-- MODAL NOTIFIKASI -->
+    <!-- MODAL NOTIFIKASI — LENGKAP DENGAN FILTER -->
     <div class="modal-overlay" id="notifModal">
         <div class="modal-content" style="max-width:460px;">
             <div class="modal-header">
@@ -2381,12 +2338,32 @@
                 </button>
             </div>
             <div class="modal-body">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:7px 10px;background:var(--bg-input);border-radius:10px;">
-                    <span style="font-size:0.62rem;color:var(--text-secondary);">
+                <!-- FILTER TABS -->
+                <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
+                    <button class="notif-filter-btn active" data-filter="all" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                        <i class="fas fa-list"></i> Semua
+                    </button>
+                    <button class="notif-filter-btn" data-filter="unread" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                        <i class="fas fa-circle"></i> Belum
+                    </button>
+                    <button class="notif-filter-btn" data-filter="emergency" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                        <i class="fas fa-exclamation-triangle"></i> Darurat
+                    </button>
+                    <button class="notif-filter-btn" data-filter="regular" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                        <i class="fas fa-bell"></i> Biasa
+                    </button>
+                </div>
+                <!-- STATISTIK + TANDAI SEMUA -->
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:7px 10px;background:rgba(255,255,255,0.04);border-radius:10px;">
+                    <span style="font-size:0.62rem;color:#a8b2c1;">
                         <i class="fas fa-info-circle" style="color:var(--primary);"></i>
                         <span id="notifStatsText">0 notifikasi</span>
                     </span>
+                    <button id="markAllReadBtn" type="button" style="padding:5px 12px;background:var(--accent-blue-gradient);color:#fff;border:none;border-radius:8px;font-size:0.6rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                        <i class="fas fa-check-double"></i> Tandai Semua
+                    </button>
                 </div>
+                <!-- LIST NOTIF -->
                 <div id="notifList" style="max-height:380px;overflow-y:auto;"></div>
             </div>
             <div class="modal-footer">
@@ -2538,28 +2515,28 @@
         </div>
     </div>
 
-    <!-- ============================================================ -->
-    <!-- TOAST CONTAINER                                               -->
-    <!-- ============================================================ -->
+    <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
     <!-- ============================================================ -->
-    <!-- SCRIPT — ALERT SEKITAR JAVASCRIPT                             -->
-    <!-- Konsisten 100% dengan lokasi-bantuan.html (INDUK)             -->
+    <!-- SCRIPT — ALERT SEKITAR JAVASCRIPT v13.0                       -->
+    <!-- Konsisten dengan lokasi-bantuan.html + fitur Notif lengkap    -->
     <!-- ============================================================ -->
     <script>
 /* ====================================================================
- * SALINK ALERT SEKITAR v12.0 — INTEGRATED WITH LOKASI-BANTUAN
+ * SALINK ALERT SEKITAR v13.0 — FINAL
  * ====================================================================
- * File INDUK: lokasi-bantuan.html
- * Semua sistem: Tema, PWA, Header, Bottom Nav, FAB, Sidebar,
- *               Modal Peta Darurat, Search, Notif, Toast, Preview,
- *               Login Guard, Storage Events → IDENTIK dengan INDUK.
- *
- * Yang berbeda HANYA konten halaman:
- *   - loadEmergencies() / renderAlertCards()  (spesifik alert)
- *   - Summary grid (total/aktif/radius)
- *   - Filter jenis emergency
+ * INDUK: lokasi-bantuan.html
+ * Fitur:
+ *   - Tema Universal (dark/light)
+ *   - PWA Install
+ *   - Header dengan Back button
+ *   - Sidebar dengan #sidebarMapBtn
+ *   - Modal Peta Darurat (sama persis lokasi-bantuan)
+ *   - Modal Notif LENGKAP: filter + tandai semua + mark read persistent
+ *   - Modal Search dengan tombol Tutup
+ *   - FAB Modal 2×2 → dashboard.html?emergency=TYPE
+ *   - Bottom Nav + FAB universal
  * ==================================================================== */
 (function() {
     'use strict';
@@ -2612,6 +2589,10 @@
     var mapCurrentLat = null;
     var mapCurrentLng = null;
     var _salinkSetup = false;
+
+    // Notif state
+    var notifFilter = 'all';
+    var readNotifs = {};
 
     // ================================================================
     // 3. HELPERS
@@ -2695,7 +2676,7 @@
     }
 
     // ================================================================
-    // 5. THEME — UNIVERSAL (TOGGLE SWITCH FRIENDLY)
+    // 5. THEME
     // ================================================================
     function loadTheme() {
         var savedTheme = localStorage.getItem('salink_theme') || 'dark';
@@ -3042,7 +3023,6 @@
                 userLng = position.coords.longitude;
                 var accuracy = Math.round(position.coords.accuracy || 0);
 
-                // Simpan ke localStorage
                 try {
                     localStorage.setItem('salink_user_lat', userLat);
                     localStorage.setItem('salink_user_lng', userLng);
@@ -3061,7 +3041,6 @@
 
                 showToast('📍 Lokasi Ditemukan', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
 
-                // Reload alert dengan lokasi baru
                 loadEmergencies();
             },
             function(error) {
@@ -3095,7 +3074,7 @@
             var url = NOMINATIM_URL + '?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id';
             fetch(url, {
                 method: 'GET',
-                headers: { 'User-Agent': 'SALINK-Alert-Sekitar/12.0' }
+                headers: { 'User-Agent': 'SALINK-Alert-Sekitar/13.0' }
             })
             .then(function(res) { return res.json(); })
             .then(function(data) {
@@ -3113,7 +3092,6 @@
     // 15. LOAD EMERGENCIES
     // ================================================================
     function loadEmergencies() {
-        // Baca dari localStorage dulu
         var localEms = [];
         try {
             localEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
@@ -3131,7 +3109,6 @@
         allEmergencies = activeEms;
         applyFilterAndRender();
 
-        // Fetch dari API juga
         fetchFromAPI();
     }
     function fetchFromAPI() {
@@ -3146,7 +3123,6 @@
                 return exp > now;
             });
 
-            // Merge dengan localStorage
             var merged = {};
             allEmergencies.forEach(function(e) { if (e.id) merged[e.id] = e; });
             valid.forEach(function(e) { if (e.id) merged[e.id] = e; });
@@ -3177,14 +3153,12 @@
     function applyFilterAndRender() {
         var filtered = allEmergencies.slice();
 
-        // Filter by type
         if (activeEmergencyFilter) {
             filtered = filtered.filter(function(e) {
                 return e.type === activeEmergencyFilter || e.emergencyType === activeEmergencyFilter;
             });
         }
 
-        // Hitung distance + sort + filter radius
         if (userLat && userLng) {
             filtered = filtered.map(function(e) {
                 var eLat = parseFloat(e.latitude || e.lat);
@@ -3327,40 +3301,62 @@
     }
 
     // ================================================================
-    // 19. NOTIF MODAL
+    // 19. NOTIF MODAL — LENGKAP DENGAN FILTER + MARK READ
     // ================================================================
+    function loadReadNotifs() {
+        try {
+            readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}');
+        } catch(e) { readNotifs = {}; }
+    }
+    function saveReadNotifs() {
+        try {
+            localStorage.setItem('salink_read_notifs', JSON.stringify(readNotifs));
+        } catch(e) {}
+    }
+
     function getAllNotifications() {
         var list = [];
+        // Emergency notifications
         allEmergencies.forEach(function(em) {
             var ts = em.timestamp ? new Date(em.timestamp).getTime() : Date.now();
+            var isRead = readNotifs[em.id] === true;
             list.push({
                 id: em.id,
                 type: 'emergency',
                 emergencyType: em.type || em.emergencyType,
                 title: (EMERGENCY_ICONS[em.type] || '🚨') + ' ' + (EMERGENCY_LABELS[em.type] || 'Emergency'),
                 message: em.text || em.description || (em.sender + ' melaporkan darurat di ' + (em.location || '-')),
-                sender: em.sender,
+                sender: em.sender || 'Sistem',
+                senderUsername: em.senderUsername || '',
+                location: em.location || em.address || '-',
                 timestamp: ts,
-                read: false
+                read: isRead
             });
         });
+        // Regular notifications
         try {
             var notifs = JSON.parse(localStorage.getItem('salink_notifications') || '[]');
             notifs.forEach(function(n) {
+                var ts = n.timestamp ? new Date(n.timestamp).getTime() : Date.now();
+                var isRead = readNotifs[n.id] === true || n.read === 'TRUE' || n.read === true;
                 list.push({
                     id: n.id,
                     type: 'regular',
+                    notifType: n.type || n.soundKey || 'info',
                     title: n.title || 'Notifikasi',
-                    message: n.message || '',
+                    message: n.message || n.text || '',
                     sender: n.sender || 'Sistem',
-                    timestamp: n.timestamp ? new Date(n.timestamp).getTime() : Date.now(),
-                    read: n.read === 'TRUE' || n.read === true
+                    senderUsername: n.senderUsername || '',
+                    link: n.link || '',
+                    timestamp: ts,
+                    read: isRead
                 });
             });
         } catch (e) {}
         list.sort(function(a, b) { return b.timestamp - a.timestamp; });
         return list;
     }
+
     function updateNotifBadge() {
         var all = getAllNotifications();
         var unread = all.filter(function(n) { return !n.read; }).length;
@@ -3372,19 +3368,45 @@
         var nmb = document.getElementById('notifModalBadge');
         if (nmb) nmb.textContent = unread;
     }
+
     function renderNotifList() {
         var listEl = document.getElementById('notifList');
         if (!listEl) return;
+
         var all = getAllNotifications();
-        if (all.length === 0) {
-            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-bell-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada notifikasi</p></div>';
+        var filtered = all;
+
+        if (notifFilter === 'unread') {
+            filtered = all.filter(function(n) { return !n.read; });
+        } else if (notifFilter === 'emergency') {
+            filtered = all.filter(function(n) { return n.type === 'emergency'; });
+        } else if (notifFilter === 'regular') {
+            filtered = all.filter(function(n) { return n.type === 'regular'; });
+        }
+
+        var unreadCount = all.filter(function(n) { return !n.read; }).length;
+        var statsEl = document.getElementById('notifStatsText');
+        if (statsEl) statsEl.textContent = all.length + ' total • ' + unreadCount + ' belum dibaca';
+
+        var badgeEl = document.getElementById('notifModalBadge');
+        if (badgeEl) badgeEl.textContent = unreadCount;
+
+        updateNotifBadge();
+
+        if (filtered.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);">' +
+                '<i class="fas fa-bell-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i>' +
+                '<p style="font-size:0.75rem;">Tidak ada notifikasi</p></div>';
             return;
         }
-        listEl.innerHTML = all.slice(0, 30).map(function(n) {
+
+        listEl.innerHTML = filtered.slice(0, 30).map(function(n) {
             var iconHtml = n.type === 'emergency'
                 ? '<div class="notif-item-icon emergency">' + (EMERGENCY_ICONS[n.emergencyType] || '🚨') + '</div>'
                 : '<div class="notif-item-icon regular"><i class="fas fa-bell"></i></div>';
-            return '<div class="notif-item ' + (n.read ? '' : 'unread') + '" onclick="openNotifDetail(\'' + escapeAttr(n.id) + '\',\'' + escapeAttr(n.type) + '\')">' +
+            var unreadClass = n.read ? '' : 'unread';
+            var typeClass = n.type === 'emergency' ? 'emergency' : '';
+            return '<div class="notif-item ' + unreadClass + ' ' + typeClass + '" onclick="openNotifDetail(\'' + escapeAttr(n.id) + '\',\'' + escapeAttr(n.type) + '\')">' +
                 iconHtml +
                 '<div class="notif-item-content">' +
                     '<div class="notif-item-title">' + escapeHTML(n.title) + '</div>' +
@@ -3394,13 +3416,61 @@
             '</div>';
         }).join('');
     }
+
+    function setupNotifFilters() {
+        document.querySelectorAll('.notif-filter-btn').forEach(function(btn) {
+            btn.onclick = function() {
+                document.querySelectorAll('.notif-filter-btn').forEach(function(b) {
+                    b.classList.remove('active');
+                });
+                this.classList.add('active');
+                notifFilter = this.dataset.filter || 'all';
+                renderNotifList();
+            };
+        });
+
+        var markAllBtn = document.getElementById('markAllReadBtn');
+        if (markAllBtn) {
+            markAllBtn.onclick = function() {
+                var allNotifs = getAllNotifications();
+                allNotifs.forEach(function(n) {
+                    readNotifs[n.id] = true;
+                });
+                saveReadNotifs();
+                renderNotifList();
+                updateNotifBadge();
+                showToast('✅', 'Semua notifikasi ditandai dibaca', 'fa-check-double');
+            };
+        }
+    }
+
+    function markNotifRead(id) {
+        if (!id) return;
+        readNotifs[id] = true;
+        saveReadNotifs();
+        updateNotifBadge();
+    }
+
     function openNotifModal() {
         if (isPreviewMode) { showPreviewOverlay(); return; }
+        loadReadNotifs();
         openModalById('notifModal');
+        notifFilter = 'all';
+        document.querySelectorAll('.notif-filter-btn').forEach(function(b) {
+            b.classList.remove('active');
+        });
+        var allBtn = document.querySelector('.notif-filter-btn[data-filter="all"]');
+        if (allBtn) allBtn.classList.add('active');
+        setupNotifFilters();
         renderNotifList();
     }
+
     function closeNotifModal() { closeModalById('notifModal'); }
+
     function openNotifDetail(id, type) {
+        if (id) {
+            markNotifRead(id);
+        }
         closeNotifModal();
         if (type === 'emergency' && id) {
             setTimeout(function() {
@@ -3427,6 +3497,12 @@
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         var allTab = document.querySelector('.search-tab[data-tab="all"]');
         if (allTab) allTab.classList.add('active');
+        var ef = document.getElementById('emergencyFilters');
+        if (ef) ef.style.display = 'none';
+        searchEmergencyFilter = 'all';
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
+        var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
+        if (allChip) allChip.classList.add('active');
     }
     function closeSearchModal() { closeModalById('searchModal'); }
     function clearSearch() {
@@ -3634,7 +3710,7 @@
     }
 
     // ================================================================
-    // 22. MAP MODAL — PETA DARURAT (SAMA PERSIS LOKASI-BANTUAN)
+    // 22. MAP MODAL — PETA DARURAT
     // ================================================================
     function openMapModal() {
         log('openMapModal() called');
@@ -3719,7 +3795,7 @@
 
         if (regionEl) {
             fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id', {
-                headers: { 'User-Agent': 'SALINK-App/12.0' }
+                headers: { 'User-Agent': 'SALINK-App/13.0' }
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -3830,7 +3906,7 @@
     }
 
     // ================================================================
-    // 25. STORAGE EVENTS (Sinkronisasi antar tab)
+    // 25. STORAGE EVENTS
     // ================================================================
     function initStorageEvents() {
         window.addEventListener('storage', function(e) {
@@ -4013,10 +4089,9 @@
             });
         });
 
-        // SEARCH MODAL
+        // SEARCH MODAL CLOSE
         var searchModalCloseBtn = document.getElementById('searchModalCloseBtn');
         if (searchModalCloseBtn) searchModalCloseBtn.addEventListener('click', closeSearchModal);
-                /* ─── FOOTER TOMBOL TUTUP SEARCH MODAL ─── */
         var searchModalFooterCloseBtn = document.getElementById('searchModalFooterCloseBtn');
         if (searchModalFooterCloseBtn) {
             searchModalFooterCloseBtn.addEventListener('click', function(e) {
@@ -4058,10 +4133,9 @@
             });
         }
 
-        // NOTIF MODAL
+        // NOTIF MODAL CLOSE
         var notifModalCloseBtn = document.getElementById('notifModalCloseBtn');
         if (notifModalCloseBtn) notifModalCloseBtn.addEventListener('click', closeNotifModal);
-                /* ─── FOOTER TOMBOL TUTUP NOTIF MODAL ─── */
         var notifModalFooterCloseBtn = document.getElementById('notifModalFooterCloseBtn');
         if (notifModalFooterCloseBtn) {
             notifModalFooterCloseBtn.addEventListener('click', function(e) {
@@ -4118,11 +4192,10 @@
     // 27. INIT
     // ================================================================
     function init() {
-        log('Initializing Alert Sekitar v12.0 (Integrated with Lokasi-Bantuan)...');
+        log('Initializing Alert Sekitar v13.0 FINAL...');
 
-        // Tema dulu
         loadTheme();
-
+        loadReadNotifs();
         setupPWA();
         loadCurrentUser();
         setupLoginGuard();
@@ -4130,11 +4203,9 @@
         initRipple();
         initStorageEvents();
 
-        // Update notif badge + interval
         updateNotifBadge();
         setInterval(updateNotifBadge, 30000);
 
-        // Cek lokasi tersimpan
         var savedLat = localStorage.getItem('salink_user_lat');
         var savedLng = localStorage.getItem('salink_user_lng');
         if (savedLat && savedLng) {
@@ -4144,23 +4215,19 @@
                 'Koordinat: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6));
         }
 
-        // Load emergencies
         loadEmergencies();
 
-        // Auto refresh tiap 60 detik
         setInterval(function() {
             if (!document.hidden) loadEmergencies();
         }, 60000);
 
-        // Show preview overlay kalau belum login
         if (isPreviewMode) setTimeout(function() { showPreviewOverlay(); }, 1200);
 
-        log('✓ Alert Sekitar v12.0 Ready!');
+        log('✓ Alert Sekitar v13.0 Ready!');
         log('  Mode: ' + (isPreviewMode ? 'PREVIEW' : 'FULL'));
         log('  User: ' + (currentUser ? currentUser.username : 'Guest'));
     }
 
-    // Bootstrap
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
@@ -4168,7 +4235,7 @@
     }
 
     // ================================================================
-    // 28. EXPOSE GLOBAL (untuk onclick="" di HTML)
+    // 28. EXPOSE GLOBAL
     // ================================================================
     window.goHome = goHome;
     window.getMyLocation = getMyLocation;
@@ -4193,6 +4260,8 @@
     window.renderNotifList = renderNotifList;
     window.openNotifDetail = openNotifDetail;
     window.updateNotifBadge = updateNotifBadge;
+    window.markNotifRead = markNotifRead;
+    window.setupNotifFilters = setupNotifFilters;
     window.openFabModal = openFabModal;
     window.closeFabModal = closeFabModal;
     window.openMapModal = openMapModal;
@@ -4210,7 +4279,7 @@
     window.activateMapGps = activateMapGps;
     window.mapSearchService = mapSearchService;
 
-    log('✓ Alert Sekitar v12.0 Script Loaded');
+    log('✓ Alert Sekitar v13.0 Script Loaded');
 })();
     </script>
 
