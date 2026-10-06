@@ -1758,6 +1758,102 @@
             .nav-fab .fab-emoji { font-size: 1.7rem; }
         }
 
+        /* ============ SEARCH FILTER CHIPS ============ */
+                .search-filter-row {
+            display: flex !important;
+            gap: 6px;
+            margin-bottom: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .search-filter-row[style*="display: none"] {
+            display: flex !important;
+        }
+        .search-filter-row.active {
+            display: flex !important;
+        }
+        .search-filter-chip {
+            padding: 6px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            color: var(--text-muted);
+            font-size: 0.65rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        .search-filter-chip:active {
+            transform: scale(0.95);
+        }
+        .search-filter-chip.active {
+            background: rgba(230,0,18,0.15);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        /* ============ RECENT SEARCH ============ */
+        .recent-search-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .recent-search-item:active { transform: scale(0.98); border-color: var(--primary); }
+        .recent-search-item .recent-icon { color: var(--text-muted); font-size: 0.72rem; flex-shrink: 0; }
+        .recent-search-item .recent-text { flex: 1; font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
+        .recent-search-item .recent-remove { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.7rem; padding: 2px 6px; }
+
+        /* ============ TRENDING ============ */
+        .trending-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .trending-item:active { transform: scale(0.98); border-color: var(--primary); }
+        .trending-item .trending-rank {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+        .trending-item .trending-rank.gold {
+            background: linear-gradient(135deg, #f0d080, #d4a017);
+            color: #0a0e1a;
+        }
+        .trending-item .trending-info { flex: 1; min-width: 0; }
+        .trending-item .trending-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-primary);
+        }
+        .trending-item .trending-sub { font-size: 0.58rem; color: var(--text-muted); }
+      
         /* ================================================================
            PATCH UNIVERSAL — FIX WARNA HEADER + MODAL THEME
            ================================================================ */
@@ -2176,6 +2272,13 @@
                         <i class="fas fa-exclamation-triangle"></i> Emergency
                     </button>
                 </div>
+                    <div class="search-filter-row" id="emergencyFilters">
+                    <button class="search-filter-chip active" data-filter="all" type="button">🎯 Semua</button>
+                    <button class="search-filter-chip" data-filter="fire" type="button">🔥 Kebakaran</button>
+                    <button class="search-filter-chip" data-filter="medical" type="button">🚑 Medis</button>
+                    <button class="search-filter-chip" data-filter="crime" type="button">🚓 Kriminal</button>
+                    <button class="search-filter-chip" data-filter="disaster" type="button">🌪️ Bencana</button>
+                </div>
                 <div id="searchResultsBody">
                     <div id="searchDefaultView">
                         <div class="search-empty-state">
@@ -2391,7 +2494,7 @@
     <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
-      <!-- ============================================================ -->
+        <!-- ============================================================ -->
     <!-- SCRIPT — STATISTIK JAVASCRIPT v13.0                           -->
     <!-- Konsisten dengan INDUK (dashboard, lokasi-bantuan, dll)      -->
     <!-- ============================================================ -->
@@ -3210,10 +3313,134 @@
     }
 
     // ================================================================
+    // SEARCH — TRENDING + RECENT SEARCHES (PATCH UNIVERSAL)
+    // ================================================================
+    var searchEmergencyFilter = 'all';
+    var recentSearches = [];
+    var MAX_RECENT_SEARCHES = 8;
+
+    function loadRecentSearches() {
+        try { recentSearches = JSON.parse(localStorage.getItem('salink_recent_searches') || '[]'); }
+        catch(e) { recentSearches = []; }
+    }
+    function saveRecentSearches() {
+        try { localStorage.setItem('salink_recent_searches', JSON.stringify(recentSearches)); }
+        catch(e) {}
+    }
+    function addRecentSearch(q) {
+        if (!q || !q.trim()) return;
+        q = q.trim();
+        recentSearches = recentSearches.filter(function(x) { return x.toLowerCase() !== q.toLowerCase(); });
+        recentSearches.unshift(q);
+        if (recentSearches.length > MAX_RECENT_SEARCHES) recentSearches = recentSearches.slice(0, MAX_RECENT_SEARCHES);
+        saveRecentSearches();
+    }
+
+    function getTrendingPosts() {
+        try {
+            var allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
+            var oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+            var todayPosts = allPosts.filter(function(p) {
+                return p && p.timestamp && new Date(p.timestamp).getTime() >= oneDayAgo;
+            });
+            todayPosts.sort(function(a, b) {
+                var aL = 0, bL = 0;
+                try { aL = JSON.parse(a.likes || '[]').length; } catch(e) {}
+                try { bL = JSON.parse(b.likes || '[]').length; } catch(e) {}
+                return bL - aL;
+            });
+            return todayPosts.slice(0, 5);
+        } catch(e) { return []; }
+    }
+
+    function renderSearchDefaultView() {
+        var container = document.getElementById('searchDefaultView');
+        if (!container) return;
+        var html = '';
+
+        // Recent searches
+        if (recentSearches.length > 0) {
+            html += '<div class="search-section-title"><span>🕐 Pencarian Terakhir</span>' +
+                '<button onclick="clearRecentSearches()" style="background:none;border:none;color:#f85149;font-size:0.6rem;cursor:pointer;font-family:inherit;"><i class="fas fa-trash"></i> Hapus</button></div>';
+            html += recentSearches.slice(0, 5).map(function(q) {
+                return '<div class="recent-search-item" onclick="applySearchQuery(\'' + escapeAttr(q) + '\')">' +
+                    '<i class="fas fa-history recent-icon"></i>' +
+                    '<span class="recent-text">' + escapeHTML(q) + '</span>' +
+                    '<button class="recent-remove" onclick="event.stopPropagation();removeRecentSearch(\'' + escapeAttr(q) + '\')"><i class="fas fa-times"></i></button>' +
+                '</div>';
+            }).join('');
+        }
+
+        // Trending
+        var trending = getTrendingPosts();
+        if (trending.length > 0) {
+            html += '<div class="search-section-title"><span>🔥 Trending Hari Ini</span><span class="count-pill">' + trending.length + '</span></div>';
+            html += trending.map(function(p, idx) {
+                var rankClass = idx === 0 ? 'gold' : '';
+                var likes = 0;
+                try { likes = JSON.parse(p.likes || '[]').length; } catch(e) {}
+                return '<div class="trending-item" onclick="goToPost(\'' + escapeAttr(p.id) + '\')">' +
+                    '<div class="trending-rank ' + rankClass + '">#' + (idx + 1) + '</div>' +
+                    '<div class="trending-info">' +
+                        '<div class="trending-title">' + escapeHTML(p.text ? p.text.substring(0, 50) : 'Postingan media') + '</div>' +
+                        '<div class="trending-sub">' + escapeHTML(p.userFullName || 'User') + ' • ❤️ ' + likes + ' suka</div>' +
+                    '</div>' +
+                    '<i class="fas fa-chevron-right result-arrow"></i>' +
+                '</div>';
+            }).join('');
+        }
+
+        if (!html) {
+            html = '<div class="search-empty-state">' +
+                '<div class="empty-big-icon">🔍</div>' +
+                '<h4>Mulai Pencarian</h4>' +
+                '<p>Ketik nama pengguna, isi postingan, lokasi, atau jenis emergency.</p>' +
+            '</div>';
+        }
+        container.innerHTML = html;
+    }
+
+    function applySearchQuery(q) {
+        var input = document.getElementById('searchInput');
+        if (input) {
+            input.value = q;
+            input.focus();
+            input.dispatchEvent(new Event('input'));
+        }
+    }
+    function removeRecentSearch(q) {
+        recentSearches = recentSearches.filter(function(x) { return x !== q; });
+        saveRecentSearches();
+        renderSearchDefaultView();
+    }
+    function clearRecentSearches() {
+        if (!confirm('Hapus semua riwayat pencarian?')) return;
+        recentSearches = [];
+        saveRecentSearches();
+        renderSearchDefaultView();
+        showToast('🗑️', 'Riwayat pencarian dihapus', 'fa-trash');
+    }
+    function goToPost(postId) {
+        addRecentSearch(postId);
+        closeSearchModal();
+        setTimeout(function() {
+            window.location.href = DASHBOARD_URL + '?post=' + encodeURIComponent(postId);
+        }, 200);
+    }
+    function setSearchEmergencyFilter(filter, btnEl) {
+        searchEmergencyFilter = filter;
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
+        if (btnEl) btnEl.classList.add('active');
+        var input = document.getElementById('searchInput');
+        if (input && input.value.trim()) performSearch(input.value.trim());
+    }
+  
+    // ================================================================
     // 22. SEARCH MODAL
     // ================================================================
-    function openSearchModal() {
+        function openSearchModal() {
         if (isPreviewMode) { showPreviewOverlay(); return; }
+        loadRecentSearches();
         openModalById('searchModal');
         var input = document.getElementById('searchInput');
         if (input) { input.value = ''; setTimeout(function() { input.focus(); }, 200); }
@@ -3223,13 +3450,21 @@
         if (sar) sar.style.display = 'none';
         var sdv = document.getElementById('searchDefaultView');
         if (sdv) sdv.style.display = 'block';
+        renderSearchDefaultView();
         searchTab = 'all';
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         var allTab = document.querySelector('.search-tab[data-tab="all"]');
         if (allTab) allTab.classList.add('active');
+        var ef = document.getElementById('emergencyFilters');
+        if (ef) ef.style.display = 'none';
+        searchEmergencyFilter = 'all';
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
+        var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
+        if (allChip) allChip.classList.add('active');
     }
+      
     function closeSearchModal() { closeModalById('searchModal'); }
-    function clearSearch() {
+        function clearSearch() {
         var input = document.getElementById('searchInput');
         if (input) input.value = '';
         var cb = document.getElementById('clearSearchBtn');
@@ -3238,16 +3473,33 @@
         if (sar) sar.style.display = 'none';
         var sdv = document.getElementById('searchDefaultView');
         if (sdv) sdv.style.display = 'block';
+        renderSearchDefaultView();
     }
-    function switchSearchTab(tab, btnEl) {
+        function switchSearchTab(tab, btnEl) {
         searchTab = tab;
-        document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
+        
+        // Update active state tab
+        document.querySelectorAll('.search-tab').forEach(function(t) {
+            t.classList.remove('active');
+        });
         if (btnEl) btnEl.classList.add('active');
+        
+        // Show/hide filter emergency
+        var ef = document.getElementById('emergencyFilters');
+        if (ef) {
+            ef.style.display = 'flex !important';
+            ef.setAttribute('style', 'display: flex !important');
+        }
+            
+        // Re-run search jika ada input
         var input = document.getElementById('searchInput');
-        if (input && input.value.trim()) performSearch(input.value.trim());
+        if (input && input.value.trim()) {
+            performSearch(input.value.trim());
+        }
     }
     function performSearch(query) {
         var q = query.trim().toLowerCase();
+        addRecentSearch(query);
         if (!q) {
             var sar = document.getElementById('searchActiveResults');
             if (sar) sar.style.display = 'none';
@@ -3585,7 +3837,13 @@
         if (_salinkSetup) return;
         _salinkSetup = true;
         log('Setting up event listeners...');
-
+                // Search Filter Chips (Emergency)
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) {
+            c.addEventListener('click', function() {
+                setSearchEmergencyFilter(this.getAttribute('data-filter'), this);
+            });
+        });
+      
         // HEADER MENU
         var menuBtn = document.getElementById('menuBtn');
         if (menuBtn) {
@@ -3669,7 +3927,7 @@
         // MAP MODAL CLOSE
         var mapModalCloseBtn = document.getElementById('mapModalCloseBtn');
         if (mapModalCloseBtn) {
-            mapModalCloseBtn.addEventListener('click', function(e) {
+          mapModalCloseBtn.addEventListener('click', function(e) {
                 e.preventDefault(); e.stopPropagation();
                 closeMapModal();
             });
@@ -3819,6 +4077,7 @@
         loadTheme();
         loadReadNotifs();
         loadUser();
+        loadRecentSearches();
         setupLoginGuard();
         setupEventListeners();
         initRipple();
@@ -3879,7 +4138,12 @@
     window.showPreviewOverlay = showPreviewOverlay;
     window.hidePreviewOverlay = hidePreviewOverlay;
     window.updateNotifBadge = updateNotifBadge;
-
+    window.goToPost = goToPost;
+    window.applySearchQuery = applySearchQuery;
+    window.removeRecentSearch = removeRecentSearch;
+    window.clearRecentSearches = clearRecentSearches;
+    window.setSearchEmergencyFilter = setSearchEmergencyFilter;
+  
     log('✓ Statistik v13.0 Script Loaded');
 })();
     </script>
@@ -3990,4 +4254,3 @@
     </script>
 </body>
 </html>
-  
