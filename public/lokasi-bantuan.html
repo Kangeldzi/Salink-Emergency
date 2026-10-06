@@ -3280,162 +3280,194 @@
         });
     }
 
-    // ================================================================
-    // 14. GPS MULTI-STAGE FALLBACK (FIX DATA SELULER)
-    // ================================================================
-    function getMyLocation() {
-        log('getMyLocation() called');
-        var btn = document.getElementById('locationBtn');
-        var btnText = document.getElementById('locationBtnText');
-        if (isPreviewMode) {
-            log('Preview mode ON — showing overlay');
-            showPreviewOverlay();
-            return;
-        }
-        if (btn) {
-            btn.disabled = true;
-            btn.classList.add('loading');
-        }
-        if (btnText) btnText.textContent = 'Mendapatkan...';
+// ====================================================================
+// 14. GPS MULTI-STAGE FALLBACK (OPSI X — CACHE INSTANT + AUTO REFRESH)
+// ====================================================================
+// Saat dipanggil:
+//   1. Tampilkan cache (kalau ada) → user langsung lihat
+//   2. Auto-trigger GPS fresh di background
+//   3. Update tampilan begitu GPS dapat
+// ====================================================================
+function getMyLocation() {
+    log('getMyLocation() called');
+    var btn = document.getElementById('locationBtn');
+    var btnText = document.getElementById('locationBtnText');
 
-        if (!navigator.geolocation) {
-            showToast('⚠️ Error', 'Perangkat tidak mendukung GPS.', 'fa-exclamation-triangle');
-            setGPSStatus('error', 'GPS tidak tersedia', 'Perangkat tidak mendukung layanan lokasi.');
-            resetLocationBtn();
-            return;
-        }
-
-        setGPSStatus('loading', '📡 Mencari sinyal GPS...', 'Menggunakan akurasi tinggi (bisa memakan waktu hingga 30 detik di data seluler)');
-
-        // Cek permission dulu
-        if (navigator.permissions && navigator.permissions.query) {
-            navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
-                log('Permission state: ' + result.state);
-                if (result.state === 'denied') {
-                    setGPSStatus('error', 'Izin lokasi ditolak', 'Aktifkan izin lokasi di pengaturan browser/HP Anda, lalu coba lagi.');
-                    showToast('⚠️ Izin Ditolak', 'Aktifkan izin lokasi di browser Anda', 'fa-exclamation-triangle');
-                    resetLocationBtn();
-                    return;
-                }
-                attemptGpsHighAccuracy();
-            }).catch(function() {
-                attemptGpsHighAccuracy();
-            });
-        } else {
-            attemptGpsHighAccuracy();
-        }
+    if (isPreviewMode) {
+        log('Preview mode ON — showing overlay');
+        showPreviewOverlay();
+        return;
     }
 
-    // Stage 1: High accuracy (GPS hardware)
-    function attemptGpsHighAccuracy() {
-        log('Stage 1: High accuracy, timeout 30s');
-        var timeoutId = setTimeout(function() {
-            log('Stage 1 timeout, fallback to Stage 2');
-            attemptGpsNetwork();
-        }, 30000);
-
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                clearTimeout(timeoutId);
-                handleGpsSuccess(position, 'high');
-            },
-            function(error) {
-                clearTimeout(timeoutId);
-                log('Stage 1 failed: code=' + error.code + ' msg=' + error.message);
-                if (error.code === 1) {
-                    // Permission denied — jangan fallback, langsung error
-                    handleGpsError(error, 'high');
-                } else {
-                    // Timeout / unavailable — coba Stage 2
-                    attemptGpsNetwork();
-                }
-            },
-            { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
-        );
+    if (!navigator.geolocation) {
+        showToast('⚠️ Error', 'Perangkat tidak mendukung GPS.', 'fa-exclamation-triangle');
+        setGPSStatus('error', 'GPS tidak tersedia', 'Perangkat tidak mendukung layanan lokasi.');
+        return;
     }
 
-    // Stage 2: Network-based (low accuracy, cocok untuk data seluler)
-    function attemptGpsNetwork() {
-        log('Stage 2: Network-based, timeout 20s');
-        setGPSStatus('loading', '📡 Sinyal GPS lemah...', 'Mencoba metode alternatif (network location)...');
-        var timeoutId = setTimeout(function() {
-            log('Stage 2 timeout, giving up');
-            setGPSStatus('error', 'Lokasi tidak dapat diperoleh', 'Sinyal GPS terlalu lemah. Coba pindah ke area terbuka atau aktifkan WiFi.');
-            showToast('⚠️ Gagal', 'GPS tidak merespons. Coba aktifkan WiFi atau pindah ke area terbuka.', 'fa-exclamation-triangle');
-            resetLocationBtn();
-        }, 20000);
+    // ⭐ STEP 1: Tampilkan cache instant (kalau ada)
+    var cachedLat = localStorage.getItem('salink_user_lat');
+    var cachedLng = localStorage.getItem('salink_user_lng');
+    var cachedAddr = localStorage.getItem('salink_user_address');
+    var hasCache = false;
 
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                clearTimeout(timeoutId);
-                handleGpsSuccess(position, 'network');
-            },
-            function(error) {
-                clearTimeout(timeoutId);
-                log('Stage 2 failed: code=' + error.code);
-                handleGpsError(error, 'network');
-            },
-            { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 }
-        );
-    }
-
-    function handleGpsSuccess(position, method) {
-        userLat = position.coords.latitude;
-        userLng = position.coords.longitude;
-        var accuracy = Math.round(position.coords.accuracy || 0);
-        var methodLabel = method === 'high' ? 'GPS' : 'Network';
-        log('GPS success (' + methodLabel + '): ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6) + ' ±' + accuracy + 'm');
-
-        try {
-            localStorage.setItem('salink_user_lat', userLat);
-            localStorage.setItem('salink_user_lng', userLng);
-        } catch(e) {}
-
-        setGPSStatus('success', '✅ Lokasi berhasil ditemukan (' + methodLabel + ')',
-            'Koordinat: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6) + ' • Akurasi ±' + accuracy + 'm');
-
-        showToast('✅ Berhasil', 'Lokasi ditemukan via ' + methodLabel + ' (±' + accuracy + 'm)', 'fa-check-circle');
-        resetLocationBtn();
+    if (cachedLat && cachedLng) {
+        userLat = parseFloat(cachedLat);
+        userLng = parseFloat(cachedLng);
+        hasCache = true;
+        log('Menampilkan cache: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6));
+        setGPSStatus('success', '📍 Lokasi dari cache', (cachedAddr || (userLat.toFixed(6) + ', ' + userLng.toFixed(6))) + ' • Refresh...');
+        if (btnText) btnText.textContent = '🔄 GPS Refresh...';
+        if (btn) btn.disabled = true;
+        // Auto load contacts dengan cache dulu
         loadContacts();
+    } else {
+        if (btn) btn.disabled = true;
+        if (btnText) btnText.textContent = 'Mendapatkan...';
+        setGPSStatus('loading', '📡 Mencari sinyal GPS...', 'GPS akurasi tinggi (bisa 30 detik di data seluler)');
     }
 
-    function handleGpsError(error, method) {
-        console.error('❌ GPS Error (' + method + '):', error);
-        var message = '';
-        if (error.code === 1) {
-            message = 'Izin lokasi ditolak. Aktifkan izin lokasi untuk browser ini di pengaturan HP Anda.';
-        } else if (error.code === 2) {
-            message = 'Lokasi tidak tersedia. Pastikan GPS aktif & Anda berada di area terbuka.';
-        } else if (error.code === 3) {
-            message = 'Waktu pencarian habis. Coba aktifkan WiFi atau pindah ke area terbuka, lalu coba lagi.';
-        } else {
-            message = error.message || 'Gagal mendapatkan lokasi. Coba lagi.';
-        }
-        setGPSStatus('error', 'Gagal mendapatkan lokasi', message);
-        showToast('⚠️ Gagal', message, 'fa-exclamation-triangle');
-        resetLocationBtn();
-    }
-
-    function resetLocationBtn() {
-        var btn = document.getElementById('locationBtn');
-        var btnText = document.getElementById('locationBtnText');
-        if (btn) {
-            btn.disabled = false;
-            btn.classList.remove('loading');
-        }
+    // ⭐ STEP 2: Auto-trigger GPS fresh di background
+    _gpsAutoRefresh(function() {
+        if (btn) { btn.disabled = false; }
         if (btnText) btnText.textContent = 'Gunakan Lokasi Saya';
-    }
+    });
+}
 
-    function setGPSStatus(type, title, detail) {
-        var status = document.getElementById('gpsStatus');
-        var titleEl = document.getElementById('gpsTitle');
-        var detailEl = document.getElementById('gpsDetail');
-        if (!status || !titleEl || !detailEl) return;
-        status.classList.remove('loading', 'success', 'error');
-        if (type) status.classList.add(type);
-        titleEl.textContent = title;
-        detailEl.textContent = detail;
+// GPS Auto-Refresh: 2-stage dengan maximumAge: 0
+function _gpsAutoRefresh(doneCallback) {
+    // Cek permission dulu
+    if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
+            if (result.state === 'denied') {
+                setGPSStatus('error', 'Izin lokasi ditolak', 'Aktifkan izin lokasi di pengaturan browser/HP Anda, lalu coba lagi.');
+                showToast('⚠️ Izin Ditolak', 'Aktifkan izin lokasi di browser Anda', 'fa-exclamation-triangle');
+                if (doneCallback) doneCallback();
+                return;
+            }
+            _gpsStage1(doneCallback);
+        }).catch(function() {
+            _gpsStage1(doneCallback);
+        });
+    } else {
+        _gpsStage1(doneCallback);
     }
+}
+
+// Stage 1: High accuracy, timeout 30s, maximumAge 0
+function _gpsStage1(doneCallback) {
+    log('Stage 1: High accuracy, timeout 30s, maximumAge 0');
+
+    var timeoutId = setTimeout(function() {
+        log('Stage 1 timeout, fallback to Stage 2');
+        _gpsStage2(doneCallback);
+    }, 30000);
+
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            clearTimeout(timeoutId);
+            _gpsSuccess(position, 'high', doneCallback);
+        },
+        function(error) {
+            clearTimeout(timeoutId);
+            log('Stage 1 failed: code=' + error.code);
+            if (error.code === 1) {
+                _gpsError(error, doneCallback);
+            } else {
+                _gpsStage2(doneCallback);
+            }
+        },
+        { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+    );
+}
+
+// Stage 2: Network-based, timeout 20s, maximumAge 0 (no cache)
+function _gpsStage2(doneCallback) {
+    log('Stage 2: Network-based, timeout 20s, maximumAge 0');
+    setGPSStatus('loading', '📡 Sinyal GPS lemah...', 'Mencoba metode alternatif (network location)...');
+
+    var timeoutId = setTimeout(function() {
+        log('Stage 2 timeout, giving up');
+        setGPSStatus('error', 'Lokasi tidak dapat diperoleh', 'Sinyal GPS terlalu lemah. Coba pindah ke area terbuka atau aktifkan WiFi.');
+        showToast('⚠️ Gagal', 'GPS tidak merespons. Coba aktifkan WiFi atau pindah ke area terbuka.', 'fa-exclamation-triangle');
+        if (doneCallback) doneCallback();
+    }, 20000);
+
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            clearTimeout(timeoutId);
+            _gpsSuccess(position, 'network', doneCallback);
+        },
+        function(error) {
+            clearTimeout(timeoutId);
+            log('Stage 2 failed: code=' + error.code);
+            _gpsError(error, doneCallback);
+        },
+        { enableHighAccuracy: false, timeout: 20000, maximumAge: 0 }
+    );
+}
+
+// Handler sukses GPS (shared Stage 1 & 2)
+function _gpsSuccess(position, method, doneCallback) {
+    userLat = position.coords.latitude;
+    userLng = position.coords.longitude;
+    var accuracy = Math.round(position.coords.accuracy || 0);
+    var methodLabel = method === 'high' ? 'GPS' : 'Network';
+    log('GPS success (' + methodLabel + '): ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6) + ' ±' + accuracy + 'm');
+
+    try {
+        localStorage.setItem('salink_user_lat', userLat);
+        localStorage.setItem('salink_user_lng', userLng);
+    } catch(e) {}
+
+    setGPSStatus('success', '✅ Lokasi berhasil ditemukan (' + methodLabel + ')',
+        'Koordinat: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6) + ' • Akurasi ±' + accuracy + 'm');
+
+    showToast('✅ Berhasil', 'Lokasi ditemukan via ' + methodLabel + ' (±' + accuracy + 'm)', 'fa-check-circle');
+
+    // Reverse geocoding → simpan alamat ke cache juga
+    _reverseGeocode(userLat, userLng, function(address) {
+        if (address) {
+            try { localStorage.setItem('salink_user_address', address); } catch(e) {}
+        }
+    });
+
+    if (doneCallback) doneCallback();
+    loadContacts();
+}
+
+// Handler error GPS
+function _gpsError(error, doneCallback) {
+    console.error('❌ GPS Error: code=' + error.code, error);
+    var message = '';
+    if (error.code === 1) {
+        message = 'Izin lokasi ditolak. Aktifkan izin lokasi untuk browser ini di pengaturan HP Anda.';
+    } else if (error.code === 2) {
+        message = 'Lokasi tidak tersedia. Pastikan GPS aktif & Anda berada di area terbuka.';
+    } else if (error.code === 3) {
+        message = 'Waktu pencarian habis. Coba aktifkan WiFi atau pindah ke area terbuka, lalu coba lagi.';
+    } else {
+        message = error.message || 'Gagal mendapatkan lokasi. Coba lagi.';
+    }
+    setGPSStatus('error', 'Gagal mendapatkan lokasi', message);
+    showToast('⚠️ Gagal', message, 'fa-exclamation-triangle');
+    if (doneCallback) doneCallback();
+}
+
+// Helper: Reverse geocoding
+function _reverseGeocode(lat, lng, callback) {
+    fetch(NOMINATIM_URL + '?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id', {
+        method: 'GET',
+        headers: { 'User-Agent': 'SALINK-App/14.0' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data && data.display_name && callback) callback(data.display_name);
+    })
+    .catch(function() {
+        if (callback) callback(null);
+    });
+}
 
     // ================================================================
     // 15. LOAD CONTACTS
@@ -3782,44 +3814,58 @@
     // ================================================================
     // 21. SEARCH MODAL
     // ================================================================
-    function openSearchModal() {
-        if (isPreviewMode) { showPreviewOverlay(); return; }
-        openModalById('searchModal');
-        var input = document.getElementById('searchInput');
-        if (input) { input.value = ''; setTimeout(function() { input.focus(); }, 200); }
-        var cb = document.getElementById('clearSearchBtn');
-        if (cb) cb.classList.remove('visible');
-        var sar = document.getElementById('searchActiveResults');
-        if (sar) sar.style.display = 'none';
-        var sdv = document.getElementById('searchDefaultView');
-        if (sdv) sdv.style.display = 'block';
-        searchTab = 'all';
-        document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
-        var allTab = document.querySelector('.search-tab[data-tab="all"]');
-        if (allTab) allTab.classList.add('active');
-        searchEmergencyFilter = 'all';
-        document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
-        var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
-        if (allChip) allChip.classList.add('active');
+    // ====================================================================
+    // openSearchModal() — Tab "Semua" default, chips TERSEMBUNYI
+    // ====================================================================
+function openSearchModal() {
+    if (isPreviewMode) { showPreviewOverlay(); return; }
+    openModalById('searchModal');
+    var input = document.getElementById('searchInput');
+    if (input) { input.value = ''; setTimeout(function() { input.focus(); }, 200); }
+    var cb = document.getElementById('clearSearchBtn');
+    if (cb) cb.classList.remove('visible');
+    var sar = document.getElementById('searchActiveResults');
+    if (sar) sar.style.display = 'none';
+    var sdv = document.getElementById('searchDefaultView');
+    if (sdv) sdv.style.display = 'block';
+
+    // ⭐ Tab default = "Semua"
+    searchTab = 'all';
+    document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
+    var allTab = document.querySelector('.search-tab[data-tab="all"]');
+    if (allTab) allTab.classList.add('active');
+
+    // ⭐ Chips TERSEMBUNYI (muncul hanya saat tab Emergency diklik)
+    var ef = document.getElementById('emergencyFilters');
+    if (ef) ef.style.display = 'none';
+
+    searchEmergencyFilter = 'all';
+    document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
+    var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
+    if (allChip) allChip.classList.add('active');
+}
+
+// ====================================================================
+// switchSearchTab() — Show chips HANYA saat tab Emergency
+// ====================================================================
+function switchSearchTab(tab, btnEl) {
+    searchTab = tab;
+    document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
+    if (btnEl) btnEl.classList.add('active');
+
+    // ⭐ Chips show/hide sesuai tab
+    var ef = document.getElementById('emergencyFilters');
+    if (ef) {
+        if (tab === 'emergency') {
+            ef.style.display = 'flex';  // Munculkan chips
+        } else {
+            ef.style.display = 'none';  // Sembunyikan chips
+        }
     }
-    function closeSearchModal() { closeModalById('searchModal'); }
-    function clearSearch() {
-        var input = document.getElementById('searchInput');
-        if (input) input.value = '';
-        var cb = document.getElementById('clearSearchBtn');
-        if (cb) cb.classList.remove('visible');
-        var sar = document.getElementById('searchActiveResults');
-        if (sar) sar.style.display = 'none';
-        var sdv = document.getElementById('searchDefaultView');
-        if (sdv) sdv.style.display = 'block';
-    }
-    function switchSearchTab(tab, btnEl) {
-        searchTab = tab;
-        document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
-        btnEl.classList.add('active');
-        var input = document.getElementById('searchInput');
-        if (input && input.value.trim()) performSearch(input.value.trim());
-    }
+
+    var input = document.getElementById('searchInput');
+    if (input && input.value.trim()) performSearch(input.value.trim());
+}
     function setSearchEmergencyFilter(filter, btnEl) {
         searchEmergencyFilter = filter;
         document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
@@ -4236,96 +4282,142 @@
             });
         }
     }
-    function activateMapGps() {
-        log('activateMapGps() called');
-        var btn = document.getElementById('mapLocationBtn');
-        var btnText = document.getElementById('mapLocationBtnText');
 
-        if (!navigator.geolocation) {
-            showToast('⚠️ GPS Tidak Tersedia', 'Browser tidak mendukung GPS', 'fa-exclamation-triangle');
-            return;
-        }
+// ====================================================================
+// activateMapGps() — OPSI X (CACHE INSTANT + AUTO REFRESH)
+// ====================================================================
+function activateMapGps() {
+    log('activateMapGps() called');
+    var btn = document.getElementById('mapLocationBtn');
+    var btnText = document.getElementById('mapLocationBtnText');
+
+    if (!navigator.geolocation) {
+        showToast('⚠️ GPS Tidak Tersedia', 'Browser tidak mendukung GPS', 'fa-exclamation-triangle');
+        return;
+    }
+
+    // ⭐ STEP 1: Tampilkan cache instant (kalau ada)
+    var cachedLat = localStorage.getItem('salink_user_lat');
+    var cachedLng = localStorage.getItem('salink_user_lng');
+    var hasCache = false;
+
+    if (cachedLat && cachedLng) {
+        mapCurrentLat = parseFloat(cachedLat);
+        mapCurrentLng = parseFloat(cachedLng);
+        hasCache = true;
+        log('Map: Menampilkan cache ' + mapCurrentLat.toFixed(6) + ', ' + mapCurrentLng.toFixed(6));
+        applyMapCoords(mapCurrentLat, mapCurrentLng);
+        if (btnText) btnText.textContent = '🔄 GPS Refresh...';
         if (btn) { btn.classList.add('loading'); btn.disabled = true; }
-        if (btnText) btnText.textContent = '📍 Mengambil lokasi...';
-
-        var timeoutId = setTimeout(function() {
-            log('Map GPS stage 1 timeout, fallback');
-            attemptMapGpsNetwork();
-        }, 30000);
-
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                clearTimeout(timeoutId);
-                handleMapGpsSuccess(position);
-            },
-            function(error) {
-                clearTimeout(timeoutId);
-                log('Map GPS stage 1 failed: code=' + error.code);
-                if (error.code === 1) {
-                    handleMapGpsError(error);
-                } else {
-                    attemptMapGpsNetwork();
-                }
-            },
-            { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
-        );
+    } else {
+        if (btn) { btn.classList.add('loading'); btn.disabled = true; }
+        if (btnText) btnText.textContent = '📍 Mencari sinyal GPS...';
     }
-    function attemptMapGpsNetwork() {
-        log('Map GPS stage 2: network-based');
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                handleMapGpsSuccess(position);
-            },
-            function(error) {
-                handleMapGpsError(error);
-            },
-            { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 }
-        );
-    }
-    function handleMapGpsSuccess(position) {
-        var lat = position.coords.latitude;
-        var lng = position.coords.longitude;
-        var accuracy = Math.round(position.coords.accuracy || 0);
-        mapCurrentLat = lat;
-        mapCurrentLng = lng;
 
-        localStorage.setItem('salink_user_lat', lat);
-        localStorage.setItem('salink_user_lng', lng);
-
-        var btn = document.getElementById('mapLocationBtn');
-        var btnText = document.getElementById('mapLocationBtnText');
+    // ⭐ STEP 2: Auto-trigger GPS fresh
+    _mapGpsAutoRefresh(function() {
         if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
         if (btnText) btnText.textContent = '✅ Refresh Lokasi';
+    });
+}
 
-        applyMapCoords(lat, lng);
-        showToast('📍 Lokasi Ditemukan', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
-        if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+// Map GPS Auto-Refresh: 2-stage maximumAge: 0
+function _mapGpsAutoRefresh(doneCallback) {
+    if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
+            if (result.state === 'denied') {
+                showToast('⚠️ Izin Ditolak', 'Aktifkan izin lokasi di browser Anda', 'fa-exclamation-triangle');
+                if (doneCallback) doneCallback();
+                return;
+            }
+            _mapGpsStage1(doneCallback);
+        }).catch(function() {
+            _mapGpsStage1(doneCallback);
+        });
+    } else {
+        _mapGpsStage1(doneCallback);
     }
-    function handleMapGpsError(error) {
-        var errMsg = 'Gagal mengambil lokasi. ';
-        switch(error.code) {
-            case 1: errMsg += 'Izin lokasi ditolak.'; break;
-            case 2: errMsg += 'Lokasi tidak tersedia.'; break;
-            case 3: errMsg += 'Timeout. Coba lagi.'; break;
-            default: errMsg += error.message || 'Coba lagi.';
-        }
-        var btn = document.getElementById('mapLocationBtn');
-        var btnText = document.getElementById('mapLocationBtnText');
-        if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
-        if (btnText) btnText.textContent = '📍 Ambil Lokasi Saya';
-        showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle');
-    }
-    function mapSearchService(searchQuery) {
-        var lat = mapCurrentLat;
-        var lng = mapCurrentLng;
-        var url;
-        if (lat && lng) {
-            url = 'https://www.google.com/maps/search/' + encodeURIComponent(searchQuery) + '/@' + lat + ',' + lng + ',14z';
-        } else {
-            url = 'https://www.google.com/maps/search/' + encodeURIComponent(searchQuery);
-        }
-        window.open(url, '_blank');
-    }
+}
+
+function _mapGpsStage1(doneCallback) {
+    log('Map GPS Stage 1: High accuracy, timeout 30s, maximumAge 0');
+    var timeoutId = setTimeout(function() {
+        log('Map GPS Stage 1 timeout → Stage 2');
+        _mapGpsStage2(doneCallback);
+    }, 30000);
+
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            clearTimeout(timeoutId);
+            _mapGpsSuccess(position, 'high', doneCallback);
+        },
+        function(error) {
+            clearTimeout(timeoutId);
+            log('Map GPS Stage 1 failed: code=' + error.code);
+            if (error.code === 1) {
+                _mapGpsError(error, doneCallback);
+            } else {
+                _mapGpsStage2(doneCallback);
+            }
+        },
+        { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+    );
+}
+
+function _mapGpsStage2(doneCallback) {
+    log('Map GPS Stage 2: Network-based, timeout 20s, maximumAge 0');
+    var btnText = document.getElementById('mapLocationBtnText');
+    if (btnText) btnText.textContent = '📍 Metode alternatif...';
+
+    var timeoutId = setTimeout(function() {
+        log('Map GPS Stage 2 timeout, giving up');
+        _mapGpsError({ code: 3, message: 'Timeout semua stage' }, doneCallback);
+    }, 20000);
+
+    navigator.geolocation.getCurrentPosition(
+        function(position) {
+            clearTimeout(timeoutId);
+            _mapGpsSuccess(position, 'network', doneCallback);
+        },
+        function(error) {
+            clearTimeout(timeoutId);
+            log('Map GPS Stage 2 failed: code=' + error.code);
+            _mapGpsError(error, doneCallback);
+        },
+        { enableHighAccuracy: false, timeout: 20000, maximumAge: 0 }
+    );
+}
+
+function _mapGpsSuccess(position, method, doneCallback) {
+    var lat = position.coords.latitude;
+    var lng = position.coords.longitude;
+    var accuracy = Math.round(position.coords.accuracy || 0);
+    var methodLabel = method === 'high' ? 'GPS' : 'Network';
+    mapCurrentLat = lat;
+    mapCurrentLng = lng;
+
+    try {
+        localStorage.setItem('salink_user_lat', lat);
+        localStorage.setItem('salink_user_lng', lng);
+    } catch(e) {}
+
+    applyMapCoords(lat, lng);
+    showToast('📍 Lokasi Ditemukan (' + methodLabel + ')', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
+    if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+
+    if (doneCallback) doneCallback();
+}
+
+function _mapGpsError(error, doneCallback) {
+    var errMsg = '';
+    if (error.code === 1) errMsg = 'Izin lokasi ditolak. Aktifkan izin lokasi untuk browser ini.';
+    else if (error.code === 2) errMsg = 'Lokasi tidak tersedia. Pastikan GPS aktif & di area terbuka.';
+    else if (error.code === 3) errMsg = 'Waktu pencarian habis. Coba aktifkan WiFi atau pindah ke area terbuka.';
+    else errMsg = error.message || 'Gagal mengambil lokasi.';
+
+    showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle');
+    if (doneCallback) doneCallback();
+}
 
     // ================================================================
     // 25. LOGOUT
