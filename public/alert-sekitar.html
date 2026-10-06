@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>SALINK - Alert Sekitar</title>
+    <title>Alert Sekitar - SALINK</title>
 
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0a0e1a" id="themeColorMeta">
@@ -18,14 +18,10 @@
 
     <style>
         /* ==================================================================
-           SALINK ALERT SEKITAR v13.0 — FINAL (KONSISTEN DASHBOARD)
+           SALINK ALERT-SEKITAR v14.0 — FINAL INDUK (NO PATCH)
            ==================================================================
-           - Tema warna universal (dark/light) — konsisten
-           - Header dengan Back button
-           - Sidebar dengan #sidebarMapBtn data-action="open-map"
-           - Modal Peta Darurat SAMA PERSIS lokasi-bantuan.html
-           - Modal Notif LENGKAP: filter + tandai semua + mark read
-           - Bottom Nav + FAB universal
+           Struktur identik dengan lokasi-bantuan.html v14.0
+           Hanya konten <main> yang berbeda.
            ================================================================== */
 
         /* ============ ROOT VARIABLES ============ */
@@ -167,6 +163,8 @@
         @keyframes floatingNotifIn { from { transform: translateX(-50%) translateY(-100px) scale(0.8); opacity: 0; } to { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; } }
         @keyframes pulse-red { 0%, 100% { box-shadow: 0 0 0 0 rgba(248,81,73,0.7); } 70% { box-shadow: 0 0 0 15px rgba(248,81,73,0); } }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        @keyframes alertPulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(248,81,73,0.5); } 50% { transform: scale(1.04); box-shadow: 0 0 20px 8px rgba(248,81,73,0.2); } }
+        @keyframes livePulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } }
 
         /* ============ LOGO BLINK ============ */
         .siren-icon-header {
@@ -514,118 +512,152 @@
         }
         .back-home-btn:active { transform: scale(0.95); border-color: var(--primary); }
 
-        /* ============ GPS CARD ============ */
-        .gps-top {
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
+        /* ============ INFO PANEL ============ */
+        .info-panel {
             background: var(--bg-card);
-            padding: 14px 16px;
-            border-radius: var(--radius);
             border: 1px solid var(--border-color);
-            margin-bottom: 12px;
+            border-radius: var(--radius);
+            padding: 18px 18px;
+            margin-bottom: 14px;
             box-shadow: 0 4px 15px var(--shadow-light);
         }
-        .gps-icon { font-size: 1.8rem; line-height: 1; flex-shrink: 0; margin-top: 2px; }
-        .gps-title { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); }
-        .gps-detail { font-size: 0.7rem; color: var(--text-secondary); margin-top: 3px; line-height: 1.4; }
-
-        .gps-actions { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+        .info-title {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            font-family: 'Poppins', sans-serif;
+            margin-bottom: 6px;
+        }
+        .info-description {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 14px;
+        }
+        .info-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
         .primary-btn {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 6px;
             background: var(--accent-blue-gradient);
             color: #fff;
             border: none;
-            padding: 11px 20px;
+            padding: 12px 20px;
             border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 700;
+            font-size: 0.78rem;
+            font-weight: 800;
             cursor: pointer;
-            box-shadow: 0 4px 15px rgba(230,0,18,0.35);
+            box-shadow: 0 4px 15px rgba(230,0,18,0.3);
             transition: all 0.3s;
             flex: 1;
-            justify-content: center;
             font-family: inherit;
         }
-        .primary-btn:active:not(:disabled) { transform: scale(0.96); }
-        .primary-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .primary-btn:active { transform: scale(0.97); }
+        .primary-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .primary-btn.loading { pointer-events: none; opacity: 0.7; }
-
         .secondary-btn {
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 6px;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
-            padding: 11px 18px;
+            padding: 12px 18px;
             border-radius: 12px;
-            font-size: 0.75rem;
+            font-size: 0.78rem;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s;
             font-family: inherit;
         }
-        .secondary-btn:active { transform: scale(0.96); border-color: var(--primary); }
+        .secondary-btn:active { transform: scale(0.97); border-color: var(--primary); }
 
-        /* ============ FILTERS ============ */
-        .control-title {
-            font-size: 0.8rem;
+        /* ============ GPS STATUS ============ */
+        .gps-status {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            margin-bottom: 14px;
+            box-shadow: 0 4px 15px var(--shadow-light);
+            transition: all 0.3s;
+        }
+        .gps-status.loading { border-color: var(--primary); background: rgba(230,0,18,0.05); }
+        .gps-status.success { border-color: var(--success); background: rgba(63,185,80,0.06); }
+        .gps-status.error { border-color: var(--accent-red); background: rgba(248,81,73,0.06); }
+        .gps-row { display: flex; align-items: center; gap: 12px; }
+        .gps-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-input);
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+        .gps-text { flex: 1; min-width: 0; }
+        .gps-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 3px;
+        }
+        .gps-detail {
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            word-break: break-word;
+        }
+
+        /* ============ FILTER & RADIUS ============ */
+        .filter-panel, .radius-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            margin-bottom: 14px;
+            box-shadow: 0 4px 15px var(--shadow-light);
+        }
+        .filter-title, .radius-title {
+            font-size: 0.72rem;
             font-weight: 700;
             color: var(--text-primary);
             margin-bottom: 10px;
-            font-family: 'Poppins', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
         }
-        .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-        .filter-btn {
-            padding: 7px 14px;
+        .filter-buttons, .radius-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .filter-btn, .radius-btn {
+            padding: 8px 14px;
             border-radius: 20px;
             border: 1px solid var(--border-color);
             background: var(--bg-input);
             color: var(--text-muted);
-            font-size: 0.65rem;
+            font-size: 0.68rem;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s;
             font-family: inherit;
         }
-        .filter-btn:active { transform: scale(0.95); border-color: var(--primary); }
-        .filter-btn.active {
+        .filter-btn:active, .radius-btn:active { transform: scale(0.95); }
+        .filter-btn.active, .radius-btn.active {
             background: var(--accent-blue-gradient);
             color: #fff;
             border-color: var(--primary);
-            box-shadow: 0 4px 14px rgba(230,0,18,0.35);
+            box-shadow: 0 2px 12px rgba(230,0,18,0.3);
         }
-
-        /* ============ SUMMARY GRID ============ */
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
-            margin-bottom: 16px;
-        }
-        .summary-card {
-            background: var(--bg-card);
-            border-radius: 12px;
-            padding: 12px 8px;
-            border: 1px solid var(--border-color);
-            text-align: center;
-            box-shadow: 0 4px 15px var(--shadow-light);
-            transition: all 0.3s;
-        }
-        .summary-label { font-size: 0.58rem; color: var(--text-muted); font-weight: 600; letter-spacing: 0.2px; }
-        .summary-value {
-            font-size: 1.35rem;
-            font-weight: 800;
-            color: var(--primary);
-            font-family: 'Poppins', sans-serif;
-            margin-top: 2px;
-            line-height: 1;
-        }
-        .summary-value.danger { color: var(--accent-red); }
-        .summary-value.success { color: var(--success); }
 
         /* ============ RESULTS HEADER ============ */
         .results-header {
@@ -633,102 +665,221 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 12px;
-            gap: 8px;
-            flex-wrap: wrap;
+            padding: 0 4px;
         }
-        .results-title { font-size: 0.9rem; font-weight: 700; color: var(--text-primary); font-family: 'Poppins', sans-serif; }
-        .results-count { font-size: 0.62rem; color: var(--text-muted); margin-top: 2px; font-weight: 600; }
-        .refresh-small {
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 7px 12px;
+        .results-title {
+            font-size: 0.92rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            font-family: 'Poppins', sans-serif;
+        }
+        .results-count {
+            font-size: 0.65rem;
             color: var(--text-muted);
-            font-size: 0.62rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-family: inherit;
+            margin-top: 2px;
+            font-weight: 600;
         }
-        .refresh-small:active { transform: scale(0.95); border-color: var(--primary); color: var(--primary); }
 
-        /* ============ ALERT GRID ============ */
-        .alert-grid { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+        /* ============ ALERT LIST (KONTEN UTAMA HALAMAN INI) ============ */
+        .alert-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
         .alert-card {
             background: var(--bg-card);
-            border-radius: var(--radius);
-            padding: 14px 16px;
             border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 0;
             box-shadow: 0 4px 15px var(--shadow-light);
             transition: all 0.3s;
+            animation: fadeIn 0.4s ease;
+            overflow: hidden;
+            position: relative;
             cursor: pointer;
-            animation: fadeIn 0.3s ease;
         }
-        .alert-card:active { transform: scale(0.98); border-color: var(--primary); }
-        .alert-card .alert-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-        .alert-card .alert-icon {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
+        .alert-card:active { transform: scale(0.99); }
+        .alert-card.fire { border-left: 4px solid var(--emergency-fire); }
+        .alert-card.medical { border-left: 4px solid var(--emergency-medical); }
+        .alert-card.crime { border-left: 4px solid var(--emergency-crime); }
+        .alert-card.disaster { border-left: 4px solid var(--emergency-disaster); }
+        .alert-card.emergency { animation: alertPulse 2s ease-in-out infinite; }
+
+        .alert-card-inner {
+            padding: 14px 16px;
+        }
+        .alert-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .alert-top-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex: 1;
+            min-width: 0;
+        }
+        .alert-type-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.1rem;
+            font-size: 1.5rem;
             flex-shrink: 0;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
         }
-        .alert-card .alert-icon.fire { background: rgba(248,81,73,0.15); color: var(--emergency-fire); }
-        .alert-card .alert-icon.medical { background: rgba(79,195,247,0.15); color: var(--emergency-medical); }
-        .alert-card .alert-icon.crime { background: rgba(240,208,128,0.15); color: var(--emergency-crime); }
-        .alert-card .alert-icon.disaster { background: rgba(199,146,234,0.15); color: var(--emergency-disaster); }
-        .alert-card .alert-type { font-size: 0.78rem; font-weight: 700; color: var(--text-primary); flex: 1; }
-        .alert-card .alert-time { font-size: 0.55rem; color: var(--text-muted); flex-shrink: 0; font-weight: 600; }
-        .alert-card .alert-location {
-            font-size: 0.7rem;
+        .alert-card.fire .alert-type-icon { border-color: var(--emergency-fire); background: rgba(248,81,73,0.1); }
+        .alert-card.medical .alert-type-icon { border-color: var(--emergency-medical); background: rgba(79,195,247,0.1); }
+        .alert-card.crime .alert-type-icon { border-color: var(--emergency-crime); background: rgba(240,208,128,0.1); }
+        .alert-card.disaster .alert-type-icon { border-color: var(--emergency-disaster); background: rgba(199,146,234,0.1); }
+
+        .alert-type-info { flex: 1; min-width: 0; }
+        .alert-type-label {
+            font-size: 0.82rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            font-family: 'Poppins', sans-serif;
+            margin-bottom: 2px;
+        }
+        .alert-sender {
+            font-size: 0.6rem;
             color: var(--text-secondary);
-            margin-bottom: 5px;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            line-height: 1.4;
+            font-weight: 600;
         }
-        .alert-card .alert-location i { color: var(--primary); font-size: 0.75rem; flex-shrink: 0; }
-        .alert-card .alert-sender {
-            font-size: 0.65rem;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            flex-wrap: wrap;
-        }
-        .alert-card .alert-sender .sender-name { color: var(--primary); cursor: pointer; font-weight: 700; }
-        .alert-card .alert-distance {
-            font-size: 0.62rem;
-            color: var(--success);
-            margin-top: 5px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            font-weight: 700;
-        }
-        .alert-card .alert-status {
+        .alert-sender b { color: var(--primary); font-weight: 800; }
+        .alert-status-badge {
             display: inline-flex;
             align-items: center;
             gap: 4px;
+            padding: 4px 10px;
+            border-radius: 10px;
             font-size: 0.55rem;
-            padding: 3px 10px;
-            border-radius: 12px;
-            margin-top: 6px;
             font-weight: 800;
+            letter-spacing: 0.3px;
+            flex-shrink: 0;
         }
-        .alert-card .alert-status.active {
-            background: rgba(248,81,73,0.15);
-            color: var(--emergency-fire);
-            border: 1px solid rgba(248,81,73,0.2);
-        }
-        .alert-card .alert-status.resolved {
+        .alert-status-badge.live {
             background: rgba(63,185,80,0.15);
             color: var(--success);
-            border: 1px solid rgba(63,185,80,0.2);
+            border: 1px solid rgba(63,185,80,0.3);
+        }
+        .alert-status-badge.live::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: livePulse 1.5s ease-in-out infinite;
+        }
+        .alert-status-badge.expired {
+            background: rgba(255,255,255,0.05);
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+        }
+
+        .alert-text {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border-radius: 10px;
+            margin-bottom: 10px;
+            font-style: italic;
+            border-left: 3px solid var(--primary);
+            word-break: break-word;
+        }
+
+        .alert-info-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            font-size: 0.66rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            margin-bottom: 6px;
+        }
+        .alert-info-row i {
+            color: var(--primary);
+            width: 14px;
+            text-align: center;
+            font-size: 0.7rem;
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+        .alert-info-row b { color: var(--text-primary); font-weight: 700; }
+
+        .alert-coords {
+            font-family: 'Courier New', monospace;
+            font-size: 0.6rem;
+            color: var(--primary);
+            padding: 4px 10px;
+            background: rgba(230,0,18,0.08);
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+
+        .alert-actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            padding-top: 10px;
+            border-top: 1px dashed var(--border-color);
+            margin-top: 4px;
+        }
+        .alert-action-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-decoration: none;
+            cursor: pointer;
+            border: none;
+            font-family: inherit;
+            transition: all 0.2s;
+            flex: 1;
+            min-width: 100px;
+        }
+        .alert-action-btn:active { transform: scale(0.95); }
+        .alert-action-btn.primary {
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(230,0,18,0.3);
+        }
+        .alert-action-btn.outline {
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        .alert-action-btn.map {
+            background: linear-gradient(135deg, #ff6b35, #ff4500);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(255,107,53,0.35);
+        }
+
+        .alert-expiry {
+            font-size: 0.55rem;
+            color: var(--accent-gold);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px dashed var(--border-color);
+            font-weight: 600;
         }
 
         /* ============ STATE CARD ============ */
@@ -740,10 +891,29 @@
             border: 1px solid var(--border-color);
             box-shadow: 0 4px 15px var(--shadow-light);
         }
-        .state-card .state-icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.5; }
-        .state-card .state-title { font-size: 0.95rem; font-weight: 800; color: var(--text-primary); margin-bottom: 6px; font-family: 'Poppins', sans-serif; }
-        .state-card .state-text { font-size: 0.72rem; color: var(--text-secondary); line-height: 1.6; max-width: 320px; margin: 0 auto; }
-        .state-card .state-text b { color: var(--primary); font-weight: 700; }
+        .state-card .state-icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+        .state-card .state-title {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 6px;
+            font-family: 'Poppins', sans-serif;
+        }
+        .state-card .state-text {
+            font-size: 0.72rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            max-width: 320px;
+            margin: 0 auto;
+        }
+        .state-card .state-text b {
+            color: var(--primary);
+            font-weight: 700;
+        }
         .state-card.warning { border-color: var(--warning); background: rgba(240,208,128,0.05); }
         .state-card.error { border-color: var(--accent-red); background: rgba(248,81,73,0.05); }
         .spinner {
@@ -798,10 +968,25 @@
             font-family: inherit;
         }
         .nav-item-bottom:active { transform: scale(0.92); }
-        .nav-item-bottom .nav-icon { font-size: 1.35rem; line-height: 1.2; transition: all 0.2s; }
-        .nav-item-bottom .nav-label { font-size: 0.58rem; font-weight: 700; white-space: nowrap; letter-spacing: 0.1px; }
-        .nav-item-bottom.active .nav-icon { transform: scale(1.08); filter: drop-shadow(0 0 6px var(--primary)); }
-        .nav-item-bottom.active .nav-label { color: var(--primary); font-weight: 800; }
+        .nav-item-bottom .nav-icon {
+            font-size: 1.35rem;
+            line-height: 1.2;
+            transition: all 0.2s;
+        }
+        .nav-item-bottom .nav-label {
+            font-size: 0.58rem;
+            font-weight: 700;
+            white-space: nowrap;
+            letter-spacing: 0.1px;
+        }
+        .nav-item-bottom.active .nav-icon {
+            transform: scale(1.08);
+            filter: drop-shadow(0 0 6px var(--primary));
+        }
+        .nav-item-bottom.active .nav-label {
+            color: var(--primary);
+            font-weight: 800;
+        }
         .nav-item-bottom.active::before {
             content: '';
             position: absolute;
@@ -952,9 +1137,43 @@
         .modal-close:active { transform: scale(0.9); }
         .modal-body { font-size: 0.75rem; }
 
+        /* ============ MODAL FOOTER (TUTUP) ============ */
+        .modal-footer {
+            margin-top: 14px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            position: sticky;
+            bottom: 0;
+            background: var(--modal-bg);
+            z-index: 2;
+        }
+        .modal-footer .btn-close-modal {
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 9px 26px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .modal-footer .btn-close-modal:active {
+            transform: scale(0.96);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
         /* ============ SEARCH MODAL ============ */
         .search-modal-content { max-width: 500px; max-height: 90vh; }
-        .search-input-wrapper { position: relative; margin-bottom: 12px; }
+        .search-input-wrapper {
+            position: relative;
+            margin-bottom: 12px;
+        }
         .search-input-wrapper i.search-icon {
             position: absolute;
             left: 14px;
@@ -999,31 +1218,78 @@
             box-shadow: 0 0 0 3px rgba(230,0,18,0.1);
         }
         #searchInput::placeholder { color: var(--text-muted); }
-        .search-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+
+        /* ============ SEARCH TABS ============ */
+        .search-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+            flex-wrap: nowrap;
+        }
         .search-tab {
             flex: 1;
-            min-width: 80px;
-            padding: 8px 10px;
+            min-width: 0;
+            padding: 8px 6px;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             color: var(--text-muted);
-            font-size: 0.62rem;
+            font-size: 0.6rem;
             font-weight: 700;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 4px;
+            gap: 3px;
             font-family: inherit;
             transition: all 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
+        .search-tab i { font-size: 0.6rem; flex-shrink: 0; }
         .search-tab.active {
             background: var(--accent-blue-gradient);
             color: #fff;
             border-color: var(--primary);
             box-shadow: 0 4px 12px rgba(230,0,18,0.3);
         }
+
+        /* ============ SEARCH FILTER CHIPS ============ */
+        .search-filter-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding-bottom: 4px;
+        }
+        .search-filter-row::-webkit-scrollbar { display: none; }
+        .search-filter-chip {
+            flex: 1;
+            min-width: 70px;
+            padding: 5px 8px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            color: var(--text-muted);
+            font-size: 0.58rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .search-filter-chip:active { transform: scale(0.96); }
+        .search-filter-chip.active {
+            background: rgba(230,0,18,0.15);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
         .search-section-title {
             font-size: 0.68rem;
             font-weight: 800;
@@ -1055,7 +1321,10 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        .search-result-item:active { transform: scale(0.98); border-color: var(--primary); }
+        .search-result-item:active {
+            transform: scale(0.98);
+            border-color: var(--primary);
+        }
         .search-result-item .result-icon {
             width: 40px;
             height: 40px;
@@ -1088,7 +1357,11 @@
             overflow: hidden;
             border: 2px solid var(--primary);
         }
-        .search-result-item .result-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .search-result-item .result-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
         .search-result-item .result-info { flex: 1; min-width: 0; }
         .search-result-item .result-title {
             font-size: 0.78rem;
@@ -1106,12 +1379,39 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .search-result-item .result-arrow { color: var(--text-muted); font-size: 0.75rem; flex-shrink: 0; }
-        .search-empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
-        .search-empty-state .empty-big-icon { font-size: 3rem; opacity: 0.3; margin-bottom: 12px; }
-        .search-empty-state h4 { font-size: 0.88rem; margin-bottom: 6px; font-weight: 700; color: var(--text-secondary); }
-        .search-empty-state p { font-size: 0.72rem; line-height: 1.5; max-width: 280px; margin: 0 auto; }
-        .keyboard-hint { font-size: 0.55rem; color: var(--text-muted); text-align: center; margin-top: 8px; }
+        .search-result-item .result-arrow {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+        .search-empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+        }
+        .search-empty-state .empty-big-icon {
+            font-size: 3rem;
+            opacity: 0.3;
+            margin-bottom: 12px;
+        }
+        .search-empty-state h4 {
+            font-size: 0.88rem;
+            margin-bottom: 6px;
+            font-weight: 700;
+            color: var(--text-secondary);
+        }
+        .search-empty-state p {
+            font-size: 0.72rem;
+            line-height: 1.5;
+            max-width: 280px;
+            margin: 0 auto;
+        }
+        .keyboard-hint {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 8px;
+        }
         .keyboard-hint kbd {
             background: var(--bg-input);
             border: 1px solid var(--border-color);
@@ -1119,23 +1419,6 @@
             padding: 1px 5px;
             font-size: 0.55rem;
             font-family: monospace;
-        }
-        .search-filter-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
-        .search-filter-chip {
-            padding: 5px 12px;
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            border-radius: 999px;
-            color: var(--text-muted);
-            font-size: 0.6rem;
-            font-weight: 700;
-            cursor: pointer;
-            font-family: inherit;
-        }
-        .search-filter-chip.active {
-            background: rgba(230,0,18,0.15);
-            border-color: var(--primary);
-            color: var(--primary);
         }
 
         /* ============ NOTIF MODAL ============ */
@@ -1151,7 +1434,10 @@
             transition: all 0.2s;
         }
         .notif-item:active { transform: scale(0.98); }
-        .notif-item.unread { background: rgba(230,0,18,0.1); border-left: 3px solid var(--primary); }
+        .notif-item.unread {
+            background: rgba(230,0,18,0.1);
+            border-left: 3px solid var(--primary);
+        }
         .notif-item.emergency { border-left: 3px solid var(--accent-red); }
         .notif-item-icon {
             width: 36px;
@@ -1163,20 +1449,96 @@
             flex-shrink: 0;
             font-size: 1rem;
         }
-        .notif-item-icon.emergency { background: rgba(248,81,73,0.2); color: var(--accent-red); }
-        .notif-item-icon.regular { background: rgba(230,0,18,0.15); color: var(--primary); }
+        .notif-item-icon.emergency {
+            background: rgba(248,81,73,0.2);
+            color: var(--accent-red);
+        }
+        .notif-item-icon.regular {
+            background: rgba(230,0,18,0.15);
+            color: var(--primary);
+        }
         .notif-item-content { flex: 1; min-width: 0; }
-        .notif-item-title { font-size: 0.75rem; font-weight: 700; margin-bottom: 3px; color: var(--text-primary); }
-        .notif-item-message { font-size: 0.65rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 4px; }
-        .notif-item-time { font-size: 0.55rem; color: var(--text-muted); }
+        .notif-item-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-bottom: 3px;
+            color: var(--text-primary);
+        }
+        .notif-item-message {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            margin-bottom: 4px;
+        }
+        .notif-item-time {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+        }
 
-        /* ============ NOTIF FILTER BUTTONS ============ */
         .notif-filter-btn.active {
             background: var(--accent-blue-gradient) !important;
             color: #fff !important;
             border-color: var(--primary) !important;
         }
         .notif-filter-btn:active { transform: scale(0.96); }
+
+        /* ============ INVITE MODAL ============ */
+        .invite-user-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+        }
+        .invite-user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--accent-blue-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: 700;
+            font-size: 1rem;
+            flex-shrink: 0;
+            overflow: hidden;
+            border: 2px solid var(--primary);
+        }
+        .invite-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .invite-user-info { flex: 1; min-width: 0; }
+        .invite-user-name {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .invite-user-sub {
+            font-size: 0.58rem;
+            color: var(--text-muted);
+        }
+        .invite-user-btn {
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: none;
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+        .invite-user-btn:active { transform: scale(0.95); }
+        .invite-user-btn.sent {
+            background: rgba(63,185,80,0.15);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+        .invite-user-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
         /* ============ FAB MODAL ============ */
         .fab-modal-overlay {
@@ -1230,7 +1592,11 @@
             letter-spacing: 0.3px;
             margin-bottom: 4px;
         }
-        .fab-modal-header p { font-size: 0.68rem; color: var(--text-muted); line-height: 1.5; }
+        .fab-modal-header p {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
         .fab-modal-close {
             position: absolute;
             top: 4px;
@@ -1274,9 +1640,24 @@
             font-family: inherit;
         }
         .fab-emergency-card:active { transform: scale(0.95); }
-        .fab-emergency-card .fab-card-icon { font-size: 2.2rem; line-height: 1; filter: drop-shadow(0 4px 12px currentColor); }
-        .fab-emergency-card .fab-card-label { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.3px; text-align: center; line-height: 1.2; }
-        .fab-emergency-card .fab-card-desc { font-size: 0.55rem; color: var(--text-muted); text-align: center; font-weight: 500; }
+        .fab-emergency-card .fab-card-icon {
+            font-size: 2.2rem;
+            line-height: 1;
+            filter: drop-shadow(0 4px 12px currentColor);
+        }
+        .fab-emergency-card .fab-card-label {
+            font-size: 0.7rem;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            text-align: center;
+            line-height: 1.2;
+        }
+        .fab-emergency-card .fab-card-desc {
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            text-align: center;
+            font-weight: 500;
+        }
         .fab-emergency-card.fire { border-color: rgba(248,81,73,0.4); }
         .fab-emergency-card.fire:active { background: rgba(248,81,73,0.15); border-color: var(--emergency-fire); }
         .fab-emergency-card.fire .fab-card-label { color: var(--emergency-fire); }
@@ -1298,7 +1679,7 @@
             line-height: 1.5;
         }
 
-        /* ============ MAP MODAL ============ */
+        /* ============ MODAL PETA DARURAT ============ */
         #mapModal .modal-content {
             max-width: 430px;
             padding: 16px 14px;
@@ -1603,10 +1984,28 @@
             background: var(--accent-blue-gradient);
             box-shadow: 0 8px 24px rgba(230,0,18,0.4);
         }
-        .preview-overlay-content .overlay-icon i { font-size: 1.8rem; color: #fff; }
-        .preview-overlay-content h2 { font-size: 1.1rem; margin-bottom: 8px; font-weight: 800; color: var(--text-primary); }
-        .preview-overlay-content p { font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6; }
-        .preview-overlay-content .overlay-buttons { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        .preview-overlay-content .overlay-icon i {
+            font-size: 1.8rem;
+            color: #fff;
+        }
+        .preview-overlay-content h2 {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            font-weight: 800;
+            color: var(--text-primary);
+        }
+        .preview-overlay-content p {
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        .preview-overlay-content .overlay-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
         .preview-overlay-content .overlay-buttons button {
             padding: 10px 20px;
             border-radius: 12px;
@@ -1618,8 +2017,16 @@
             max-width: 160px;
             font-family: inherit;
         }
-        .preview-overlay-content .overlay-buttons .btn-login { background: var(--accent-blue-gradient); color: #fff; box-shadow: 0 6px 18px rgba(230,0,18,0.4); }
-        .preview-overlay-content .overlay-buttons .btn-cancel { background: var(--bg-input); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .preview-overlay-content .overlay-buttons .btn-login {
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            box-shadow: 0 6px 18px rgba(230,0,18,0.4);
+        }
+        .preview-overlay-content .overlay-buttons .btn-cancel {
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
 
         .preview-badge {
             position: fixed;
@@ -1637,7 +2044,12 @@
             display: none;
             color: var(--text-secondary);
         }
-        .preview-badge .login-link { color: var(--primary); font-weight: 700; cursor: pointer; text-decoration: underline; }
+        .preview-badge .login-link {
+            color: var(--primary);
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: underline;
+        }
         .preview-badge.active { display: block; }
 
         /* ============ FLOATING NOTIFICATION ============ */
@@ -1658,9 +2070,17 @@
             cursor: pointer;
             color: #ffffff;
         }
-        .floating-notification.active { display: flex !important; align-items: center; gap: 12px; animation: floatingNotifIn 0.5s ease; }
+        .floating-notification.active {
+            display: flex !important;
+            align-items: center;
+            gap: 12px;
+            animation: floatingNotifIn 0.5s ease;
+        }
         .floating-notification.hide { animation: toastOut 0.5s ease; }
-        .floating-notification.emergency-notif { border-color: var(--accent-red); box-shadow: 0 0 30px rgba(248,81,73,0.5); }
+        .floating-notification.emergency-notif {
+            border-color: var(--accent-red);
+            box-shadow: 0 0 30px rgba(248,81,73,0.5);
+        }
         .floating-notification .notif-icon {
             width: 36px;
             height: 36px;
@@ -1671,11 +2091,24 @@
             flex-shrink: 0;
             font-size: 1rem;
         }
-        .floating-notification .notif-icon.emergency { background: rgba(248,81,73,0.2); color: var(--accent-red); }
-        .floating-notification .notif-icon.install { background: rgba(230,0,18,0.2); color: var(--primary); }
-        .floating-notification .notif-icon.regular { background: rgba(230,0,18,0.15); color: var(--primary); }
+        .floating-notification .notif-icon.emergency {
+            background: rgba(248,81,73,0.2);
+            color: var(--accent-red);
+        }
+        .floating-notification .notif-icon.install {
+            background: rgba(230,0,18,0.2);
+            color: var(--primary);
+        }
+        .floating-notification .notif-icon.regular {
+            background: rgba(230,0,18,0.15);
+            color: var(--primary);
+        }
         .floating-notification .notif-content { flex: 1; min-width: 0; }
-        .floating-notification .notif-content .notif-title { font-size: 0.78rem; font-weight: 700; color: #ffffff; }
+        .floating-notification .notif-content .notif-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
         .floating-notification .notif-content .notif-message {
             font-size: 0.65rem;
             color: #a8b2c1;
@@ -1683,7 +2116,10 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .floating-notification .notif-content .notif-subtitle { font-size: 0.58rem; color: #6b7688; }
+        .floating-notification .notif-content .notif-subtitle {
+            font-size: 0.58rem;
+            color: #6b7688;
+        }
         .floating-notification .notif-action {
             padding: 5px 14px;
             border-radius: 8px;
@@ -1778,37 +2214,6 @@
         }
         button:focus:not(:focus-visible) { outline: none; }
 
-        /* ============ MODAL FOOTER (TUTUP) ============ */
-        .modal-footer {
-            margin-top: 14px;
-            padding-top: 12px;
-            border-top: 1px solid var(--border-color);
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-            position: sticky;
-            bottom: 0;
-            background: var(--modal-bg);
-            z-index: 2;
-        }
-        .modal-footer .btn-close-modal {
-            background: var(--bg-input);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 9px 26px;
-            font-size: 0.72rem;
-            font-weight: 700;
-            cursor: pointer;
-            font-family: inherit;
-            transition: all 0.2s;
-        }
-        .modal-footer .btn-close-modal:active {
-            transform: scale(0.96);
-            border-color: var(--primary);
-            color: var(--primary);
-        }
-
         /* ============ RESPONSIVE ============ */
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
@@ -1826,12 +2231,8 @@
             .header-center { gap: 4px; }
             .header-left { gap: 4px; }
             .header-right { gap: 4px; }
-            .summary-grid { gap: 6px; }
-            .summary-card { padding: 10px 6px; }
-            .summary-value { font-size: 1.15rem; }
-            .gps-top { padding: 12px 14px; }
-            .gps-icon { font-size: 1.5rem; }
-            .primary-btn, .secondary-btn { font-size: 0.7rem; padding: 10px 14px; }
+            .info-actions { flex-direction: column; }
+            .primary-btn, .secondary-btn { width: 100%; }
         }
 
         @media (max-width: 360px) {
@@ -1843,19 +2244,16 @@
             .header-center { gap: 3px; }
             .nav-fab { width: 64px; height: 64px; }
             .nav-fab .fab-emoji { font-size: 1.7rem; }
-            .summary-value { font-size: 1rem; }
-            .summary-label { font-size: 0.52rem; }
+            .search-tab { font-size: 0.55rem; padding: 7px 4px; }
+            .search-filter-chip { font-size: 0.55rem; min-width: 62px; }
         }
 
-        /* ================================================================
-           PATCH UNIVERSAL — FIX WARNA HEADER + MODAL THEME
-           ================================================================ */
-
+        /* ============ UNIVERSAL THEME (NO PATCH) ============ */
         body, body * {
             transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
         }
-        body { color: var(--text-primary) !important; }
-        h1, h2, h3, h4, h5, h6 { color: var(--text-primary) !important; }
+        body { color: var(--text-primary); }
+        h1, h2, h3, h4, h5, h6 { color: var(--text-primary); }
         p, span, div, li, td, th, label, strong, em, small, b, i { color: inherit; }
 
         a { color: var(--primary); text-decoration: none; transition: color 0.2s ease; }
@@ -1866,7 +2264,7 @@
             font-family: inherit;
         }
         input::placeholder, textarea::placeholder {
-            color: var(--text-muted) !important;
+            color: var(--text-muted);
             opacity: 1;
         }
         input:focus, textarea:focus, select:focus {
@@ -1879,116 +2277,38 @@
             color: var(--text-primary);
         }
 
-        [style*="color: #fff"], [style*="color:#fff"],
-        [style*="color: white"], [style*="color:white"] {
-            color: var(--text-primary) !important;
-        }
-
-        .app-bar { background: var(--header-bg) !important; border-bottom: 1px solid var(--border-color) !important; }
-        .app-title, .app-title .title-text { color: var(--text-white) !important; }
-
-        .user-btn, .search-btn, .menu-btn, .back-btn, .refresh-btn {
-            color: var(--text-white) !important;
-            background: rgba(255,255,255,0.08) !important;
-            border: 1px solid rgba(255,255,255,0.12) !important;
-        }
-        .user-btn:active, .search-btn:active, .menu-btn:active,
-        .back-btn:active, .refresh-btn:active {
-            transform: scale(0.9);
-            border-color: var(--primary) !important;
-            background: rgba(230,0,18,0.2) !important;
-        }
-
-        [data-theme="light"] .app-bar { background: rgba(255,255,255,0.92) !important; }
+        [data-theme="light"] .app-bar { background: rgba(255,255,255,0.92); }
         [data-theme="light"] .app-title,
-        [data-theme="light"] .app-title .title-text { color: var(--text-primary) !important; }
+        [data-theme="light"] .app-title .title-text { color: var(--text-primary); }
         [data-theme="light"] .user-btn,
         [data-theme="light"] .search-btn,
         [data-theme="light"] .menu-btn,
         [data-theme="light"] .back-btn,
         [data-theme="light"] .refresh-btn {
-            color: var(--text-primary) !important;
-            background: rgba(0,0,0,0.06) !important;
-            border-color: rgba(0,0,0,0.1) !important;
+            color: var(--text-primary);
+            background: rgba(0,0,0,0.06);
+            border-color: rgba(0,0,0,0.1);
         }
-
-        #headerNotifBtn #notifBadge { border-color: var(--header-bg) !important; }
-        [data-theme="light"] #headerNotifBtn #notifBadge { border-color: var(--header-bg) !important; }
-
-        .sidebar { background: var(--bg-secondary) !important; color: var(--text-primary); }
-        .sidebar-user-name { color: var(--text-primary); }
-        .sidebar-user-email { color: var(--text-muted); }
-        .nav-link { color: var(--text-primary); }
-        .nav-link i { color: var(--accent-gold); }
-        .nav-link.active { color: var(--primary); }
-        .nav-link.active i { color: var(--primary); }
-        [data-theme="light"] .sidebar { background: #ffffff !important; }
-
-        .nav-item-bottom { color: var(--text-muted); }
-        .nav-item-bottom.active .nav-label { color: var(--primary); }
-        [data-theme="light"] .bottom-nav { background: rgba(255,255,255,0.98) !important; }
-        [data-theme="light"] .nav-item-bottom .badge { border-color: var(--footer-bg) !important; }
-
-        .modal-content, .modal-body, .modal-title { color: var(--text-primary) !important; }
-        .modal-body p, .modal-body span, .modal-body div { color: var(--text-primary); }
-        [data-theme="light"] .modal-content { background: #ffffff !important; color: var(--text-primary); }
-        [data-theme="light"] .modal-header { background: #ffffff; }
-
+        [data-theme="light"] .sidebar { background: #ffffff; }
+        [data-theme="light"] .bottom-nav { background: rgba(255,255,255,0.98); }
+        [data-theme="light"] .modal-content { background: #ffffff; color: var(--text-primary); }
+        [data-theme="light"] .modal-header,
         [data-theme="light"] .modal-footer { background: #ffffff; }
         [data-theme="light"] .modal-footer .btn-close-modal {
             background: rgba(0,0,0,0.04);
             color: var(--text-primary);
             border-color: rgba(0,0,0,0.1);
         }
-
-        .search-section-title { color: var(--text-secondary) !important; }
-        .search-result-item .result-title { color: var(--text-primary) !important; }
-        .search-result-item .result-sub { color: var(--text-secondary) !important; }
-        .search-result-item .result-arrow { color: var(--text-muted) !important; }
-        .search-result-item mark { background: rgba(240,208,128,0.3); color: var(--text-primary); }
-        .search-empty-state { color: var(--text-muted); }
-        .search-empty-state h4 { color: var(--text-secondary); }
-
-        .notif-item { color: var(--text-primary); }
-        .notif-item-title { color: var(--text-primary) !important; }
-        .notif-item-message { color: var(--text-secondary) !important; }
-        .notif-item-time { color: var(--text-muted) !important; }
-
-        .preview-overlay-content { color: var(--text-primary); }
-        .preview-overlay-content h2 { color: var(--text-primary); }
-        .preview-overlay-content p { color: var(--text-secondary); }
-        [data-theme="light"] .preview-overlay-content { background: #ffffff; }
-
-        .toast .toast-title { color: var(--text-primary); }
-        .toast .toast-message { color: var(--text-secondary); }
         [data-theme="light"] .toast { background: #ffffff; }
-
-        .floating-notification .notif-title { color: var(--text-primary); }
-        .floating-notification .notif-message { color: var(--text-secondary); }
-        .floating-notification .notif-subtitle { color: var(--text-muted); }
         [data-theme="light"] .floating-notification { background: #ffffff; }
-
-        .map-status-title { color: var(--text-primary) !important; }
-        .map-status-desc { color: var(--text-muted) !important; }
-        .map-info-row { color: var(--text-secondary) !important; }
-        .map-info-row .info-label { color: var(--text-muted) !important; }
-        .map-info-row .info-value { color: var(--text-primary) !important; }
-        .map-info-row .info-value.coords { color: var(--text-primary) !important; font-family: 'Courier New', monospace; }
-        .map-owner-name { color: var(--text-primary) !important; }
-        .map-owner-loc { color: var(--text-muted) !important; }
-        .map-address-row { color: var(--text-muted) !important; }
-        .map-address-row .map-address-value { color: var(--text-primary) !important; }
-        .map-services-label { color: var(--text-secondary) !important; }
-        .map-service-card .service-desc { color: var(--text-muted) !important; }
-
-        * { -webkit-text-fill-color: currentColor; }
-        ::-webkit-scrollbar-thumb { background: var(--primary); }
-        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+        [data-theme="light"] .preview-overlay-content { background: #ffffff; }
     </style>
 </head>
-
 <body>
 
+    <!-- ============================================================ -->
+    <!-- APP SHELL                                                     -->
+    <!-- ============================================================ -->
     <div class="app-shell">
 
     <!-- FLOATING NOTIFICATION -->
@@ -2028,7 +2348,9 @@
         <span class="login-link" id="badgeLoginLink">Masuk untuk berinteraksi</span>
     </div>
 
-    <!-- HEADER -->
+    <!-- ============================================================ -->
+    <!-- HEADER — KONSISTEN DENGAN SEMUA FILE                          -->
+    <!-- ============================================================ -->
     <header class="app-bar" id="appBar">
         <div class="header-left">
             <button class="menu-btn" id="menuBtn" type="button" title="Menu" aria-label="Menu">
@@ -2065,7 +2387,9 @@
         </div>
     </header>
 
-    <!-- SIDEBAR -->
+    <!-- ============================================================ -->
+    <!-- SIDEBAR                                                       -->
+    <!-- ============================================================ -->
     <div class="sidebar-overlay-bg" id="sidebarOverlay"></div>
     <div class="sidebar" id="sidebar" role="navigation" aria-label="Menu Utama">
         <button class="sidebar-close" id="sidebarClose" type="button" aria-label="Tutup Menu">
@@ -2155,15 +2479,18 @@
         </ul>
     </div>
 
-    <!-- MAIN CONTENT -->
+    <!-- ============================================================ -->
+    <!-- MAIN CONTENT                                                  -->
+    <!-- ============================================================ -->
     <main class="main-content">
 
+        <!-- BRAND SECTION -->
         <div class="brand-section">
             <div class="brand-left">
-                <div class="brand-icon">📢</div>
+                <div class="brand-icon">🔔</div>
                 <div>
                     <div class="brand-title">SALINK</div>
-                    <div class="brand-subtitle">Alert Sekitar</div>
+                    <div class="brand-subtitle">Alert Sekitar Anda</div>
                 </div>
             </div>
             <button class="back-home-btn" id="backHomeBtn" type="button">
@@ -2171,73 +2498,87 @@
             </button>
         </div>
 
-        <section class="gps-top">
-            <div class="gps-icon">📍</div>
-            <div>
-                <div class="gps-title" id="gpsTitle">Lokasi belum tersedia</div>
-                <div class="gps-detail" id="gpsDetail">
-                    Aktifkan lokasi perangkat agar SALINK dapat mendeteksi emergency di sekitar Anda.
+        <!-- INFO PANEL -->
+        <section class="info-panel">
+            <div class="info-title">🔔 Alert Darurat di Sekitar Anda</div>
+            <div class="info-description">
+                Pantau semua laporan darurat (kebakaran, medis, kriminal, bencana) di sekitar lokasi Anda.
+                SALINK akan membaca lokasi GPS Anda dan menampilkan laporan aktif yang paling dekat.
+            </div>
+            <div class="info-actions">
+                <button class="primary-btn" id="locationBtn" type="button">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span id="locationBtnText">Gunakan Lokasi Saya</span>
+                </button>
+                <button class="secondary-btn" id="refreshBtn" type="button">
+                    <i class="fas fa-sync-alt"></i>
+                    <span>Refresh</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- GPS STATUS -->
+        <section class="gps-status" id="gpsStatus">
+            <div class="gps-row">
+                <div class="gps-icon">📡</div>
+                <div class="gps-text">
+                    <div class="gps-title" id="gpsTitle">Lokasi belum tersedia</div>
+                    <div class="gps-detail" id="gpsDetail">
+                        Tekan "Gunakan Lokasi Saya" untuk menampilkan alert darurat di sekitar Anda.
+                    </div>
                 </div>
             </div>
         </section>
 
-        <div class="gps-actions">
-            <button class="primary-btn" id="locationBtn" type="button">
-                <i class="fas fa-map-marker-alt"></i>
-                <span id="locationBtnText">Gunakan Lokasi Saya</span>
-            </button>
-            <button class="secondary-btn" id="refreshBtn" type="button">
-                <i class="fas fa-sync-alt"></i>
-                <span>Refresh</span>
-            </button>
-        </div>
-
-        <div class="control-title">🔎 Filter Jenis Emergency</div>
-        <div class="filters" id="filterContainer">
-            <button class="filter-btn active" data-type="" type="button">🆘 Semua</button>
-            <button class="filter-btn" data-type="fire" type="button">🔥 Kebakaran</button>
-            <button class="filter-btn" data-type="medical" type="button">🚑 Medis</button>
-            <button class="filter-btn" data-type="crime" type="button">🚓 Kriminal</button>
-            <button class="filter-btn" data-type="disaster" type="button">🌪️ Bencana</button>
-        </div>
-
-        <div class="summary-grid">
-            <div class="summary-card">
-                <div class="summary-label">Emergency sekitar</div>
-                <div class="summary-value" id="totalAlerts">0</div>
+        <!-- FILTER PANEL -->
+        <section class="filter-panel">
+            <div class="filter-title">Filter berdasarkan jenis darurat</div>
+            <div class="filter-buttons" id="filterContainer">
+                <button class="filter-btn active" data-type="" type="button">🆘 Semua</button>
+                <button class="filter-btn" data-type="fire" type="button">🔥 Kebakaran</button>
+                <button class="filter-btn" data-type="medical" type="button">🚑 Medis</button>
+                <button class="filter-btn" data-type="crime" type="button">🚓 Kriminal</button>
+                <button class="filter-btn" data-type="disaster" type="button">🌪️ Bencana</button>
             </div>
-            <div class="summary-card">
-                <div class="summary-label">Aktif</div>
-                <div class="summary-value danger" id="activeAlerts">0</div>
-            </div>
-            <div class="summary-card">
-                <div class="summary-label">Radius</div>
-                <div class="summary-value" id="radiusValue">∞</div>
-            </div>
-        </div>
+        </section>
 
-        <div class="results-header">
-            <div>
-                <div class="results-title">🚨 Emergency di Sekitar Anda</div>
-                <div class="results-count" id="resultsCount">Menunggu lokasi pengguna</div>
+        <!-- RADIUS PANEL -->
+        <section class="radius-panel">
+            <div class="radius-title">📏 Jangkauan Pencarian</div>
+            <div class="radius-buttons" id="radiusContainer">
+                <button class="radius-btn active" data-radius="1.5" type="button">1.5 km</button>
+                <button class="radius-btn" data-radius="3" type="button">3 km</button>
+                <button class="radius-btn" data-radius="5" type="button">5 km</button>
+                <button class="radius-btn" data-radius="10" type="button">10 km</button>
+                <button class="radius-btn" data-radius="0" type="button">🌍 Semua</button>
             </div>
-            <button class="refresh-small" id="refreshSmallBtn" type="button">
-                <i class="fas fa-sync-alt"></i> Refresh
-            </button>
-        </div>
+        </section>
 
-        <div class="alert-grid" id="alertContainer">
-            <div class="state-card">
-                <div class="state-icon">📍</div>
-                <div class="state-title">Lokasi Anda belum diketahui</div>
-                <div class="state-text">
-                    Tekan <b>"Gunakan Lokasi Saya"</b> untuk mencari peringatan emergency di sekitar posisi Anda.
+        <!-- RESULTS -->
+        <section>
+            <div class="results-header">
+                <div>
+                    <div class="results-title">🚨 Laporan Darurat Aktif</div>
+                    <div class="results-count" id="resultsCount">Belum mencari lokasi</div>
                 </div>
             </div>
-        </div>
+
+            <div class="alert-list" id="alertContainer">
+                <div class="state-card">
+                    <div class="state-icon">📍</div>
+                    <div class="state-title">Lokasi Anda belum diketahui</div>
+                    <div class="state-text">
+                        Tekan tombol <b>"Gunakan Lokasi Saya"</b> agar SALINK dapat menampilkan alert darurat di sekitar Anda.
+                    </div>
+                </div>
+            </div>
+        </section>
+
     </main>
 
-    <!-- BOTTOM NAV -->
+    <!-- ============================================================ -->
+    <!-- BOTTOM NAV                                                    -->
+    <!-- ============================================================ -->
     <nav class="bottom-nav" id="sl-bottom-nav" role="navigation" aria-label="Main Navigation">
         <a href="dashboard.html" class="nav-item-bottom" data-workspace="home" aria-label="Home">
             <span class="nav-icon">🏠</span>
@@ -2252,7 +2593,7 @@
                 <span class="fab-emoji">🚨</span>
             </button>
         </div>
-        <button class="nav-item-bottom" id="bottomInviteNav" data-workspace="invite" data-action="login" type="button" aria-label="Invite">
+        <button class="nav-item-bottom" id="bottomInviteNav" data-workspace="invite" type="button" aria-label="Invite">
             <span class="nav-icon">📨</span>
             <span class="nav-label">Invite</span>
             <span class="badge" id="inviteBadge">0</span>
@@ -2263,9 +2604,11 @@
         </a>
     </nav>
 
-    </div>
+    </div> <!-- /app-shell -->
 
-    <!-- MODAL SEARCH — DENGAN TOMBOL TUTUP -->
+    <!-- ============================================================ -->
+    <!-- MODAL SEARCH — 4 TAB 1 BARIS + CHIPS SELALU TAMPIL            -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="searchModal">
         <div class="modal-content search-modal-content">
             <div class="modal-header">
@@ -2285,6 +2628,8 @@
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
+
+                <!-- 4 TAB DALAM 1 BARIS -->
                 <div class="search-tabs">
                     <button class="search-tab active" data-tab="all" type="button">
                         <i class="fas fa-globe"></i> Semua
@@ -2299,13 +2644,16 @@
                         <i class="fas fa-exclamation-triangle"></i> Emergency
                     </button>
                 </div>
-                <div class="search-filter-row" id="emergencyFilters" style="display:none;">
+
+                <!-- FILTER CHIPS — SELALU TAMPIL -->
+                <div class="search-filter-row" id="emergencyFilters">
                     <button class="search-filter-chip active" data-filter="all" type="button">🎯 Semua</button>
                     <button class="search-filter-chip" data-filter="fire" type="button">🔥 Kebakaran</button>
                     <button class="search-filter-chip" data-filter="medical" type="button">🚑 Medis</button>
                     <button class="search-filter-chip" data-filter="crime" type="button">🚓 Kriminal</button>
                     <button class="search-filter-chip" data-filter="disaster" type="button">🌪️ Bencana</button>
                 </div>
+
                 <div id="searchResultsBody">
                     <div id="searchDefaultView">
                         <div class="search-empty-state">
@@ -2324,7 +2672,9 @@
         </div>
     </div>
 
-    <!-- MODAL NOTIFIKASI — LENGKAP DENGAN FILTER -->
+    <!-- ============================================================ -->
+    <!-- MODAL NOTIFIKASI                                              -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="notifModal">
         <div class="modal-content" style="max-width:460px;">
             <div class="modal-header">
@@ -2338,24 +2688,22 @@
                 </button>
             </div>
             <div class="modal-body">
-                <!-- FILTER TABS -->
                 <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
-                    <button class="notif-filter-btn active" data-filter="all" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                    <button class="notif-filter-btn active" data-filter="all" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
                         <i class="fas fa-list"></i> Semua
                     </button>
-                    <button class="notif-filter-btn" data-filter="unread" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                    <button class="notif-filter-btn" data-filter="unread" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
                         <i class="fas fa-circle"></i> Belum
                     </button>
-                    <button class="notif-filter-btn" data-filter="emergency" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                    <button class="notif-filter-btn" data-filter="emergency" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
                         <i class="fas fa-exclamation-triangle"></i> Darurat
                     </button>
-                    <button class="notif-filter-btn" data-filter="regular" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                    <button class="notif-filter-btn" data-filter="regular" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
                         <i class="fas fa-bell"></i> Biasa
                     </button>
                 </div>
-                <!-- STATISTIK + TANDAI SEMUA -->
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:7px 10px;background:rgba(255,255,255,0.04);border-radius:10px;">
-                    <span style="font-size:0.62rem;color:#a8b2c1;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:7px 10px;background:var(--bg-input);border-radius:10px;">
+                    <span style="font-size:0.62rem;color:var(--text-secondary);">
                         <i class="fas fa-info-circle" style="color:var(--primary);"></i>
                         <span id="notifStatsText">0 notifikasi</span>
                     </span>
@@ -2363,7 +2711,6 @@
                         <i class="fas fa-check-double"></i> Tandai Semua
                     </button>
                 </div>
-                <!-- LIST NOTIF -->
                 <div id="notifList" style="max-height:380px;overflow-y:auto;"></div>
             </div>
             <div class="modal-footer">
@@ -2372,7 +2719,39 @@
         </div>
     </div>
 
-    <!-- FAB MODAL -->
+    <!-- ============================================================ -->
+    <!-- MODAL INVITE — SAMA DENGAN DASHBOARD                          -->
+    <!-- ============================================================ -->
+    <div class="modal-overlay" id="inviteModal">
+        <div class="modal-content" style="max-width:460px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Undang Pengguna</span>
+                    <span class="badge-count" id="inviteModalCount">0</span>
+                </div>
+                <button class="modal-close" id="inviteModalCloseBtn" type="button" aria-label="Tutup">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <input type="text" id="inviteSearchInput" placeholder="🔍 Cari nama atau username..." style="flex:1;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;color:var(--text-primary);font-size:0.72rem;font-family:inherit;">
+                    <button id="inviteRefreshBtn" type="button" style="padding:9px 14px;background:var(--accent-blue-gradient);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:0.7rem;font-weight:700;">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div id="inviteUserList" style="max-height:380px;overflow-y:auto;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-close-modal" id="inviteModalFooterCloseBtn" type="button">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- FAB MODAL — GRID 2×2 EMERGENCY                                -->
+    <!-- ============================================================ -->
     <div class="fab-modal-overlay" id="fabModalOverlay">
         <div class="fab-modal-content" id="fabModalContent">
             <button class="fab-modal-close" id="fabModalClose" type="button" aria-label="Tutup">
@@ -2415,7 +2794,9 @@
         </div>
     </div>
 
-    <!-- MODAL PETA DARURAT -->
+    <!-- ============================================================ -->
+    <!-- MODAL PETA DARURAT                                            -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="mapModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -2518,25 +2899,16 @@
     <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <!-- ============================================================ -->
-    <!-- SCRIPT — ALERT SEKITAR JAVASCRIPT v13.0                       -->
-    <!-- Konsisten dengan lokasi-bantuan.html + fitur Notif lengkap    -->
+        <!-- ============================================================ -->
+    <!-- SCRIPT UTAMA — ALERT-SEKITAR v14.0 (NO PATCH)                 -->
     <!-- ============================================================ -->
     <script>
 /* ====================================================================
- * SALINK ALERT SEKITAR v13.0 — FINAL
+ * SALINK ALERT-SEKITAR v14.0 — FINAL INDUK (NO PATCH)
  * ====================================================================
- * INDUK: lokasi-bantuan.html
- * Fitur:
- *   - Tema Universal (dark/light)
- *   - PWA Install
- *   - Header dengan Back button
- *   - Sidebar dengan #sidebarMapBtn
- *   - Modal Peta Darurat (sama persis lokasi-bantuan)
- *   - Modal Notif LENGKAP: filter + tandai semua + mark read persistent
- *   - Modal Search dengan tombol Tutup
- *   - FAB Modal 2×2 → dashboard.html?emergency=TYPE
- *   - Bottom Nav + FAB universal
+ * Struktur identik dengan lokasi-bantuan.html v14.0
+ * Perbedaan: konten utama menampilkan EMERGENCY dari salink_emergencies
+ * (bukan kontak bantuan/instansi).
  * ==================================================================== */
 (function() {
     'use strict';
@@ -2544,26 +2916,25 @@
     // ================================================================
     // 1. KONSTANTA
     // ================================================================
-    const API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
-    const LOGIN_URL = 'login-register.html';
-    const DASHBOARD_URL = 'dashboard.html';
-    const PROFILE_URL = 'profil.html';
-    const DETAIL_URL = 'detail-emergency.html';
-    const EMERGENCY_PAGE = 'alert-sekitar.html';
-    const EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
-    const NEARBY_RADIUS_KM = 50;
-    const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
+    var API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
+    var LOGIN_URL = 'login-register.html';
+    var DASHBOARD_URL = 'dashboard.html';
+    var PROFILE_URL = 'profil.html';
+    var DETAIL_URL = 'detail-emergency.html';
+    var CURRENT_PAGE = 'alert-sekitar.html';
+    var EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
+    var NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
 
-    const EMERGENCY_LABELS = {
+    var EMERGENCY_LABELS = {
         fire: '🔥 Kebakaran',
         medical: '🚑 Medis & Kematian',
         crime: '🚓 Kriminal',
         disaster: '🌪️ Bencana Alam'
     };
-    const EMERGENCY_ICONS = {
+    var EMERGENCY_ICONS = {
         fire: '🔥', medical: '🚑', crime: '🚓', disaster: '🌪️'
     };
-    const EMERGENCY_CSS_CLASS = {
+    var EMERGENCY_CSS = {
         fire: 'fire', medical: 'medical', crime: 'crime', disaster: 'disaster'
     };
 
@@ -2575,12 +2946,11 @@
     var currentTheme = 'dark';
     var userLat = null;
     var userLng = null;
-    var userAddress = '';
-    var allEmergencies = [];
-    var filteredEmergencies = [];
-    var activeEmergencyFilter = '';
-    var currentRadius = null;
+    var alertsData = [];
+    var currentFilter = '';
+    var currentRadius = 1.5;
     var isSidebarOpen = false;
+    var isLoading = false;
     var deferredPrompt = null;
     var searchTab = 'all';
     var searchEmergencyFilter = 'all';
@@ -2594,25 +2964,23 @@
     var notifFilter = 'all';
     var readNotifs = {};
 
+    // Invite state
+    var allUsers = [];
+    var sentInvites = {};
+
+    // Polling
+    var emergencyPollTimer = null;
+
     // ================================================================
     // 3. HELPERS
     // ================================================================
     function escapeHTML(str) {
         if (!str) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
     function escapeAttr(str) {
         if (!str) return '';
-        return String(str)
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
+        return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
     function getTimeAgo(ts) {
         if (!ts) return '-';
@@ -2627,21 +2995,27 @@
         if (day < 7) return day + 'h lalu';
         return new Date(ts).toLocaleDateString('id-ID');
     }
-    function calculateDistance(lat1, lon1, lat2, lon2) {
-        if (!isFinite(lat1) || !isFinite(lon1) || !isFinite(lat2) || !isFinite(lon2)) return null;
-        var R = 6371;
-        var dLat = (lat2 - lat1) * Math.PI / 180;
-        var dLon = (lon2 - lon1) * Math.PI / 180;
-        var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-                Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
+    function getRemainingTime(expiresAt) {
+        var r = expiresAt - Date.now();
+        if (r <= 0) return 'Kadaluarsa';
+        var h = Math.floor(r / 3600000), m = Math.floor((r % 3600000) / 60000);
+        return h + 'j ' + m + 'm tersisa';
     }
     function formatDistance(km) {
-        if (km === null || !isFinite(km)) return '';
+        if (!km || !Number.isFinite(km)) return '';
         if (km < 1) return Math.round(km * 1000) + ' m';
         return km.toFixed(2) + ' km';
+    }
+    function haversineDistance(lat1, lng1, lat2, lng2) {
+        if (!lat1 || !lng1 || !lat2 || !lng2) return Infinity;
+        var R = 6371;
+        var dLat = (lat2 - lat1) * Math.PI / 180;
+        var dLng = (lng2 - lng1) * Math.PI / 180;
+        var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
     }
     function log(msg) {
         console.log('[SALINK AlertSekitar] ' + msg);
@@ -2835,7 +3209,7 @@
         if (o) { o.classList.remove('active'); document.body.style.overflow = ''; }
     }
     function redirectToLogin() {
-        window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(EMERGENCY_PAGE);
+        window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(CURRENT_PAGE);
     }
     function applyPreviewMode() {
         var badge = document.getElementById('previewBadge');
@@ -2968,340 +3342,380 @@
     function goHome() { window.location.href = DASHBOARD_URL; }
 
     // ================================================================
-    // 13. API — GET EMERGENCIES
+    // 13. LOAD EMERGENCIES FROM LOCAL STORAGE
     // ================================================================
-    function apiGetEmergencies() {
-        var params = new URLSearchParams({
-            action: 'get_emergencies',
-            timestamp: Date.now()
-        });
-        return fetch(API_URL + '?' + params.toString(), {
-            method: 'GET',
-            headers: { 'Accept': 'application/json' },
-            cache: 'no-store'
-        })
-        .then(function(response) {
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            return response.json();
-        })
-        .then(function(result) {
-            if (result && result.status === 'success' && Array.isArray(result.data)) {
-                return result.data;
-            }
-            return [];
-        })
-        .catch(function(error) {
-            console.warn('⚠️ [API] Gagal fetch emergencies:', error.message);
-            return [];
-        });
-    }
-
-    // ================================================================
-    // 14. GPS — getMyLocation
-    // ================================================================
-    function getMyLocation() {
-        if (isPreviewMode) {
-            showPreviewOverlay();
-            return;
-        }
-        var btn = document.getElementById('locationBtn');
-        var btnText = document.getElementById('locationBtnText');
-        if (btn) btn.classList.add('loading');
-        if (btnText) btnText.textContent = 'Mengambil lokasi...';
-
-        if (!navigator.geolocation) {
-            showToast('⚠️ Tidak Didukung', 'Browser Anda tidak mendukung GPS', 'fa-exclamation-triangle');
-            if (btn) btn.classList.remove('loading');
-            if (btnText) btnText.textContent = 'Gunakan Lokasi Saya';
-            setGPSStatus('error', 'GPS tidak tersedia', 'Browser tidak mendukung layanan lokasi.');
-            return;
-        }
-
-        navigator.geolocation.getCurrentPosition(
-            function(position) {
-                userLat = position.coords.latitude;
-                userLng = position.coords.longitude;
-                var accuracy = Math.round(position.coords.accuracy || 0);
-
-                try {
-                    localStorage.setItem('salink_user_lat', userLat);
-                    localStorage.setItem('salink_user_lng', userLng);
-                } catch(e) {}
-
-                setGPSStatus('success', '📍 Lokasi Anda terdeteksi',
-                    userLat.toFixed(6) + ', ' + userLng.toFixed(6) + ' (±' + accuracy + 'm)');
-
-                reverseGeocode(userLat, userLng);
-
-                if (btn) {
-                    btn.classList.remove('loading');
-                    btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
-                }
-                if (btnText) btnText.textContent = 'Lokasi Ditemukan — Tap untuk Refresh';
-
-                showToast('📍 Lokasi Ditemukan', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
-
-                loadEmergencies();
-            },
-            function(error) {
-                var errMsg = 'Gagal mengambil lokasi';
-                if (error.code === 1) errMsg = 'Izin lokasi ditolak.';
-                else if (error.code === 2) errMsg = 'Lokasi tidak tersedia.';
-                else if (error.code === 3) errMsg = 'Timeout. Coba lagi.';
-
-                setGPSStatus('error', '⚠️ Gagal Mengambil Lokasi', errMsg);
-                showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle');
-
-                if (btn) btn.classList.remove('loading');
-                if (btnText) btnText.textContent = 'Coba Lagi';
-            },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-        );
-    }
-    function setGPSStatus(type, title, detail) {
-        var gpsTitle = document.getElementById('gpsTitle');
-        var gpsDetail = document.getElementById('gpsDetail');
-        var gpsTop = document.querySelector('.gps-top');
-        if (gpsTop) {
-            gpsTop.classList.remove('loading', 'success', 'error');
-            if (type) gpsTop.classList.add(type);
-        }
-        if (gpsTitle) gpsTitle.textContent = title;
-        if (gpsDetail) gpsDetail.textContent = detail;
-    }
-    function reverseGeocode(lat, lng) {
+    function getAllEmergencies() {
         try {
-            var url = NOMINATIM_URL + '?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id';
-            fetch(url, {
-                method: 'GET',
-                headers: { 'User-Agent': 'SALINK-Alert-Sekitar/13.0' }
-            })
-            .then(function(res) { return res.json(); })
-            .then(function(data) {
-                if (data && data.display_name) {
-                    userAddress = data.display_name;
-                    var gpsDetail = document.getElementById('gpsDetail');
-                    if (gpsDetail) gpsDetail.textContent = '📍 ' + data.display_name;
-                }
-            })
-            .catch(function() {});
-        } catch (e) {}
+            return JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+        } catch(e) { return []; }
     }
-
-    // ================================================================
-    // 15. LOAD EMERGENCIES
-    // ================================================================
-    function loadEmergencies() {
-        var localEms = [];
-        try {
-            localEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-        } catch (e) { localEms = []; }
-
+    function getActiveEmergencies() {
+        var all = getAllEmergencies();
         var now = Date.now();
-        var activeEms = localEms.filter(function(e) {
+        return all.filter(function(e) {
             if (!e || !e.id) return false;
             var ts = typeof e.timestamp === 'number' ? e.timestamp : new Date(e.timestamp).getTime();
             if (isNaN(ts)) ts = now;
             var exp = e.expiresAt || (ts + EMERGENCY_DURATION);
             return exp > now;
         });
-
-        allEmergencies = activeEms;
-        applyFilterAndRender();
-
-        fetchFromAPI();
-    }
-    function fetchFromAPI() {
-        apiGetEmergencies().then(function(apiEms) {
-            if (!apiEms || apiEms.length === 0) return;
-            var now = Date.now();
-            var valid = apiEms.filter(function(e) {
-                if (!e || !e.id) return false;
-                var ts = typeof e.timestamp === 'number' ? e.timestamp : new Date(e.timestamp).getTime();
-                if (isNaN(ts)) ts = now;
-                var exp = e.expiresAt || (ts + EMERGENCY_DURATION);
-                return exp > now;
-            });
-
-            var merged = {};
-            allEmergencies.forEach(function(e) { if (e.id) merged[e.id] = e; });
-            valid.forEach(function(e) { if (e.id) merged[e.id] = e; });
-            allEmergencies = Object.values(merged);
-
-            try {
-                localStorage.setItem('salink_emergencies', JSON.stringify(allEmergencies));
-            } catch(e) {}
-
-            applyFilterAndRender();
-        });
     }
 
     // ================================================================
-    // 16. FILTER & RENDER
+    // 14. GPS MULTI-STAGE FALLBACK
     // ================================================================
-    function setEmergencyFilter(btn) {
-        var type = btn.getAttribute('data-type') || '';
-        activeEmergencyFilter = type;
-        var container = document.getElementById('filterContainer');
-        if (container) {
-            var btns = container.querySelectorAll('.filter-btn');
-            for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
+    function getMyLocation() {
+        log('getMyLocation() called');
+        var btn = document.getElementById('locationBtn');
+        var btnText = document.getElementById('locationBtnText');
+        if (isPreviewMode) {
+            log('Preview mode ON — showing overlay');
+            showPreviewOverlay();
+            return;
         }
-        btn.classList.add('active');
-        applyFilterAndRender();
-    }
-    function applyFilterAndRender() {
-        var filtered = allEmergencies.slice();
-
-        if (activeEmergencyFilter) {
-            filtered = filtered.filter(function(e) {
-                return e.type === activeEmergencyFilter || e.emergencyType === activeEmergencyFilter;
-            });
+        if (btn) {
+            btn.disabled = true;
+            btn.classList.add('loading');
         }
+        if (btnText) btnText.textContent = 'Mendapatkan...';
 
-        if (userLat && userLng) {
-            filtered = filtered.map(function(e) {
-                var eLat = parseFloat(e.latitude || e.lat);
-                var eLng = parseFloat(e.longitude || e.lng);
-                var distance = null;
-                if (isFinite(eLat) && isFinite(eLng)) {
-                    distance = calculateDistance(userLat, userLng, eLat, eLng);
-                }
-                return Object.assign({}, e, { _distance: distance });
-            });
-            filtered.sort(function(a, b) {
-                var da = (a._distance === null) ? 99999 : a._distance;
-                var db = (b._distance === null) ? 99999 : b._distance;
-                return da - db;
-            });
-            filtered = filtered.filter(function(e) {
-                if (e._distance === null) return true;
-                return e._distance <= NEARBY_RADIUS_KM;
-            });
-        } else {
-            filtered.sort(function(a, b) {
-                var ta = a.timestamp ? new Date(a.timestamp).getTime() : 0;
-                var tb = b.timestamp ? new Date(b.timestamp).getTime() : 0;
-                return tb - ta;
-            });
-        }
-
-        filteredEmergencies = filtered;
-        updateSummary(filtered);
-        renderAlertCards(filtered);
-    }
-    function updateSummary(list) {
-        var totalEl = document.getElementById('totalAlerts');
-        var activeEl = document.getElementById('activeAlerts');
-        var radiusEl = document.getElementById('radiusValue');
-        var resultsCount = document.getElementById('resultsCount');
-
-        var now = Date.now();
-        var activeCount = 0;
-        list.forEach(function(e) {
-            var ts = e.timestamp ? new Date(e.timestamp).getTime() : now;
-            var exp = e.expiresAt || (ts + EMERGENCY_DURATION);
-            if (exp > now) activeCount++;
-        });
-
-        if (totalEl) totalEl.textContent = list.length;
-        if (activeEl) activeEl.textContent = activeCount;
-        if (radiusEl) {
-            radiusEl.textContent = (userLat && userLng) ? (NEARBY_RADIUS_KM + ' km') : '∞';
-        }
-        if (resultsCount) {
-            if (!userLat || !userLng) {
-                resultsCount.textContent = list.length + ' emergency (semua lokasi)';
-            } else {
-                resultsCount.textContent = list.length + ' emergency dalam radius ' + NEARBY_RADIUS_KM + ' km';
-            }
-        }
-    }
-    function renderAlertCards(list) {
-        var container = document.getElementById('alertContainer');
-        if (!container) return;
-
-        if (list.length === 0) {
-            container.innerHTML =
-                '<div class="state-card">' +
-                    '<div class="state-icon">✅</div>' +
-                    '<div class="state-title">Tidak Ada Emergency</div>' +
-                    '<div class="state-text">' +
-                        (userLat && userLng
-                            ? 'Tidak ada peringatan emergency dalam radius <b>' + NEARBY_RADIUS_KM + ' km</b> dari lokasi Anda. Semoga selalu aman! 🙏'
-                            : 'Tekan <b>"Gunakan Lokasi Saya"</b> untuk mencari peringatan emergency di sekitar posisi Anda.') +
-                    '</div>' +
-                '</div>';
+        if (!navigator.geolocation) {
+            showToast('⚠️ Error', 'Perangkat tidak mendukung GPS.', 'fa-exclamation-triangle');
+            setGPSStatus('error', 'GPS tidak tersedia', 'Perangkat tidak mendukung layanan lokasi.');
+            resetLocationBtn();
             return;
         }
 
-        var html = '';
-        list.forEach(function(e) {
-            var type = e.type || e.emergencyType || 'fire';
-            var icon = EMERGENCY_ICONS[type] || '🚨';
-            var label = EMERGENCY_LABELS[type] || 'Emergency';
-            var ts = e.timestamp ? new Date(e.timestamp).getTime() : Date.now();
-            var exp = e.expiresAt || (ts + EMERGENCY_DURATION);
-            var isActive = exp > Date.now();
-            var location = e.location || e.address || 'Lokasi tidak diketahui';
-            var sender = e.sender || e.senderUsername || 'Sistem';
-            var distanceText = '';
-            if (e._distance !== null && e._distance !== undefined) {
-                distanceText = '📏 ' + formatDistance(e._distance) + ' dari lokasi Anda';
-            }
+        setGPSStatus('loading', '📡 Mencari sinyal GPS...', 'Menggunakan akurasi tinggi (bisa memakan waktu hingga 30 detik di data seluler)');
 
-            html +=
-                '<div class="alert-card" onclick="goToEmergencyDetail(\'' + escapeAttr(e.id) + '\')">' +
-                    '<div class="alert-header">' +
-                        '<div class="alert-icon ' + type + '">' + icon + '</div>' +
-                        '<div class="alert-type">' + escapeHTML(label) + '</div>' +
-                        '<div class="alert-time">' + getTimeAgo(ts) + '</div>' +
-                    '</div>' +
-                    '<div class="alert-location">' +
-                        '<i class="fas fa-map-marker-alt"></i>' +
-                        '<span>' + escapeHTML(location) + '</span>' +
-                    '</div>' +
-                    '<div class="alert-sender">' +
-                        '📤 <span class="sender-name">' + escapeHTML(sender) + '</span>' +
-                    '</div>' +
-                    (distanceText ? '<div class="alert-distance">' + distanceText + '</div>' : '') +
-                    '<div class="alert-status ' + (isActive ? 'active' : 'resolved') + '">' +
-                        (isActive
-                            ? '<i class="fas fa-circle" style="font-size:0.4rem;"></i> AKTIF'
-                            : '<i class="fas fa-check"></i> SELESAI') +
-                    '</div>' +
-                '</div>';
+        if (navigator.permissions && navigator.permissions.query) {
+            navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
+                log('Permission state: ' + result.state);
+                if (result.state === 'denied') {
+                    setGPSStatus('error', 'Izin lokasi ditolak', 'Aktifkan izin lokasi di pengaturan browser/HP Anda, lalu coba lagi.');
+                    showToast('⚠️ Izin Ditolak', 'Aktifkan izin lokasi di browser Anda', 'fa-exclamation-triangle');
+                    resetLocationBtn();
+                    return;
+                }
+                attemptGpsHighAccuracy();
+            }).catch(function() {
+                attemptGpsHighAccuracy();
+            });
+        } else {
+            attemptGpsHighAccuracy();
+        }
+    }
+
+    function attemptGpsHighAccuracy() {
+        log('Stage 1: High accuracy, timeout 30s');
+        var timeoutId = setTimeout(function() {
+            log('Stage 1 timeout, fallback to Stage 2');
+            attemptGpsNetwork();
+        }, 30000);
+
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                clearTimeout(timeoutId);
+                handleGpsSuccess(position, 'high');
+            },
+            function(error) {
+                clearTimeout(timeoutId);
+                log('Stage 1 failed: code=' + error.code + ' msg=' + error.message);
+                if (error.code === 1) {
+                    handleGpsError(error, 'high');
+                } else {
+                    attemptGpsNetwork();
+                }
+            },
+            { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+        );
+    }
+
+    function attemptGpsNetwork() {
+        log('Stage 2: Network-based, timeout 20s');
+        setGPSStatus('loading', '📡 Sinyal GPS lemah...', 'Mencoba metode alternatif (network location)...');
+        var timeoutId = setTimeout(function() {
+            log('Stage 2 timeout, giving up');
+            setGPSStatus('error', 'Lokasi tidak dapat diperoleh', 'Sinyal GPS terlalu lemah. Coba pindah ke area terbuka atau aktifkan WiFi.');
+            showToast('⚠️ Gagal', 'GPS tidak merespons. Coba aktifkan WiFi atau pindah ke area terbuka.', 'fa-exclamation-triangle');
+            resetLocationBtn();
+        }, 20000);
+
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                clearTimeout(timeoutId);
+                handleGpsSuccess(position, 'network');
+            },
+            function(error) {
+                clearTimeout(timeoutId);
+                log('Stage 2 failed: code=' + error.code);
+                handleGpsError(error, 'network');
+            },
+            { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 }
+        );
+    }
+
+    function handleGpsSuccess(position, method) {
+        userLat = position.coords.latitude;
+        userLng = position.coords.longitude;
+        var accuracy = Math.round(position.coords.accuracy || 0);
+        var methodLabel = method === 'high' ? 'GPS' : 'Network';
+        log('GPS success (' + methodLabel + '): ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6) + ' ±' + accuracy + 'm');
+
+        try {
+            localStorage.setItem('salink_user_lat', userLat);
+            localStorage.setItem('salink_user_lng', userLng);
+        } catch(e) {}
+
+        setGPSStatus('success', '✅ Lokasi berhasil ditemukan (' + methodLabel + ')',
+            'Koordinat: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6) + ' • Akurasi ±' + accuracy + 'm');
+
+        showToast('✅ Berhasil', 'Lokasi ditemukan via ' + methodLabel + ' (±' + accuracy + 'm)', 'fa-check-circle');
+        resetLocationBtn();
+        loadAlerts();
+    }
+
+    function handleGpsError(error, method) {
+        console.error('❌ GPS Error (' + method + '):', error);
+        var message = '';
+        if (error.code === 1) {
+            message = 'Izin lokasi ditolak. Aktifkan izin lokasi untuk browser ini di pengaturan HP Anda.';
+        } else if (error.code === 2) {
+            message = 'Lokasi tidak tersedia. Pastikan GPS aktif & Anda berada di area terbuka.';
+        } else if (error.code === 3) {
+            message = 'Waktu pencarian habis. Coba aktifkan WiFi atau pindah ke area terbuka, lalu coba lagi.';
+        } else {
+            message = error.message || 'Gagal mendapatkan lokasi. Coba lagi.';
+        }
+        setGPSStatus('error', 'Gagal mendapatkan lokasi', message);
+        showToast('⚠️ Gagal', message, 'fa-exclamation-triangle');
+        resetLocationBtn();
+    }
+
+    function resetLocationBtn() {
+        var btn = document.getElementById('locationBtn');
+        var btnText = document.getElementById('locationBtnText');
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove('loading');
+        }
+        if (btnText) btnText.textContent = 'Gunakan Lokasi Saya';
+    }
+
+    function setGPSStatus(type, title, detail) {
+        var status = document.getElementById('gpsStatus');
+        var titleEl = document.getElementById('gpsTitle');
+        var detailEl = document.getElementById('gpsDetail');
+        if (!status || !titleEl || !detailEl) return;
+        status.classList.remove('loading', 'success', 'error');
+        if (type) status.classList.add(type);
+        titleEl.textContent = title;
+        detailEl.textContent = detail;
+    }
+
+    // ================================================================
+    // 15. LOAD ALERTS (EMERGENCY DI SEKITAR)
+    // ================================================================
+    function loadAlerts() {
+        if (isLoading) return;
+        isLoading = true;
+
+        if (!userLat || !userLng) {
+            showState('📍', 'Lokasi belum tersedia', 'Silakan gunakan lokasi Anda terlebih dahulu.');
+            isLoading = false;
+            return;
+        }
+
+        var allEms = getActiveEmergencies();
+
+        // Filter tipe
+        var filtered = allEms;
+        if (currentFilter) {
+            filtered = filtered.filter(function(e) { return e.type === currentFilter; });
+        }
+
+        // Hitung jarak
+        var withDistance = filtered.map(function(em) {
+            var emLat = parseFloat(em.latitude);
+            var emLng = parseFloat(em.longitude);
+            var dist = (emLat && emLng && !isNaN(emLat) && !isNaN(emLng))
+                ? haversineDistance(userLat, userLng, emLat, emLng)
+                : Infinity;
+            return Object.assign({}, em, { _distanceKm: dist });
         });
 
-        container.innerHTML = html;
-    }
-    function goToEmergencyDetail(id) {
-        if (!id) return;
-        window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(id);
+        // Sort by distance
+        withDistance.sort(function(a, b) { return a._distanceKm - b._distanceKm; });
+
+        // Filter radius
+        var radius = currentRadius === 0 ? Infinity : currentRadius;
+        var finalList = withDistance.filter(function(em) {
+            return em._distanceKm <= radius;
+        });
+
+        alertsData = finalList;
+
+        if (finalList.length === 0) {
+            var radiusText = currentRadius === 0 ? 'semua area' : currentRadius + ' km';
+            showState('🏢', 'Tidak ada alert darurat',
+                'Belum ada laporan darurat aktif dalam radius ' + radiusText + '.',
+                'warning');
+            var rc = document.getElementById('resultsCount');
+            if (rc) rc.textContent = 'Tidak ada alert darurat';
+            isLoading = false;
+            return;
+        }
+
+        renderAlerts(finalList);
+        var radiusText2 = currentRadius === 0 ? 'semua area' : currentRadius + ' km';
+        var rc2 = document.getElementById('resultsCount');
+        if (rc2) rc2.textContent = finalList.length + ' alert aktif dalam radius ' + radiusText2;
+        showToast('✅ Berhasil', finalList.length + ' alert darurat ditemukan', 'fa-check-circle');
+        isLoading = false;
     }
 
     // ================================================================
-    // 17. REFRESH
+    // 16. FILTER & RADIUS
+    // ================================================================
+    function setEmergencyFilter(btn) {
+        document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        currentFilter = btn.dataset.type || '';
+        if (userLat && userLng) loadAlerts();
+        else showState('📍', 'Lokasi belum tersedia', 'Gunakan lokasi Anda terlebih dahulu.');
+    }
+    function setRadius(btn) {
+        document.querySelectorAll('.radius-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        currentRadius = parseFloat(btn.dataset.radius) || 1.5;
+        if (userLat && userLng) loadAlerts();
+        else showState('📍', 'Lokasi belum tersedia', 'Gunakan lokasi Anda terlebih dahulu.');
+    }
+
+    // ================================================================
+    // 17. RENDER ALERTS
+    // ================================================================
+    function renderAlerts(alerts) {
+        var container = document.getElementById('alertContainer');
+        if (!container) return;
+        container.innerHTML = '';
+
+        if (!alerts || alerts.length === 0) {
+            showState('🏢', 'Tidak ada alert darurat', 'Tidak ada laporan darurat aktif di sekitar Anda.', 'warning');
+            return;
+        }
+
+        alerts.forEach(function(em) {
+            var card = document.createElement('div');
+            var type = em.type || 'fire';
+            var cssClass = EMERGENCY_CSS[type] || 'fire';
+            var icon = EMERGENCY_ICONS[type] || '🚨';
+            var label = EMERGENCY_LABELS[type] || 'DARURAT';
+            var expiresAt = em.expiresAt || ((typeof em.timestamp === 'number' ? em.timestamp : new Date(em.timestamp).getTime()) + EMERGENCY_DURATION);
+            var isExpired = expiresAt < Date.now();
+            var distText = formatDistance(em._distanceKm);
+            var coords = (em.latitude && em.longitude) ? (em.latitude + ', ' + em.longitude) : '';
+            var mapsURL = em.mapsURL || (coords ? 'https://www.google.com/maps?q=' + coords : '');
+            var senderName = em.sender || 'User';
+            var senderUsername = em.senderUsername || '';
+            var location = em.location || em.address || 'Lokasi tidak diketahui';
+            var text = em.text || em.description || '';
+
+            card.className = 'alert-card ' + cssClass + (isExpired ? '' : ' emergency');
+            card.setAttribute('data-emergency-id', em.id);
+
+            var statusBadge = isExpired
+                ? '<span class="alert-status-badge expired"><i class="fas fa-clock"></i> Kadaluarsa</span>'
+                : '<span class="alert-status-badge live">LIVE</span>';
+
+            var html = '';
+            html += '<div class="alert-card-inner">';
+            html += '<div class="alert-top">';
+            html += '<div class="alert-top-left">';
+            html += '<div class="alert-type-icon">' + icon + '</div>';
+            html += '<div class="alert-type-info">';
+            html += '<div class="alert-type-label">' + label + '</div>';
+            html += '<div class="alert-sender">Dilaporkan oleh <b>' + escapeHTML(senderName) + '</b></div>';
+            html += '</div>';
+            html += '</div>';
+            html += statusBadge;
+            html += '</div>';
+
+            if (text) {
+                html += '<div class="alert-text">"' + escapeHTML(text) + '"</div>';
+            }
+
+            html += '<div class="alert-info-row"><i class="fas fa-map-marker-alt"></i><span>' + escapeHTML(location) + '</span></div>';
+
+            if (distText) {
+                html += '<div class="alert-info-row"><i class="fas fa-route"></i><span>Jarak: <b>' + distText + '</b> dari lokasi Anda</span></div>';
+            }
+
+            if (coords) {
+                html += '<div class="alert-coords"><i class="fas fa-crosshairs"></i> ' + escapeHTML(coords) + '</div>';
+            }
+
+            html += '<div class="alert-actions">';
+            if (mapsURL) {
+                html += '<a href="' + escapeAttr(mapsURL) + '" target="_blank" rel="noopener" class="alert-action-btn map" onclick="event.stopPropagation();"><i class="fas fa-external-link-alt"></i> Peta</a>';
+            }
+            html += '<a href="' + DETAIL_URL + '?id=' + encodeURIComponent(em.id) + '" class="alert-action-btn primary" onclick="event.stopPropagation();"><i class="fas fa-info-circle"></i> Detail</a>';
+            html += '</div>';
+
+            html += '<div class="alert-expiry"><i class="fas fa-clock"></i> ' + getRemainingTime(expiresAt) + ' • ' + getTimeAgo(typeof em.timestamp === 'number' ? em.timestamp : new Date(em.timestamp).getTime()) + '</div>';
+            html += '</div>';
+
+            card.innerHTML = html;
+
+            card.addEventListener('click', function(e) {
+                if (e.target.closest('a, button')) return;
+                window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(em.id);
+            });
+
+            container.appendChild(card);
+        });
+    }
+
+    function showState(icon, title, text, type) {
+        var container = document.getElementById('alertContainer');
+        if (!container) return;
+        container.innerHTML = '<div class="state-card ' + (type || '') + '">' +
+            '<div class="state-icon">' + icon + '</div>' +
+            '<div class="state-title">' + escapeHTML(title) + '</div>' +
+            '<div class="state-text">' + escapeHTML(text) + '</div>' +
+        '</div>';
+        var rc = document.getElementById('resultsCount');
+        if (rc) rc.textContent = 'Belum mencari lokasi';
+    }
+
+    // ================================================================
+    // 18. REFRESH
     // ================================================================
     function refreshAlerts() {
-        showToast('🔄 Memperbarui...', 'Mengambil data emergency terbaru', 'fa-sync-alt');
-        loadEmergencies();
+        if (userLat && userLng) loadAlerts();
+        else getMyLocation();
     }
 
     // ================================================================
-    // 18. MODAL HELPERS
+    // 19. MODAL HELPERS
     // ================================================================
     function openModalById(id) {
         var m = document.getElementById(id);
-        if (m) { m.classList.add('active'); document.body.style.overflow = 'hidden'; }
+        if (m) {
+            m.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
     }
     function closeModalById(id) {
         var m = document.getElementById(id);
-        if (m) { m.classList.remove('active'); document.body.style.overflow = ''; }
+        if (m) {
+            m.classList.remove('active');
+            document.body.style.overflow = '';
+        }
     }
 
     // ================================================================
-    // 19. NOTIF MODAL — LENGKAP DENGAN FILTER + MARK READ
+    // 20. NOTIF MODAL
     // ================================================================
     function loadReadNotifs() {
         try {
@@ -3316,24 +3730,26 @@
 
     function getAllNotifications() {
         var list = [];
-        // Emergency notifications
-        allEmergencies.forEach(function(em) {
-            var ts = em.timestamp ? new Date(em.timestamp).getTime() : Date.now();
-            var isRead = readNotifs[em.id] === true;
-            list.push({
-                id: em.id,
-                type: 'emergency',
-                emergencyType: em.type || em.emergencyType,
-                title: (EMERGENCY_ICONS[em.type] || '🚨') + ' ' + (EMERGENCY_LABELS[em.type] || 'Emergency'),
-                message: em.text || em.description || (em.sender + ' melaporkan darurat di ' + (em.location || '-')),
-                sender: em.sender || 'Sistem',
-                senderUsername: em.senderUsername || '',
-                location: em.location || em.address || '-',
-                timestamp: ts,
-                read: isRead
+        try {
+            var allEmergencies = getActiveEmergencies();
+            allEmergencies.forEach(function(em) {
+                var ts = typeof em.timestamp === 'number' ? em.timestamp : new Date(em.timestamp).getTime();
+                if (isNaN(ts)) ts = Date.now();
+                var isRead = readNotifs[em.id] === true;
+                list.push({
+                    id: em.id,
+                    type: 'emergency',
+                    emergencyType: em.type || em.emergencyType,
+                    title: (EMERGENCY_ICONS[em.type] || '🚨') + ' ' + (EMERGENCY_LABELS[em.type] || 'Emergency'),
+                    message: em.text || em.description || (em.sender + ' melaporkan darurat di ' + (em.location || '-')),
+                    sender: em.sender || 'Sistem',
+                    senderUsername: em.senderUsername || '',
+                    location: em.location || em.address || '-',
+                    timestamp: ts,
+                    read: isRead
+                });
             });
-        });
-        // Regular notifications
+        } catch(e) {}
         try {
             var notifs = JSON.parse(localStorage.getItem('salink_notifications') || '[]');
             notifs.forEach(function(n) {
@@ -3406,7 +3822,7 @@
                 : '<div class="notif-item-icon regular"><i class="fas fa-bell"></i></div>';
             var unreadClass = n.read ? '' : 'unread';
             var typeClass = n.type === 'emergency' ? 'emergency' : '';
-            return '<div class="notif-item ' + unreadClass + ' ' + typeClass + '" onclick="openNotifDetail(\'' + escapeAttr(n.id) + '\',\'' + escapeAttr(n.type) + '\')">' +
+            return '<div class="notif-item ' + unreadClass + ' ' + typeClass + '" data-notif-id="' + escapeAttr(n.id) + '" data-notif-type="' + escapeAttr(n.type) + '">' +
                 iconHtml +
                 '<div class="notif-item-content">' +
                     '<div class="notif-item-title">' + escapeHTML(n.title) + '</div>' +
@@ -3415,6 +3831,14 @@
                 '</div>' +
             '</div>';
         }).join('');
+
+        listEl.querySelectorAll('[data-notif-id]').forEach(function(el) {
+            el.addEventListener('click', function() {
+                var id = this.getAttribute('data-notif-id');
+                var type = this.getAttribute('data-notif-type');
+                openNotifDetail(id, type);
+            });
+        });
     }
 
     function setupNotifFilters() {
@@ -3468,9 +3892,7 @@
     function closeNotifModal() { closeModalById('notifModal'); }
 
     function openNotifDetail(id, type) {
-        if (id) {
-            markNotifRead(id);
-        }
+        if (id) markNotifRead(id);
         closeNotifModal();
         if (type === 'emergency' && id) {
             setTimeout(function() {
@@ -3480,7 +3902,7 @@
     }
 
     // ================================================================
-    // 20. SEARCH MODAL
+    // 21. SEARCH MODAL
     // ================================================================
     function openSearchModal() {
         if (isPreviewMode) { showPreviewOverlay(); return; }
@@ -3497,8 +3919,6 @@
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         var allTab = document.querySelector('.search-tab[data-tab="all"]');
         if (allTab) allTab.classList.add('active');
-        var ef = document.getElementById('emergencyFilters');
-        if (ef) ef.style.display = 'none';
         searchEmergencyFilter = 'all';
         document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
         var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
@@ -3519,8 +3939,6 @@
         searchTab = tab;
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         btnEl.classList.add('active');
-        var ef = document.getElementById('emergencyFilters');
-        if (ef) ef.style.display = (tab === 'emergency') ? 'flex' : 'none';
         var input = document.getElementById('searchInput');
         if (input && input.value.trim()) performSearch(input.value.trim());
     }
@@ -3547,9 +3965,9 @@
         var cb = document.getElementById('clearSearchBtn');
         if (cb) cb.classList.add('visible');
 
-        var allUsers = [];
-        try { allUsers = JSON.parse(localStorage.getItem('salink_users') || '[]'); } catch(e) {}
-        var matchedUsers = allUsers.filter(function(u) {
+        var allUsersArr = [];
+        try { allUsersArr = JSON.parse(localStorage.getItem('salink_users') || '[]'); } catch(e) {}
+        var matchedUsers = allUsersArr.filter(function(u) {
             return (u.fullName || '').toLowerCase().indexOf(q) !== -1 ||
                    (u.username || '').toLowerCase().indexOf(q) !== -1;
         });
@@ -3561,13 +3979,9 @@
                    (p.userFullName || '').toLowerCase().indexOf(q) !== -1;
         });
 
-        var matchedEm = allEmergencies.slice();
-        if (searchEmergencyFilter !== 'all') {
-            matchedEm = matchedEm.filter(function(e) {
-                return e.type === searchEmergencyFilter || e.emergencyType === searchEmergencyFilter;
-            });
-        }
-        matchedEm = matchedEm.filter(function(e) {
+        var allEms = getActiveEmergencies();
+        var matchedEm = allEms.filter(function(e) {
+            if (searchEmergencyFilter !== 'all' && e.type !== searchEmergencyFilter) return false;
             return (e.location || e.address || '').toLowerCase().indexOf(q) !== -1 ||
                    (e.text || e.description || '').toLowerCase().indexOf(q) !== -1 ||
                    (e.sender || '').toLowerCase().indexOf(q) !== -1;
@@ -3585,7 +3999,7 @@
             html += matchedUsers.slice(0, 10).map(function(u) {
                 var initial = (u.fullName || u.username || 'U').charAt(0).toUpperCase();
                 var avatar = u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" alt="">' : initial;
-                return '<div class="search-result-item" onclick="goToUserFromSearch(\'' + escapeAttr(u.username) + '\')">' +
+                return '<div class="search-result-item" data-user="' + escapeAttr(u.username) + '">' +
                     '<div class="result-avatar">' + avatar + '</div>' +
                     '<div class="result-info"><div class="result-title">' + escapeHTML(u.fullName || u.username) + '</div><div class="result-sub">@' + escapeHTML(u.username) + '</div></div>' +
                     '<i class="fas fa-chevron-right result-arrow"></i>' +
@@ -3597,7 +4011,7 @@
             html += '<div class="search-section-title"><span>📝 Postingan</span><span class="count-pill">' + matchedPosts.length + '</span></div>';
             html += matchedPosts.slice(0, 10).map(function(p) {
                 var textPreview = p.text ? p.text.substring(0, 60) : 'Postingan media';
-                return '<div class="search-result-item" onclick="goToPostFromSearch(\'' + escapeAttr(p.id) + '\')">' +
+                return '<div class="search-result-item">' +
                     '<div class="result-icon post"><i class="fas fa-file-alt"></i></div>' +
                     '<div class="result-info"><div class="result-title">' + escapeHTML(textPreview) + '</div><div class="result-sub">' + escapeHTML(p.userFullName || 'Pengguna') + '</div></div>' +
                 '</div>';
@@ -3606,13 +4020,12 @@
         if (showEm && matchedEm.length > 0) {
             totalCount += matchedEm.length;
             html += '<div class="search-section-title"><span>🚨 Emergency</span><span class="count-pill">' + matchedEm.length + '</span></div>';
-            html += matchedEm.slice(0, 20).map(function(em) {
-                var type = em.type || em.emergencyType || 'fire';
+            html += matchedEm.slice(0, 10).map(function(em) {
+                var type = em.type || 'fire';
                 var icon = EMERGENCY_ICONS[type] || '🚨';
-                var label = EMERGENCY_LABELS[type] || 'Emergency';
-                return '<div class="search-result-item" onclick="goToEmergencyFromSearch(\'' + escapeAttr(em.id) + '\')">' +
+                return '<div class="search-result-item" data-emergency-id="' + escapeAttr(em.id) + '">' +
                     '<div class="result-icon ' + type + '">' + icon + '</div>' +
-                    '<div class="result-info"><div class="result-title">' + escapeHTML(label) + '</div><div class="result-sub">📍 ' + escapeHTML(em.location || '-') + '</div></div>' +
+                    '<div class="result-info"><div class="result-title">' + escapeHTML(EMERGENCY_LABELS[type]) + '</div><div class="result-sub">📍 ' + escapeHTML(em.location || '-') + '</div></div>' +
                 '</div>';
             }).join('');
         }
@@ -3620,28 +4033,161 @@
             html = '<div class="search-empty-state"><div class="empty-big-icon">🔍</div><h4>Tidak ditemukan hasil</h4><p>Coba kata kunci lain.</p></div>';
         }
         if (sar2) sar2.innerHTML = html;
-    }
-    function goToUserFromSearch(username) {
-        closeSearchModal();
-        setTimeout(function() {
-            window.open('profile-user.html?username=' + encodeURIComponent(username), '_blank');
-        }, 200);
-    }
-    function goToPostFromSearch(postId) {
-        closeSearchModal();
-        setTimeout(function() {
-            window.location.href = DASHBOARD_URL + '?post=' + encodeURIComponent(postId);
-        }, 200);
-    }
-    function goToEmergencyFromSearch(emergencyId) {
-        closeSearchModal();
-        setTimeout(function() {
-            window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(emergencyId);
-        }, 200);
+
+        if (sar2) {
+            sar2.querySelectorAll('[data-user]').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    var username = this.getAttribute('data-user');
+                    closeSearchModal();
+                    setTimeout(function() {
+                        window.open('profile-user.html?username=' + encodeURIComponent(username), '_blank');
+                    }, 200);
+                });
+            });
+            sar2.querySelectorAll('[data-emergency-id]').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    var eid = this.getAttribute('data-emergency-id');
+                    closeSearchModal();
+                    setTimeout(function() {
+                        window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(eid);
+                    }, 200);
+                });
+            });
+        }
     }
 
     // ================================================================
-    // 21. FAB MODAL
+    // 22. INVITE MODAL
+    // ================================================================
+    function loadSentInvites() {
+        try {
+            sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}');
+        } catch(e) { sentInvites = {}; }
+    }
+    function saveSentInvites() {
+        try {
+            localStorage.setItem('salink_sent_invites', JSON.stringify(sentInvites));
+        } catch(e) {}
+    }
+    function updateInviteBadge() {
+        var badge = document.getElementById('inviteBadge');
+        if (badge) {
+            var pending = Object.keys(sentInvites).length;
+            badge.textContent = pending;
+            badge.classList.toggle('show', pending > 0);
+        }
+    }
+    function openInviteModal() {
+        if (isPreviewMode) { showPreviewOverlay(); return; }
+        openModalById('inviteModal');
+        loadInviteUsers();
+        setupInviteFilters();
+    }
+    function closeInviteModal() { closeModalById('inviteModal'); }
+
+    function loadInviteUsers() {
+        var listEl = document.getElementById('inviteUserList');
+        if (!listEl) return;
+        if (!allUsers || allUsers.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-users-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada pengguna untuk diundang</p></div>';
+            return;
+        }
+        var filtered = allUsers.filter(function(u) { return !currentUser || u.username !== currentUser.username; });
+        var inputEl = document.getElementById('inviteSearchInput');
+        var q = (inputEl ? inputEl.value : '').toLowerCase().trim();
+        if (q) {
+            filtered = filtered.filter(function(u) {
+                return (u.fullName || '').toLowerCase().indexOf(q) !== -1 ||
+                       (u.username || '').toLowerCase().indexOf(q) !== -1;
+            });
+        }
+        var countEl = document.getElementById('inviteModalCount');
+        if (countEl) countEl.textContent = filtered.length;
+        if (filtered.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-search" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada pengguna yang cocok</p></div>';
+            return;
+        }
+        listEl.innerHTML = filtered.map(function(u) {
+            var initial = (u.fullName || u.username || 'U').charAt(0).toUpperCase();
+            var avatar = u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" alt="">' : initial;
+            var isSent = sentInvites[u.username] === true;
+            var location = [u.city, u.province].filter(Boolean).join(', ') || u.country || 'Lokasi tidak diketahui';
+            var statusDot = u.isOnline ? '🟢' : '⚪';
+            return '<div class="invite-user-item">' +
+                '<div class="invite-user-avatar">' + avatar + '</div>' +
+                '<div class="invite-user-info">' +
+                    '<div class="invite-user-name">' + statusDot + ' ' + escapeHTML(u.fullName || u.username) + '</div>' +
+                    '<div class="invite-user-sub"><i class="fas fa-map-marker-alt" style="font-size:0.5rem;"></i> ' + escapeHTML(location) + '</div>' +
+                '</div>' +
+                '<button class="invite-user-btn ' + (isSent ? 'sent' : '') + '" data-invite-username="' + escapeAttr(u.username) + '" ' + (isSent ? 'disabled' : '') + '>' +
+                    (isSent ? '<i class="fas fa-check"></i> Terkirim' : '<i class="fas fa-paper-plane"></i> Undang') +
+                '</button>' +
+            '</div>';
+        }).join('');
+
+        listEl.querySelectorAll('[data-invite-username]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                sendInvite(this.getAttribute('data-invite-username'), this);
+            });
+        });
+    }
+
+    function setupInviteFilters() {
+        var searchInput = document.getElementById('inviteSearchInput');
+        if (searchInput) searchInput.oninput = loadInviteUsers;
+        var refreshBtn = document.getElementById('inviteRefreshBtn');
+        if (refreshBtn) {
+            refreshBtn.onclick = function() {
+                var icon = this.querySelector('i');
+                if (icon) icon.classList.add('fa-spin');
+                try {
+                    var users = JSON.parse(localStorage.getItem('salink_users') || '[]');
+                    if (users && users.length > 0) allUsers = users;
+                    loadInviteUsers();
+                    showToast('🔄', 'Daftar pengguna diperbarui', 'fa-sync-alt');
+                } catch(e) {
+                    showToast('⚠️', 'Gagal refresh', 'fa-exclamation-triangle');
+                }
+                if (icon) setTimeout(function() { icon.classList.remove('fa-spin'); }, 800);
+            };
+        }
+    }
+
+    async function sendInvite(username, btnEl) {
+        if (!currentUser) { redirectToLogin(); return; }
+        if (!username) return;
+        btnEl.disabled = true;
+        btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        try {
+            sentInvites[username] = true;
+            saveSentInvites();
+            var invitePayload = {
+                id: 'invite-' + Date.now(),
+                user1: currentUser.username,
+                user2: username,
+                status: 'pending',
+                requestedBy: currentUser.username,
+                timestamp: new Date().toISOString(),
+                acceptedAt: ''
+            };
+            fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'save_invite', data: invitePayload })
+            }).catch(function() {});
+            btnEl.classList.add('sent');
+            btnEl.innerHTML = '<i class="fas fa-check"></i> Terkirim';
+            updateInviteBadge();
+            showToast('📨 Terkirim', 'Undangan dikirim ke ' + username, 'fa-paper-plane');
+        } catch(e) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = '<i class="fas fa-paper-plane"></i> Undang';
+            showToast('⚠️ Gagal', 'Tidak dapat mengirim undangan', 'fa-exclamation-triangle');
+        }
+    }
+
+    // ================================================================
+    // 23. FAB MODAL
     // ================================================================
     function openFabModal() {
         var overlay = document.getElementById('fabModalOverlay');
@@ -3710,7 +4256,7 @@
     }
 
     // ================================================================
-    // 22. MAP MODAL — PETA DARURAT
+    // 24. MAP MODAL — PETA DARURAT
     // ================================================================
     function openMapModal() {
         log('openMapModal() called');
@@ -3795,7 +4341,7 @@
 
         if (regionEl) {
             fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id', {
-                headers: { 'User-Agent': 'SALINK-App/13.0' }
+                headers: { 'User-Agent': 'SALINK-App/14.0' }
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -3823,38 +4369,72 @@
         if (btn) { btn.classList.add('loading'); btn.disabled = true; }
         if (btnText) btnText.textContent = '📍 Mengambil lokasi...';
 
+        var timeoutId = setTimeout(function() {
+            log('Map GPS stage 1 timeout, fallback');
+            attemptMapGpsNetwork();
+        }, 30000);
+
         navigator.geolocation.getCurrentPosition(
             function(position) {
-                var lat = position.coords.latitude;
-                var lng = position.coords.longitude;
-                var accuracy = Math.round(position.coords.accuracy || 0);
-                mapCurrentLat = lat;
-                mapCurrentLng = lng;
-
-                localStorage.setItem('salink_user_lat', lat);
-                localStorage.setItem('salink_user_lng', lng);
-
-                if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
-                if (btnText) btnText.textContent = '✅ Refresh Lokasi';
-
-                applyMapCoords(lat, lng);
-                showToast('📍 Lokasi Ditemukan', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
-                if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+                clearTimeout(timeoutId);
+                handleMapGpsSuccess(position);
             },
             function(error) {
-                var errMsg = 'Gagal mengambil lokasi. ';
-                switch(error.code) {
-                    case 1: errMsg += 'Izin lokasi ditolak.'; break;
-                    case 2: errMsg += 'Lokasi tidak tersedia.'; break;
-                    case 3: errMsg += 'Timeout. Coba lagi.'; break;
-                    default: errMsg += error.message || 'Coba lagi.';
+                clearTimeout(timeoutId);
+                log('Map GPS stage 1 failed: code=' + error.code);
+                if (error.code === 1) {
+                    handleMapGpsError(error);
+                } else {
+                    attemptMapGpsNetwork();
                 }
-                if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
-                if (btnText) btnText.textContent = '📍 Ambil Lokasi Saya';
-                showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle');
             },
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
         );
+    }
+    function attemptMapGpsNetwork() {
+        log('Map GPS stage 2: network-based');
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                handleMapGpsSuccess(position);
+            },
+            function(error) {
+                handleMapGpsError(error);
+            },
+            { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 }
+        );
+    }
+    function handleMapGpsSuccess(position) {
+        var lat = position.coords.latitude;
+        var lng = position.coords.longitude;
+        var accuracy = Math.round(position.coords.accuracy || 0);
+        mapCurrentLat = lat;
+        mapCurrentLng = lng;
+
+        localStorage.setItem('salink_user_lat', lat);
+        localStorage.setItem('salink_user_lng', lng);
+
+        var btn = document.getElementById('mapLocationBtn');
+        var btnText = document.getElementById('mapLocationBtnText');
+        if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
+        if (btnText) btnText.textContent = '✅ Refresh Lokasi';
+
+        applyMapCoords(lat, lng);
+        showToast('📍 Lokasi Ditemukan', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
+        if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+    }
+    function handleMapGpsError(error) {
+        var errMsg = 'Gagal mengambil lokasi. ';
+        switch(error.code) {
+            case 1: errMsg += 'Izin lokasi ditolak.'; break;
+            case 2: errMsg += 'Lokasi tidak tersedia.'; break;
+            case 3: errMsg += 'Timeout. Coba lagi.'; break;
+            default: errMsg += error.message || 'Coba lagi.';
+        }
+        var btn = document.getElementById('mapLocationBtn');
+        var btnText = document.getElementById('mapLocationBtnText');
+        if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
+        if (btnText) btnText.textContent = '📍 Ambil Lokasi Saya';
+        showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle');
     }
     function mapSearchService(searchQuery) {
         var lat = mapCurrentLat;
@@ -3869,7 +4449,7 @@
     }
 
     // ================================================================
-    // 23. LOGOUT
+    // 25. LOGOUT
     // ================================================================
     function handleLogout() {
         if (confirm('Apakah Anda yakin ingin keluar?')) {
@@ -3885,7 +4465,7 @@
     }
 
     // ================================================================
-    // 24. RIPPLE
+    // 26. RIPPLE
     // ================================================================
     function initRipple() {
         document.addEventListener('click', function(e) {
@@ -3906,7 +4486,7 @@
     }
 
     // ================================================================
-    // 25. STORAGE EVENTS
+    // 27. STORAGE EVENTS
     // ================================================================
     function initStorageEvents() {
         window.addEventListener('storage', function(e) {
@@ -3916,17 +4496,19 @@
             if (e.key === 'salink_theme') {
                 loadTheme();
             }
-            if (e.key === 'salink_emergencies' || e.key === 'salink_sync_trigger' || e.key === 'salink_notifications') {
-                setTimeout(function() {
-                    loadEmergencies();
-                    updateNotifBadge();
-                }, 300);
+            if (e.key === 'salink_emergencies' || e.key === 'salink_notifications') {
+                updateNotifBadge();
+                if (userLat && userLng) loadAlerts();
+            }
+            if (e.key === 'salink_sent_invites') {
+                loadSentInvites();
+                updateInviteBadge();
             }
         });
     }
 
     // ================================================================
-    // 26. EVENT LISTENERS
+    // 28. EVENT LISTENERS
     // ================================================================
     function setupEventListeners() {
         if (_salinkSetup) return;
@@ -3955,7 +4537,7 @@
         var sidebarOverlay = document.getElementById('sidebarOverlay');
         if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
 
-        // SIDEBAR MAP BUTTON → BUKA PETA DARURAT
+        // SIDEBAR MAP BUTTON
         var sidebarMapBtn = document.getElementById('sidebarMapBtn');
         if (sidebarMapBtn) {
             sidebarMapBtn.addEventListener('click', function(e) {
@@ -4029,19 +4611,20 @@
                 setTimeout(function() { if (icon) icon.classList.remove('fa-spin'); }, 2000);
             });
         }
-        var refreshSmallBtn = document.getElementById('refreshSmallBtn');
-        if (refreshSmallBtn) {
-            refreshSmallBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                refreshAlerts();
-            });
-        }
 
         // FILTER BUTTONS
         document.querySelectorAll('.filter-btn').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
                 setEmergencyFilter(this);
+            });
+        });
+
+        // RADIUS BUTTONS
+        document.querySelectorAll('.radius-btn').forEach(function(btn) {
+            btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                setRadius(this);
             });
         });
 
@@ -4151,6 +4734,34 @@
             });
         }
 
+        // INVITE MODAL CLOSE
+        var inviteModalCloseBtn = document.getElementById('inviteModalCloseBtn');
+        if (inviteModalCloseBtn) inviteModalCloseBtn.addEventListener('click', closeInviteModal);
+        var inviteModalFooterCloseBtn = document.getElementById('inviteModalFooterCloseBtn');
+        if (inviteModalFooterCloseBtn) {
+            inviteModalFooterCloseBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeInviteModal();
+            });
+        }
+        var inviteModal = document.getElementById('inviteModal');
+        if (inviteModal) {
+            inviteModal.addEventListener('click', function(e) {
+                if (e.target === inviteModal) closeInviteModal();
+            });
+        }
+
+        // BOTTOM NAV INVITE
+        var bottomInviteNav = document.getElementById('bottomInviteNav');
+        if (bottomInviteNav) {
+            bottomInviteNav.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                openInviteModal();
+            });
+        }
+
         // PREVIEW OVERLAY
         var overlayLoginBtn = document.getElementById('overlayLoginBtn');
         if (overlayLoginBtn) overlayLoginBtn.addEventListener('click', redirectToLogin);
@@ -4179,6 +4790,7 @@
             if (e.key === 'Escape') {
                 closeSearchModal();
                 closeNotifModal();
+                closeInviteModal();
                 closeFabModal();
                 closeMapModal();
                 closeSidebar();
@@ -4189,13 +4801,14 @@
     }
 
     // ================================================================
-    // 27. INIT
+    // 29. INIT
     // ================================================================
     function init() {
-        log('Initializing Alert Sekitar v13.0 FINAL...');
+        log('Initializing Alert Sekitar v14.0 FINAL...');
 
         loadTheme();
         loadReadNotifs();
+        loadSentInvites();
         setupPWA();
         loadCurrentUser();
         setupLoginGuard();
@@ -4204,26 +4817,30 @@
         initStorageEvents();
 
         updateNotifBadge();
+        updateInviteBadge();
         setInterval(updateNotifBadge, 30000);
 
+        // Auto-load kalau sudah ada lokasi tersimpan
         var savedLat = localStorage.getItem('salink_user_lat');
         var savedLng = localStorage.getItem('salink_user_lng');
         if (savedLat && savedLng) {
             userLat = parseFloat(savedLat);
             userLng = parseFloat(savedLng);
-            setGPSStatus('success', 'Lokasi tersimpan',
-                'Koordinat: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6));
+            setGPSStatus('success', 'Lokasi tersimpan', 'Koordinat: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6));
+            loadAlerts();
         }
-
-        loadEmergencies();
-
-        setInterval(function() {
-            if (!document.hidden) loadEmergencies();
-        }, 60000);
 
         if (isPreviewMode) setTimeout(function() { showPreviewOverlay(); }, 1200);
 
-        log('✓ Alert Sekitar v13.0 Ready!');
+        // Polling emergency baru setiap 30 detik
+        if (emergencyPollTimer) clearInterval(emergencyPollTimer);
+        emergencyPollTimer = setInterval(function() {
+            if (userLat && userLng && !document.hidden) {
+                loadAlerts();
+            }
+        }, 30000);
+
+        log('✓ Alert Sekitar v14.0 Ready!');
         log('  Mode: ' + (isPreviewMode ? 'PREVIEW' : 'FULL'));
         log('  User: ' + (currentUser ? currentUser.username : 'Guest'));
     }
@@ -4235,13 +4852,13 @@
     }
 
     // ================================================================
-    // 28. EXPOSE GLOBAL
+    // 30. EXPOSE GLOBAL
     // ================================================================
     window.goHome = goHome;
     window.getMyLocation = getMyLocation;
     window.refreshAlerts = refreshAlerts;
     window.setEmergencyFilter = setEmergencyFilter;
-    window.goToEmergencyDetail = goToEmergencyDetail;
+    window.setRadius = setRadius;
     window.showToast = showToast;
     window.openSidebar = openSidebar;
     window.closeSidebar = closeSidebar;
@@ -4252,9 +4869,6 @@
     window.switchSearchTab = switchSearchTab;
     window.setSearchEmergencyFilter = setSearchEmergencyFilter;
     window.performSearch = performSearch;
-    window.goToUserFromSearch = goToUserFromSearch;
-    window.goToPostFromSearch = goToPostFromSearch;
-    window.goToEmergencyFromSearch = goToEmergencyFromSearch;
     window.openNotifModal = openNotifModal;
     window.closeNotifModal = closeNotifModal;
     window.renderNotifList = renderNotifList;
@@ -4262,15 +4876,16 @@
     window.updateNotifBadge = updateNotifBadge;
     window.markNotifRead = markNotifRead;
     window.setupNotifFilters = setupNotifFilters;
+    window.openInviteModal = openInviteModal;
+    window.closeInviteModal = closeInviteModal;
+    window.loadInviteUsers = loadInviteUsers;
+    window.sendInvite = sendInvite;
+    window.updateInviteBadge = updateInviteBadge;
     window.openFabModal = openFabModal;
     window.closeFabModal = closeFabModal;
     window.openMapModal = openMapModal;
     window.closeMapModal = closeMapModal;
     window.toggleTheme = toggleTheme;
-    window.loadEmergencies = loadEmergencies;
-    window.applyFilterAndRender = applyFilterAndRender;
-    window.renderAlertCards = renderAlertCards;
-    window.updateSummary = updateSummary;
     window.showFloatingNotification = showFloatingNotification;
     window.hideFloatingNotification = hideFloatingNotification;
     window.showInstallPrompt = showInstallPrompt;
@@ -4278,8 +4893,9 @@
     window.hidePreviewOverlay = hidePreviewOverlay;
     window.activateMapGps = activateMapGps;
     window.mapSearchService = mapSearchService;
+    window.loadAlerts = loadAlerts;
 
-    log('✓ Alert Sekitar v13.0 Script Loaded');
+    log('✓ Alert Sekitar v14.0 Script Loaded');
 })();
     </script>
 
