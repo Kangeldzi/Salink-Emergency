@@ -2647,80 +2647,162 @@ function triggerEmergencyAutoAlarm(em) {
 window.triggerEmergencyAutoAlarm = triggerEmergencyAutoAlarm;
 
 // ====================================================================
-// 15. GPS — Ambil Lokasi
+// 15. GPS MULTI-STAGE FALLBACK (FIX DATA SELULER)
+// ====================================================================
+// Stage 1: High accuracy (GPS hardware) — timeout 30s
+// Stage 2: Network-based (cocok untuk data seluler) — timeout 20s
 // ====================================================================
 async function ambilLokasiSaya() {
     const btn = document.getElementById('gpsLocationBtn');
     const btnText = document.getElementById('gpsLocationBtnText');
     const resultBox = document.getElementById('gpsLocationResult');
     const errorBox = document.getElementById('gpsError');
-    const addrEl = document.getElementById('gpsAddress');
-    const coordsEl = document.getElementById('gpsCoords');
-    const mapsLink = document.getElementById('gpsMapsLink');
+
     if (!navigator.geolocation) {
         if (errorBox) { errorBox.textContent = '❌ Browser Anda tidak mendukung GPS.'; errorBox.classList.add('active'); }
         return;
     }
-    if (btn) btn.classList.add('loading');
-    if (btnText) btnText.innerHTML = '<span class="gps-location-loading"></span> Mengambil lokasi...';
+
+    if (btn) { btn.disabled = true; btn.classList.add('loading'); }
+    if (btnText) btnText.innerHTML = '<span class="gps-location-loading"></span> Mencari sinyal GPS...';
     if (resultBox) resultBox.classList.remove('active');
     if (errorBox) errorBox.classList.remove('active');
-    try {
-        const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-                enableHighAccuracy: true, timeout: 15000, maximumAge: 0
-            });
-        });
-        const lat = position.coords.latitude.toFixed(6);
-        const lng = position.coords.longitude.toFixed(6);
-        const accuracy = Math.round(position.coords.accuracy || 0);
-        const mapsURL = 'https://www.google.com/maps?q=' + lat + ',' + lng;
-        if (coordsEl) coordsEl.textContent = lat + ', ' + lng + ' (±' + accuracy + 'm)';
-        if (addrEl) addrEl.textContent = '🔄 Mengambil alamat...';
-        if (resultBox) resultBox.classList.add('active');
-        if (mapsLink) mapsLink.href = mapsURL;
-        currentGpsData = {
-            lat: parseFloat(lat), lng: parseFloat(lng),
-            accuracy: accuracy, address: lat + ', ' + lng, mapsURL: mapsURL
-        };
+
+    // Cek permission dulu (deteksi izin ditolak lebih awal)
+    if (navigator.permissions && navigator.permissions.query) {
         try {
-            const nominatimUrl = NOMINATIM_URL + '?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id';
-            const response = await fetch(nominatimUrl, {
-                method: 'GET', headers: { 'User-Agent': 'SALINK-Emergency-App/12.0' }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                if (data && data.display_name) {
-                    if (addrEl) addrEl.textContent = '📍 ' + data.display_name;
-                    currentGpsData.address = data.display_name;
-                } else {
-                    if (addrEl) addrEl.textContent = '📍 Koordinat: ' + lat + ', ' + lng;
+            const permResult = await navigator.permissions.query({ name: 'geolocation' });
+            console.log('[GPS] Permission state:', permResult.state);
+            if (permResult.state === 'denied') {
+                if (errorBox) {
+                    errorBox.textContent = '❌ Izin lokasi ditolak. Aktifkan izin lokasi di pengaturan browser/HP Anda.';
+                    errorBox.classList.add('active');
                 }
+                if (btnText) btnText.textContent = '📍 Ambil Lokasi Saya';
+                if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+                showToast('⚠️ Izin Ditolak', 'Aktifkan izin lokasi di browser Anda', 'fa-exclamation-triangle');
+                return;
+            }
+        } catch(e) {
+            // Permission API tidak didukung — lanjut saja
+        }
+    }
+
+    // Stage 1: High accuracy
+    try {
+        if (btnText) btnText.innerHTML = '<span class="gps-location-loading"></span> GPS akurasi tinggi...';
+        const position = await _gpsGetPosition({ enableHighAccuracy: true, timeout: 30000, maximumAge: 0 });
+        await _handleGpsSuccess(position, 'high');
+        return;
+    } catch (err1) {
+        console.warn('[GPS] Stage 1 (high accuracy) gagal:', err1.code, err1.message);
+        if (err1.code === 1) {
+            // Izin ditolak — jangan fallback, langsung error
+            _handleGpsFinalError(err1);
+            return;
+        }
+    }
+
+    // Stage 2: Network-based (cocok untuk data seluler)
+    try {
+        if (btnText) btnText.innerHTML = '<span class="gps-location-loading"></span> Metode alternatif...';
+        const position = await _gpsGetPosition({ enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 });
+        await _handleGpsSuccess(position, 'network');
+        return;
+    } catch (err2) {
+        console.warn('[GPS] Stage 2 (network) gagal:', err2.code, err2.message);
+        _handleGpsFinalError(err2);
+    }
+}
+
+// Helper: Promise-based getCurrentPosition
+function _gpsGetPosition(options) {
+    return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+    });
+}
+
+// Helper: Handle sukses GPS (shared untuk Stage 1 & 2)
+async function _handleGpsSuccess(position, method) {
+    const btn = document.getElementById('gpsLocationBtn');
+    const btnText = document.getElementById('gpsLocationBtnText');
+    const resultBox = document.getElementById('gpsLocationResult');
+    const addrEl = document.getElementById('gpsAddress');
+    const coordsEl = document.getElementById('gpsCoords');
+    const mapsLink = document.getElementById('gpsMapsLink');
+
+    const lat = position.coords.latitude.toFixed(6);
+    const lng = position.coords.longitude.toFixed(6);
+    const accuracy = Math.round(position.coords.accuracy || 0);
+    const methodLabel = method === 'high' ? 'GPS' : 'Network';
+    const mapsURL = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+
+    if (coordsEl) coordsEl.textContent = lat + ', ' + lng + ' (±' + accuracy + 'm)';
+    if (addrEl) addrEl.textContent = '🔄 Mengambil alamat...';
+    if (resultBox) resultBox.classList.add('active');
+    if (mapsLink) mapsLink.href = mapsURL;
+
+    currentGpsData = {
+        lat: parseFloat(lat), lng: parseFloat(lng),
+        accuracy: accuracy, address: lat + ', ' + lng, mapsURL: mapsURL
+    };
+
+    // Reverse geocoding via Nominatim
+    try {
+        const nominatimUrl = NOMINATIM_URL + '?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id';
+        const response = await fetch(nominatimUrl, {
+            method: 'GET', headers: { 'User-Agent': 'SALINK-Emergency-App/14.0' }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            if (data && data.display_name) {
+                if (addrEl) addrEl.textContent = '📍 ' + data.display_name;
+                currentGpsData.address = data.display_name;
             } else {
                 if (addrEl) addrEl.textContent = '📍 Koordinat: ' + lat + ', ' + lng;
             }
-        } catch(e) {
+        } else {
             if (addrEl) addrEl.textContent = '📍 Koordinat: ' + lat + ', ' + lng;
         }
-        if (btn) btn.classList.remove('loading');
-        if (btnText) btnText.textContent = '✅ Lokasi Ditemukan — Tap untuk Ambil Ulang';
-        if (btn) btn.style.background = 'linear-gradient(135deg, #3fb950, #2ea44f)';
-        showToast('📍 Lokasi Ditemukan', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
-    } catch(error) {
-        if (btn) btn.classList.remove('loading');
-        if (btnText) btnText.textContent = '📍 Ambil Lokasi Saya';
-        if (btn) btn.style.background = '';
-        let errMsg = 'Gagal mengambil lokasi. ';
-        switch(error.code) {
-            case 1: errMsg += 'Izin lokasi ditolak.'; break;
-            case 2: errMsg += 'Lokasi tidak tersedia.'; break;
-            case 3: errMsg += 'Timeout. Coba lagi.'; break;
-            default: errMsg += error.message || 'Coba lagi.';
-        }
-        if (errorBox) { errorBox.textContent = '❌ ' + errMsg; errorBox.classList.add('active'); }
-        showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle');
+    } catch(e) {
+        if (addrEl) addrEl.textContent = '📍 Koordinat: ' + lat + ', ' + lng;
     }
+
+    if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+    if (btnText) btnText.textContent = '✅ Lokasi Ditemukan — Tap untuk Ambil Ulang';
+    if (btn) btn.style.background = 'linear-gradient(135deg, #3fb950, #2ea44f)';
+
+    showToast('📍 Lokasi Ditemukan (' + methodLabel + ')', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
 }
+
+// Helper: Handle error final setelah semua stage gagal
+function _handleGpsFinalError(error) {
+    const btn = document.getElementById('gpsLocationBtn');
+    const btnText = document.getElementById('gpsLocationBtnText');
+    const errorBox = document.getElementById('gpsError');
+
+    if (btn) { btn.disabled = false; btn.classList.remove('loading'); }
+    if (btnText) btnText.textContent = '📍 Ambil Lokasi Saya';
+    if (btn) btn.style.background = '';
+
+    let errMsg = '';
+    if (error.code === 1) {
+        errMsg = 'Izin lokasi ditolak. Aktifkan izin lokasi untuk browser ini di pengaturan HP Anda.';
+    } else if (error.code === 2) {
+        errMsg = 'Lokasi tidak tersedia. Pastikan GPS aktif & Anda di area terbuka.';
+    } else if (error.code === 3) {
+        errMsg = 'Waktu pencarian habis. Coba aktifkan WiFi atau pindah ke area terbuka, lalu coba lagi.';
+    } else {
+        errMsg = error.message || 'Gagal mengambil lokasi. Coba lagi.';
+    }
+
+    if (errorBox) {
+        errorBox.textContent = '❌ ' + errMsg;
+        errorBox.classList.add('active');
+    }
+    showToast('⚠️ Gagal GPS', errMsg, 'fa-exclamation-triangle');
+}
+
 
 console.log('✅ [TAHAP 1] Foundation loaded');
             
