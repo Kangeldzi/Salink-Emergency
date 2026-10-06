@@ -1222,6 +1222,86 @@
         .notif-item-message { font-size: 0.65rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 4px; }
         .notif-item-time { font-size: 0.55rem; color: var(--text-muted); }
 
+                /* ============ SEARCH FILTER CHIPS ============ */
+        .search-filter-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+        .search-filter-chip {
+            padding: 5px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            color: var(--text-muted);
+            font-size: 0.6rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .search-filter-chip:active { transform: scale(0.95); }
+        .search-filter-chip.active {
+            background: rgba(230,0,18,0.15);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+                /* ============ RECENT SEARCH & TRENDING ============ */
+        .recent-search-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .recent-search-item:active { transform: scale(0.98); border-color: var(--primary); }
+        .recent-search-item .recent-icon { color: var(--text-muted); font-size: 0.72rem; flex-shrink: 0; }
+        .recent-search-item .recent-text { flex: 1; font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
+        .recent-search-item .recent-remove { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.7rem; padding: 2px 6px; }
+
+        .trending-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .trending-item:active { transform: scale(0.98); border-color: var(--primary); }
+        .trending-item .trending-rank {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+        .trending-item .trending-rank.gold {
+            background: linear-gradient(135deg, #f0d080, #d4a017);
+            color: #0a0e1a;
+        }
+        .trending-item .trending-info { flex: 1; min-width: 0; }
+        .trending-item .trending-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-primary);
+        }
+        .trending-item .trending-sub { font-size: 0.58rem; color: var(--text-muted); }
+        
         /* ============ NOTIF FILTER BUTTONS ============ */
         .notif-filter-btn.active {
             background: var(--accent-blue-gradient) !important;
@@ -2332,6 +2412,13 @@
                     <button class="search-tab" data-tab="emergency" type="button">
                         <i class="fas fa-exclamation-triangle"></i> Emergency
                     </button>
+                </div>
+                                <div class="search-filter-row" id="emergencyFilters" style="display:none;">
+                    <button class="search-filter-chip active" data-filter="all" type="button">🎯 Semua</button>
+                    <button class="search-filter-chip" data-filter="fire" type="button">🔥 Kebakaran</button>
+                    <button class="search-filter-chip" data-filter="medical" type="button">🚑 Medis</button>
+                    <button class="search-filter-chip" data-filter="crime" type="button">🚓 Kriminal</button>
+                    <button class="search-filter-chip" data-filter="disaster" type="button">🌪️ Bencana</button>
                 </div>
                 <div id="searchResultsBody">
                     <div id="searchDefaultView">
@@ -3552,10 +3639,122 @@
     }
 
     // ================================================================
-    // 23. SEARCH MODAL
+    // 23. SEARCH MODAL — LENGKAP DENGAN TRENDING + RECENT + FILTER
     // ================================================================
+    var searchEmergencyFilter = 'all';
+    var recentSearches = [];
+    var MAX_RECENT_SEARCHES = 8;
+
+    function loadRecentSearches() {
+        try { recentSearches = JSON.parse(localStorage.getItem('salink_recent_searches') || '[]'); }
+        catch(e) { recentSearches = []; }
+    }
+    function saveRecentSearches() {
+        try { localStorage.setItem('salink_recent_searches', JSON.stringify(recentSearches)); }
+        catch(e) {}
+    }
+    function addRecentSearch(q) {
+        if (!q || !q.trim()) return;
+        q = q.trim();
+        recentSearches = recentSearches.filter(function(x) { return x.toLowerCase() !== q.toLowerCase(); });
+        recentSearches.unshift(q);
+        if (recentSearches.length > MAX_RECENT_SEARCHES) recentSearches = recentSearches.slice(0, MAX_RECENT_SEARCHES);
+        saveRecentSearches();
+    }
+
+    function getTrendingPosts() {
+        try {
+            var allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
+            var oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+            var todayPosts = allPosts.filter(function(p) { return p && p.timestamp && new Date(p.timestamp).getTime() >= oneDayAgo; });
+            todayPosts.sort(function(a, b) {
+                var aL = 0, bL = 0;
+                try { aL = JSON.parse(a.likes || '[]').length; } catch(e) {}
+                try { bL = JSON.parse(b.likes || '[]').length; } catch(e) {}
+                return bL - aL;
+            });
+            return todayPosts.slice(0, 5);
+        } catch(e) { return []; }
+    }
+
+    function renderSearchDefaultView() {
+        var container = document.getElementById('searchDefaultView');
+        if (!container) return;
+        var html = '';
+
+        // Recent searches
+        if (recentSearches.length > 0) {
+            html += '<div class="search-section-title"><span>🕐 Pencarian Terakhir</span>' +
+                '<button onclick="clearRecentSearches()" style="background:none;border:none;color:#f85149;font-size:0.6rem;cursor:pointer;font-family:inherit;"><i class="fas fa-trash"></i> Hapus</button></div>';
+            html += recentSearches.slice(0, 5).map(function(q) {
+                return '<div class="recent-search-item" onclick="applySearchQuery(\'' + escapeAttr(q) + '\')">' +
+                    '<i class="fas fa-history recent-icon"></i>' +
+                    '<span class="recent-text">' + escapeHTML(q) + '</span>' +
+                    '<button class="recent-remove" onclick="event.stopPropagation();removeRecentSearch(\'' + escapeAttr(q) + '\')"><i class="fas fa-times"></i></button>' +
+                '</div>';
+            }).join('');
+        }
+
+        // Trending
+        var trending = getTrendingPosts();
+        if (trending.length > 0) {
+            html += '<div class="search-section-title"><span>🔥 Trending Hari Ini</span><span class="count-pill">' + trending.length + '</span></div>';
+            html += trending.map(function(p, idx) {
+                var rankClass = idx === 0 ? 'gold' : '';
+                var likes = 0;
+                try { likes = JSON.parse(p.likes || '[]').length; } catch(e) {}
+                return '<div class="trending-item" onclick="goToPost(\'' + escapeAttr(p.id) + '\')">' +
+                    '<div class="trending-rank ' + rankClass + '">#' + (idx + 1) + '</div>' +
+                    '<div class="trending-info">' +
+                        '<div class="trending-title">' + escapeHTML(p.text ? p.text.substring(0, 50) : 'Postingan media') + '</div>' +
+                        '<div class="trending-sub">' + escapeHTML(p.userFullName || 'User') + ' • ❤️ ' + likes + ' suka</div>' +
+                    '</div>' +
+                    '<i class="fas fa-chevron-right result-arrow"></i>' +
+                '</div>';
+            }).join('');
+        }
+
+        if (!html) {
+            html = '<div class="search-empty-state">' +
+                '<div class="empty-big-icon">🔍</div>' +
+                '<h4>Mulai Pencarian</h4>' +
+                '<p>Ketik nama pengguna, isi postingan, lokasi, atau jenis emergency.</p>' +
+            '</div>';
+        }
+        container.innerHTML = html;
+    }
+
+    function applySearchQuery(q) {
+        var input = document.getElementById('searchInput');
+        if (input) {
+            input.value = q;
+            input.focus();
+            input.dispatchEvent(new Event('input'));
+        }
+    }
+    function removeRecentSearch(q) {
+        recentSearches = recentSearches.filter(function(x) { return x !== q; });
+        saveRecentSearches();
+        renderSearchDefaultView();
+    }
+    function clearRecentSearches() {
+        if (!confirm('Hapus semua riwayat pencarian?')) return;
+        recentSearches = [];
+        saveRecentSearches();
+        renderSearchDefaultView();
+        showToast('🗑️', 'Riwayat pencarian dihapus', 'fa-trash');
+    }
+    function goToPost(postId) {
+        addRecentSearch(postId);
+        closeSearchModal();
+        setTimeout(function() {
+            window.location.href = DASHBOARD_URL + '?post=' + encodeURIComponent(postId);
+        }, 200);
+    }
+
     function openSearchModal() {
         if (isPreviewMode) { showPreviewOverlay(); return; }
+        loadRecentSearches();
         openModalById('searchModal');
         var input = document.getElementById('searchInput');
         if (input) { input.value = ''; setTimeout(function() { input.focus(); }, 200); }
@@ -3565,10 +3764,17 @@
         if (sar) sar.style.display = 'none';
         var sdv = document.getElementById('searchDefaultView');
         if (sdv) sdv.style.display = 'block';
+        renderSearchDefaultView();
         searchTab = 'all';
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         var allTab = document.querySelector('.search-tab[data-tab="all"]');
         if (allTab) allTab.classList.add('active');
+        var ef = document.getElementById('emergencyFilters');
+        if (ef) ef.style.display = 'none';
+        searchEmergencyFilter = 'all';
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
+        var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
+        if (allChip) allChip.classList.add('active');
     }
     function closeSearchModal() { closeModalById('searchModal'); }
     function clearSearch() {
@@ -3580,10 +3786,20 @@
         if (sar) sar.style.display = 'none';
         var sdv = document.getElementById('searchDefaultView');
         if (sdv) sdv.style.display = 'block';
+        renderSearchDefaultView();
     }
     function switchSearchTab(tab, btnEl) {
         searchTab = tab;
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
+        if (btnEl) btnEl.classList.add('active');
+        var ef = document.getElementById('emergencyFilters');
+        if (ef) ef.style.display = (tab === 'emergency') ? 'flex' : 'none';
+        var input = document.getElementById('searchInput');
+        if (input && input.value.trim()) performSearch(input.value.trim());
+    }
+    function setSearchEmergencyFilter(filter, btnEl) {
+        searchEmergencyFilter = filter;
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
         if (btnEl) btnEl.classList.add('active');
         var input = document.getElementById('searchInput');
         if (input && input.value.trim()) performSearch(input.value.trim());
@@ -3597,6 +3813,7 @@
             if (sdv) sdv.style.display = 'block';
             return;
         }
+        addRecentSearch(query);
         var sdv2 = document.getElementById('searchDefaultView');
         if (sdv2) sdv2.style.display = 'none';
         var sar2 = document.getElementById('searchActiveResults');
@@ -3620,6 +3837,11 @@
 
         var allEms = [];
         try { allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) {}
+        if (searchEmergencyFilter !== 'all') {
+            allEms = allEms.filter(function(e) {
+                return e.type === searchEmergencyFilter || e.emergencyType === searchEmergencyFilter;
+            });
+        }
         var matchedEm = allEms.filter(function(e) {
             return (e.location || e.address || '').toLowerCase().indexOf(q) !== -1 ||
                    (e.text || e.description || '').toLowerCase().indexOf(q) !== -1 ||
@@ -3638,7 +3860,7 @@
             html += matchedUsers.slice(0, 10).map(function(u) {
                 var initial = (u.fullName || u.username || 'U').charAt(0).toUpperCase();
                 var avatar = u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" alt="">' : initial;
-                return '<div class="search-result-item" data-user="' + escapeAttr(u.username) + '">' +
+                return '<div class="search-result-item" onclick="goToUserFromSearch(\'' + escapeAttr(u.username) + '\')">' +
                     '<div class="result-avatar">' + avatar + '</div>' +
                     '<div class="result-info"><div class="result-title">' + escapeHTML(u.fullName || u.username) + '</div><div class="result-sub">@' + escapeHTML(u.username) + '</div></div>' +
                     '<i class="fas fa-chevron-right result-arrow"></i>' +
@@ -3650,7 +3872,7 @@
             html += '<div class="search-section-title"><span>📝 Postingan</span><span class="count-pill">' + matchedPosts.length + '</span></div>';
             html += matchedPosts.slice(0, 10).map(function(p) {
                 var textPreview = p.text ? p.text.substring(0, 60) : 'Postingan media';
-                return '<div class="search-result-item">' +
+                return '<div class="search-result-item" onclick="goToPostFromSearch(\'' + escapeAttr(p.id) + '\')">' +
                     '<div class="result-icon post"><i class="fas fa-file-alt"></i></div>' +
                     '<div class="result-info"><div class="result-title">' + escapeHTML(textPreview) + '</div><div class="result-sub">' + escapeHTML(p.userFullName || 'Pengguna') + '</div></div>' +
                 '</div>';
@@ -3659,12 +3881,13 @@
         if (showEm && matchedEm.length > 0) {
             totalCount += matchedEm.length;
             html += '<div class="search-section-title"><span>🚨 Emergency</span><span class="count-pill">' + matchedEm.length + '</span></div>';
-            html += matchedEm.slice(0, 10).map(function(em) {
-                var type = em.type || 'fire';
+            html += matchedEm.slice(0, 20).map(function(em) {
+                var type = em.type || em.emergencyType || 'fire';
                 var icon = EMERGENCY_ICONS[type] || '🚨';
-                return '<div class="search-result-item" data-emergency-id="' + escapeAttr(em.id) + '">' +
+                var label = EMERGENCY_LABELS[type] || 'Emergency';
+                return '<div class="search-result-item" onclick="goToEmergencyFromSearch(\'' + escapeAttr(em.id) + '\')">' +
                     '<div class="result-icon ' + type + '">' + icon + '</div>' +
-                    '<div class="result-info"><div class="result-title">' + escapeHTML(EMERGENCY_LABELS[type]) + '</div><div class="result-sub">📍 ' + escapeHTML(em.location || '-') + '</div></div>' +
+                    '<div class="result-info"><div class="result-title">' + escapeHTML(label) + '</div><div class="result-sub">📍 ' + escapeHTML(em.location || '-') + '</div></div>' +
                 '</div>';
             }).join('');
         }
@@ -3672,27 +3895,27 @@
             html = '<div class="search-empty-state"><div class="empty-big-icon">🔍</div><h4>Tidak ditemukan hasil</h4><p>Coba kata kunci lain.</p></div>';
         }
         if (sar2) sar2.innerHTML = html;
-
-        if (sar2) {
-            sar2.querySelectorAll('[data-user]').forEach(function(el) {
-                el.addEventListener('click', function() {
-                    var username = this.getAttribute('data-user');
-                    closeSearchModal();
-                    setTimeout(function() {
-                        window.open('profile-user.html?username=' + encodeURIComponent(username), '_blank');
-                    }, 200);
-                });
-            });
-            sar2.querySelectorAll('[data-emergency-id]').forEach(function(el) {
-                el.addEventListener('click', function() {
-                    var eid = this.getAttribute('data-emergency-id');
-                    closeSearchModal();
-                    setTimeout(function() {
-                        window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(eid);
-                    }, 200);
-                });
-            });
-        }
+    }
+    function goToUserFromSearch(username) {
+        addRecentSearch(username);
+        closeSearchModal();
+        setTimeout(function() {
+            window.open('profile-user.html?username=' + encodeURIComponent(username), '_blank');
+        }, 200);
+    }
+    function goToPostFromSearch(postId) {
+        addRecentSearch(postId);
+        closeSearchModal();
+        setTimeout(function() {
+            window.location.href = DASHBOARD_URL + '?post=' + encodeURIComponent(postId);
+        }, 200);
+    }
+    function goToEmergencyFromSearch(emergencyId) {
+        addRecentSearch(emergencyId);
+        closeSearchModal();
+        setTimeout(function() {
+            window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(emergencyId);
+        }, 200);
     }
 
     // ================================================================
