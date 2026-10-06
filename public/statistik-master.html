@@ -1757,27 +1757,40 @@
             .nav-fab { width: 64px; height: 64px; }
             .nav-fab .fab-emoji { font-size: 1.7rem; }
         }
-                /* ============ SEARCH FILTER CHIPS ============ */
-        .search-filter-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+
+        /* ============ SEARCH FILTER CHIPS ============ */
+        .search-filter-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+            margin-top: 10px;
+            flex-wrap: wrap;
+        }
+        .search-filter-row.active {
+            display: flex !important;
+        }
         .search-filter-chip {
-            padding: 5px 12px;
+            padding: 6px 14px;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
             border-radius: 999px;
             color: var(--text-muted);
-            font-size: 0.6rem;
+            font-size: 0.65rem;
             font-weight: 700;
             cursor: pointer;
             font-family: inherit;
             transition: all 0.2s;
+            white-space: nowrap;
         }
-        .search-filter-chip:active { transform: scale(0.95); }
+        .search-filter-chip:active {
+            transform: scale(0.95);
+        }
         .search-filter-chip.active {
             background: rgba(230,0,18,0.15);
             border-color: var(--primary);
             color: var(--primary);
         }
-
+        
         /* ============ RECENT SEARCH ============ */
         .recent-search-item {
             display: flex;
@@ -3459,14 +3472,30 @@
         if (sdv) sdv.style.display = 'block';
         renderSearchDefaultView();
     }
-        function switchSearchTab(tab, btnEl) {
+            function switchSearchTab(tab, btnEl) {
         searchTab = tab;
-        document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
+        
+        // Update active state tab
+        document.querySelectorAll('.search-tab').forEach(function(t) {
+            t.classList.remove('active');
+        });
         if (btnEl) btnEl.classList.add('active');
+        
+        // Show/hide filter emergency
         var ef = document.getElementById('emergencyFilters');
-        if (ef) ef.style.display = (tab === 'emergency') ? 'flex' : 'none';
+        if (ef) {
+            if (tab === 'emergency') {
+                ef.style.display = 'flex';   // TAMPILKAN
+            } else {
+                ef.style.display = 'none';    // SEMBUNYIKAN
+            }
+        }
+        
+        // Re-run search jika ada input
         var input = document.getElementById('searchInput');
-        if (input && input.value.trim()) performSearch(input.value.trim());
+        if (input && input.value.trim()) {
+            performSearch(input.value.trim());
+        }
     }
     function performSearch(query) {
         var q = query.trim().toLowerCase();
