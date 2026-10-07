@@ -1981,6 +1981,29 @@
         }
         .national-toggle-btn:active { transform: scale(0.9); }
         .national-toggle-btn i { transition: transform 0.3s; }
+        .national-grid.collapsed {
+            max-height: 0;
+            opacity: 0;
+            margin: 0;
+            overflow: hidden;
+        }
+        .national-toggle-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #fff;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+            transition: all 0.3s;
+        }
+        .national-toggle-btn:active { transform: scale(0.9); }
+        .national-toggle-btn i { transition: transform 0.3s; }
         .national-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -2331,10 +2354,7 @@
                 <span id="gpsStatusText" style="display:block;font-size:0.65rem;margin-top:6px;opacity:0.85;"></span>
             </p>
         </section>
-
-        <!-- 🆘 KONTAK DARURAT NASIONAL — SESUAI ASLI, TIDAK COLLAPSE DEFAULT -->
-        <section class="national-emergency-section" id="nationalEmergencySection">
-            <div class="national-header">
+                    <div class="national-header">
                 <div class="national-title">
                     <span class="national-icon">🆘</span>
                     <div>
@@ -2342,7 +2362,11 @@
                         <div class="national-title-sub">Hotline 24 Jam — Bisa langsung ditelepon</div>
                     </div>
                 </div>
+                <button class="national-toggle-btn" id="nationalToggleBtn" type="button" aria-label="Toggle Kontak Darurat">
+                    <i class="fas fa-chevron-up"></i>
+                </button>
             </div>
+        
             <div class="national-grid" id="nationalGrid">
                 <!-- Akan di-render via JavaScript -->
             </div>
@@ -2722,7 +2746,7 @@
     <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
-        <!-- ============================================================ -->
+    <!-- ============================================================ -->
     <!-- SCRIPT UTAMA — KONTAK-DARURAT v14.0 (FRESH, NO PATCH)         -->
     <!-- ============================================================ -->
     <script>
@@ -3212,6 +3236,19 @@
         grid.innerHTML = html;
     }
 
+        // ⭐ Toggle Kontak Darurat Nasional (collapse/expand)
+    function toggleNationalContacts() {
+        var grid = document.getElementById('nationalGrid');
+        var btn = document.getElementById('nationalToggleBtn');
+        if (!grid || !btn) return;
+        var icon = btn.querySelector('i');
+        var isCollapsed = grid.classList.toggle('collapsed');
+        if (icon) {
+            icon.className = isCollapsed ? 'fas fa-chevron-down' : 'fas fa-chevron-up';
+        }
+        if (navigator.vibrate) navigator.vibrate(15);
+    }
+    
     // ================================================================
     // 14. API CALL
     // ================================================================
@@ -4522,6 +4559,17 @@
         initStorageEvents();
 
         renderNationalContacts();
+        initFabModal();
+
+        // ⭐ Toggle Kontak Darurat Nasional
+        var nationalToggleBtn = document.getElementById('nationalToggleBtn');
+        if (nationalToggleBtn) {
+            nationalToggleBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleNationalContacts();
+            });
+        }
         updateNotifBadge();
         updateInviteBadge();
         setInterval(updateNotifBadge, 30000);
@@ -4586,6 +4634,7 @@
     window.showInstallPrompt = showInstallPrompt;
     window.showPreviewOverlay = showPreviewOverlay;
     window.hidePreviewOverlay = hidePreviewOverlay;
+    window.toggleNationalContacts = toggleNationalContacts;
 
     log('✓ Kontak Darurat v14.0 Script Loaded');
 })();
