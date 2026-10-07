@@ -2334,8 +2334,8 @@
            Doughnut di tengah, legend grid 2×2 di bawah
            ================================================================ */
 
-        /* Panel composition: atur min-height & flex column */
-        .panel-grid .panel:has(#chartDoughnut) {
+        /* Panel composition — pakai class khusus biar kompatibel */
+        .panel.panel-composition {
             min-height: auto !important;
             padding-bottom: 12px !important;
         }
@@ -2721,7 +2721,7 @@
                 </div>
                 <div class="chart-wrap"><div id="chartBar" class="chart"></div></div>
             </div>
-                <div class="panel">
+                           <div class="panel panel-composition">
                 <div class="panel-head">
                     <div class="panel-title">🍩 Composition <span class="badge">PIE</span></div>
                 </div>
@@ -2729,7 +2729,7 @@
                     <div id="chartDoughnut" class="chart"></div>
                 </div>
                 <div class="composition-legend" id="compositionLegend"></div>
-            </div>
+            </div> 
         </section>
 
         <!-- PANEL GRID 2 (AREA 7 HARI) -->
@@ -3678,6 +3678,9 @@
             upd(document.getElementById('kpiPosts'), allPosts.length);
             upd(document.getElementById('kpiLikes'), totalLikes);
 
+            // Render legend SEBELUM chart (biar pasti muncul)
+            renderCompositionLegend(byType);
+
             // Charts + Map + Table
             initCharts({ byType: byType, allEms: allEms });
             renderMap(allEms);
@@ -3783,21 +3786,27 @@
                     }
                 }]
             }, true);
+            
+        // Render legend grid 2×2 di bawah doughnut
+        renderCompositionLegend(byType);
         }
-
+        
     // ================================================================
     // 16b. COMPOSITION LEGEND GRID 2×2
     // ================================================================
     function renderCompositionLegend(byType) {
         var legendEl = document.getElementById('compositionLegend');
-        if (!legendEl) return;
+        if (!legendEl) {
+            console.warn('⚠️ [CompositionLegend] #compositionLegend tidak ditemukan di DOM');
+            return;
+        }
         byType = byType || { fire: 0, medical: 0, crime: 0, disaster: 0 };
 
         var items = [
-            { key: 'fire',     label: 'Kebakaran', color: '#f97316', emoji: '🔥' },
-            { key: 'medical',  label: 'Medis',     color: '#38bdf8', emoji: '🚑' },
-            { key: 'crime',    label: 'Kriminal',  color: '#a78bfa', emoji: '🚓' },
-            { key: 'disaster', label: 'Bencana',   color: '#facc15', emoji: '🌪️' }
+            { key: 'fire',     label: 'Kebakaran', color: '#f97316' },
+            { key: 'medical',  label: 'Medis',     color: '#38bdf8' },
+            { key: 'crime',    label: 'Kriminal',  color: '#a78bfa' },
+            { key: 'disaster', label: 'Bencana',   color: '#facc15' }
         ];
 
         legendEl.innerHTML = items.map(function(it) {
@@ -3808,6 +3817,8 @@
                 '<span class="composition-legend-count">' + count + '</span>' +
             '</div>';
         }).join('');
+
+        console.log('✅ [CompositionLegend] Rendered:', items.map(function(i) { return i.label + '=' + (byType[i.key] || 0); }).join(', '));
     }
 
         // Area chart 7 days
