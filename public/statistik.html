@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>SALINK - Statistik Emergency</title>
+    <title>SALINK - Statistik</title>
 
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0a0e1a" id="themeColorMeta">
@@ -18,7 +18,17 @@
 
     <style>
         /* ==================================================================
-           SALINK STATISTIK v13.0 — FINAL (KONSISTEN INDUK)
+           SALINK STATISTIK v14.0 — FINAL (NO PATCH)
+           ==================================================================
+           Konsisten dengan INDUK lokasi-bantuan.html v14.1:
+           - Tema warna universal (dark/light)
+           - Header Opsi A (Menu | Logo | Search | Notif | Theme | Profil | Back)
+           - Sidebar dengan #sidebarMapBtn
+           - Modal Search: tab Semua default + chips TERSEMBUNYI
+           - Modal Notif: filter + tandai semua + mark read
+           - Modal Invite: LENGKAP (persis Dashboard)
+           - Modal Peta Darurat + GPS Opsi X
+           - FAB Modal 2×2 → dashboard.html?emergency=TYPE
            ================================================================== */
 
         /* ============ ROOT VARIABLES ============ */
@@ -28,11 +38,13 @@
             --bg-card: #141b2e;
             --bg-card-2: #1a2235;
             --bg-input: rgba(255,255,255,0.06);
+
             --text-primary: #f5f7fa;
             --text-secondary: #a8b2c1;
             --text-muted: #6b7688;
             --text-dark: #0a0e1a;
             --text-white: #ffffff;
+
             --border-color: rgba(255,255,255,0.08);
             --border-light: rgba(255,255,255,0.12);
             --shadow-color: rgba(0,0,0,0.4);
@@ -40,31 +52,37 @@
             --shadow-sm: 0 4px 12px rgba(0,0,0,0.2);
             --shadow-md: 0 10px 30px rgba(0,0,0,0.3);
             --shadow-lg: 0 20px 50px rgba(0,0,0,0.4);
+
             --primary: #e60012;
             --primary-dark: #b8000d;
             --primary-glow: #ff0033;
             --accent-blue: #e60012;
             --accent-blue-dark: #b8000d;
             --accent-blue-gradient: linear-gradient(135deg, #e60012, #ff0033);
+
             --accent-red: #f85149;
             --accent-green: #25D366;
             --accent-gold: #ffa726;
             --accent-purple: #e57373;
+
             --emergency-fire: #f85149;
             --emergency-medical: #4fc3f7;
             --emergency-crime: #f0d080;
             --emergency-disaster: #c792ea;
+
             --toggle-bg: rgba(255,255,255,0.1);
             --toggle-thumb: #e60012;
             --header-bg: rgba(10,14,26,0.88);
             --footer-bg: rgba(10,14,26,0.95);
             --modal-bg: #141b2e;
             --input-border: rgba(255,255,255,0.1);
+
             --header-height: 60px;
             --footer-height: 68px;
             --safe-bottom: env(safe-area-inset-bottom, 0px);
             --radius: 14px;
             --radius-lg: 20px;
+
             --danger: #f85149;
             --success: #3fb950;
             --warning: #f0d080;
@@ -77,9 +95,11 @@
             --bg-card: #ffffff;
             --bg-card-2: #f8f9fb;
             --bg-input: rgba(0,0,0,0.04);
+
             --text-primary: #0a0e1a;
             --text-secondary: #4a5568;
             --text-muted: #9aa0ab;
+
             --border-color: rgba(0,0,0,0.08);
             --border-light: rgba(0,0,0,0.06);
             --shadow-color: rgba(0,0,0,0.08);
@@ -87,6 +107,7 @@
             --shadow-sm: 0 4px 12px rgba(0,0,0,0.06);
             --shadow-md: 0 10px 30px rgba(0,0,0,0.08);
             --shadow-lg: 0 20px 50px rgba(0,0,0,0.12);
+
             --header-bg: rgba(255,255,255,0.92);
             --footer-bg: rgba(255,255,255,0.98);
             --modal-bg: #ffffff;
@@ -225,6 +246,7 @@
         }
         .user-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
         .user-btn .user-initials { font-size: 0.85rem; font-weight: 700; color: #fff; }
+        .refresh-btn.loading i { animation: spin 1s linear infinite; }
 
         #headerNotifBtn { position: relative; }
         #headerNotifBtn #notifBadge {
@@ -733,6 +755,26 @@
         .error-title { font-weight: 700; color: var(--text-primary); }
         .error-text { font-size: 0.75rem; margin-top: 4px; line-height: 1.5; }
 
+        /* ============ SYNC INDICATOR ============ */
+        .sync-indicator {
+            position: fixed;
+            top: calc(var(--header-height) + 6px);
+            right: 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            z-index: 999;
+            display: none;
+            align-items: center;
+            gap: 5px;
+            animation: syncPulse 1s ease-in-out infinite;
+            box-shadow: var(--shadow-sm);
+        }
+        .sync-indicator.active { display: flex; }
+
         /* ============ BOTTOM NAV ============ */
         .bottom-nav {
             position: fixed;
@@ -1006,31 +1048,81 @@
             box-shadow: 0 0 0 3px rgba(230,0,18,0.1);
         }
         #searchInput::placeholder { color: var(--text-muted); }
-        .search-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+
+        /* 4 Tab dalam 1 baris */
+        .search-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+            flex-wrap: nowrap;
+        }
         .search-tab {
             flex: 1;
-            min-width: 80px;
-            padding: 8px 10px;
+            min-width: 0;
+            padding: 8px 6px;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             color: var(--text-muted);
-            font-size: 0.62rem;
+            font-size: 0.6rem;
             font-weight: 700;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 4px;
+            gap: 3px;
             font-family: inherit;
             transition: all 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
+        .search-tab i { font-size: 0.6rem; flex-shrink: 0; }
         .search-tab.active {
             background: var(--accent-blue-gradient);
             color: #fff;
             border-color: var(--primary);
             box-shadow: 0 4px 12px rgba(230,0,18,0.3);
         }
+
+        /* ⭐ CHIPS TERSEMBUNYI (default display: none, JS yang toggle) */
+        .search-filter-row {
+            display: none;
+            gap: 6px;
+            margin-bottom: 10px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding-bottom: 4px;
+        }
+        .search-filter-row::-webkit-scrollbar { display: none; }
+        .search-filter-row.visible {
+            display: flex;
+        }
+        .search-filter-chip {
+            flex: 1;
+            min-width: 70px;
+            padding: 5px 8px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            color: var(--text-muted);
+            font-size: 0.58rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .search-filter-chip:active { transform: scale(0.96); }
+        .search-filter-chip.active {
+            background: rgba(230,0,18,0.15);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
         .search-section-title {
             font-size: 0.68rem;
             font-weight: 800;
@@ -1128,6 +1220,65 @@
             font-family: monospace;
         }
 
+        /* ============ RECENT SEARCH & TRENDING ============ */
+        .recent-search-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .recent-search-item:active { transform: scale(0.98); border-color: var(--primary); }
+        .recent-search-item .recent-icon { color: var(--text-muted); font-size: 0.72rem; flex-shrink: 0; }
+        .recent-search-item .recent-text { flex: 1; font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
+        .recent-search-item .recent-remove { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.7rem; padding: 2px 6px; }
+
+        .trending-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .trending-item:active { transform: scale(0.98); border-color: var(--primary); }
+        .trending-item .trending-rank {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 800;
+            flex-shrink: 0;
+        }
+        .trending-item .trending-rank.gold {
+            background: linear-gradient(135deg, #f0d080, #d4a017);
+            color: #0a0e1a;
+        }
+        .trending-item .trending-info { flex: 1; min-width: 0; }
+        .trending-item .trending-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-primary);
+        }
+        .trending-item .trending-sub { font-size: 0.58rem; color: var(--text-muted); }
+
         /* ============ NOTIF MODAL ============ */
         .notif-item {
             display: flex;
@@ -1167,6 +1318,64 @@
             border-color: var(--primary) !important;
         }
         .notif-filter-btn:active { transform: scale(0.96); }
+
+        /* ============ INVITE MODAL ============ */
+        .invite-user-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+        }
+        .invite-user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--accent-blue-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: 700;
+            font-size: 1rem;
+            flex-shrink: 0;
+            overflow: hidden;
+            border: 2px solid var(--primary);
+        }
+        .invite-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .invite-user-info { flex: 1; min-width: 0; }
+        .invite-user-name {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        .invite-user-sub {
+            font-size: 0.58rem;
+            color: var(--text-muted);
+        }
+        .invite-user-btn {
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: none;
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+        .invite-user-btn:active { transform: scale(0.95); }
+        .invite-user-btn.sent {
+            background: rgba(63,185,80,0.15);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+        .invite-user-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
         /* ============ FAB MODAL ============ */
         .fab-modal-overlay {
@@ -1750,164 +1959,74 @@
         @media (max-width: 480px) {
             .main-content { padding: calc(var(--header-height) + 10px) 10px calc(var(--footer-height) + 20px); }
             .sidebar { width: 85%; }
+            .header-center { gap: 4px; }
+            .header-left { gap: 4px; }
+            .header-right { gap: 4px; }
         }
         @media (max-width: 360px) {
             .user-btn, .search-btn, .menu-btn, .back-btn, .refresh-btn { width: 34px; height: 34px; }
             .app-title .title-text { font-size: 0.8rem; }
+            .header-center { gap: 3px; }
             .nav-fab { width: 64px; height: 64px; }
             .nav-fab .fab-emoji { font-size: 1.7rem; }
+            .search-tab { font-size: 0.55rem; padding: 7px 4px; }
+            .search-filter-chip { font-size: 0.55rem; min-width: 62px; }
         }
 
-        /* ============ SEARCH FILTER CHIPS ============ */
-                .search-filter-row {
-            display: flex !important;
-            gap: 6px;
-            margin-bottom: 10px;
-            margin-top: 10px;
-            flex-wrap: wrap;
+        /* ============ UNIVERSAL THEME (NO PATCH) ============ */
+        body, body * {
+            transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
         }
-        .search-filter-row[style*="display: none"] {
-            display: flex !important;
-        }
-        .search-filter-row.active {
-            display: flex !important;
-        }
-        .search-filter-chip {
-            padding: 6px 14px;
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            border-radius: 999px;
-            color: var(--text-muted);
-            font-size: 0.65rem;
-            font-weight: 700;
-            cursor: pointer;
-            font-family: inherit;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-        .search-filter-chip:active {
-            transform: scale(0.95);
-        }
-        .search-filter-chip.active {
-            background: rgba(230,0,18,0.15);
-            border-color: var(--primary);
-            color: var(--primary);
-        }
-        
-        /* ============ RECENT SEARCH ============ */
-        .recent-search-item {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 9px 12px;
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            margin-bottom: 4px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .recent-search-item:active { transform: scale(0.98); border-color: var(--primary); }
-        .recent-search-item .recent-icon { color: var(--text-muted); font-size: 0.72rem; flex-shrink: 0; }
-        .recent-search-item .recent-text { flex: 1; font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
-        .recent-search-item .recent-remove { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.7rem; padding: 2px 6px; }
-
-        /* ============ TRENDING ============ */
-        .trending-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 12px;
-            background: var(--bg-input);
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            margin-bottom: 6px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .trending-item:active { transform: scale(0.98); border-color: var(--primary); }
-        .trending-item .trending-rank {
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            background: var(--accent-blue-gradient);
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.7rem;
-            font-weight: 800;
-            flex-shrink: 0;
-        }
-        .trending-item .trending-rank.gold {
-            background: linear-gradient(135deg, #f0d080, #d4a017);
-            color: #0a0e1a;
-        }
-        .trending-item .trending-info { flex: 1; min-width: 0; }
-        .trending-item .trending-title {
-            font-size: 0.72rem;
-            font-weight: 700;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            color: var(--text-primary);
-        }
-        .trending-item .trending-sub { font-size: 0.58rem; color: var(--text-muted); }
-      
-        /* ================================================================
-           PATCH UNIVERSAL — FIX WARNA HEADER + MODAL THEME
-           ================================================================ */
-        body, body * { transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease; }
-        body { color: var(--text-primary) !important; }
-        h1, h2, h3, h4, h5, h6 { color: var(--text-primary) !important; }
+        body { color: var(--text-primary); }
+        h1, h2, h3, h4, h5, h6 { color: var(--text-primary); }
         p, span, div, li, td, th, label, strong, em, small, b, i { color: inherit; }
 
-        a { color: var(--primary); text-decoration: none; }
+        a { color: var(--primary); text-decoration: none; transition: color 0.2s ease; }
         a:hover { color: var(--primary-glow); }
 
-        input, textarea, select, button { color: var(--text-primary); font-family: inherit; }
-        input::placeholder, textarea::placeholder { color: var(--text-muted) !important; opacity: 1; }
-        input:focus, textarea:focus, select:focus { color: var(--text-primary); background: var(--bg-input); border-color: var(--primary); }
-
-        [style*="color: #fff"], [style*="color:#fff"], [style*="color: white"], [style*="color:white"] {
-            color: var(--text-primary) !important;
+        input, textarea, select, button {
+            color: var(--text-primary);
+            font-family: inherit;
+        }
+        input::placeholder, textarea::placeholder {
+            color: var(--text-muted);
+            opacity: 1;
+        }
+        input:focus, textarea:focus, select:focus {
+            color: var(--text-primary);
+            background: var(--bg-input);
+            border-color: var(--primary);
+        }
+        select option {
+            background: var(--bg-card);
+            color: var(--text-primary);
         }
 
-        .app-bar { background: var(--header-bg) !important; border-bottom: 1px solid var(--border-color) !important; }
-        .app-title, .app-title .title-text { color: var(--text-white) !important; }
-
-        .user-btn, .search-btn, .menu-btn, .back-btn, .refresh-btn {
-            color: var(--text-white) !important;
-            background: rgba(255,255,255,0.08) !important;
-            border: 1px solid rgba(255,255,255,0.12) !important;
+        [data-theme="light"] .app-bar { background: rgba(255,255,255,0.92); }
+        [data-theme="light"] .app-title,
+        [data-theme="light"] .app-title .title-text { color: var(--text-primary); }
+        [data-theme="light"] .user-btn,
+        [data-theme="light"] .search-btn,
+        [data-theme="light"] .menu-btn,
+        [data-theme="light"] .back-btn,
+        [data-theme="light"] .refresh-btn {
+            color: var(--text-primary);
+            background: rgba(0,0,0,0.06);
+            border-color: rgba(0,0,0,0.1);
         }
-        [data-theme="light"] .app-bar { background: rgba(255,255,255,0.92) !important; }
-        [data-theme="light"] .app-title, [data-theme="light"] .app-title .title-text { color: var(--text-primary) !important; }
-        [data-theme="light"] .user-btn, [data-theme="light"] .search-btn, [data-theme="light"] .menu-btn, [data-theme="light"] .back-btn, [data-theme="light"] .refresh-btn {
-            color: var(--text-primary) !important;
-            background: rgba(0,0,0,0.06) !important;
-            border-color: rgba(0,0,0,0.1) !important;
-        }
-        [data-theme="light"] #headerNotifBtn #notifBadge { border-color: var(--header-bg) !important; }
-
-        .sidebar { background: var(--bg-secondary) !important; color: var(--text-primary); }
-        .nav-link { color: var(--text-primary); }
-        .nav-link.active { color: var(--primary); }
-        [data-theme="light"] .sidebar { background: #ffffff !important; }
-
-        .nav-item-bottom { color: var(--text-muted); }
-        .nav-item-bottom.active .nav-label { color: var(--primary); }
-        [data-theme="light"] .bottom-nav { background: rgba(255,255,255,0.98) !important; }
-        [data-theme="light"] .nav-item-bottom .badge { border-color: var(--footer-bg) !important; }
-
-        .modal-content, .modal-body, .modal-title { color: var(--text-primary) !important; }
-        [data-theme="light"] .modal-content { background: #ffffff !important; }
-        [data-theme="light"] .modal-header { background: #ffffff; }
+        [data-theme="light"] .sidebar { background: #ffffff; }
+        [data-theme="light"] .bottom-nav { background: rgba(255,255,255,0.98); }
+        [data-theme="light"] .modal-content { background: #ffffff; color: var(--text-primary); }
+        [data-theme="light"] .modal-header,
         [data-theme="light"] .modal-footer { background: #ffffff; }
-
-        * { -webkit-text-fill-color: currentColor; }
-        ::-webkit-scrollbar-thumb { background: var(--primary); }
-        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+        [data-theme="light"] .modal-footer .btn-close-modal {
+            background: rgba(0,0,0,0.04);
+            color: var(--text-primary);
+            border-color: rgba(0,0,0,0.1);
+        }
+        [data-theme="light"] .toast { background: #ffffff; }
+        [data-theme="light"] .floating-notification { background: #ffffff; }
+        [data-theme="light"] .preview-overlay-content { background: #ffffff; }
     </style>
 </head>
 <body>
@@ -1953,7 +2072,9 @@
         </div>
     </div>
 
-    <!-- HEADER -->
+    <!-- ============================================================ -->
+    <!-- HEADER — OPSI A (Menu | Logo | Search | Notif | Theme | Profil | Back) -->
+    <!-- ============================================================ -->
     <header class="app-bar" id="appBar">
         <div class="header-left">
             <button class="menu-btn" id="menuBtn" type="button" title="Menu" aria-label="Menu">
@@ -1990,7 +2111,9 @@
         </div>
     </header>
 
-    <!-- SIDEBAR -->
+    <!-- ============================================================ -->
+    <!-- SIDEBAR                                                       -->
+    <!-- ============================================================ -->
     <div class="sidebar-overlay-bg" id="sidebarOverlay"></div>
     <div class="sidebar" id="sidebar" role="navigation" aria-label="Menu Utama">
         <button class="sidebar-close" id="sidebarClose" type="button" aria-label="Tutup Menu">
@@ -2080,7 +2203,9 @@
         </ul>
     </div>
 
-    <!-- MAIN CONTENT -->
+    <!-- ============================================================ -->
+    <!-- MAIN CONTENT — KONTEN KHUSUS STATISTIK (TIDAK DIUBAH)         -->
+    <!-- ============================================================ -->
     <main class="main-content">
 
         <h1 class="page-title">📊 Statistik Emergency</h1>
@@ -2208,7 +2333,9 @@
 
     </main>
 
-    <!-- BOTTOM NAV -->
+    <!-- ============================================================ -->
+    <!-- BOTTOM NAV                                                    -->
+    <!-- ============================================================ -->
     <nav class="bottom-nav" id="sl-bottom-nav" role="navigation" aria-label="Main Navigation">
         <a href="dashboard.html" class="nav-item-bottom" data-workspace="home" aria-label="Home">
             <span class="nav-icon">🏠</span>
@@ -2223,7 +2350,7 @@
                 <span class="fab-emoji">🚨</span>
             </button>
         </div>
-        <button class="nav-item-bottom" id="bottomInviteNav" data-workspace="invite" data-action="login" type="button" aria-label="Invite">
+        <button class="nav-item-bottom" id="bottomInviteNav" data-workspace="invite" type="button" aria-label="Invite">
             <span class="nav-icon">📨</span>
             <span class="nav-label">Invite</span>
             <span class="badge" id="inviteBadge">0</span>
@@ -2237,7 +2364,7 @@
     </div> <!-- /app-shell -->
 
     <!-- ============================================================ -->
-    <!-- MODAL SEARCH — DENGAN TOMBOL TUTUP                            -->
+    <!-- MODAL SEARCH — 4 TAB + CHIPS TERSEMBUNYI (muncul saat tab Emergency) -->
     <!-- ============================================================ -->
     <div class="modal-overlay" id="searchModal">
         <div class="modal-content search-modal-content">
@@ -2258,6 +2385,8 @@
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
+
+                <!-- 4 TAB DALAM 1 BARIS -->
                 <div class="search-tabs">
                     <button class="search-tab active" data-tab="all" type="button">
                         <i class="fas fa-globe"></i> Semua
@@ -2272,13 +2401,16 @@
                         <i class="fas fa-exclamation-triangle"></i> Emergency
                     </button>
                 </div>
-                    <div class="search-filter-row" id="emergencyFilters">
+
+                <!-- FILTER CHIPS — TERSEMBUNYI default, muncul saat tab Emergency -->
+                <div class="search-filter-row" id="emergencyFilters">
                     <button class="search-filter-chip active" data-filter="all" type="button">🎯 Semua</button>
                     <button class="search-filter-chip" data-filter="fire" type="button">🔥 Kebakaran</button>
                     <button class="search-filter-chip" data-filter="medical" type="button">🚑 Medis</button>
                     <button class="search-filter-chip" data-filter="crime" type="button">🚓 Kriminal</button>
                     <button class="search-filter-chip" data-filter="disaster" type="button">🌪️ Bencana</button>
                 </div>
+
                 <div id="searchResultsBody">
                     <div id="searchDefaultView">
                         <div class="search-empty-state">
@@ -2298,7 +2430,7 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- MODAL NOTIFIKASI — LENGKAP DENGAN FILTER + TANDAI SEMUA       -->
+    <!-- MODAL NOTIFIKASI — FILTER + TANDAI SEMUA + TUTUP              -->
     <!-- ============================================================ -->
     <div class="modal-overlay" id="notifModal">
         <div class="modal-content" style="max-width:460px;">
@@ -2314,21 +2446,21 @@
             </div>
             <div class="modal-body">
                 <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
-                    <button class="notif-filter-btn active" data-filter="all" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                    <button class="notif-filter-btn active" data-filter="all" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
                         <i class="fas fa-list"></i> Semua
                     </button>
-                    <button class="notif-filter-btn" data-filter="unread" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                    <button class="notif-filter-btn" data-filter="unread" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
                         <i class="fas fa-circle"></i> Belum
                     </button>
-                    <button class="notif-filter-btn" data-filter="emergency" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                    <button class="notif-filter-btn" data-filter="emergency" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
                         <i class="fas fa-exclamation-triangle"></i> Darurat
                     </button>
-                    <button class="notif-filter-btn" data-filter="regular" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                    <button class="notif-filter-btn" data-filter="regular" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
                         <i class="fas fa-bell"></i> Biasa
                     </button>
                 </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:7px 10px;background:rgba(255,255,255,0.04);border-radius:10px;">
-                    <span style="font-size:0.62rem;color:#a8b2c1;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:7px 10px;background:var(--bg-input);border-radius:10px;">
+                    <span style="font-size:0.62rem;color:var(--text-secondary);">
                         <i class="fas fa-info-circle" style="color:var(--primary);"></i>
                         <span id="notifStatsText">0 notifikasi</span>
                     </span>
@@ -2340,6 +2472,36 @@
             </div>
             <div class="modal-footer">
                 <button class="btn-close-modal" id="notifModalFooterBtn" type="button">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MODAL INVITE — SAMA DENGAN DASHBOARD                          -->
+    <!-- ============================================================ -->
+    <div class="modal-overlay" id="inviteModal">
+        <div class="modal-content" style="max-width:460px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Undang Pengguna</span>
+                    <span class="badge-count" id="inviteModalCount">0</span>
+                </div>
+                <button class="modal-close" id="inviteModalCloseBtn" type="button" aria-label="Tutup">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <input type="text" id="inviteSearchInput" placeholder="🔍 Cari nama atau username..." style="flex:1;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;color:var(--text-primary);font-size:0.72rem;font-family:inherit;">
+                    <button id="inviteRefreshBtn" type="button" style="padding:9px 14px;background:var(--accent-blue-gradient);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:0.7rem;font-weight:700;">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div id="inviteUserList" style="max-height:380px;overflow-y:auto;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-close-modal" id="inviteModalFooterBtn" type="button">Tutup</button>
             </div>
         </div>
     </div>
@@ -2390,7 +2552,7 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- MODAL PETA DARURAT                                            -->
+    <!-- MODAL PETA DARURAT — SAMA PERSIS INDUK                        -->
     <!-- ============================================================ -->
     <div class="modal-overlay" id="mapModal">
         <div class="modal-content">
@@ -2495,23 +2657,20 @@
     <div class="toast-container" id="toastContainer"></div>
 
         <!-- ============================================================ -->
-    <!-- SCRIPT — STATISTIK JAVASCRIPT v13.0                           -->
-    <!-- Konsisten dengan INDUK (dashboard, lokasi-bantuan, dll)      -->
+    <!-- SCRIPT UTAMA — STATISTIK v14.0 (NO PATCH)                     -->
     <!-- ============================================================ -->
     <script>
 /* ====================================================================
- * SALINK STATISTIK v13.0 — FINAL
+ * SALINK STATISTIK v14.0 — FINAL (NO PATCH)
  * ====================================================================
- * Fitur:
- *   - Tema Universal (dark/light)
- *   - PWA + FCM
- *   - Header Back + Menu + Search + Notif + Theme + Profile
- *   - Sidebar dengan #sidebarMapBtn
- *   - Modal Search + TOMBOL TUTUP
- *   - Modal Notif LENGKAP: filter + tandai semua + mark read
+ * Konsisten dengan INDUK lokasi-bantuan.html v14.1:
+ *   - Header Opsi A (Menu | Logo | Search | Notif | Theme | Profil | Back)
+ *   - Search Modal: tab "Semua" default + chips TERSEMBUNYI
+ *   - Modal Invite: LENGKAP (persis Dashboard)
+ *   - Modal Notif: filter + tandai semua + mark read
  *   - Modal Peta Darurat
- *   - Logika statistik: calculateRealStats, loadStatistics, dll
- *   - FAB Modal → dashboard.html?emergency=TYPE
+ *   - FAB Modal 2×2 → dashboard.html?emergency=TYPE
+ *   - Konten utama statistik TIDAK DIUBAH
  * ==================================================================== */
 (function() {
     'use strict';
@@ -2551,8 +2710,15 @@
     let mapCurrentLat = null;
     let mapCurrentLng = null;
     let searchTab = 'all';
+    let searchEmergencyFilter = 'all';
     let searchDebounceTimer = null;
+    let recentSearches = [];
+    const MAX_RECENT_SEARCHES = 8;
     let _salinkSetup = false;
+
+    // Invite state
+    let allUsers = [];
+    let sentInvites = {};
 
     try {
         syncChannel = new BroadcastChannel('salink_sync');
@@ -2671,7 +2837,7 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('./sw.js', { scope: './' })
-                    .then(function() { log('PWA: ServiceWorker registered'); })
+                    .then(function() { log('PWA: SW registered'); })
                     .catch(function(err) { console.warn('⚠️ PWA: SW gagal:', err.message); });
             });
         }
@@ -2680,14 +2846,8 @@
             deferredPrompt = e;
             setTimeout(function() {
                 if (deferredPrompt && !localStorage.getItem('salink_installed')) {
-                    showFloatingNotification(
-                        'install',
-                        '📱 Install SALINK',
-                        'Akses lebih cepat & offline',
-                        'Tap untuk install aplikasi',
-                        'Install',
-                        function() { showInstallPrompt(); }
-                    );
+                    showFloatingNotification('install', '📱 Install SALINK', 'Akses lebih cepat & offline',
+                        'Tap untuk install aplikasi', 'Install', function() { showInstallPrompt(); });
                 }
             }, 10000);
         });
@@ -3023,10 +3183,12 @@
                 const fiveMinAgo = Date.now() - 5 * 60 * 1000;
                 teamsCount = users.filter(u => u.lastActive && new Date(u.lastActive).getTime() > fiveMinAgo).length;
                 if (teamsCount === 0) teamsCount = users.length;
+                if (users && users.length > 0) allUsers = users.map(u => Object.assign({}, u, { isOnline: u.lastActive && new Date(u.lastActive).getTime() > fiveMinAgo }));
             } catch(e) {
                 try {
                     const users = JSON.parse(localStorage.getItem('salink_users') || '[]');
                     teamsCount = users.length;
+                    allUsers = users;
                 } catch(e2) { teamsCount = 0; }
             }
             upd(document.getElementById('contactCount'), teamsCount);
@@ -3145,7 +3307,7 @@
     }
 
     // ================================================================
-    // 21. NOTIF MODAL — LENGKAP
+    // 21. NOTIF MODAL
     // ================================================================
     function loadReadNotifs() {
         try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); }
@@ -3249,7 +3411,7 @@
                 : '<div class="notif-item-icon regular"><i class="fas fa-bell"></i></div>';
             var unreadClass = n.read ? '' : 'unread';
             var typeClass = n.type === 'emergency' ? 'emergency' : '';
-            return '<div class="notif-item ' + unreadClass + ' ' + typeClass + '" onclick="openNotifDetail(\'' + escapeAttr(n.id) + '\',\'' + escapeAttr(n.type) + '\')">' +
+            return '<div class="notif-item ' + unreadClass + ' ' + typeClass + '" data-notif-id="' + escapeAttr(n.id) + '" data-notif-type="' + escapeAttr(n.type) + '">' +
                 iconHtml +
                 '<div class="notif-item-content">' +
                     '<div class="notif-item-title">' + escapeHTML(n.title) + '</div>' +
@@ -3258,6 +3420,14 @@
                 '</div>' +
             '</div>';
         }).join('');
+
+        listEl.querySelectorAll('[data-notif-id]').forEach(function(el) {
+            el.addEventListener('click', function() {
+                var id = this.getAttribute('data-notif-id');
+                var type = this.getAttribute('data-notif-type');
+                openNotifDetail(id, type);
+            });
+        });
     }
 
     function setupNotifFilters() {
@@ -3313,12 +3483,8 @@
     }
 
     // ================================================================
-    // SEARCH — TRENDING + RECENT SEARCHES (PATCH UNIVERSAL)
+    // 22. SEARCH MODAL — Tab "Semua" default + Chips TERSEMBUNYI
     // ================================================================
-    var searchEmergencyFilter = 'all';
-    var recentSearches = [];
-    var MAX_RECENT_SEARCHES = 8;
-
     function loadRecentSearches() {
         try { recentSearches = JSON.parse(localStorage.getItem('salink_recent_searches') || '[]'); }
         catch(e) { recentSearches = []; }
@@ -3335,7 +3501,6 @@
         if (recentSearches.length > MAX_RECENT_SEARCHES) recentSearches = recentSearches.slice(0, MAX_RECENT_SEARCHES);
         saveRecentSearches();
     }
-
     function getTrendingPosts() {
         try {
             var allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
@@ -3352,13 +3517,10 @@
             return todayPosts.slice(0, 5);
         } catch(e) { return []; }
     }
-
     function renderSearchDefaultView() {
         var container = document.getElementById('searchDefaultView');
         if (!container) return;
         var html = '';
-
-        // Recent searches
         if (recentSearches.length > 0) {
             html += '<div class="search-section-title"><span>🕐 Pencarian Terakhir</span>' +
                 '<button onclick="clearRecentSearches()" style="background:none;border:none;color:#f85149;font-size:0.6rem;cursor:pointer;font-family:inherit;"><i class="fas fa-trash"></i> Hapus</button></div>';
@@ -3370,8 +3532,6 @@
                 '</div>';
             }).join('');
         }
-
-        // Trending
         var trending = getTrendingPosts();
         if (trending.length > 0) {
             html += '<div class="search-section-title"><span>🔥 Trending Hari Ini</span><span class="count-pill">' + trending.length + '</span></div>';
@@ -3379,7 +3539,7 @@
                 var rankClass = idx === 0 ? 'gold' : '';
                 var likes = 0;
                 try { likes = JSON.parse(p.likes || '[]').length; } catch(e) {}
-                return '<div class="trending-item" onclick="goToPost(\'' + escapeAttr(p.id) + '\')">' +
+                return '<div class="trending-item" onclick="goToPostFromSearch(\'' + escapeAttr(p.id) + '\')">' +
                     '<div class="trending-rank ' + rankClass + '">#' + (idx + 1) + '</div>' +
                     '<div class="trending-info">' +
                         '<div class="trending-title">' + escapeHTML(p.text ? p.text.substring(0, 50) : 'Postingan media') + '</div>' +
@@ -3389,7 +3549,6 @@
                 '</div>';
             }).join('');
         }
-
         if (!html) {
             html = '<div class="search-empty-state">' +
                 '<div class="empty-big-icon">🔍</div>' +
@@ -3399,7 +3558,6 @@
         }
         container.innerHTML = html;
     }
-
     function applySearchQuery(q) {
         var input = document.getElementById('searchInput');
         if (input) {
@@ -3420,25 +3578,15 @@
         renderSearchDefaultView();
         showToast('🗑️', 'Riwayat pencarian dihapus', 'fa-trash');
     }
-    function goToPost(postId) {
+    function goToPostFromSearch(postId) {
         addRecentSearch(postId);
         closeSearchModal();
         setTimeout(function() {
             window.location.href = DASHBOARD_URL + '?post=' + encodeURIComponent(postId);
         }, 200);
     }
-    function setSearchEmergencyFilter(filter, btnEl) {
-        searchEmergencyFilter = filter;
-        document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
-        if (btnEl) btnEl.classList.add('active');
-        var input = document.getElementById('searchInput');
-        if (input && input.value.trim()) performSearch(input.value.trim());
-    }
-  
-    // ================================================================
-    // 22. SEARCH MODAL
-    // ================================================================
-        function openSearchModal() {
+
+    function openSearchModal() {
         if (isPreviewMode) { showPreviewOverlay(); return; }
         loadRecentSearches();
         openModalById('searchModal');
@@ -3451,20 +3599,24 @@
         var sdv = document.getElementById('searchDefaultView');
         if (sdv) sdv.style.display = 'block';
         renderSearchDefaultView();
+
+        // ⭐ Tab default = "Semua"
         searchTab = 'all';
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         var allTab = document.querySelector('.search-tab[data-tab="all"]');
         if (allTab) allTab.classList.add('active');
+
+        // ⭐ Chips TERSEMBUNYI (hapus class visible)
         var ef = document.getElementById('emergencyFilters');
-        if (ef) ef.style.display = 'none';
+        if (ef) ef.classList.remove('visible');
+
         searchEmergencyFilter = 'all';
         document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
         var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
         if (allChip) allChip.classList.add('active');
     }
-      
     function closeSearchModal() { closeModalById('searchModal'); }
-        function clearSearch() {
+    function clearSearch() {
         var input = document.getElementById('searchInput');
         if (input) input.value = '';
         var cb = document.getElementById('clearSearchBtn');
@@ -3475,31 +3627,33 @@
         if (sdv) sdv.style.display = 'block';
         renderSearchDefaultView();
     }
-        function switchSearchTab(tab, btnEl) {
+    function switchSearchTab(tab, btnEl) {
         searchTab = tab;
-        
-        // Update active state tab
-        document.querySelectorAll('.search-tab').forEach(function(t) {
-            t.classList.remove('active');
-        });
+        document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         if (btnEl) btnEl.classList.add('active');
-        
-        // Show/hide filter emergency
+
+        // ⭐ Chips show/hide sesuai tab (pakai class visible)
         var ef = document.getElementById('emergencyFilters');
         if (ef) {
-            ef.style.display = 'flex !important';
-            ef.setAttribute('style', 'display: flex !important');
+            if (tab === 'emergency') {
+                ef.classList.add('visible');
+            } else {
+                ef.classList.remove('visible');
+            }
         }
-            
-        // Re-run search jika ada input
+
         var input = document.getElementById('searchInput');
-        if (input && input.value.trim()) {
-            performSearch(input.value.trim());
-        }
+        if (input && input.value.trim()) performSearch(input.value.trim());
+    }
+    function setSearchEmergencyFilter(filter, btnEl) {
+        searchEmergencyFilter = filter;
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
+        if (btnEl) btnEl.classList.add('active');
+        var input = document.getElementById('searchInput');
+        if (input && input.value.trim()) performSearch(input.value.trim());
     }
     function performSearch(query) {
         var q = query.trim().toLowerCase();
-        addRecentSearch(query);
         if (!q) {
             var sar = document.getElementById('searchActiveResults');
             if (sar) sar.style.display = 'none';
@@ -3507,6 +3661,7 @@
             if (sdv) sdv.style.display = 'block';
             return;
         }
+        addRecentSearch(query);
         var sdv2 = document.getElementById('searchDefaultView');
         if (sdv2) sdv2.style.display = 'none';
         var sar2 = document.getElementById('searchActiveResults');
@@ -3514,9 +3669,9 @@
         var cb = document.getElementById('clearSearchBtn');
         if (cb) cb.classList.add('visible');
 
-        var allUsers = [];
-        try { allUsers = JSON.parse(localStorage.getItem('salink_users') || '[]'); } catch(e) {}
-        var matchedUsers = allUsers.filter(function(u) {
+        var usersArr = [];
+        try { usersArr = JSON.parse(localStorage.getItem('salink_users') || '[]'); } catch(e) {}
+        var matchedUsers = usersArr.filter(function(u) {
             return (u.fullName || '').toLowerCase().indexOf(q) !== -1 ||
                    (u.username || '').toLowerCase().indexOf(q) !== -1;
         });
@@ -3531,6 +3686,7 @@
         var allEms = [];
         try { allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) {}
         var matchedEm = allEms.filter(function(e) {
+            if (searchEmergencyFilter !== 'all' && e.type !== searchEmergencyFilter) return false;
             return (e.location || e.address || '').toLowerCase().indexOf(q) !== -1 ||
                    (e.text || e.description || '').toLowerCase().indexOf(q) !== -1 ||
                    (e.sender || '').toLowerCase().indexOf(q) !== -1;
@@ -3606,7 +3762,135 @@
     }
 
     // ================================================================
-    // 23. FAB MODAL
+    // 23. INVITE MODAL
+    // ================================================================
+    function loadSentInvites() {
+        try { sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}'); }
+        catch(e) { sentInvites = {}; }
+    }
+    function saveSentInvites() {
+        try { localStorage.setItem('salink_sent_invites', JSON.stringify(sentInvites)); }
+        catch(e) {}
+    }
+    function updateInviteBadge() {
+        var badge = document.getElementById('inviteBadge');
+        if (badge) {
+            var pending = Object.keys(sentInvites).length;
+            badge.textContent = pending;
+            badge.classList.toggle('show', pending > 0);
+        }
+    }
+    function openInviteModal() {
+        if (isPreviewMode) { showPreviewOverlay(); return; }
+        openModalById('inviteModal');
+        loadInviteUsers();
+        setupInviteFilters();
+    }
+    function closeInviteModal() { closeModalById('inviteModal'); }
+
+    function loadInviteUsers() {
+        var listEl = document.getElementById('inviteUserList');
+        if (!listEl) return;
+        if (!allUsers || allUsers.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-users-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada pengguna untuk diundang</p></div>';
+            return;
+        }
+        var filtered = allUsers.filter(function(u) { return !currentUser || u.username !== currentUser.username; });
+        var inputEl = document.getElementById('inviteSearchInput');
+        var q = (inputEl ? inputEl.value : '').toLowerCase().trim();
+        if (q) {
+            filtered = filtered.filter(function(u) {
+                return (u.fullName || '').toLowerCase().indexOf(q) !== -1 ||
+                       (u.username || '').toLowerCase().indexOf(q) !== -1;
+            });
+        }
+        var countEl = document.getElementById('inviteModalCount');
+        if (countEl) countEl.textContent = filtered.length;
+        if (filtered.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-search" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada pengguna yang cocok</p></div>';
+            return;
+        }
+        listEl.innerHTML = filtered.map(function(u) {
+            var initial = (u.fullName || u.username || 'U').charAt(0).toUpperCase();
+            var avatar = u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" alt="">' : initial;
+            var isSent = sentInvites[u.username] === true;
+            var location = [u.city, u.province].filter(Boolean).join(', ') || u.country || 'Lokasi tidak diketahui';
+            var statusDot = u.isOnline ? '🟢' : '⚪';
+            return '<div class="invite-user-item">' +
+                '<div class="invite-user-avatar">' + avatar + '</div>' +
+                '<div class="invite-user-info">' +
+                    '<div class="invite-user-name">' + statusDot + ' ' + escapeHTML(u.fullName || u.username) + '</div>' +
+                    '<div class="invite-user-sub"><i class="fas fa-map-marker-alt" style="font-size:0.5rem;"></i> ' + escapeHTML(location) + '</div>' +
+                '</div>' +
+                '<button class="invite-user-btn ' + (isSent ? 'sent' : '') + '" data-invite-username="' + escapeAttr(u.username) + '" ' + (isSent ? 'disabled' : '') + '>' +
+                    (isSent ? '<i class="fas fa-check"></i> Terkirim' : '<i class="fas fa-paper-plane"></i> Undang') +
+                '</button>' +
+            '</div>';
+        }).join('');
+
+        listEl.querySelectorAll('[data-invite-username]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                sendInvite(this.getAttribute('data-invite-username'), this);
+            });
+        });
+    }
+
+    function setupInviteFilters() {
+        var searchInput = document.getElementById('inviteSearchInput');
+        if (searchInput) searchInput.oninput = loadInviteUsers;
+        var refreshBtn = document.getElementById('inviteRefreshBtn');
+        if (refreshBtn) {
+            refreshBtn.onclick = function() {
+                var icon = this.querySelector('i');
+                if (icon) icon.classList.add('fa-spin');
+                try {
+                    var users = JSON.parse(localStorage.getItem('salink_users') || '[]');
+                    if (users && users.length > 0) allUsers = users;
+                    loadInviteUsers();
+                    showToast('🔄', 'Daftar pengguna diperbarui', 'fa-sync-alt');
+                } catch(e) {
+                    showToast('⚠️', 'Gagal refresh', 'fa-exclamation-triangle');
+                }
+                if (icon) setTimeout(function() { icon.classList.remove('fa-spin'); }, 800);
+            };
+        }
+    }
+
+    async function sendInvite(username, btnEl) {
+        if (!currentUser) { redirectToLogin(); return; }
+        if (!username) return;
+        btnEl.disabled = true;
+        btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        try {
+            sentInvites[username] = true;
+            saveSentInvites();
+            var invitePayload = {
+                id: 'invite-' + Date.now(),
+                user1: currentUser.username,
+                user2: username,
+                status: 'pending',
+                requestedBy: currentUser.username,
+                timestamp: new Date().toISOString(),
+                acceptedAt: ''
+            };
+            fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'save_invite', data: invitePayload })
+            }).catch(function() {});
+            btnEl.classList.add('sent');
+            btnEl.innerHTML = '<i class="fas fa-check"></i> Terkirim';
+            updateInviteBadge();
+            showToast('📨 Terkirim', 'Undangan dikirim ke ' + username, 'fa-paper-plane');
+        } catch(e) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = '<i class="fas fa-paper-plane"></i> Undang';
+            showToast('⚠️ Gagal', 'Tidak dapat mengirim undangan', 'fa-exclamation-triangle');
+        }
+    }
+
+    // ================================================================
+    // 24. FAB MODAL
     // ================================================================
     function openFabModal() {
         var overlay = document.getElementById('fabModalOverlay');
@@ -3661,10 +3945,15 @@
                 if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
             });
         });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && fabModalOverlay && fabModalOverlay.classList.contains('active')) {
+                closeFabModal();
+            }
+        });
     }
 
     // ================================================================
-    // 24. MAP MODAL
+    // 25. MAP MODAL
     // ================================================================
     function openMapModal() {
         closeSidebar();
@@ -3739,7 +4028,7 @@
 
         if (regionEl) {
             fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id', {
-                headers: { 'User-Agent': 'SALINK-App/13.0' }
+                headers: { 'User-Agent': 'SALINK-App/14.0' }
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -3810,7 +4099,7 @@
     }
 
     // ================================================================
-    // 25. RIPPLE
+    // 26. RIPPLE
     // ================================================================
     function initRipple() {
         document.addEventListener('click', function(e) {
@@ -3831,19 +4120,37 @@
     }
 
     // ================================================================
-    // 26. EVENT LISTENERS
+    // 27. STORAGE EVENTS
+    // ================================================================
+    function initStorageEvents() {
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'salink_sync_trigger') {
+                try {
+                    var data = JSON.parse(e.newValue);
+                    if (data && data.type) handleSyncMessage(data);
+                } catch(err) {}
+            }
+            if (e.key === 'salink_posts' || e.key === 'salink_emergencies') {
+                loadStatistics();
+            }
+            if (e.key === 'salink_user') loadUser();
+            if (e.key === 'salink_theme') loadTheme();
+            if (e.key === 'salink_notifications') updateNotifBadge();
+            if (e.key === 'salink_sent_invites') {
+                loadSentInvites();
+                updateInviteBadge();
+            }
+        });
+    }
+
+    // ================================================================
+    // 28. EVENT LISTENERS
     // ================================================================
     function setupEventListeners() {
         if (_salinkSetup) return;
         _salinkSetup = true;
         log('Setting up event listeners...');
-                // Search Filter Chips (Emergency)
-        document.querySelectorAll('.search-filter-chip').forEach(function(c) {
-            c.addEventListener('click', function() {
-                setSearchEmergencyFilter(this.getAttribute('data-filter'), this);
-            });
-        });
-      
+
         // HEADER MENU
         var menuBtn = document.getElementById('menuBtn');
         if (menuBtn) {
@@ -3927,7 +4234,7 @@
         // MAP MODAL CLOSE
         var mapModalCloseBtn = document.getElementById('mapModalCloseBtn');
         if (mapModalCloseBtn) {
-          mapModalCloseBtn.addEventListener('click', function(e) {
+            mapModalCloseBtn.addEventListener('click', function(e) {
                 e.preventDefault(); e.stopPropagation();
                 closeMapModal();
             });
@@ -3987,6 +4294,11 @@
                 switchSearchTab(this.getAttribute('data-tab'), this);
             });
         });
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) {
+            c.addEventListener('click', function() {
+                setSearchEmergencyFilter(this.getAttribute('data-filter'), this);
+            });
+        });
         var searchInput = document.getElementById('searchInput');
         if (searchInput) {
             searchInput.addEventListener('input', function() {
@@ -4019,6 +4331,32 @@
             });
         }
 
+        // INVITE MODAL CLOSE
+        var inviteModalCloseBtn = document.getElementById('inviteModalCloseBtn');
+        if (inviteModalCloseBtn) inviteModalCloseBtn.addEventListener('click', closeInviteModal);
+        var inviteModalFooterBtn = document.getElementById('inviteModalFooterBtn');
+        if (inviteModalFooterBtn) {
+            inviteModalFooterBtn.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                closeInviteModal();
+            });
+        }
+        var inviteModal = document.getElementById('inviteModal');
+        if (inviteModal) {
+            inviteModal.addEventListener('click', function(e) {
+                if (e.target === inviteModal) closeInviteModal();
+            });
+        }
+
+        // BOTTOM NAV INVITE
+        var bottomInviteNav = document.getElementById('bottomInviteNav');
+        if (bottomInviteNav) {
+            bottomInviteNav.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                openInviteModal();
+            });
+        }
+
         // PREVIEW OVERLAY
         var overlayLoginBtn = document.getElementById('overlayLoginBtn');
         if (overlayLoginBtn) overlayLoginBtn.addEventListener('click', redirectToLogin);
@@ -4039,6 +4377,7 @@
             if (e.key === 'Escape') {
                 closeSearchModal();
                 closeNotifModal();
+                closeInviteModal();
                 closeFabModal();
                 closeMapModal();
                 closeSidebar();
@@ -4049,33 +4388,14 @@
     }
 
     // ================================================================
-    // 27. STORAGE EVENTS
-    // ================================================================
-    function initStorageEvents() {
-        window.addEventListener('storage', function(e) {
-            if (e.key === 'salink_sync_trigger') {
-                try {
-                    var data = JSON.parse(e.newValue);
-                    if (data && data.type) handleSyncMessage(data);
-                } catch(err) {}
-            }
-            if (e.key === 'salink_posts' || e.key === 'salink_emergencies') {
-                loadStatistics();
-            }
-            if (e.key === 'salink_user') loadUser();
-            if (e.key === 'salink_theme') loadTheme();
-            if (e.key === 'salink_notifications') updateNotifBadge();
-        });
-    }
-
-    // ================================================================
-    // 28. INIT
+    // 29. INIT
     // ================================================================
     function init() {
-        log('Initializing Statistik v13.0 FINAL...');
+        log('Initializing Statistik v14.0 FINAL...');
 
         loadTheme();
         loadReadNotifs();
+        loadSentInvites();
         loadUser();
         loadRecentSearches();
         setupLoginGuard();
@@ -4085,6 +4405,7 @@
         initStorageEvents();
 
         updateNotifBadge();
+        updateInviteBadge();
         setInterval(updateNotifBadge, 30000);
 
         loadStatistics();
@@ -4097,7 +4418,7 @@
         // Preview overlay jika belum login
         if (isPreviewMode) setTimeout(showPreviewOverlay, 1200);
 
-        log('✓ Statistik v13.0 Ready!');
+        log('✓ Statistik v14.0 Ready!');
         log('  Mode: ' + (isPreviewMode ? 'PREVIEW' : 'FULL'));
         log('  User: ' + (currentUser ? currentUser.username : 'Guest'));
     }
@@ -4109,7 +4430,7 @@
     }
 
     // ================================================================
-    // 29. EXPOSE GLOBAL
+    // 30. EXPOSE GLOBAL
     // ================================================================
     window.loadStatistics = loadStatistics;
     window.openSidebar = openSidebar;
@@ -4120,10 +4441,21 @@
     window.clearSearch = clearSearch;
     window.switchSearchTab = switchSearchTab;
     window.performSearch = performSearch;
+    window.setSearchEmergencyFilter = setSearchEmergencyFilter;
+    window.applySearchQuery = applySearchQuery;
+    window.removeRecentSearch = removeRecentSearch;
+    window.clearRecentSearches = clearRecentSearches;
+    window.goToPostFromSearch = goToPostFromSearch;
     window.openNotifModal = openNotifModal;
     window.closeNotifModal = closeNotifModal;
     window.openNotifDetail = openNotifDetail;
     window.markNotifRead = markNotifRead;
+    window.updateNotifBadge = updateNotifBadge;
+    window.openInviteModal = openInviteModal;
+    window.closeInviteModal = closeInviteModal;
+    window.loadInviteUsers = loadInviteUsers;
+    window.sendInvite = sendInvite;
+    window.updateInviteBadge = updateInviteBadge;
     window.openFabModal = openFabModal;
     window.closeFabModal = closeFabModal;
     window.openMapModal = openMapModal;
@@ -4137,14 +4469,8 @@
     window.showInstallPrompt = showInstallPrompt;
     window.showPreviewOverlay = showPreviewOverlay;
     window.hidePreviewOverlay = hidePreviewOverlay;
-    window.updateNotifBadge = updateNotifBadge;
-    window.goToPost = goToPost;
-    window.applySearchQuery = applySearchQuery;
-    window.removeRecentSearch = removeRecentSearch;
-    window.clearRecentSearches = clearRecentSearches;
-    window.setSearchEmergencyFilter = setSearchEmergencyFilter;
-  
-    log('✓ Statistik v13.0 Script Loaded');
+
+    log('✓ Statistik v14.0 Script Loaded');
 })();
     </script>
 
