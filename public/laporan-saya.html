@@ -1989,6 +1989,64 @@
             background: var(--accent-red);
             color: #fff;
         }
+
+        /* ============ INVITE MODAL ============ */
+.invite-user-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+}
+.invite-user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--accent-blue-gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: 1rem;
+    flex-shrink: 0;
+    overflow: hidden;
+    border: 2px solid var(--primary);
+}
+.invite-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.invite-user-info { flex: 1; min-width: 0; }
+.invite-user-name {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.invite-user-sub {
+    font-size: 0.58rem;
+    color: var(--text-muted);
+}
+.invite-user-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent-blue-gradient);
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+.invite-user-btn:active { transform: scale(0.95); }
+.invite-user-btn.sent {
+    background: rgba(63,185,80,0.15);
+    color: var(--success);
+    border: 1px solid var(--success);
+}
+.invite-user-btn:disabled { opacity: 0.6; cursor: not-allowed; }
         
         /* ================================================================
            PATCH UNIVERSAL — FIX WARNA HEADER + MODAL THEME
@@ -2364,7 +2422,7 @@
                 <span class="fab-emoji">🚨</span>
             </button>
         </div>
-        <button class="nav-item-bottom" id="bottomInviteNav" data-workspace="invite" data-action="login" type="button" aria-label="Invite">
+        <button class="nav-item-bottom" id="bottomInviteNav" data-workspace="invite" type="button" aria-label="Invite">
             <span class="nav-icon">📨</span>
             <span class="nav-label">Invite</span>
             <span class="badge" id="inviteBadge">0</span>
@@ -2502,6 +2560,36 @@
             </div>
             <div class="modal-body">
                 <div id="detailContent"></div>
+            </div>
+        </div>
+    </div>
+
+        <!-- ============================================================ -->
+    <!-- MODAL INVITE — SAMA DENGAN DASHBOARD                          -->
+    <!-- ============================================================ -->
+    <div class="modal-overlay" id="inviteModal">
+        <div class="modal-content" style="max-width:460px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Undang Pengguna</span>
+                    <span class="badge-count" id="inviteModalCount">0</span>
+                </div>
+                <button class="modal-close" id="inviteModalCloseBtn" type="button" aria-label="Tutup">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <input type="text" id="inviteSearchInput" placeholder="🔍 Cari nama atau username..." style="flex:1;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;color:var(--text-primary);font-size:0.72rem;font-family:inherit;">
+                    <button id="inviteRefreshBtn" type="button" style="padding:9px 14px;background:var(--accent-blue-gradient);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:0.7rem;font-weight:700;">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div id="inviteUserList" style="max-height:380px;overflow-y:auto;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-close-modal" id="inviteModalFooterBtn" type="button">Tutup</button>
             </div>
         </div>
     </div>
@@ -2674,7 +2762,7 @@
     <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
-        <!-- ============================================================ -->
+    <!-- ============================================================ -->
     <!-- SCRIPT — LAPORAN-SAYA JAVASCRIPT v13.0                        -->
     <!-- Konsisten dengan INDUK (dashboard, lokasi-bantuan, alert)    -->
     <!-- ============================================================ -->
@@ -3468,6 +3556,146 @@
         if (m) { m.classList.remove('active'); document.body.style.overflow = ''; }
     }
 
+        // ================================================================
+    // 21.5 INVITE MODAL (BARU - SAMA DENGAN DASHBOARD)
+    // ================================================================
+    var allUsers = [];
+    var sentInvites = {};
+
+    function loadSentInvites() {
+        try { sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}'); }
+        catch(e) { sentInvites = {}; }
+    }
+    function saveSentInvites() {
+        try { localStorage.setItem('salink_sent_invites', JSON.stringify(sentInvites)); }
+        catch(e) {}
+    }
+    function updateInviteBadge() {
+        var badge = document.getElementById('inviteBadge');
+        if (badge) {
+            var pending = Object.keys(sentInvites).length;
+            badge.textContent = pending;
+            badge.classList.toggle('show', pending > 0);
+        }
+    }
+    function openInviteModal() {
+        if (isPreviewMode) { showPreviewOverlay(); return; }
+        openModalById('inviteModal');
+        loadInviteUsers();
+        setupInviteFilters();
+    }
+    function closeInviteModal() { closeModalById('inviteModal'); }
+
+    function loadInviteUsers() {
+        var listEl = document.getElementById('inviteUserList');
+        if (!listEl) return;
+        if (!allUsers || allUsers.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-users-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada pengguna untuk diundang</p></div>';
+            return;
+        }
+        var filtered = allUsers.filter(function(u) { return !currentUser || u.username !== currentUser.username; });
+        var inputEl = document.getElementById('inviteSearchInput');
+        var q = (inputEl ? inputEl.value : '').toLowerCase().trim();
+        if (q) {
+            filtered = filtered.filter(function(u) {
+                return (u.fullName || '').toLowerCase().indexOf(q) !== -1 ||
+                       (u.username || '').toLowerCase().indexOf(q) !== -1;
+            });
+        }
+        var countEl = document.getElementById('inviteModalCount');
+        if (countEl) countEl.textContent = filtered.length;
+        if (filtered.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-search" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada pengguna yang cocok</p></div>';
+            return;
+        }
+        listEl.innerHTML = filtered.map(function(u) {
+            var initial = (u.fullName || u.username || 'U').charAt(0).toUpperCase();
+            var avatar = u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" alt="">' : initial;
+            var isSent = sentInvites[u.username] === true;
+            var location = [u.city, u.province].filter(Boolean).join(', ') || u.country || 'Lokasi tidak diketahui';
+            var statusDot = u.isOnline ? '🟢' : '⚪';
+            return '<div class="invite-user-item">' +
+                '<div class="invite-user-avatar">' + avatar + '</div>' +
+                '<div class="invite-user-info">' +
+                    '<div class="invite-user-name">' + statusDot + ' ' + escapeHTML(u.fullName || u.username) + '</div>' +
+                    '<div class="invite-user-sub"><i class="fas fa-map-marker-alt" style="font-size:0.5rem;"></i> ' + escapeHTML(location) + '</div>' +
+                '</div>' +
+                '<button class="invite-user-btn ' + (isSent ? 'sent' : '') + '" data-invite-username="' + escapeAttr(u.username) + '" ' + (isSent ? 'disabled' : '') + '>' +
+                    (isSent ? '<i class="fas fa-check"></i> Terkirim' : '<i class="fas fa-paper-plane"></i> Undang') +
+                '</button>' +
+            '</div>';
+        }).join('');
+
+        listEl.querySelectorAll('[data-invite-username]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                sendInvite(this.getAttribute('data-invite-username'), this);
+            });
+        });
+    }
+
+    function setupInviteFilters() {
+        var searchInput = document.getElementById('inviteSearchInput');
+        if (searchInput) searchInput.oninput = loadInviteUsers;
+        var refreshBtn = document.getElementById('inviteRefreshBtn');
+        if (refreshBtn) {
+            refreshBtn.onclick = function() {
+                var icon = this.querySelector('i');
+                if (icon) icon.classList.add('fa-spin');
+                try {
+                    var users = JSON.parse(localStorage.getItem('salink_users') || '[]');
+                    if (users && users.length > 0) allUsers = users;
+                    loadInviteUsers();
+                    showToast('🔄', 'Daftar pengguna diperbarui', 'fa-sync-alt');
+                } catch(e) {
+                    showToast('⚠️', 'Gagal refresh', 'fa-exclamation-triangle');
+                }
+                if (icon) setTimeout(function() { icon.classList.remove('fa-spin'); }, 800);
+            };
+        }
+    }
+
+    async function sendInvite(username, btnEl) {
+        if (!currentUser) { redirectToLogin(); return; }
+        if (!username) return;
+        btnEl.disabled = true;
+        btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        try {
+            sentInvites[username] = true;
+            saveSentInvites();
+            var invitePayload = {
+                id: 'invite-' + Date.now(),
+                user1: currentUser.username,
+                user2: username,
+                status: 'pending',
+                requestedBy: currentUser.username,
+                timestamp: new Date().toISOString(),
+                acceptedAt: ''
+            };
+            fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'save_invite', data: invitePayload })
+            }).catch(function() {});
+            btnEl.classList.add('sent');
+            btnEl.innerHTML = '<i class="fas fa-check"></i> Terkirim';
+            updateInviteBadge();
+            showToast('📨 Terkirim', 'Undangan dikirim ke ' + username, 'fa-paper-plane');
+        } catch(e) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = '<i class="fas fa-paper-plane"></i> Undang';
+            showToast('⚠️ Gagal', 'Tidak dapat mengirim undangan', 'fa-exclamation-triangle');
+        }
+    }
+
+    // Load all users saat init
+    function loadAllUsersFromStorage() {
+        try {
+            var users = JSON.parse(localStorage.getItem('salink_users') || '[]');
+            if (users && users.length > 0) allUsers = users;
+        } catch(e) { allUsers = []; }
+    }
+
+
     // ================================================================
     // 22. NOTIF MODAL — LENGKAP
     // ================================================================
@@ -4212,6 +4440,16 @@
             });
         }
 
+                // BOTTOM NAV INVITE
+        var bottomInviteNav = document.getElementById('bottomInviteNav');
+        if (bottomInviteNav) {
+            bottomInviteNav.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                openInviteModal();
+            });
+        }
+
         // HEADER NOTIF
         var headerNotifBtn = document.getElementById('headerNotifBtn');
         if (headerNotifBtn) {
@@ -4310,6 +4548,23 @@
             });
             searchInput.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape') closeSearchModal();
+            });
+        }
+                // INVITE MODAL CLOSE
+        var inviteModalCloseBtn = document.getElementById('inviteModalCloseBtn');
+        if (inviteModalCloseBtn) inviteModalCloseBtn.addEventListener('click', closeInviteModal);
+        var inviteModalFooterBtn = document.getElementById('inviteModalFooterBtn');
+        if (inviteModalFooterBtn) {
+            inviteModalFooterBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeInviteModal();
+            });
+        }
+        var inviteModal = document.getElementById('inviteModal');
+        if (inviteModal) {
+            inviteModal.addEventListener('click', function(e) {
+                if (e.target === inviteModal) closeInviteModal();
             });
         }
 
@@ -4426,7 +4681,8 @@
         } else {
             loadAll();
         }
-
+        loadSentInvites();
+        loadAllUsersFromStorage();
         setupLoginGuard();
         setupEventListeners();
         initRipple();
@@ -4434,6 +4690,7 @@
         initStorageEvents();
 
         updateNotifBadge();
+        updateInviteBadge();
         setInterval(updateNotifBadge, 30000);
 
         setInterval(function() {
@@ -4486,6 +4743,11 @@
     window.showPreviewOverlay = showPreviewOverlay;
     window.hidePreviewOverlay = hidePreviewOverlay;
     window.updateNotifBadge = updateNotifBadge;
+    window.openInviteModal = openInviteModal;
+    window.closeInviteModal = closeInviteModal;
+    window.loadInviteUsers = loadInviteUsers;
+    window.sendInvite = sendInvite;
+    window.updateInviteBadge = updateInviteBadge;
 
     log('✓ Laporan Saya v13.0 Script Loaded');
 })();
