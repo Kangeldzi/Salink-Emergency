@@ -3101,26 +3101,19 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <!-- ============================================================ -->
-    <!-- SCRIPT UTAMA — STATISTIK-EMERGENCY v14.0 (NO PATCH)           -->
+    <!-- SCRIPT UTAMA — STATISTIK-EMERGENCY v14.0 FINAL (NO PATCH)     -->
     <!-- ============================================================ -->
     <script>
 /* ====================================================================
  * SALINK COMMAND CENTER v14.0 — FINAL INDUK (NO PATCH)
  * ====================================================================
- * Fitur:
- *   - Tema Universal (dark/light) — konsisten dengan INDUK
- *   - PWA Install
- *   - Header: Menu | Logo | Search | Notif | Theme | Profil | Back
- *   - Sidebar + #sidebarMapBtn (Peta Darurat)
- *   - Modal Peta Darurat
- *   - Modal Search (4 tab 1 baris + chips selalu tampil)
- *   - Modal Notif (filter + tandai semua + mark read persistent)
- *   - Modal Invite (persis Dashboard)
- *   - Bottom Nav: Home | Toko | FAB | Invite | Profil
- *   - FAB Modal 2×2 → dashboard.html?emergency=TYPE
- *   - KPI Grid + ECharts (Bar, Pie, Area) + Leaflet Map + Table
- *   - Central Delete + Cross-Tab Sync
- *   - Export CSV
+ * Struktur bersih:
+ *   Section 1-15  : Konstanta, State, Helpers, Theme, PWA, Preview, Sidebar, User
+ *   Section 16    : Sync, Delete, LoadData
+ *   Section 17-19 : Charts (Bar, Doughnut, Area) + Composition Legend
+ *   Section 20-21 : Map, Table, Export
+ *   Section 22-27 : Notif, Search, Invite, FAB, Map Modal, Logout
+ *   Section 28-31 : Ripple, Storage, Resize, Event Listeners, Init, Expose
  * ==================================================================== */
 (function() {
     'use strict';
@@ -3146,10 +3139,10 @@
         fire: '🔥', medical: '🚑', crime: '🚓', disaster: '🌪️'
     };
     var CATEGORY_MAP = {
-        fire:    { label: '🔥 Kebakaran', color: '#f97316' },
-        medical: { label: '🚑 Medis',     color: '#38bdf8' },
-        crime:   { label: '🚓 Kriminal',  color: '#a78bfa' },
-        disaster:{ label: '🌪️ Bencana',   color: '#facc15' }
+        fire:     { label: '🔥 Kebakaran', color: '#f97316' },
+        medical:  { label: '🚑 Medis',     color: '#38bdf8' },
+        crime:    { label: '🚓 Kriminal',  color: '#a78bfa' },
+        disaster: { label: '🌪️ Bencana',   color: '#facc15' }
     };
 
     // ================================================================
@@ -3693,7 +3686,7 @@
     }
 
     // ================================================================
-    // 16a. CHARTS (ECharts)
+    // 16. CHARTS (ECharts)
     // ================================================================
     function initCharts(data) {
         if (typeof echarts === 'undefined') return;
@@ -3713,7 +3706,7 @@
         var values = cats.map(function(c) { return byType[c]; });
         var colors = cats.map(function(c) { return CATEGORY_MAP[c].color; });
 
-        // Bar chart
+        // ---- Bar Chart ----
         var barDom = document.getElementById('chartBar');
         if (barDom) {
             if (!chartInstances.bar) chartInstances.bar = echarts.init(barDom);
@@ -3747,7 +3740,7 @@
             }, true);
         }
 
-               // Doughnut chart — di tengah, tanpa legend ECharts (legend pakai HTML grid di bawah)
+        // ---- Doughnut Chart (legend ECharts OFF, legend HTML di bawah) ----
         var doughnutDom = document.getElementById('chartDoughnut');
         if (doughnutDom) {
             if (!chartInstances.doughnut) chartInstances.doughnut = echarts.init(doughnutDom);
@@ -3785,41 +3778,13 @@
                         itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' }
                     }
                 }]
-            }, true); 
+            }, true);
         }
-        // Render legend grid 2×2 di bawah doughnut
+
+        // ---- Render legend grid 2×2 di bawah doughnut ----
         renderCompositionLegend(byType);
-    // ================================================================
-    // 16b. COMPOSITION LEGEND GRID 2×2
-    // ================================================================
-    function renderCompositionLegend(byType) {
-        var legendEl = document.getElementById('compositionLegend');
-        if (!legendEl) {
-            console.warn('⚠️ [CompositionLegend] #compositionLegend tidak ditemukan di DOM');
-            return;
-        }
-        byType = byType || { fire: 0, medical: 0, crime: 0, disaster: 0 };
 
-        var items = [
-            { key: 'fire',     label: 'Kebakaran', color: '#f97316' },
-            { key: 'medical',  label: 'Medis',     color: '#38bdf8' },
-            { key: 'crime',    label: 'Kriminal',  color: '#a78bfa' },
-            { key: 'disaster', label: 'Bencana',   color: '#facc15' }
-        ];
-
-        legendEl.innerHTML = items.map(function(it) {
-            var count = byType[it.key] || 0;
-            return '<div class="composition-legend-item">' +
-                '<span class="composition-legend-dot" style="background:' + it.color + ';color:' + it.color + ';"></span>' +
-                '<span class="composition-legend-label">' + escapeHTML(it.label) + '</span>' +
-                '<span class="composition-legend-count">' + count + '</span>' +
-            '</div>';
-        }).join('');
-
-        console.log('✅ [CompositionLegend] Rendered:', items.map(function(i) { return i.label + '=' + (byType[i.key] || 0); }).join(', '));
-    }
-
-        // Area chart 7 days
+        // ---- Area Chart (7 hari) ----
         var days = [];
         for (var i = 6; i >= 0; i--) {
             var d = new Date();
@@ -3881,7 +3846,35 @@
     }
 
     // ================================================================
-    // 17. MAP (Leaflet)
+    // 17. COMPOSITION LEGEND GRID 2×2 (fungsi terpisah, TIDAK nested)
+    // ================================================================
+    function renderCompositionLegend(byType) {
+        var legendEl = document.getElementById('compositionLegend');
+        if (!legendEl) {
+            console.warn('⚠️ [CompositionLegend] #compositionLegend tidak ditemukan di DOM');
+            return;
+        }
+        byType = byType || { fire: 0, medical: 0, crime: 0, disaster: 0 };
+
+        var items = [
+            { key: 'fire',     label: 'Kebakaran', color: '#f97316' },
+            { key: 'medical',  label: 'Medis',     color: '#38bdf8' },
+            { key: 'crime',    label: 'Kriminal',  color: '#a78bfa' },
+            { key: 'disaster', label: 'Bencana',   color: '#facc15' }
+        ];
+
+        legendEl.innerHTML = items.map(function(it) {
+            var count = byType[it.key] || 0;
+            return '<div class="composition-legend-item">' +
+                '<span class="composition-legend-dot" style="background:' + it.color + ';color:' + it.color + ';"></span>' +
+                '<span class="composition-legend-label">' + escapeHTML(it.label) + '</span>' +
+                '<span class="composition-legend-count">' + count + '</span>' +
+            '</div>';
+        }).join('');
+    }
+
+    // ================================================================
+    // 18. MAP (Leaflet)
     // ================================================================
     function renderMap(allEms) {
         var el = document.getElementById('map');
@@ -3923,7 +3916,7 @@
     }
 
     // ================================================================
-    // 18. TABLE
+    // 19. TABLE
     // ================================================================
     function renderTable(allEms) {
         var body = document.getElementById('reportsBody');
@@ -3962,7 +3955,7 @@
     }
 
     // ================================================================
-    // 19. EXPORT CSV
+    // 20. EXPORT CSV
     // ================================================================
     function exportCSV() {
         if (isPreviewMode) { showPreviewOverlay(); return; }
@@ -3994,7 +3987,7 @@
     }
 
     // ================================================================
-    // 20. NOTIF MODAL
+    // 21. NOTIF MODAL
     // ================================================================
     function loadReadNotifs() {
         try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); }
@@ -4151,7 +4144,7 @@
     }
 
     // ================================================================
-    // 21. SEARCH MODAL
+    // 22. SEARCH MODAL
     // ================================================================
     function openModalById(id) {
         var m = document.getElementById(id);
@@ -4176,11 +4169,10 @@
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         var allTab = document.querySelector('.search-tab[data-tab="all"]');
         if (allTab) allTab.classList.add('active');
-                searchEmergencyFilter = 'all';
+        searchEmergencyFilter = 'all';
         document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
         var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
         if (allChip) allChip.classList.add('active');
-
         // Reset chips row ke hidden (muncul hanya saat tab Emergency)
         var chipsRow = document.getElementById('emergencyFilters');
         if (chipsRow) chipsRow.classList.add('hidden');
@@ -4196,7 +4188,7 @@
         var sdv = document.getElementById('searchDefaultView');
         if (sdv) sdv.style.display = 'block';
     }
-        function switchSearchTab(tab, btnEl) {
+    function switchSearchTab(tab, btnEl) {
         searchTab = tab;
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         btnEl.classList.add('active');
@@ -4204,11 +4196,8 @@
         // Show chips filter HANYA saat tab Emergency aktif
         var chipsRow = document.getElementById('emergencyFilters');
         if (chipsRow) {
-            if (tab === 'emergency') {
-                chipsRow.classList.remove('hidden');
-            } else {
-                chipsRow.classList.add('hidden');
-            }
+            if (tab === 'emergency') chipsRow.classList.remove('hidden');
+            else chipsRow.classList.add('hidden');
         }
 
         var input = document.getElementById('searchInput');
@@ -4330,7 +4319,7 @@
     }
 
     // ================================================================
-    // 22. INVITE MODAL
+    // 23. INVITE MODAL
     // ================================================================
     function loadSentInvites() {
         try { sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}'); }
@@ -4448,7 +4437,7 @@
     }
 
     // ================================================================
-    // 23. FAB MODAL
+    // 24. FAB MODAL
     // ================================================================
     function openFabModal() {
         var overlay = document.getElementById('fabModalOverlay');
@@ -4511,7 +4500,7 @@
     }
 
     // ================================================================
-    // 24. MAP MODAL — PETA DARURAT
+    // 25. MAP MODAL — PETA DARURAT
     // ================================================================
     function openMapModal() {
         log('openMapModal() called');
@@ -4680,7 +4669,7 @@
     }
 
     // ================================================================
-    // 25. LOGOUT
+    // 26. LOGOUT
     // ================================================================
     function handleLogout() {
         if (confirm('Apakah Anda yakin ingin keluar?')) {
@@ -4696,7 +4685,7 @@
     }
 
     // ================================================================
-    // 26. RIPPLE
+    // 27. RIPPLE
     // ================================================================
     function initRipple() {
         document.addEventListener('click', function(e) {
@@ -4717,7 +4706,7 @@
     }
 
     // ================================================================
-    // 27. STORAGE EVENTS
+    // 28. STORAGE EVENTS
     // ================================================================
     function initStorageEvents() {
         window.addEventListener('storage', function(e) {
@@ -4735,7 +4724,7 @@
     }
 
     // ================================================================
-    // 28. RESIZE
+    // 29. RESIZE
     // ================================================================
     window.addEventListener('resize', function() {
         Object.keys(chartInstances).forEach(function(k) {
@@ -4745,7 +4734,7 @@
     });
 
     // ================================================================
-    // 29. EVENT LISTENERS
+    // 30. EVENT LISTENERS
     // ================================================================
     function setupEventListeners() {
         if (_salinkSetup) return;
@@ -4986,7 +4975,7 @@
     }
 
     // ================================================================
-    // 30. INIT
+    // 31. INIT
     // ================================================================
     function init() {
         log('Initializing Command Center v14.0 FINAL...');
@@ -5023,7 +5012,7 @@
     }
 
     // ================================================================
-    // 31. EXPOSE GLOBAL
+    // 32. EXPOSE GLOBAL
     // ================================================================
     window.goHome = goHome;
     window.requestDelete = requestDelete;
@@ -5065,6 +5054,7 @@
     window.activateMapGps = activateMapGps;
     window.mapSearchService = mapSearchService;
     window.loadData = loadData;
+    window.renderCompositionLegend = renderCompositionLegend;
 
     log('✓ Command Center v14.0 Script Loaded');
 })();
