@@ -2329,13 +2329,87 @@
             box-shadow: 0 0 0 2px rgba(230,0,18,0.08);
         }
 
-        /* ============ COMPOSITION PANEL — RAPIH & KOTAK LEGEND KECIL ============ */
-        #chartDoughnut {
-            min-height: 200px !important;
-        }
-        /* Panel composition sedikit lebih tinggi supaya legend tidak tumpang tindih */
+                /* ================================================================
+           PATCH v14.2 — COMPOSITION LAYOUT REDESIGN
+           Doughnut di tengah, legend grid 2×2 di bawah
+           ================================================================ */
+
+        /* Panel composition: atur min-height & flex column */
         .panel-grid .panel:has(#chartDoughnut) {
-            min-height: 240px;
+            min-height: auto !important;
+            padding-bottom: 12px !important;
+        }
+
+        /* Chart doughnut: full width, tengah, height fix */
+        #chartDoughnut {
+            width: 100% !important;
+            height: 180px !important;
+            min-height: 180px !important;
+            margin: 0 auto !important;
+        }
+
+        /* Legend grid 2×2 di bawah chart */
+        .composition-legend {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px 10px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed var(--border-color);
+        }
+        .composition-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            border-radius: 8px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
+            min-width: 0;
+        }
+        .composition-legend-item:active {
+            transform: scale(0.97);
+            border-color: var(--primary);
+        }
+        .composition-legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+            flex-shrink: 0;
+            box-shadow: 0 0 6px currentColor;
+        }
+        .composition-legend-label {
+            flex: 1;
+            font-size: 0.6rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+        }
+        .composition-legend-count {
+            font-size: 0.68rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            font-family: 'Poppins', sans-serif;
+            flex-shrink: 0;
+            padding: 1px 6px;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.06);
+            min-width: 22px;
+            text-align: center;
+        }
+        [data-theme="light"] .composition-legend-count {
+            background: rgba(0,0,0,0.06);
+        }
+
+        /* Responsive tiny */
+        @media (max-width: 360px) {
+            .composition-legend-label { font-size: 0.55rem; }
+            .composition-legend-count { font-size: 0.62rem; }
+            #chartDoughnut { height: 160px !important; min-height: 160px !important; }
         }
     </style>
 </head>
@@ -2647,11 +2721,14 @@
                 </div>
                 <div class="chart-wrap"><div id="chartBar" class="chart"></div></div>
             </div>
-            <div class="panel">
+                <div class="panel">
                 <div class="panel-head">
                     <div class="panel-title">🍩 Composition <span class="badge">PIE</span></div>
                 </div>
-                <div class="chart-wrap"><div id="chartDoughnut" class="chart"></div></div>
+                <div class="chart-wrap" style="min-height:auto;">
+                    <div id="chartDoughnut" class="chart"></div>
+                </div>
+                <div class="composition-legend" id="compositionLegend"></div>
             </div>
         </section>
 
@@ -3613,7 +3690,7 @@
     }
 
     // ================================================================
-    // 16. CHARTS (ECharts)
+    // 16a. CHARTS (ECharts)
     // ================================================================
     function initCharts(data) {
         if (typeof echarts === 'undefined') return;
@@ -3667,7 +3744,7 @@
             }, true);
         }
 
-                // Doughnut chart — legend di samping kanan, kotak kecil, no overlap
+               // Doughnut chart — di tengah, tanpa legend ECharts (legend pakai HTML grid di bawah)
         var doughnutDom = document.getElementById('chartDoughnut');
         if (doughnutDom) {
             if (!chartInstances.doughnut) chartInstances.doughnut = echarts.init(doughnutDom);
@@ -3675,33 +3752,27 @@
                 tooltip: {
                     backgroundColor: isDark ? 'rgba(6,8,15,0.92)' : 'rgba(255,255,255,0.95)',
                     textStyle: { color: textColor, fontSize: 11 },
-                    trigger: 'item'
-                },
-                legend: {
-                    orient: 'vertical',
-                    right: 4,
-                    top: 'middle',
-                    itemWidth: 8,
-                    itemHeight: 8,
-                    itemGap: 8,
-                    icon: 'roundRect',
-                    textStyle: {
-                        color: textColor,
-                        fontSize: 9,
-                        fontWeight: 600,
-                        padding: [0, 0, 0, 2]
-                    },
-                    formatter: function(name) {
-                        return name.length > 14 ? name.substring(0, 13) + '…' : name;
+                    trigger: 'item',
+                    formatter: function(p) {
+                        return p.name + ': <b>' + p.value + '</b>';
                     }
                 },
+                legend: { show: false },
                 series: [{
                     type: 'pie',
                     radius: ['50%', '72%'],
-                    center: ['34%', '50%'],
+                    center: ['50%', '50%'],
                     avoidLabelOverlap: true,
                     data: cats.map(function(c, i) {
-                        return { name: labels[i], value: values[i], itemStyle: { color: colors[i], borderColor: isDark ? '#141b2e' : '#ffffff', borderWidth: 2 } };
+                        return {
+                            name: labels[i],
+                            value: values[i],
+                            itemStyle: {
+                                color: colors[i],
+                                borderColor: isDark ? '#141b2e' : '#ffffff',
+                                borderWidth: 2
+                            }
+                        };
                     }),
                     label: { show: false },
                     labelLine: { show: false },
@@ -3713,6 +3784,31 @@
                 }]
             }, true);
         }
+
+    // ================================================================
+    // 16b. COMPOSITION LEGEND GRID 2×2
+    // ================================================================
+    function renderCompositionLegend(byType) {
+        var legendEl = document.getElementById('compositionLegend');
+        if (!legendEl) return;
+        byType = byType || { fire: 0, medical: 0, crime: 0, disaster: 0 };
+
+        var items = [
+            { key: 'fire',     label: 'Kebakaran', color: '#f97316', emoji: '🔥' },
+            { key: 'medical',  label: 'Medis',     color: '#38bdf8', emoji: '🚑' },
+            { key: 'crime',    label: 'Kriminal',  color: '#a78bfa', emoji: '🚓' },
+            { key: 'disaster', label: 'Bencana',   color: '#facc15', emoji: '🌪️' }
+        ];
+
+        legendEl.innerHTML = items.map(function(it) {
+            var count = byType[it.key] || 0;
+            return '<div class="composition-legend-item">' +
+                '<span class="composition-legend-dot" style="background:' + it.color + ';color:' + it.color + ';"></span>' +
+                '<span class="composition-legend-label">' + escapeHTML(it.label) + '</span>' +
+                '<span class="composition-legend-count">' + count + '</span>' +
+            '</div>';
+        }).join('');
+    }
 
         // Area chart 7 days
         var days = [];
