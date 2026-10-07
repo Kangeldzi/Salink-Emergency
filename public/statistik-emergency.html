@@ -2284,6 +2284,59 @@
         [data-theme="light"] .toast { background: #ffffff; }
         [data-theme="light"] .floating-notification { background: #ffffff; }
         [data-theme="light"] .preview-overlay-content { background: #ffffff; }
+
+                /* ================================================================
+           PATCH v14.1 — SEARCH CHIPS + DOUGHNUT LEGEND FIX
+           ================================================================ */
+
+        /* ============ SEARCH FILTER CHIPS — WRAP + TAMPIL SAAT TAB EMERGENCY ============ */
+        .search-filter-row {
+            display: flex !important;
+            gap: 6px;
+            margin-bottom: 12px;
+            flex-wrap: wrap !important;
+            overflow-x: visible !important;
+            padding-bottom: 0 !important;
+        }
+        .search-filter-row::-webkit-scrollbar { display: none; }
+        .search-filter-row.hidden {
+            display: none !important;
+        }
+        .search-filter-chip {
+            flex: 0 0 auto !important;
+            min-width: 0 !important;
+            padding: 6px 14px !important;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            color: var(--text-secondary);
+            font-size: 0.62rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            text-align: center;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .search-filter-chip:active { transform: scale(0.96); }
+        .search-filter-chip.active {
+            background: rgba(230,0,18,0.15);
+            border-color: var(--primary);
+            color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(230,0,18,0.08);
+        }
+
+        /* ============ COMPOSITION PANEL — RAPIH & KOTAK LEGEND KECIL ============ */
+        #chartDoughnut {
+            min-height: 200px !important;
+        }
+        /* Panel composition sedikit lebih tinggi supaya legend tidak tumpang tindih */
+        .panel-grid .panel:has(#chartDoughnut) {
+            min-height: 240px;
+        }
     </style>
 </head>
 <body>
@@ -2717,7 +2770,7 @@
                     </button>
                 </div>
 
-                <div class="search-filter-row" id="emergencyFilters">
+                    <div class="search-filter-row hidden" id="emergencyFilters">
                     <button class="search-filter-chip active" data-filter="all" type="button">🎯 Semua</button>
                     <button class="search-filter-chip" data-filter="fire" type="button">🔥 Kebakaran</button>
                     <button class="search-filter-chip" data-filter="medical" type="button">🚑 Medis</button>
@@ -2970,7 +3023,7 @@
     <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
-      <!-- ============================================================ -->
+    <!-- ============================================================ -->
     <!-- SCRIPT UTAMA — STATISTIK-EMERGENCY v14.0 (NO PATCH)           -->
     <!-- ============================================================ -->
     <script>
@@ -3614,7 +3667,7 @@
             }, true);
         }
 
-        // Doughnut chart
+                // Doughnut chart — legend di samping kanan, kotak kecil, no overlap
         var doughnutDom = document.getElementById('chartDoughnut');
         if (doughnutDom) {
             if (!chartInstances.doughnut) chartInstances.doughnut = echarts.init(doughnutDom);
@@ -3624,13 +3677,39 @@
                     textStyle: { color: textColor, fontSize: 11 },
                     trigger: 'item'
                 },
-                legend: { bottom: 0, textStyle: { color: textColor, fontSize: 9 } },
+                legend: {
+                    orient: 'vertical',
+                    right: 4,
+                    top: 'middle',
+                    itemWidth: 8,
+                    itemHeight: 8,
+                    itemGap: 8,
+                    icon: 'roundRect',
+                    textStyle: {
+                        color: textColor,
+                        fontSize: 9,
+                        fontWeight: 600,
+                        padding: [0, 0, 0, 2]
+                    },
+                    formatter: function(name) {
+                        return name.length > 14 ? name.substring(0, 13) + '…' : name;
+                    }
+                },
                 series: [{
                     type: 'pie',
-                    radius: ['48%', '72%'],
-                    center: ['50%', '42%'],
-                    data: cats.map(function(c, i) { return { name: labels[i], value: values[i], itemStyle: { color: colors[i] } }; }),
-                    label: { show: false }
+                    radius: ['50%', '72%'],
+                    center: ['34%', '50%'],
+                    avoidLabelOverlap: true,
+                    data: cats.map(function(c, i) {
+                        return { name: labels[i], value: values[i], itemStyle: { color: colors[i], borderColor: isDark ? '#141b2e' : '#ffffff', borderWidth: 2 } };
+                    }),
+                    label: { show: false },
+                    labelLine: { show: false },
+                    emphasis: {
+                        scale: true,
+                        scaleSize: 4,
+                        itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.3)' }
+                    }
                 }]
             }, true);
         }
@@ -3992,10 +4071,14 @@
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         var allTab = document.querySelector('.search-tab[data-tab="all"]');
         if (allTab) allTab.classList.add('active');
-        searchEmergencyFilter = 'all';
+                searchEmergencyFilter = 'all';
         document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
         var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
         if (allChip) allChip.classList.add('active');
+
+        // Reset chips row ke hidden (muncul hanya saat tab Emergency)
+        var chipsRow = document.getElementById('emergencyFilters');
+        if (chipsRow) chipsRow.classList.add('hidden');
     }
     function closeSearchModal() { closeModalById('searchModal'); }
     function clearSearch() {
@@ -4008,10 +4091,21 @@
         var sdv = document.getElementById('searchDefaultView');
         if (sdv) sdv.style.display = 'block';
     }
-    function switchSearchTab(tab, btnEl) {
+        function switchSearchTab(tab, btnEl) {
         searchTab = tab;
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         btnEl.classList.add('active');
+
+        // Show chips filter HANYA saat tab Emergency aktif
+        var chipsRow = document.getElementById('emergencyFilters');
+        if (chipsRow) {
+            if (tab === 'emergency') {
+                chipsRow.classList.remove('hidden');
+            } else {
+                chipsRow.classList.add('hidden');
+            }
+        }
+
         var input = document.getElementById('searchInput');
         if (input && input.value.trim()) performSearch(input.value.trim());
     }
