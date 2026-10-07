@@ -18,7 +18,12 @@
 
     <style>
         /* ==================================================================
-           SALINK KONTAK-DARURAT v13.1 — FINAL (KONSISTEN LOKASI-BANTUAN)
+           SALINK KONTAK-DARURAT v14.0 — FINAL (NO PATCH)
+           ==================================================================
+           Update v14.0:
+           - Modal Peta Darurat: GPS Opsi X (cache + auto-refresh)
+           - Modal Search: 4 tab + chips emergency selalu tampil
+           - Modal Invite: persis Dashboard
            ================================================================== */
 
         /* ============ ROOT VARIABLES ============ */
@@ -527,7 +532,7 @@
         .hero h1 { font-size: 1.2rem; font-weight: 800; font-family: 'Poppins', sans-serif; margin-bottom: 4px; }
         .hero p { font-size: 0.72rem; opacity: 0.9; line-height: 1.5; max-width: 500px; }
 
-        /* ============ CONTROL CARD (Search + Filter) ============ */
+        /* ============ CONTROL CARD ============ */
         .control-card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
@@ -618,11 +623,7 @@
         .refresh-btn:active { transform: scale(0.95); border-color: var(--primary); color: var(--primary); }
 
         /* ============ CONTACT GRID ============ */
-        .contact-grid {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
+        .contact-grid { display: flex; flex-direction: column; gap: 12px; }
         .contact-card {
             background: var(--bg-card);
             border: 1px solid var(--border-color);
@@ -670,11 +671,7 @@
             line-height: 1.3;
             margin-bottom: 3px;
         }
-        .contact-category {
-            font-size: 0.62rem;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-        }
+        .contact-category { font-size: 0.62rem; color: var(--text-muted); margin-bottom: 8px; }
         .contact-location {
             display: flex;
             align-items: flex-start;
@@ -701,11 +698,7 @@
             margin-bottom: 8px;
             border: 1px solid rgba(230,0,18,0.2);
         }
-        .contact-actions {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 6px;
-        }
+        .contact-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
         .contact-action {
             display: flex;
             align-items: center;
@@ -979,7 +972,7 @@
             color: var(--primary);
         }
 
-        /* Detail Modal Rows */
+        /* ============ DETAIL MODAL ROWS ============ */
         .detail-row {
             display: flex;
             padding: 8px 0;
@@ -988,18 +981,8 @@
             gap: 8px;
         }
         .detail-row:last-child { border-bottom: none; }
-        .detail-label {
-            color: var(--text-muted);
-            width: 110px;
-            flex-shrink: 0;
-            font-weight: 600;
-        }
-        .detail-value {
-            color: var(--text-primary);
-            word-break: break-word;
-            flex: 1;
-            font-weight: 500;
-        }
+        .detail-label { color: var(--text-muted); width: 110px; flex-shrink: 0; font-weight: 600; }
+        .detail-value { color: var(--text-primary); word-break: break-word; flex: 1; font-weight: 500; }
 
         /* ============ SEARCH MODAL ============ */
         .search-modal-content { max-width: 500px; max-height: 90vh; }
@@ -1031,7 +1014,7 @@
             font-size: 0.7rem;
         }
         .search-input-wrapper .clear-search-btn.visible { display: flex; }
-        #searchInput {
+        #searchInputGlobal {
             width: 100%;
             padding: 12px 42px 12px 42px;
             background: var(--bg-input);
@@ -1042,37 +1025,79 @@
             font-weight: 500;
             font-family: inherit;
         }
-        #searchInput:focus {
+        #searchInputGlobal:focus {
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(230,0,18,0.1);
         }
-        #searchInput::placeholder { color: var(--text-muted); }
-        .search-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+        #searchInputGlobal::placeholder { color: var(--text-muted); }
+
+        /* ============ SEARCH TABS ============ */
+        .search-tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: nowrap; }
         .search-tab {
             flex: 1;
-            min-width: 80px;
-            padding: 8px 10px;
+            min-width: 0;
+            padding: 8px 6px;
             background: var(--bg-input);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             color: var(--text-muted);
-            font-size: 0.62rem;
+            font-size: 0.6rem;
             font-weight: 700;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 4px;
+            gap: 3px;
             font-family: inherit;
             transition: all 0.2s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
+        .search-tab i { font-size: 0.6rem; flex-shrink: 0; }
         .search-tab.active {
             background: var(--accent-blue-gradient);
             color: #fff;
             border-color: var(--primary);
             box-shadow: 0 4px 12px rgba(230,0,18,0.3);
         }
+
+        /* ============ SEARCH FILTER CHIPS ============ */
+        .search-filter-row {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 10px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            padding-bottom: 4px;
+        }
+        .search-filter-row::-webkit-scrollbar { display: none; }
+        .search-filter-chip {
+            flex: 1;
+            min-width: 70px;
+            padding: 5px 8px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            color: var(--text-muted);
+            font-size: 0.58rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            white-space: nowrap;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .search-filter-chip:active { transform: scale(0.96); }
+        .search-filter-chip.active {
+            background: rgba(230,0,18,0.15);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
         .search-section-title {
             font-size: 0.68rem;
             font-weight: 800;
@@ -1201,13 +1226,63 @@
         .notif-item-title { font-size: 0.75rem; font-weight: 700; margin-bottom: 3px; color: var(--text-primary); }
         .notif-item-message { font-size: 0.65rem; color: var(--text-secondary); line-height: 1.4; margin-bottom: 4px; }
         .notif-item-time { font-size: 0.55rem; color: var(--text-muted); }
-
         .notif-filter-btn.active {
             background: var(--accent-blue-gradient) !important;
             color: #fff !important;
             border-color: var(--primary) !important;
         }
         .notif-filter-btn:active { transform: scale(0.96); }
+
+        /* ============ INVITE MODAL ============ */
+        .invite-user-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+        }
+        .invite-user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--accent-blue-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: 700;
+            font-size: 1rem;
+            flex-shrink: 0;
+            overflow: hidden;
+            border: 2px solid var(--primary);
+        }
+        .invite-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .invite-user-info { flex: 1; min-width: 0; }
+        .invite-user-name { font-size: 0.78rem; font-weight: 700; color: var(--text-primary); }
+        .invite-user-sub { font-size: 0.58rem; color: var(--text-muted); }
+        .invite-user-btn {
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: none;
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+        .invite-user-btn:active { transform: scale(0.95); }
+        .invite-user-btn.sent {
+            background: rgba(63,185,80,0.15);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+        .invite-user-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
         /* ============ FAB MODAL ============ */
         .fab-modal-overlay {
@@ -1330,10 +1405,7 @@
         }
 
         /* ============ MAP MODAL ============ */
-        #mapModal .modal-content {
-            max-width: 430px;
-            padding: 16px 14px;
-        }
+        #mapModal .modal-content { max-width: 430px; padding: 16px 14px; }
         .map-modal-title-icon {
             width: 30px;
             height: 30px;
@@ -1359,12 +1431,7 @@
             border-color: rgba(16,185,129,0.4);
             background: rgba(16,185,129,0.06);
         }
-        .map-status-icon {
-            font-size: 2rem;
-            margin-bottom: 6px;
-            display: inline-block;
-            line-height: 1;
-        }
+        .map-status-icon { font-size: 2rem; margin-bottom: 6px; display: inline-block; line-height: 1; }
         .map-status-title {
             font-size: 0.88rem;
             font-weight: 800;
@@ -1372,11 +1439,7 @@
             font-family: 'Poppins', sans-serif;
             margin-bottom: 3px;
         }
-        .map-status-desc {
-            font-size: 0.68rem;
-            color: var(--text-muted);
-            margin-bottom: 12px;
-        }
+        .map-status-desc { font-size: 0.68rem; color: var(--text-muted); margin-bottom: 12px; }
         .map-btn-location {
             width: 100%;
             padding: 11px 14px;
@@ -1417,27 +1480,10 @@
             line-height: 1.45;
             color: var(--text-secondary);
         }
-        .map-info-row .info-icon {
-            width: 20px;
-            text-align: center;
-            font-size: 0.85rem;
-            flex-shrink: 0;
-            margin-top: 2px;
-        }
-        .map-info-row .info-label {
-            color: var(--text-muted);
-            font-weight: 600;
-            margin-right: 4px;
-        }
-        .map-info-row .info-value {
-            color: var(--text-primary);
-            font-weight: 700;
-        }
-        .map-info-row .info-value.coords {
-            font-family: 'Courier New', monospace;
-            color: var(--primary);
-            font-size: 0.7rem;
-        }
+        .map-info-row .info-icon { width: 20px; text-align: center; font-size: 0.85rem; flex-shrink: 0; margin-top: 2px; }
+        .map-info-row .info-label { color: var(--text-muted); font-weight: 600; margin-right: 4px; }
+        .map-info-row .info-value { color: var(--text-primary); font-weight: 700; }
+        .map-info-row .info-value.coords { font-family: 'Courier New', monospace; color: var(--primary); font-size: 0.7rem; }
 
         .map-owner-card {
             background: var(--bg-input);
@@ -1472,11 +1518,7 @@
             color: var(--text-primary);
             font-family: 'Poppins', sans-serif;
         }
-        .map-owner-loc {
-            font-size: 0.62rem;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
+        .map-owner-loc { font-size: 0.62rem; color: var(--text-muted); margin-top: 2px; }
 
         .map-iframe-wrap {
             width: 100%;
@@ -1536,24 +1578,9 @@
             font-family: inherit;
         }
         .map-service-card:active { transform: scale(0.95); }
-        .map-service-card .service-icon {
-            font-size: 1.6rem;
-            line-height: 1;
-            filter: drop-shadow(0 3px 8px currentColor);
-        }
-        .map-service-card .service-label {
-            font-size: 0.62rem;
-            font-weight: 800;
-            letter-spacing: 0.2px;
-            text-align: center;
-            line-height: 1.2;
-        }
-        .map-service-card .service-desc {
-            font-size: 0.52rem;
-            color: var(--text-muted);
-            text-align: center;
-            font-weight: 500;
-        }
+        .map-service-card .service-icon { font-size: 1.6rem; line-height: 1; filter: drop-shadow(0 3px 8px currentColor); }
+        .map-service-card .service-label { font-size: 0.62rem; font-weight: 800; letter-spacing: 0.2px; text-align: center; line-height: 1.2; }
+        .map-service-card .service-desc { font-size: 0.52rem; color: var(--text-muted); text-align: center; font-weight: 500; }
         .map-service-card.fire { border-color: rgba(248,81,73,0.4); }
         .map-service-card.fire:active { background: rgba(248,81,73,0.15); border-color: var(--emergency-fire); }
         .map-service-card.fire .service-label { color: var(--emergency-fire); }
@@ -1567,11 +1594,7 @@
         .map-service-card.disaster:active { background: rgba(199,146,234,0.15); border-color: var(--emergency-disaster); }
         .map-service-card.disaster .service-label { color: var(--emergency-disaster); }
 
-        .map-actions-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-        }
+        .map-actions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .map-action-btn {
             padding: 11px 12px;
             border-radius: 10px;
@@ -1773,23 +1796,9 @@
             color: var(--primary);
         }
         .toast .toast-content { flex: 1; }
-        .toast .toast-title {
-            font-size: 0.72rem;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-        .toast .toast-message {
-            font-size: 0.68rem;
-            color: var(--text-secondary);
-        }
-        .toast .toast-close {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            font-size: 0.8rem;
-            padding: 4px;
-        }
+        .toast .toast-title { font-size: 0.72rem; font-weight: 700; color: var(--text-primary); }
+        .toast .toast-message { font-size: 0.68rem; color: var(--text-secondary); }
+        .toast .toast-close { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; padding: 4px; }
 
         /* ============ UTILITIES ============ */
         .ripple { position: relative; overflow: hidden; }
@@ -1803,10 +1812,7 @@
         }
         .shake-element { animation: shake 0.3s ease; }
 
-        :focus-visible {
-            outline: 2px solid var(--primary);
-            outline-offset: 2px;
-        }
+        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
         button:focus:not(:focus-visible) { outline: none; }
 
         /* ============ RESPONSIVE ============ */
@@ -1817,11 +1823,8 @@
                 transition-duration: .01ms !important;
             }
         }
-
         @media (max-width: 480px) {
-            .main-content {
-                padding: calc(var(--header-height) + 10px) 10px calc(var(--footer-height) + 20px);
-            }
+            .main-content { padding: calc(var(--header-height) + 10px) 10px calc(var(--footer-height) + 20px); }
             .sidebar { width: 85%; }
             .header-center { gap: 4px; }
             .header-left { gap: 4px; }
@@ -1830,341 +1833,56 @@
             .hero { padding: 16px; }
             .hero h1 { font-size: 1.1rem; }
         }
-
         @media (max-width: 360px) {
-            .user-btn, .search-btn, .menu-btn, .back-btn, .refresh-btn {
-                width: 34px;
-                height: 34px;
-            }
+            .user-btn, .search-btn, .menu-btn, .back-btn, .refresh-btn { width: 34px; height: 34px; }
             .app-title .title-text { font-size: 0.8rem; }
             .header-center { gap: 3px; }
             .nav-fab { width: 64px; height: 64px; }
             .nav-fab .fab-emoji { font-size: 1.7rem; }
+            .search-tab { font-size: 0.55rem; padding: 7px 4px; }
+            .search-filter-chip { font-size: 0.55rem; min-width: 62px; }
         }
 
-        /* ================================================================
-           PATCH UNIVERSAL — FIX WARNA HEADER + MODAL THEME
-           ================================================================ */
-        body, body * {
-            transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
-        }
-        body { color: var(--text-primary) !important; }
-        h1, h2, h3, h4, h5, h6 { color: var(--text-primary) !important; }
+        /* ============ UNIVERSAL THEME (NO PATCH) ============ */
+        body, body * { transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease; }
+        body { color: var(--text-primary); }
+        h1, h2, h3, h4, h5, h6 { color: var(--text-primary); }
         p, span, div, li, td, th, label, strong, em, small, b, i { color: inherit; }
-
         a { color: var(--primary); text-decoration: none; transition: color 0.2s ease; }
         a:hover { color: var(--primary-glow); }
-
-        input, textarea, select, button {
-            color: var(--text-primary);
-            font-family: inherit;
-        }
-        input::placeholder, textarea::placeholder {
-            color: var(--text-muted) !important;
-            opacity: 1;
-        }
+        input, textarea, select, button { color: var(--text-primary); font-family: inherit; }
+        input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1; }
         input:focus, textarea:focus, select:focus {
             color: var(--text-primary);
             background: var(--bg-input);
             border-color: var(--primary);
         }
-        select option {
-            background: var(--bg-card);
-            color: var(--text-primary);
-        }
-
-        [style*="color: #fff"], [style*="color:#fff"],
-        [style*="color: white"], [style*="color:white"] {
-            color: var(--text-primary) !important;
-        }
-
-        .app-bar { background: var(--header-bg) !important; border-bottom: 1px solid var(--border-color) !important; }
-        .app-title, .app-title .title-text { color: var(--text-white) !important; }
-
-        .user-btn, .search-btn, .menu-btn, .back-btn, .refresh-btn {
-            color: var(--text-white) !important;
-            background: rgba(255,255,255,0.08) !important;
-            border: 1px solid rgba(255,255,255,0.12) !important;
-        }
-        .user-btn:active, .search-btn:active, .menu-btn:active,
-        .back-btn:active, .refresh-btn:active {
-            transform: scale(0.9);
-            border-color: var(--primary) !important;
-            background: rgba(230,0,18,0.2) !important;
-        }
-
-        [data-theme="light"] .app-bar { background: rgba(255,255,255,0.92) !important; }
+        select option { background: var(--bg-card); color: var(--text-primary); }
+        [data-theme="light"] .app-bar { background: rgba(255,255,255,0.92); }
         [data-theme="light"] .app-title,
-        [data-theme="light"] .app-title .title-text { color: var(--text-primary) !important; }
+        [data-theme="light"] .app-title .title-text { color: var(--text-primary); }
         [data-theme="light"] .user-btn,
         [data-theme="light"] .search-btn,
         [data-theme="light"] .menu-btn,
         [data-theme="light"] .back-btn,
         [data-theme="light"] .refresh-btn {
-            color: var(--text-primary) !important;
-            background: rgba(0,0,0,0.06) !important;
-            border-color: rgba(0,0,0,0.1) !important;
+            color: var(--text-primary);
+            background: rgba(0,0,0,0.06);
+            border-color: rgba(0,0,0,0.1);
         }
-
-        #headerNotifBtn #notifBadge { border-color: var(--header-bg) !important; }
-        [data-theme="light"] #headerNotifBtn #notifBadge { border-color: var(--header-bg) !important; }
-
-        .sidebar { background: var(--bg-secondary) !important; color: var(--text-primary); }
-        .sidebar-user-name { color: var(--text-primary); }
-        .sidebar-user-email { color: var(--text-muted); }
-        .nav-link { color: var(--text-primary); }
-        .nav-link i { color: var(--accent-gold); }
-        .nav-link.active { color: var(--primary); }
-        .nav-link.active i { color: var(--primary); }
-        [data-theme="light"] .sidebar { background: #ffffff !important; }
-
-        .nav-item-bottom { color: var(--text-muted); }
-        .nav-item-bottom.active .nav-label { color: var(--primary); }
-        [data-theme="light"] .bottom-nav { background: rgba(255,255,255,0.98) !important; }
-        [data-theme="light"] .nav-item-bottom .badge { border-color: var(--footer-bg) !important; }
-
-        .modal-content, .modal-body, .modal-title { color: var(--text-primary) !important; }
-        .modal-body p, .modal-body span, .modal-body div { color: var(--text-primary); }
-        [data-theme="light"] .modal-content { background: #ffffff !important; color: var(--text-primary); }
-        [data-theme="light"] .modal-header { background: #ffffff; }
+        [data-theme="light"] .sidebar { background: #ffffff; }
+        [data-theme="light"] .bottom-nav { background: rgba(255,255,255,0.98); }
+        [data-theme="light"] .modal-content { background: #ffffff; color: var(--text-primary); }
+        [data-theme="light"] .modal-header,
         [data-theme="light"] .modal-footer { background: #ffffff; }
         [data-theme="light"] .modal-footer .btn-close-modal {
             background: rgba(0,0,0,0.04);
             color: var(--text-primary);
             border-color: rgba(0,0,0,0.1);
         }
-
-        .search-section-title { color: var(--text-secondary) !important; }
-        .search-result-item .result-title { color: var(--text-primary) !important; }
-        .search-result-item .result-sub { color: var(--text-secondary) !important; }
-        .search-result-item .result-arrow { color: var(--text-muted) !important; }
-        .search-empty-state { color: var(--text-muted); }
-        .search-empty-state h4 { color: var(--text-secondary); }
-
-        .notif-item { color: var(--text-primary); }
-        .notif-item-title { color: var(--text-primary) !important; }
-        .notif-item-message { color: var(--text-secondary) !important; }
-        .notif-item-time { color: var(--text-muted) !important; }
-
-        .preview-overlay-content { color: var(--text-primary); }
-        .preview-overlay-content h2 { color: var(--text-primary); }
-        .preview-overlay-content p { color: var(--text-secondary); }
-        [data-theme="light"] .preview-overlay-content { background: #ffffff; }
-
-        .toast .toast-title { color: var(--text-primary); }
-        .toast .toast-message { color: var(--text-secondary); }
         [data-theme="light"] .toast { background: #ffffff; }
-
-        .floating-notification .notif-title { color: var(--text-primary); }
-        .floating-notification .notif-message { color: var(--text-secondary); }
-        .floating-notification .notif-subtitle { color: var(--text-muted); }
         [data-theme="light"] .floating-notification { background: #ffffff; }
-
-        .map-status-title { color: var(--text-primary) !important; }
-        .map-status-desc { color: var(--text-muted) !important; }
-        .map-info-row { color: var(--text-secondary) !important; }
-        .map-info-row .info-label { color: var(--text-muted) !important; }
-        .map-info-row .info-value { color: var(--text-primary) !important; }
-        .map-info-row .info-value.coords { color: var(--text-primary) !important; font-family: 'Courier New', monospace; }
-        .map-owner-name { color: var(--text-primary) !important; }
-        .map-owner-loc { color: var(--text-muted) !important; }
-        .map-address-row { color: var(--text-muted) !important; }
-        .map-address-row .map-address-value { color: var(--text-primary) !important; }
-        .map-services-label { color: var(--text-secondary) !important; }
-        .map-service-card .service-desc { color: var(--text-muted) !important; }
-
-        * { -webkit-text-fill-color: currentColor; }
-        ::-webkit-scrollbar-thumb { background: var(--primary); }
-        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-
-                /* ============ 🆘 KONTAK DARURAT NASIONAL ============ */
-        .national-emergency-section {
-            background: linear-gradient(160deg, #2a0a15 0%, #4a0a15 100%);
-            border: 1px solid rgba(230, 0, 18, 0.3);
-            border-radius: var(--radius);
-            padding: 14px 16px;
-            margin-bottom: 14px;
-            box-shadow: 0 6px 24px rgba(74, 10, 21, 0.4);
-            position: relative;
-            overflow: hidden;
-        }
-        .national-emergency-section::before {
-            content: '';
-            position: absolute;
-            top: -40px;
-            right: -40px;
-            width: 120px;
-            height: 120px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(230, 0, 18, 0.3), transparent 70%);
-            pointer-events: none;
-        }
-        .national-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 10px;
-            margin-bottom: 12px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            position: relative;
-            z-index: 1;
-        }
-        .national-title {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex: 1;
-            min-width: 0;
-        }
-        .national-icon {
-            font-size: 1.5rem;
-            line-height: 1;
-            animation: notifPulse 1.5s ease-in-out infinite;
-            flex-shrink: 0;
-        }
-        .national-title-text {
-            font-size: 0.88rem;
-            font-weight: 800;
-            color: #ffffff;
-            font-family: 'Poppins', sans-serif;
-            margin-bottom: 2px;
-        }
-        .national-title-sub {
-            font-size: 0.58rem;
-            color: rgba(255, 255, 255, 0.65);
-            font-weight: 500;
-        }
-        .national-toggle-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #fff;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            flex-shrink: 0;
-            transition: all 0.3s;
-        }
-        .national-toggle-btn:active { transform: scale(0.9); }
-        .national-toggle-btn i { transition: transform 0.3s; }
-        .national-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            position: relative;
-            z-index: 1;
-            transition: max-height 0.4s ease, opacity 0.3s ease;
-            overflow: hidden;
-        }
-        .national-grid.collapsed {
-            max-height: 0;
-            opacity: 0;
-            margin: 0;
-        }
-        .national-card {
-            background: rgba(10, 14, 26, 0.55);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            padding: 10px 10px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            transition: all 0.25s;
-            text-decoration: none;
-            color: #ffffff;
-            position: relative;
-            overflow: hidden;
-            min-height: 60px;
-        }
-        .national-card:active { transform: scale(0.97); }
-        .national-card:hover {
-            border-color: var(--primary);
-            background: rgba(230, 0, 18, 0.15);
-            box-shadow: 0 4px 14px rgba(230, 0, 18, 0.3);
-        }
-        .national-card-icon {
-            width: 34px;
-            height: 34px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
-            flex-shrink: 0;
-            background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .national-card-icon.fire { background: rgba(248,81,73,0.15); border-color: rgba(248,81,73,0.3); }
-        .national-card-icon.medical { background: rgba(79,195,247,0.15); border-color: rgba(79,195,247,0.3); }
-        .national-card-icon.crime { background: rgba(240,208,128,0.15); border-color: rgba(240,208,128,0.3); }
-        .national-card-icon.disaster { background: rgba(199,146,234,0.15); border-color: rgba(199,146,234,0.3); }
-        .national-card-icon.general { background: rgba(230,0,18,0.15); border-color: rgba(230,0,18,0.3); }
-        .national-card-info {
-            flex: 1;
-            min-width: 0;
-        }
-        .national-card-label {
-            font-size: 0.62rem;
-            font-weight: 700;
-            color: rgba(255, 255, 255, 0.85);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-bottom: 2px;
-        }
-        .national-card-number {
-            font-size: 0.82rem;
-            font-weight: 800;
-            color: #ffffff;
-            font-family: 'Poppins', sans-serif;
-            letter-spacing: 0.5px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .national-card-number.hotline {
-            color: #ff6b7a;
-        }
-        .national-card-actions {
-            display: flex;
-            gap: 4px;
-            flex-shrink: 0;
-        }
-        .national-card-action {
-            width: 26px;
-            height: 26px;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            color: #fff;
-            font-size: 0.65rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            text-decoration: none;
-        }
-        .national-card-action:active { transform: scale(0.9); }
-        .national-card-action.phone { color: #3fb950; border-color: rgba(63,185,80,0.3); }
-        .national-card-action.phone:hover { background: rgba(63,185,80,0.2); }
-        .national-card-action.whatsapp { color: #25D366; border-color: rgba(37,211,102,0.3); }
-        .national-card-action.whatsapp:hover { background: rgba(37,211,102,0.2); }
-        .national-card-action.website { color: var(--primary); border-color: rgba(230,0,18,0.3); }
-        .national-card-action.website:hover { background: rgba(230,0,18,0.2); }
-
-        @media (max-width: 360px) {
-            .national-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-        
+        [data-theme="light"] .preview-overlay-content { background: #ffffff; }
     </style>
 </head>
 <body>
@@ -2208,7 +1926,7 @@
         <span class="login-link" id="badgeLoginLink">Masuk untuk berinteraksi</span>
     </div>
 
-    <!-- HEADER -->
+    <!-- HEADER — KONSISTEN DENGAN SEMUA FILE -->
     <header class="app-bar" id="appBar">
         <div class="header-left">
             <button class="menu-btn" id="menuBtn" type="button" title="Menu" aria-label="Menu">
@@ -2335,7 +2053,7 @@
         </ul>
     </div>
 
-    <!-- MAIN CONTENT -->
+    <!-- MAIN CONTENT — KONTEN KHUSUS KONTAK DARURAT -->
     <main class="main-content">
 
         <!-- BRAND SECTION -->
@@ -2363,7 +2081,7 @@
             </p>
         </section>
 
-        <!-- 🆘 KONTAK DARURAT NASIONAL (SECTION BARU) -->
+        <!-- 🆘 KONTAK DARURAT NASIONAL -->
         <section class="national-emergency-section" id="nationalEmergencySection">
             <div class="national-header">
                 <div class="national-title">
@@ -2435,7 +2153,7 @@
                 <span class="fab-emoji">🚨</span>
             </button>
         </div>
-        <button class="nav-item-bottom" id="bottomInviteNav" data-workspace="invite" data-action="login" type="button" aria-label="Invite">
+        <button class="nav-item-bottom" id="bottomInviteNav" data-workspace="invite" type="button" aria-label="Invite">
             <span class="nav-icon">📨</span>
             <span class="nav-label">Invite</span>
             <span class="badge" id="inviteBadge">0</span>
@@ -2448,7 +2166,9 @@
 
     </div> <!-- /app-shell -->
 
-    <!-- MODAL SEARCH -->
+    <!-- ============================================================ -->
+    <!-- MODAL SEARCH — 4 TAB + CHIPS SELALU TAMPIL                    -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="searchModal">
         <div class="modal-content search-modal-content">
             <div class="modal-header">
@@ -2468,6 +2188,8 @@
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
+
+                <!-- 4 TAB DALAM 1 BARIS -->
                 <div class="search-tabs">
                     <button class="search-tab active" data-tab="all" type="button">
                         <i class="fas fa-globe"></i> Semua
@@ -2482,6 +2204,16 @@
                         <i class="fas fa-exclamation-triangle"></i> Emergency
                     </button>
                 </div>
+
+                <!-- FILTER CHIPS — SELALU TAMPIL -->
+                <div class="search-filter-row" id="emergencyFilters">
+                    <button class="search-filter-chip active" data-filter="all" type="button">🎯 Semua</button>
+                    <button class="search-filter-chip" data-filter="fire" type="button">🔥 Kebakaran</button>
+                    <button class="search-filter-chip" data-filter="medical" type="button">🚑 Medis</button>
+                    <button class="search-filter-chip" data-filter="crime" type="button">🚓 Kriminal</button>
+                    <button class="search-filter-chip" data-filter="disaster" type="button">🌪️ Bencana</button>
+                </div>
+
                 <div id="searchResultsBody">
                     <div id="searchDefaultView">
                         <div class="search-empty-state">
@@ -2500,7 +2232,9 @@
         </div>
     </div>
 
-    <!-- MODAL NOTIFIKASI -->
+    <!-- ============================================================ -->
+    <!-- MODAL NOTIFIKASI                                              -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="notifModal">
         <div class="modal-content" style="max-width:460px;">
             <div class="modal-header">
@@ -2515,21 +2249,21 @@
             </div>
             <div class="modal-body">
                 <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;">
-                    <button class="notif-filter-btn active" data-filter="all" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                    <button class="notif-filter-btn active" data-filter="all" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
                         <i class="fas fa-list"></i> Semua
                     </button>
-                    <button class="notif-filter-btn" data-filter="unread" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                    <button class="notif-filter-btn" data-filter="unread" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
                         <i class="fas fa-circle"></i> Belum
                     </button>
-                    <button class="notif-filter-btn" data-filter="emergency" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                    <button class="notif-filter-btn" data-filter="emergency" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
                         <i class="fas fa-exclamation-triangle"></i> Darurat
                     </button>
-                    <button class="notif-filter-btn" data-filter="regular" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);color:#6b7688;font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
+                    <button class="notif-filter-btn" data-filter="regular" type="button" style="flex:1;padding:7px 10px;border-radius:8px;border:1px solid var(--border-color);background:var(--bg-input);color:var(--text-muted);font-size:0.62rem;cursor:pointer;font-weight:700;font-family:inherit;">
                         <i class="fas fa-bell"></i> Biasa
                     </button>
                 </div>
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:7px 10px;background:rgba(255,255,255,0.04);border-radius:10px;">
-                    <span style="font-size:0.62rem;color:#a8b2c1;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding:7px 10px;background:var(--bg-input);border-radius:10px;">
+                    <span style="font-size:0.62rem;color:var(--text-secondary);">
                         <i class="fas fa-info-circle" style="color:var(--primary);"></i>
                         <span id="notifStatsText">0 notifikasi</span>
                     </span>
@@ -2545,7 +2279,39 @@
         </div>
     </div>
 
-    <!-- FAB MODAL -->
+    <!-- ============================================================ -->
+    <!-- MODAL INVITE — SAMA DENGAN DASHBOARD                          -->
+    <!-- ============================================================ -->
+    <div class="modal-overlay" id="inviteModal">
+        <div class="modal-content" style="max-width:460px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-user-plus"></i>
+                    <span>Undang Pengguna</span>
+                    <span class="badge-count" id="inviteModalCount">0</span>
+                </div>
+                <button class="modal-close" id="inviteModalCloseBtn" type="button" aria-label="Tutup">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <input type="text" id="inviteSearchInput" placeholder="🔍 Cari nama atau username..." style="flex:1;padding:9px 12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;color:var(--text-primary);font-size:0.72rem;font-family:inherit;">
+                    <button id="inviteRefreshBtn" type="button" style="padding:9px 14px;background:var(--accent-blue-gradient);color:#fff;border:none;border-radius:10px;cursor:pointer;font-size:0.7rem;font-weight:700;">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div id="inviteUserList" style="max-height:380px;overflow-y:auto;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-close-modal" id="inviteModalFooterBtn" type="button">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- FAB MODAL — GRID 2×2 EMERGENCY                                -->
+    <!-- ============================================================ -->
     <div class="fab-modal-overlay" id="fabModalOverlay">
         <div class="fab-modal-content" id="fabModalContent">
             <button class="fab-modal-close" id="fabModalClose" type="button" aria-label="Tutup">
@@ -2588,7 +2354,9 @@
         </div>
     </div>
 
-    <!-- MODAL PETA DARURAT -->
+    <!-- ============================================================ -->
+    <!-- MODAL PETA DARURAT                                            -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="mapModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -2711,24 +2479,17 @@
     <div class="toast-container" id="toastContainer"></div>
 
         <!-- ============================================================ -->
-    <!-- SCRIPT — KONTAK-DARURAT v13.1 — FINAL + KONTAK NASIONAL       -->
+    <!-- SCRIPT UTAMA — KONTAK-DARURAT v14.0 (NO PATCH)                -->
     <!-- ============================================================ -->
     <script>
 /* ====================================================================
- * SALINK KONTAK-DARURAT v13.1 — FINAL
+ * SALINK KONTAK-DARURAT v14.0 — FINAL (NO PATCH)
  * ====================================================================
- * Fitur:
- *   - 12 Kontak Darurat Nasional (hardcoded, valid)
- *   - Kontak dari Google Sheets (dinamis)
- *   - Tema Universal (dark/light)
- *   - PWA Install
- *   - Header dengan Back button
- *   - Sidebar dengan #sidebarMapBtn
- *   - Modal Peta Darurat (GPS akurat)
- *   - Modal Search + TOMBOL TUTUP
- *   - Modal Notif LENGKAP: filter + tandai semua + mark read
- *   - Modal Detail Kontak
- *   - FAB Modal 2×2 → dashboard.html?emergency=TYPE
+ * Update v14.0:
+ *   - GPS Opsi X: cache instant + auto-refresh (maximumAge: 0)
+ *   - Modal Search: 4 tab + chips SELALU TAMPIL
+ *   - Modal Invite: persis Dashboard
+ *   - Kontak Nasional (hardcoded) + Kontak dari Google Sheets
  * ==================================================================== */
 (function() {
     'use strict';
@@ -2736,170 +2497,41 @@
     // ================================================================
     // 1. KONSTANTA
     // ================================================================
-    const API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
-    const LOGIN_URL = 'login-register.html';
-    const DASHBOARD_URL = 'dashboard.html';
-    const PROFILE_URL = 'profil.html';
-    const DETAIL_URL = 'detail-emergency.html';
-    const EMERGENCY_PAGE = 'kontak-darurat.html';
-    const EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
-    const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
+    var API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
+    var LOGIN_URL = 'login-register.html';
+    var DASHBOARD_URL = 'dashboard.html';
+    var PROFILE_URL = 'profil.html';
+    var DETAIL_URL = 'detail-emergency.html';
+    var CURRENT_PAGE = 'kontak-darurat.html';
+    var EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
+    var NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
 
-    // ⭐ GPS CONFIG
-    const GPS_CONFIG = {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-    };
-    const GPS_MAX_RETRY = 2;
-    const GPS_FRESH_THRESHOLD = 5 * 60 * 1000;
-
-    const EMERGENCY_LABELS = {
+    var EMERGENCY_LABELS = {
         fire: '🔥 Kebakaran',
         medical: '🚑 Medis & Kematian',
         crime: '🚓 Kriminal',
         disaster: '🌪️ Bencana Alam'
     };
-    const EMERGENCY_ICONS = {
+    var EMERGENCY_ICONS = {
         fire: '🔥', medical: '🚑', crime: '🚓', disaster: '🌪️'
     };
 
     // ================================================================
     // 2. ⭐⭐ 12 KONTAK DARURAT NASIONAL (HARDCODED, VALID)
     // ================================================================
-    const NATIONAL_EMERGENCY_CONTACTS = [
-        {
-            id: 'nat-112',
-            name: 'Nomor Tunggal Darurat Terpadu',
-            label: 'Nomor Darurat Terpadu',
-            number: '112',
-            category: 'general',
-            icon: '🆘',
-            desc: 'Semua jenis darurat (bebas pulsa)',
-            phone: '112',
-            website: ''
-        },
-        {
-            id: 'nat-110',
-            name: 'Call Center Polri',
-            label: 'Polisi',
-            number: '110',
-            category: 'crime',
-            icon: '🚓',
-            desc: 'Keamanan & kriminal',
-            phone: '110',
-            website: ''
-        },
-        {
-            id: 'nat-118',
-            name: 'Ambulans',
-            label: 'Ambulans',
-            number: '118',
-            category: 'medical',
-            icon: '🚑',
-            desc: 'Layanan ambulans nasional',
-            phone: '118',
-            website: ''
-        },
-        {
-            id: 'nat-119',
-            name: 'PSC 119 — Medis Darurat',
-            label: 'PSC 119 (Kemenkes)',
-            number: '119',
-            category: 'medical',
-            icon: '🏥',
-            desc: 'Public Safety Center Kemenkes',
-            phone: '119',
-            website: 'https://psc119.kemkes.go.id/'
-        },
-        {
-            id: 'nat-113',
-            name: 'Pemadam Kebakaran',
-            label: 'Pemadam Kebakaran',
-            number: '113',
-            category: 'fire',
-            icon: '🔥',
-            desc: 'Layanan DAMKAR nasional',
-            phone: '113',
-            website: ''
-        },
-        {
-            id: 'nat-115',
-            name: 'Basarnas — SAR',
-            label: 'Basarnas (SAR)',
-            number: '115',
-            category: 'disaster',
-            icon: '🛟',
-            desc: 'Search & Rescue 24 jam',
-            phone: '115',
-            website: 'https://www.basarnas.go.id/'
-        },
-        {
-            id: 'nat-117',
-            name: 'BNPB — Bencana',
-            label: 'BNPB (Bencana)',
-            number: '117',
-            category: 'disaster',
-            icon: '🌪️',
-            desc: 'Badan Nasional Penanggulangan Bencana',
-            phone: '117',
-            website: 'https://bnpb.go.id/'
-        },
-        {
-            id: 'nat-pmi',
-            name: 'PMI — Palang Merah Indonesia',
-            label: 'PMI Pusat',
-            number: '021-7992325',
-            category: 'medical',
-            icon: '🩸',
-            desc: 'Palang Merah Indonesia',
-            phone: '021-7992325',
-            website: 'https://www.pmi.or.id/'
-        },
-        {
-            id: 'nat-kemenkes',
-            name: 'Halo Kemenkes',
-            label: 'Kemenkes',
-            number: '1500-567',
-            category: 'medical',
-            icon: '☎️',
-            desc: 'Layanan informasi kesehatan',
-            phone: '1500567',
-            website: 'https://www.kemkes.go.id/'
-        },
-        {
-            id: 'nat-pln',
-            name: 'PLN — Gangguan Listrik',
-            label: 'PLN (Listrik)',
-            number: '123',
-            category: 'general',
-            icon: '⚡',
-            desc: 'Gangguan listrik nasional',
-            phone: '123',
-            website: 'https://www.pln.co.id/'
-        },
-        {
-            id: 'nat-kpai',
-            name: 'KPAI — Perlindungan Anak',
-            label: 'KPAI (Anak)',
-            number: '021-31901556',
-            category: 'general',
-            icon: '👶',
-            desc: 'Komisi Perlindungan Anak Indonesia',
-            phone: '02131901556',
-            website: 'https://www.kpai.go.id/'
-        },
-        {
-            id: 'nat-komnas-perempuan',
-            name: 'Komnas Perempuan',
-            label: 'Komnas Perempuan',
-            number: '021-3903963',
-            category: 'general',
-            icon: '👩',
-            desc: 'Komisi Nasional Anti Kekerasan terhadap Perempuan',
-            phone: '0213903963',
-            website: 'https://komnasperempuan.go.id/'
-        }
+    var NATIONAL_EMERGENCY_CONTACTS = [
+        { id: 'nat-112', name: 'Nomor Tunggal Darurat Terpadu', label: 'Nomor Darurat Terpadu', number: '112', category: 'general', icon: '🆘', desc: 'Semua jenis darurat (bebas pulsa)', phone: '112', website: '' },
+        { id: 'nat-110', name: 'Call Center Polri', label: 'Polisi', number: '110', category: 'crime', icon: '🚓', desc: 'Keamanan & kriminal', phone: '110', website: '' },
+        { id: 'nat-118', name: 'Ambulans', label: 'Ambulans', number: '118', category: 'medical', icon: '🚑', desc: 'Layanan ambulans nasional', phone: '118', website: '' },
+        { id: 'nat-119', name: 'PSC 119 — Medis Darurat', label: 'PSC 119 (Kemenkes)', number: '119', category: 'medical', icon: '🏥', desc: 'Public Safety Center Kemenkes', phone: '119', website: 'https://psc119.kemkes.go.id/' },
+        { id: 'nat-113', name: 'Pemadam Kebakaran', label: 'Pemadam Kebakaran', number: '113', category: 'fire', icon: '🔥', desc: 'Layanan DAMKAR nasional', phone: '113', website: '' },
+        { id: 'nat-115', name: 'Basarnas — SAR', label: 'Basarnas (SAR)', number: '115', category: 'disaster', icon: '🛟', desc: 'Search & Rescue 24 jam', phone: '115', website: 'https://www.basarnas.go.id/' },
+        { id: 'nat-117', name: 'BNPB — Bencana', label: 'BNPB (Bencana)', number: '117', category: 'disaster', icon: '🌪️', desc: 'Badan Nasional Penanggulangan Bencana', phone: '117', website: 'https://bnpb.go.id/' },
+        { id: 'nat-pmi', name: 'PMI — Palang Merah Indonesia', label: 'PMI Pusat', number: '021-7992325', category: 'medical', icon: '🩸', desc: 'Palang Merah Indonesia', phone: '021-7992325', website: 'https://www.pmi.or.id/' },
+        { id: 'nat-kemenkes', name: 'Halo Kemenkes', label: 'Kemenkes', number: '1500-567', category: 'medical', icon: '☎️', desc: 'Layanan informasi kesehatan', phone: '1500567', website: 'https://www.kemkes.go.id/' },
+        { id: 'nat-pln', name: 'PLN — Gangguan Listrik', label: 'PLN (Listrik)', number: '123', category: 'general', icon: '⚡', desc: 'Gangguan listrik nasional', phone: '123', website: 'https://www.pln.co.id/' },
+        { id: 'nat-kpai', name: 'KPAI — Perlindungan Anak', label: 'KPAI (Anak)', number: '021-31901556', category: 'general', icon: '👶', desc: 'Komisi Perlindungan Anak Indonesia', phone: '02131901556', website: 'https://www.kpai.go.id/' },
+        { id: 'nat-komnas-perempuan', name: 'Komnas Perempuan', label: 'Komnas Perempuan', number: '021-3903963', category: 'general', icon: '👩', desc: 'Komnas Anti Kekerasan terhadap Perempuan', phone: '0213903963', website: 'https://komnasperempuan.go.id/' }
     ];
 
     // ================================================================
@@ -2911,23 +2543,27 @@
     var allContacts = [];
     var userLat = null;
     var userLng = null;
-    var userAccuracy = null;
     var activeFilter = '';
     var searchQuery = '';
     var isSidebarOpen = false;
     var isLoading = false;
     var deferredPrompt = null;
     var searchTab = 'all';
+    var searchEmergencyFilter = 'all';
     var searchDebounceTimer = null;
     var floatingNotifTimeout = null;
     var mapCurrentLat = null;
     var mapCurrentLng = null;
-    var mapCurrentAccuracy = null;
     var _salinkSetup = false;
     var nationalCollapsed = false;
 
+    // Notif state
     var notifFilter = 'all';
     var readNotifs = {};
+
+    // Invite state
+    var allUsers = [];
+    var sentInvites = {};
 
     // ================================================================
     // 4. HELPERS
@@ -2986,17 +2622,7 @@
         if (day < 7) return day + 'h lalu';
         return new Date(ts).toLocaleDateString('id-ID');
     }
-    function log(msg) {
-        console.log('[SALINK KontakDarurat] ' + msg);
-    }
-    function getAccuracyLabel(acc) {
-        if (!acc && acc !== 0) return { text: '', color: '' };
-        if (acc <= 10) return { text: 'Excellent', color: '#3fb950' };
-        if (acc <= 50) return { text: 'Good', color: '#3fb950' };
-        if (acc <= 200) return { text: 'Fair', color: '#f0d080' };
-        if (acc <= 1000) return { text: 'Poor', color: '#f85149' };
-        return { text: 'IP-based', color: '#f85149' };
-    }
+    function log(msg) { console.log('[SALINK KontakDarurat] ' + msg); }
 
     // ================================================================
     // 5. TOAST
@@ -3054,9 +2680,7 @@
     }
     function updateThemeColorMeta(theme) {
         var meta = document.getElementById('themeColorMeta');
-        if (meta) {
-            meta.setAttribute('content', theme === 'light' ? '#f5f7fa' : '#0a0e1a');
-        }
+        if (meta) meta.setAttribute('content', theme === 'light' ? '#f5f7fa' : '#0a0e1a');
     }
     function toggleTheme() {
         var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
@@ -3076,7 +2700,7 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
                 navigator.serviceWorker.register('./sw.js', { scope: './' })
-                    .then(function() { log('PWA: ServiceWorker registered'); })
+                    .then(function() { log('PWA: SW registered'); })
                     .catch(function(err) { console.warn('⚠️ PWA: SW gagal:', err.message); });
             });
         }
@@ -3085,14 +2709,8 @@
             deferredPrompt = e;
             setTimeout(function() {
                 if (deferredPrompt && !localStorage.getItem('salink_installed')) {
-                    showFloatingNotification(
-                        'install',
-                        '📱 Install SALINK',
-                        'Akses lebih cepat & offline',
-                        'Tap untuk install aplikasi',
-                        'Install',
-                        function() { showInstallPrompt(); }
-                    );
+                    showFloatingNotification('install', '📱 Install SALINK', 'Akses lebih cepat & offline',
+                        'Tap untuk install aplikasi', 'Install', function() { showInstallPrompt(); });
                 }
             }, 10000);
         });
@@ -3148,18 +2766,12 @@
         } else {
             actionBtn.style.display = 'none';
         }
-
         var closeBtn = document.getElementById('floatingClose');
         if (closeBtn) {
-            closeBtn.onclick = function(e) {
-                e.stopPropagation();
-                hideFloatingNotification();
-            };
+            closeBtn.onclick = function(e) { e.stopPropagation(); hideFloatingNotification(); };
         }
-
         if (type === 'emergency') notif.classList.add('emergency-notif');
         else notif.classList.remove('emergency-notif');
-
         notif.onclick = function() { if (actionCallback) actionCallback(); };
         notif.classList.add('active');
         floatingNotifTimeout = setTimeout(function() { hideFloatingNotification(); }, 10000);
@@ -3186,7 +2798,7 @@
         if (o) { o.classList.remove('active'); document.body.style.overflow = ''; }
     }
     function redirectToLogin() {
-        window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(EMERGENCY_PAGE);
+        window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(CURRENT_PAGE);
     }
     function applyPreviewMode() {
         var badge = document.getElementById('previewBadge');
@@ -3274,7 +2886,7 @@
                 if (gpsEl) gpsEl.textContent = '📍 GPS aktif: ' + userLat.toFixed(6) + ', ' + userLng.toFixed(6);
             } else {
                 var gpsEl2 = document.getElementById('gpsStatusText');
-                if (gpsEl2) gpsEl2.textContent = '💡 GPS belum aktif. Buka dashboard untuk aktivasi.';
+                if (gpsEl2) gpsEl2.textContent = '💡 GPS belum aktif. Buka Peta Darurat untuk aktivasi.';
             }
         } catch(e) {}
 
@@ -3326,7 +2938,7 @@
     function goHome() { window.location.href = DASHBOARD_URL; }
 
     // ================================================================
-    // 14. ⭐ RENDER KONTAK DARURAT NASIONAL
+    // 14. RENDER KONTAK NASIONAL
     // ================================================================
     function renderNationalContacts() {
         var grid = document.getElementById('nationalGrid');
@@ -3413,7 +3025,7 @@
     }
 
     // ================================================================
-    // 16. LOAD CONTACTS (Google Sheets)
+    // 16. LOAD CONTACTS
     // ================================================================
     async function loadContacts() {
         if (isLoading) return;
@@ -3428,13 +3040,11 @@
             var data = await apiGetContacts();
             if (data && data.length > 0) {
                 allContacts = data;
-                // Sort by distance kalau ada GPS
                 if (userLat !== null && userLng !== null) {
                     allContacts = allContacts.map(function(c) {
                         var d = calcDistance(userLat, userLng, parseFloat(c.latitude), parseFloat(c.longitude));
                         if (d !== null && isFinite(d)) {
-                            var cc = Object.assign({}, c, { distanceKm: d, distanceText: formatDistance(d) });
-                            return cc;
+                            return Object.assign({}, c, { distanceKm: d, distanceText: formatDistance(d) });
                         }
                         return c;
                     });
@@ -3448,7 +3058,7 @@
                 showToast('✅ Berhasil', 'Data kontak berhasil dimuat!', 'fa-check-circle');
             } else {
                 allContacts = [];
-                container.innerHTML = '<div class="state-card"><div class="state-icon">📭</div><div class="state-title">Belum ada kontak wilayah</div><div class="state-text">Database kontak wilayah masih kosong. Kontak dapat ditambahkan melalui Google Spreadsheet.</div></div>';
+                container.innerHTML = '<div class="state-card"><div class="state-icon">📭</div><div class="state-title">Belum ada kontak wilayah</div><div class="state-text">Database kontak wilayah masih kosong.</div></div>';
                 count.textContent = '0 kontak wilayah tersedia';
             }
         } catch (error) {
@@ -3461,7 +3071,7 @@
     }
 
     // ================================================================
-    // 17. FILTER & SEARCH
+    // 17. FILTER & SEARCH (LOKAL)
     // ================================================================
     function setFilter(button) {
         document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
@@ -3613,17 +3223,11 @@
     // ================================================================
     function openModalById(id) {
         var m = document.getElementById(id);
-        if (m) {
-            m.classList.add('active');
-            document.body.style.overflow = 'hidden';
-        }
+        if (m) { m.classList.add('active'); document.body.style.overflow = 'hidden'; }
     }
     function closeModalById(id) {
         var m = document.getElementById(id);
-        if (m) {
-            m.classList.remove('active');
-            document.body.style.overflow = '';
-        }
+        if (m) { m.classList.remove('active'); document.body.style.overflow = ''; }
     }
 
     // ================================================================
@@ -3714,7 +3318,7 @@
                 : '<div class="notif-item-icon regular"><i class="fas fa-bell"></i></div>';
             var unreadClass = n.read ? '' : 'unread';
             var typeClass = n.type === 'emergency' ? 'emergency' : '';
-            return '<div class="notif-item ' + unreadClass + ' ' + typeClass + '" onclick="openNotifDetail(\'' + escapeAttr(n.id) + '\',\'' + escapeAttr(n.type) + '\')">' +
+            return '<div class="notif-item ' + unreadClass + ' ' + typeClass + '" data-notif-id="' + escapeAttr(n.id) + '" data-notif-type="' + escapeAttr(n.type) + '">' +
                 iconHtml +
                 '<div class="notif-item-content">' +
                     '<div class="notif-item-title">' + escapeHTML(n.title) + '</div>' +
@@ -3723,6 +3327,13 @@
                 '</div>' +
             '</div>';
         }).join('');
+        listEl.querySelectorAll('[data-notif-id]').forEach(function(el) {
+            el.addEventListener('click', function() {
+                var id = this.getAttribute('data-notif-id');
+                var type = this.getAttribute('data-notif-type');
+                openNotifDetail(id, type);
+            });
+        });
     }
     function setupNotifFilters() {
         document.querySelectorAll('.notif-filter-btn').forEach(function(btn) {
@@ -3774,7 +3385,7 @@
     }
 
     // ================================================================
-    // 22. SEARCH MODAL
+    // 22. SEARCH MODAL — 4 TAB + CHIPS SELALU TAMPIL
     // ================================================================
     function openSearchModal() {
         if (isPreviewMode) { showPreviewOverlay(); return; }
@@ -3791,6 +3402,13 @@
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         var allTab = document.querySelector('.search-tab[data-tab="all"]');
         if (allTab) allTab.classList.add('active');
+        searchEmergencyFilter = 'all';
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
+        var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
+        if (allChip) allChip.classList.add('active');
+        // ⭐ CHIPS SELALU TAMPIL
+        var ef = document.getElementById('emergencyFilters');
+        if (ef) ef.style.display = 'flex';
     }
     function closeSearchModal() { closeModalById('searchModal'); }
     function clearSearch() {
@@ -3806,7 +3424,17 @@
     function switchSearchTab(tab, btnEl) {
         searchTab = tab;
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
-        btnEl.classList.add('active');
+        if (btnEl) btnEl.classList.add('active');
+        // ⭐ CHIPS SELALU TAMPIL (tidak di-hide)
+        var ef = document.getElementById('emergencyFilters');
+        if (ef) ef.style.display = 'flex';
+        var input = document.getElementById('searchInputGlobal');
+        if (input && input.value.trim()) performSearch(input.value.trim());
+    }
+    function setSearchEmergencyFilter(filter, btnEl) {
+        searchEmergencyFilter = filter;
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
+        if (btnEl) btnEl.classList.add('active');
         var input = document.getElementById('searchInputGlobal');
         if (input && input.value.trim()) performSearch(input.value.trim());
     }
@@ -3826,9 +3454,9 @@
         var cb = document.getElementById('clearSearchBtn');
         if (cb) cb.classList.add('visible');
 
-        var allUsers = [];
-        try { allUsers = JSON.parse(localStorage.getItem('salink_users') || '[]'); } catch(e) {}
-        var matchedUsers = allUsers.filter(function(u) {
+        var allUsersArr = [];
+        try { allUsersArr = JSON.parse(localStorage.getItem('salink_users') || '[]'); } catch(e) {}
+        var matchedUsers = allUsersArr.filter(function(u) {
             return (u.fullName || '').toLowerCase().indexOf(q) !== -1 ||
                    (u.username || '').toLowerCase().indexOf(q) !== -1;
         });
@@ -3843,6 +3471,7 @@
         var allEms = [];
         try { allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) {}
         var matchedEm = allEms.filter(function(e) {
+            if (searchEmergencyFilter !== 'all' && e.type !== searchEmergencyFilter) return false;
             return (e.location || e.address || '').toLowerCase().indexOf(q) !== -1 ||
                    (e.text || e.description || '').toLowerCase().indexOf(q) !== -1 ||
                    (e.sender || '').toLowerCase().indexOf(q) !== -1;
@@ -3918,7 +3547,132 @@
     }
 
     // ================================================================
-    // 23. FAB MODAL
+    // 23. INVITE MODAL — PERSIS DASHBOARD
+    // ================================================================
+    function loadSentInvites() {
+        try { sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}'); }
+        catch(e) { sentInvites = {}; }
+    }
+    function saveSentInvites() {
+        try { localStorage.setItem('salink_sent_invites', JSON.stringify(sentInvites)); } catch(e) {}
+    }
+    function updateInviteBadge() {
+        var badge = document.getElementById('inviteBadge');
+        if (badge) {
+            var pending = Object.keys(sentInvites).length;
+            badge.textContent = pending;
+            badge.classList.toggle('show', pending > 0);
+        }
+    }
+    function openInviteModal() {
+        if (isPreviewMode) { showPreviewOverlay(); return; }
+        openModalById('inviteModal');
+        loadInviteUsers();
+        setupInviteFilters();
+    }
+    function closeInviteModal() { closeModalById('inviteModal'); }
+
+    function loadInviteUsers() {
+        var listEl = document.getElementById('inviteUserList');
+        if (!listEl) return;
+        if (!allUsers || allUsers.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-users-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada pengguna untuk diundang</p></div>';
+            return;
+        }
+        var filtered = allUsers.filter(function(u) { return !currentUser || u.username !== currentUser.username; });
+        var inputEl = document.getElementById('inviteSearchInput');
+        var q = (inputEl ? inputEl.value : '').toLowerCase().trim();
+        if (q) {
+            filtered = filtered.filter(function(u) {
+                return (u.fullName || '').toLowerCase().indexOf(q) !== -1 ||
+                       (u.username || '').toLowerCase().indexOf(q) !== -1;
+            });
+        }
+        var countEl = document.getElementById('inviteModalCount');
+        if (countEl) countEl.textContent = filtered.length;
+        if (filtered.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-search" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada pengguna yang cocok</p></div>';
+            return;
+        }
+        listEl.innerHTML = filtered.map(function(u) {
+            var initial = (u.fullName || u.username || 'U').charAt(0).toUpperCase();
+            var avatar = u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" alt="">' : initial;
+            var isSent = sentInvites[u.username] === true;
+            var location = [u.city, u.province].filter(Boolean).join(', ') || u.country || 'Lokasi tidak diketahui';
+            var statusDot = u.isOnline ? '🟢' : '⚪';
+            return '<div class="invite-user-item">' +
+                '<div class="invite-user-avatar">' + avatar + '</div>' +
+                '<div class="invite-user-info">' +
+                    '<div class="invite-user-name">' + statusDot + ' ' + escapeHTML(u.fullName || u.username) + '</div>' +
+                    '<div class="invite-user-sub"><i class="fas fa-map-marker-alt" style="font-size:0.5rem;"></i> ' + escapeHTML(location) + '</div>' +
+                '</div>' +
+                '<button class="invite-user-btn ' + (isSent ? 'sent' : '') + '" data-invite-username="' + escapeAttr(u.username) + '" ' + (isSent ? 'disabled' : '') + '>' +
+                    (isSent ? '<i class="fas fa-check"></i> Terkirim' : '<i class="fas fa-paper-plane"></i> Undang') +
+                '</button>' +
+            '</div>';
+        }).join('');
+
+        listEl.querySelectorAll('[data-invite-username]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                sendInvite(this.getAttribute('data-invite-username'), this);
+            });
+        });
+    }
+    function setupInviteFilters() {
+        var searchInput = document.getElementById('inviteSearchInput');
+        if (searchInput) searchInput.oninput = loadInviteUsers;
+        var refreshBtn = document.getElementById('inviteRefreshBtn');
+        if (refreshBtn) {
+            refreshBtn.onclick = function() {
+                var icon = this.querySelector('i');
+                if (icon) icon.classList.add('fa-spin');
+                try {
+                    var users = JSON.parse(localStorage.getItem('salink_users') || '[]');
+                    if (users && users.length > 0) allUsers = users;
+                    loadInviteUsers();
+                    showToast('🔄', 'Daftar pengguna diperbarui', 'fa-sync-alt');
+                } catch(e) {
+                    showToast('⚠️', 'Gagal refresh', 'fa-exclamation-triangle');
+                }
+                if (icon) setTimeout(function() { icon.classList.remove('fa-spin'); }, 800);
+            };
+        }
+    }
+    async function sendInvite(username, btnEl) {
+        if (!currentUser) { redirectToLogin(); return; }
+        if (!username) return;
+        btnEl.disabled = true;
+        btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        try {
+            sentInvites[username] = true;
+            saveSentInvites();
+            var invitePayload = {
+                id: 'invite-' + Date.now(),
+                user1: currentUser.username,
+                user2: username,
+                status: 'pending',
+                requestedBy: currentUser.username,
+                timestamp: new Date().toISOString(),
+                acceptedAt: ''
+            };
+            fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'save_invite', data: invitePayload })
+            }).catch(function() {});
+            btnEl.classList.add('sent');
+            btnEl.innerHTML = '<i class="fas fa-check"></i> Terkirim';
+            updateInviteBadge();
+            showToast('📨 Terkirim', 'Undangan dikirim ke ' + username, 'fa-paper-plane');
+        } catch(e) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = '<i class="fas fa-paper-plane"></i> Undang';
+            showToast('⚠️ Gagal', 'Tidak dapat mengirim undangan', 'fa-exclamation-triangle');
+        }
+    }
+
+    // ================================================================
+    // 24. FAB MODAL
     // ================================================================
     function openFabModal() {
         var overlay = document.getElementById('fabModalOverlay');
@@ -3981,50 +3735,7 @@
     }
 
     // ================================================================
-    // 24. GPS HELPER (REAL-TIME ACCURATE)
-    // ================================================================
-    function getGPSPosition(attempt) {
-        attempt = attempt || 0;
-        return new Promise(function(resolve, reject) {
-            if (!navigator.geolocation) {
-                reject({ code: 0, message: 'GPS tidak didukung browser' });
-                return;
-            }
-            navigator.geolocation.getCurrentPosition(
-                function(position) {
-                    resolve({
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude,
-                        accuracy: Math.round(position.coords.accuracy || 0)
-                    });
-                },
-                function(error) {
-                    if ((error.code === 2 || error.code === 3) && attempt < GPS_MAX_RETRY) {
-                        setTimeout(function() {
-                            getGPSPosition(attempt + 1).then(resolve).catch(reject);
-                        }, 1500);
-                        return;
-                    }
-                    reject(error);
-                },
-                GPS_CONFIG
-            );
-        });
-    }
-    function reverseGeocodeAddress(lat, lng) {
-        return new Promise(function(resolve) {
-            try {
-                var url = NOMINATIM_URL + '?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id';
-                fetch(url, { method: 'GET', headers: { 'User-Agent': 'SALINK-App/13.1' } })
-                .then(function(r) { return r.json(); })
-                .then(function(data) { resolve((data && data.display_name) ? data.display_name : ''); })
-                .catch(function() { resolve(''); });
-            } catch(e) { resolve(''); }
-        });
-    }
-
-    // ================================================================
-    // 25. MAP MODAL
+    // 25. MAP MODAL — GPS OPSI X (CACHE + AUTO REFRESH)
     // ================================================================
     function openMapModal() {
         var modal = document.getElementById('mapModal');
@@ -4033,13 +3744,41 @@
         document.body.style.overflow = 'hidden';
         if (navigator.vibrate) navigator.vibrate(30);
         updateMapOwnerInfo();
+
+        // ⭐ OPSI X: Auto-trigger GPS fresh saat modal dibuka
+        setTimeout(function() {
+            if (!isPreviewMode) {
+                _autoRefreshMapOnOpen();
+            }
+        }, 400);
     }
+
     function closeMapModal() {
         var modal = document.getElementById('mapModal');
         if (!modal) return;
         modal.classList.remove('active');
         document.body.style.overflow = '';
     }
+
+    function _autoRefreshMapOnOpen() {
+        // Tampilkan cache dulu (kalau ada)
+        var cachedLat = localStorage.getItem('salink_user_lat');
+        var cachedLng = localStorage.getItem('salink_user_lng');
+        if (cachedLat && cachedLng) {
+            mapCurrentLat = parseFloat(cachedLat);
+            mapCurrentLng = parseFloat(cachedLng);
+            applyMapCoords(mapCurrentLat, mapCurrentLng);
+        }
+
+        // Auto-refresh GPS fresh di background
+        var btnText = document.getElementById('mapLocationBtnText');
+        if (btnText) btnText.textContent = '🔄 GPS Refresh...';
+
+        _mapGpsAutoRefresh(function() {
+            if (btnText) btnText.textContent = 'Ambil Lokasi Saya';
+        });
+    }
+
     function updateMapOwnerInfo() {
         var ownerNameEl = document.getElementById('mapOwnerName');
         var ownerLocEl = document.getElementById('mapOwnerLoc');
@@ -4066,30 +3805,17 @@
 
         var savedLat = localStorage.getItem('salink_user_lat');
         var savedLng = localStorage.getItem('salink_user_lng');
-        var savedTime = parseInt(localStorage.getItem('salink_user_lat_time') || '0', 10);
-        var savedAcc = parseInt(localStorage.getItem('salink_user_lat_acc') || '0', 10);
-        var isFresh = savedTime > 0 && (Date.now() - savedTime) < GPS_FRESH_THRESHOLD;
-        if (savedLat && savedLng && isFresh) {
+        if (savedLat && savedLng) {
             mapCurrentLat = parseFloat(savedLat);
             mapCurrentLng = parseFloat(savedLng);
-            mapCurrentAccuracy = savedAcc;
-            applyMapCoords(mapCurrentLat, mapCurrentLng, mapCurrentAccuracy);
-        } else {
-            var statusTitle = document.getElementById('mapStatusTitle');
-            var statusDesc = document.getElementById('mapStatusDesc');
-            var statusIcon = document.getElementById('mapStatusIcon');
-            var statusCard = document.getElementById('mapStatusCard');
-            if (statusCard) statusCard.classList.remove('detected');
-            if (statusTitle) statusTitle.textContent = 'Lokasi belum terdeteksi';
-            if (statusDesc) statusDesc.textContent = 'Tekan tombol di bawah untuk ambil GPS real-time';
-            if (statusIcon) statusIcon.textContent = '📍';
+            applyMapCoords(mapCurrentLat, mapCurrentLng);
         }
     }
-    function applyMapCoords(lat, lng, accuracy) {
+    function applyMapCoords(lat, lng) {
         var coordsEl = document.getElementById('mapCoords');
         if (coordsEl) coordsEl.textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
         var regionEl = document.getElementById('mapRegion');
-        if (regionEl) regionEl.textContent = '🔄 Mengambil...';
+        if (regionEl && regionEl.textContent === '-') regionEl.textContent = '🔄 Mengambil...';
         var addressEl = document.getElementById('mapAddressValue');
         if (addressEl) addressEl.textContent = lat.toFixed(4) + ', ' + lng.toFixed(4);
         var iframe = document.getElementById('mapIframe');
@@ -4103,62 +3829,144 @@
         var statusIcon = document.getElementById('mapStatusIcon');
         if (statusCard) statusCard.classList.add('detected');
         if (statusTitle) statusTitle.textContent = '✅ Lokasi terdeteksi';
-        if (statusDesc) {
-            var accText = (accuracy !== undefined && accuracy !== null && accuracy > 0) ? ' • Akurasi: ±' + accuracy + 'm' : '';
-            statusDesc.textContent = 'Koordinat: ' + lat.toFixed(6) + ', ' + lng.toFixed(6) + accText;
-        }
+        if (statusDesc) statusDesc.textContent = 'Koordinat: ' + lat.toFixed(6) + ', ' + lng.toFixed(6);
         if (statusIcon) statusIcon.textContent = '✅';
 
-        reverseGeocodeAddress(lat, lng).then(function(addr) {
-            if (regionEl) regionEl.textContent = addr || (lat.toFixed(4) + ', ' + lng.toFixed(4));
-            if (addressEl && addr) addressEl.textContent = addr;
-        });
+        if (regionEl) {
+            fetch(NOMINATIM_URL + '?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id', {
+                headers: { 'User-Agent': 'SALINK-App/14.0' }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data && data.display_name) {
+                    regionEl.textContent = data.display_name;
+                    if (addressEl) addressEl.textContent = data.display_name;
+                } else {
+                    regionEl.textContent = lat.toFixed(4) + ', ' + lng.toFixed(4);
+                }
+            })
+            .catch(function() {
+                regionEl.textContent = lat.toFixed(4) + ', ' + lng.toFixed(4);
+            });
+        }
     }
+
+    // ⭐ Tombol manual "Ambil Lokasi Saya"
     function activateMapGps() {
+        log('activateMapGps() called');
         var btn = document.getElementById('mapLocationBtn');
         var btnText = document.getElementById('mapLocationBtnText');
+
         if (!navigator.geolocation) {
             showToast('⚠️ GPS Tidak Tersedia', 'Browser tidak mendukung GPS', 'fa-exclamation-triangle');
             return;
         }
         if (btn) { btn.classList.add('loading'); btn.disabled = true; }
-        if (btnText) btnText.textContent = '📡 Mengambil GPS...';
+        if (btnText) btnText.textContent = '📍 Mencari sinyal GPS...';
 
-        getGPSPosition(0).then(function(pos) {
-            mapCurrentLat = pos.lat;
-            mapCurrentLng = pos.lng;
-            mapCurrentAccuracy = pos.accuracy;
-            try {
-                localStorage.setItem('salink_user_lat', pos.lat);
-                localStorage.setItem('salink_user_lng', pos.lng);
-                localStorage.setItem('salink_user_lat_time', Date.now());
-                localStorage.setItem('salink_user_lat_acc', pos.accuracy);
-            } catch(e) {}
+        _mapGpsAutoRefresh(function() {
             if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
-            if (btnText) btnText.textContent = '✅ Refresh Lokasi GPS';
-            applyMapCoords(pos.lat, pos.lng, pos.accuracy);
-            var accLabel = getAccuracyLabel(pos.accuracy);
-            showToast('📍 GPS Akurat', '±' + pos.accuracy + 'm — ' + accLabel.text, 'fa-location-arrow');
-            if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
-        }).catch(function(error) {
-            var errMsg = 'Gagal mengambil lokasi GPS. ';
-            switch(error.code) {
-                case 1: errMsg = 'Izin lokasi DITOLAK. Aktifkan di pengaturan browser.'; break;
-                case 2: errMsg = 'Sinyal GPS tidak tersedia. Coba di area terbuka.'; break;
-                case 3: errMsg = 'GPS timeout. Nyalakan GPS device & coba lagi.'; break;
-                default: errMsg = error.message || 'Coba lagi.';
-            }
-            if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
-            if (btnText) btnText.textContent = '📍 Coba Lagi';
-            var statusTitle = document.getElementById('mapStatusTitle');
-            var statusDesc = document.getElementById('mapStatusDesc');
-            var statusIcon = document.getElementById('mapStatusIcon');
-            if (statusTitle) statusTitle.textContent = '⚠️ Gagal Ambil GPS';
-            if (statusDesc) statusDesc.textContent = errMsg;
-            if (statusIcon) statusIcon.textContent = '⚠️';
-            showToast('⚠️ GPS Gagal', errMsg, 'fa-exclamation-triangle');
+            if (btnText) btnText.textContent = '✅ Refresh Lokasi';
         });
     }
+
+    function _mapGpsAutoRefresh(doneCallback) {
+        if (navigator.permissions && navigator.permissions.query) {
+            navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
+                if (result.state === 'denied') {
+                    showToast('⚠️ Izin Ditolak', 'Aktifkan izin lokasi di browser Anda', 'fa-exclamation-triangle');
+                    if (doneCallback) doneCallback();
+                    return;
+                }
+                _mapGpsStage1(doneCallback);
+            }).catch(function() {
+                _mapGpsStage1(doneCallback);
+            });
+        } else {
+            _mapGpsStage1(doneCallback);
+        }
+    }
+
+    function _mapGpsStage1(doneCallback) {
+        log('Map GPS Stage 1: High accuracy, timeout 30s, maximumAge 0');
+        var timeoutId = setTimeout(function() {
+            log('Map GPS Stage 1 timeout → Stage 2');
+            _mapGpsStage2(doneCallback);
+        }, 30000);
+
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                clearTimeout(timeoutId);
+                _mapGpsSuccess(position, 'high', doneCallback);
+            },
+            function(error) {
+                clearTimeout(timeoutId);
+                log('Map GPS Stage 1 failed: code=' + error.code);
+                if (error.code === 1) {
+                    _mapGpsError(error, doneCallback);
+                } else {
+                    _mapGpsStage2(doneCallback);
+                }
+            },
+            { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+        );
+    }
+
+    function _mapGpsStage2(doneCallback) {
+        log('Map GPS Stage 2: Network-based, timeout 20s, maximumAge 0');
+        var btnText = document.getElementById('mapLocationBtnText');
+        if (btnText) btnText.textContent = '📍 Metode alternatif...';
+
+        var timeoutId = setTimeout(function() {
+            log('Map GPS Stage 2 timeout, giving up');
+            _mapGpsError({ code: 3, message: 'Timeout semua stage' }, doneCallback);
+        }, 20000);
+
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                clearTimeout(timeoutId);
+                _mapGpsSuccess(position, 'network', doneCallback);
+            },
+            function(error) {
+                clearTimeout(timeoutId);
+                log('Map GPS Stage 2 failed: code=' + error.code);
+                _mapGpsError(error, doneCallback);
+            },
+            { enableHighAccuracy: false, timeout: 20000, maximumAge: 0 }
+        );
+    }
+
+    function _mapGpsSuccess(position, method, doneCallback) {
+        var lat = position.coords.latitude;
+        var lng = position.coords.longitude;
+        var accuracy = Math.round(position.coords.accuracy || 0);
+        var methodLabel = method === 'high' ? 'GPS' : 'Network';
+        mapCurrentLat = lat;
+        mapCurrentLng = lng;
+
+        try {
+            localStorage.setItem('salink_user_lat', lat);
+            localStorage.setItem('salink_user_lng', lng);
+        } catch(e) {}
+
+        applyMapCoords(lat, lng);
+        showToast('📍 Lokasi Ditemukan (' + methodLabel + ')', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
+        if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+
+        if (doneCallback) doneCallback();
+    }
+
+    function _mapGpsError(error, doneCallback) {
+        var errMsg = '';
+        if (error.code === 1) errMsg = 'Izin lokasi ditolak. Aktifkan izin lokasi untuk browser ini.';
+        else if (error.code === 2) errMsg = 'Lokasi tidak tersedia. Pastikan GPS aktif & di area terbuka.';
+        else if (error.code === 3) errMsg = 'Waktu pencarian habis. Coba aktifkan WiFi atau pindah ke area terbuka.';
+        else errMsg = error.message || 'Gagal mengambil lokasi.';
+
+        showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle');
+        if (doneCallback) doneCallback();
+    }
+
     function mapSearchService(searchQuery) {
         var lat = mapCurrentLat;
         var lng = mapCurrentLng;
@@ -4177,7 +3985,7 @@
     function handleLogout() {
         if (confirm('Apakah Anda yakin ingin keluar?')) {
             currentUser = null;
-            ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies','salink_logged_in','salink_user_lat','salink_user_lng','salink_user_lat_time','salink_user_lat_acc'].forEach(function(k) {
+            ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies','salink_logged_in','salink_user_lat','salink_user_lng'].forEach(function(k) {
                 try { localStorage.removeItem(k); } catch(e) {}
             });
             updateUserUI();
@@ -4216,6 +4024,10 @@
             if (e.key === 'salink_user') loadCurrentUser();
             if (e.key === 'salink_theme') loadTheme();
             if (e.key === 'salink_emergencies' || e.key === 'salink_notifications') updateNotifBadge();
+            if (e.key === 'salink_sent_invites') {
+                loadSentInvites();
+                updateInviteBadge();
+            }
         });
     }
 
@@ -4237,14 +4049,9 @@
             });
         }
 
-        // SIDEBAR CLOSE + OVERLAY
+        // SIDEBAR
         var sidebarClose = document.getElementById('sidebarClose');
-        if (sidebarClose) {
-            sidebarClose.addEventListener('click', function(e) {
-                e.preventDefault(); e.stopPropagation();
-                closeSidebar();
-            });
-        }
+        if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
         var sidebarOverlay = document.getElementById('sidebarOverlay');
         if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
 
@@ -4311,7 +4118,7 @@
             });
         }
 
-        // SEARCH INPUT (lokal, untuk filter kontak wilayah)
+        // SEARCH INPUT (lokal filter kontak wilayah)
         var searchInput = document.getElementById('searchInput');
         if (searchInput) {
             searchInput.addEventListener('input', function() {
@@ -4342,19 +4149,9 @@
 
         // MAP MODAL CLOSE
         var mapModalCloseBtn = document.getElementById('mapModalCloseBtn');
-        if (mapModalCloseBtn) {
-            mapModalCloseBtn.addEventListener('click', function(e) {
-                e.preventDefault(); e.stopPropagation();
-                closeMapModal();
-            });
-        }
+        if (mapModalCloseBtn) mapModalCloseBtn.addEventListener('click', closeMapModal);
         var mapModalCloseFooter = document.getElementById('mapModalCloseFooter');
-        if (mapModalCloseFooter) {
-            mapModalCloseFooter.addEventListener('click', function(e) {
-                e.preventDefault(); e.stopPropagation();
-                closeMapModal();
-            });
-        }
+        if (mapModalCloseFooter) mapModalCloseFooter.addEventListener('click', closeMapModal);
         var mapModal = document.getElementById('mapModal');
         if (mapModal) {
             mapModal.addEventListener('click', function(e) {
@@ -4364,20 +4161,14 @@
 
         // MAP GPS BUTTON
         var mapLocationBtn = document.getElementById('mapLocationBtn');
-        if (mapLocationBtn) {
-            mapLocationBtn.addEventListener('click', function(e) {
-                e.preventDefault(); e.stopPropagation();
-                activateMapGps();
-            });
-        }
+        if (mapLocationBtn) mapLocationBtn.addEventListener('click', activateMapGps);
 
         // MAP SERVICE CARDS
         document.querySelectorAll('.map-service-card[data-search]').forEach(function(btn) {
             btn.addEventListener('click', function(e) {
                 e.preventDefault();
                 var search = this.getAttribute('data-search');
-                if (!search) return;
-                mapSearchService(search);
+                if (search) mapSearchService(search);
             });
         });
 
@@ -4402,6 +4193,11 @@
         document.querySelectorAll('.search-tab').forEach(function(t) {
             t.addEventListener('click', function() {
                 switchSearchTab(this.getAttribute('data-tab'), this);
+            });
+        });
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) {
+            c.addEventListener('click', function() {
+                setSearchEmergencyFilter(this.getAttribute('data-filter'), this);
             });
         });
         var searchInputGlobal = document.getElementById('searchInputGlobal');
@@ -4433,6 +4229,32 @@
         if (notifModal) {
             notifModal.addEventListener('click', function(e) {
                 if (e.target === notifModal) closeNotifModal();
+            });
+        }
+
+        // INVITE MODAL CLOSE
+        var inviteModalCloseBtn = document.getElementById('inviteModalCloseBtn');
+        if (inviteModalCloseBtn) inviteModalCloseBtn.addEventListener('click', closeInviteModal);
+        var inviteModalFooterBtn = document.getElementById('inviteModalFooterBtn');
+        if (inviteModalFooterBtn) {
+            inviteModalFooterBtn.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                closeInviteModal();
+            });
+        }
+        var inviteModal = document.getElementById('inviteModal');
+        if (inviteModal) {
+            inviteModal.addEventListener('click', function(e) {
+                if (e.target === inviteModal) closeInviteModal();
+            });
+        }
+
+        // BOTTOM NAV INVITE
+        var bottomInviteNav = document.getElementById('bottomInviteNav');
+        if (bottomInviteNav) {
+            bottomInviteNav.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                openInviteModal();
             });
         }
 
@@ -4472,23 +4294,6 @@
             });
         }
 
-        // BOTTOM NAV
-        var bottomInviteNav = document.getElementById('bottomInviteNav');
-        if (bottomInviteNav) {
-            bottomInviteNav.addEventListener('click', function(e) {
-                e.preventDefault();
-                if (isPreviewMode) { showPreviewOverlay(); return; }
-                showToast('📨 Invite', 'Buka dashboard untuk invite', 'fa-user-plus');
-            });
-        }
-        var bottomNotifNav = document.getElementById('bottomNotifNav');
-        if (bottomNotifNav) {
-            bottomNotifNav.addEventListener('click', function(e) {
-                e.preventDefault();
-                openNotifModal();
-            });
-        }
-
         // KEYBOARD SHORTCUTS
         document.addEventListener('keydown', function(e) {
             if (e.key === '/' && !e.target.matches('input, textarea, select')) {
@@ -4498,6 +4303,7 @@
             if (e.key === 'Escape') {
                 closeSearchModal();
                 closeNotifModal();
+                closeInviteModal();
                 closeFabModal();
                 closeMapModal();
                 closeSidebar();
@@ -4512,10 +4318,11 @@
     // 30. INIT
     // ================================================================
     function init() {
-        log('Initializing Kontak Darurat v13.1 FINAL...');
+        log('Initializing Kontak Darurat v14.0 FINAL...');
 
         loadTheme();
         loadReadNotifs();
+        loadSentInvites();
         setupPWA();
         loadCurrentUser();
         setupLoginGuard();
@@ -4523,19 +4330,16 @@
         initRipple();
         initStorageEvents();
 
-        // Render National Contacts
         renderNationalContacts();
-
-        // Update badge
         updateNotifBadge();
+        updateInviteBadge();
         setInterval(updateNotifBadge, 30000);
 
-        // Load contacts dari Google Sheets
         loadContacts();
 
         if (isPreviewMode) setTimeout(function() { showPreviewOverlay(); }, 1200);
 
-        log('✓ Kontak Darurat v13.1 Ready!');
+        log('✓ Kontak Darurat v14.0 Ready!');
         log('  Mode: ' + (isPreviewMode ? 'PREVIEW' : 'FULL'));
         log('  User: ' + (currentUser ? currentUser.username : 'Guest'));
         log('  National Contacts: ' + NATIONAL_EMERGENCY_CONTACTS.length);
@@ -4563,6 +4367,7 @@
     window.closeSearchModal = closeSearchModal;
     window.clearSearch = clearSearch;
     window.switchSearchTab = switchSearchTab;
+    window.setSearchEmergencyFilter = setSearchEmergencyFilter;
     window.performSearch = performSearch;
     window.openNotifModal = openNotifModal;
     window.closeNotifModal = closeNotifModal;
@@ -4571,10 +4376,17 @@
     window.updateNotifBadge = updateNotifBadge;
     window.markNotifRead = markNotifRead;
     window.setupNotifFilters = setupNotifFilters;
+    window.openInviteModal = openInviteModal;
+    window.closeInviteModal = closeInviteModal;
+    window.loadInviteUsers = loadInviteUsers;
+    window.sendInvite = sendInvite;
+    window.updateInviteBadge = updateInviteBadge;
     window.openFabModal = openFabModal;
     window.closeFabModal = closeFabModal;
     window.openMapModal = openMapModal;
     window.closeMapModal = closeMapModal;
+    window.activateMapGps = activateMapGps;
+    window.mapSearchService = mapSearchService;
     window.toggleTheme = toggleTheme;
     window.toggleNationalSection = toggleNationalSection;
     window.renderNationalContacts = renderNationalContacts;
@@ -4584,11 +4396,8 @@
     window.showInstallPrompt = showInstallPrompt;
     window.showPreviewOverlay = showPreviewOverlay;
     window.hidePreviewOverlay = hidePreviewOverlay;
-    window.activateMapGps = activateMapGps;
-    window.mapSearchService = mapSearchService;
-    window.getGPSPosition = getGPSPosition;
 
-    log('✓ Kontak Darurat v13.1 Script Loaded');
+    log('✓ Kontak Darurat v14.0 Script Loaded');
 })();
     </script>
 
