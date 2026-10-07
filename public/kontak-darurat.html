@@ -2940,7 +2940,7 @@
     // ================================================================
     // 14. RENDER KONTAK NASIONAL
     // ================================================================
-    function renderNationalContacts() {
+        function renderNationalContacts() {
         var grid = document.getElementById('nationalGrid');
         if (!grid) return;
         var html = NATIONAL_EMERGENCY_CONTACTS.map(function(c) {
@@ -3387,6 +3387,7 @@
     // ================================================================
     // 22. SEARCH MODAL — 4 TAB + CHIPS SELALU TAMPIL
     // ================================================================
+        
     function openSearchModal() {
         if (isPreviewMode) { showPreviewOverlay(); return; }
         openModalById('searchModal');
@@ -3398,36 +3399,38 @@
         if (sar) sar.style.display = 'none';
         var sdv = document.getElementById('searchDefaultView');
         if (sdv) sdv.style.display = 'block';
+
+        // ⭐ Tab default = "Semua"
         searchTab = 'all';
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         var allTab = document.querySelector('.search-tab[data-tab="all"]');
         if (allTab) allTab.classList.add('active');
+
+        // ⭐ Chips TERSEMBUNYI (muncul hanya saat tab Emergency diklik)
+        var ef = document.getElementById('emergencyFilters');
+        if (ef) ef.style.display = 'none';
+
         searchEmergencyFilter = 'all';
         document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
         var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
         if (allChip) allChip.classList.add('active');
-        // ⭐ CHIPS SELALU TAMPIL
-        var ef = document.getElementById('emergencyFilters');
-        if (ef) ef.style.display = 'flex';
     }
-    function closeSearchModal() { closeModalById('searchModal'); }
-    function clearSearch() {
-        var input = document.getElementById('searchInputGlobal');
-        if (input) input.value = '';
-        var cb = document.getElementById('clearSearchBtn');
-        if (cb) cb.classList.remove('visible');
-        var sar = document.getElementById('searchActiveResults');
-        if (sar) sar.style.display = 'none';
-        var sdv = document.getElementById('searchDefaultView');
-        if (sdv) sdv.style.display = 'block';
-    }
+
     function switchSearchTab(tab, btnEl) {
         searchTab = tab;
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         if (btnEl) btnEl.classList.add('active');
-        // ⭐ CHIPS SELALU TAMPIL (tidak di-hide)
+
+        // ⭐ Chips show/hide sesuai tab
         var ef = document.getElementById('emergencyFilters');
-        if (ef) ef.style.display = 'flex';
+        if (ef) {
+            if (tab === 'emergency') {
+                ef.style.display = 'flex';
+            } else {
+                ef.style.display = 'none';
+            }
+        }
+
         var input = document.getElementById('searchInputGlobal');
         if (input && input.value.trim()) performSearch(input.value.trim());
     }
