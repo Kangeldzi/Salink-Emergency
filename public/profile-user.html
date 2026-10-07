@@ -3233,8 +3233,8 @@
                     </button>
                 </div>
 
-                <!-- FILTER CHIPS — SELALU TAMPIL -->
-                <div class="search-filter-row" id="emergencyFilters">
+                <!-- FILTER CHIPS — HANYA TAMPIL SAAT TAB EMERGENCY -->
+                <div class="search-filter-row" id="emergencyFilters" style="display:none;">
                     <button class="search-filter-chip active" data-filter="all" type="button">🎯 Semua</button>
                     <button class="search-filter-chip" data-filter="fire" type="button">🔥 Kebakaran</button>
                     <button class="search-filter-chip" data-filter="medical" type="button">🚑 Medis</button>
@@ -5537,7 +5537,7 @@
     // ================================================================
     // 32. SEARCH MODAL
     // ================================================================
-    function openSearchModal() {
+        function openSearchModal() {
         if (isPreviewMode) { showPreviewOverlay(); return; }
         openModalById('searchModal');
         var input = document.getElementById('searchInput');
@@ -5556,6 +5556,8 @@
         document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
         var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
         if (allChip) allChip.classList.add('active');
+        // ⭐ FIX: Sembunyikan chips karena default tab = 'all'
+        updateSearchChipsVisibility();
     }
     function closeSearchModal() { closeModalById('searchModal'); }
     function clearSearch() {
@@ -5568,19 +5570,32 @@
         var sdv = document.getElementById('searchDefaultView');
         if (sdv) sdv.style.display = 'block';
     }
-    function switchSearchTab(tab, btnEl) {
+        function switchSearchTab(tab, btnEl) {
         searchTab = tab;
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         if (btnEl) btnEl.classList.add('active');
+        // ⭐ FIX: Chips hanya tampil kalau tab Emergency aktif
+        updateSearchChipsVisibility();
         var input = document.getElementById('searchInput');
         if (input && input.value.trim()) performSearch(input.value.trim());
     }
-    function setSearchEmergencyFilter(filter, btnEl) {
+        function setSearchEmergencyFilter(filter, btnEl) {
         searchEmergencyFilter = filter;
         document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
         if (btnEl) btnEl.classList.add('active');
         var input = document.getElementById('searchInput');
         if (input && input.value.trim()) performSearch(input.value.trim());
+    }
+
+    // ⭐ FUNGSI BARU — Show/Hide chips berdasarkan tab aktif
+    function updateSearchChipsVisibility() {
+        var chipsRow = document.getElementById('emergencyFilters');
+        if (!chipsRow) return;
+        if (searchTab === 'emergency') {
+            chipsRow.style.display = 'flex';
+        } else {
+            chipsRow.style.display = 'none';
+        }
     }
     function performSearch(query) {
         var q = query.trim().toLowerCase();
