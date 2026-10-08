@@ -3031,118 +3031,1592 @@
         </div>
     </div>
 
-    <!-- TOAST CONTAINER -->
+        <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
-    /* ====================================================================
- * SALINK-SOCIAL.js v1.0 — JEMBATAN INTEGRASI
+    <!-- ============================================================ -->
+    <!-- SCRIPT UTAMA — PESAN-MASUK v15.1 (NO PATCH)                   -->
+    <!-- ============================================================ -->
+    <script>
+/* ====================================================================
+ * SALINK PESAN-MASUK v15.1 — FINAL
  * ====================================================================
- * Menghubungkan:
- *   - pesan-masuk.html
- *   - profil.html
- *   - profile-user.html
- *
  * Fitur:
- *   - SalinkSocial.init() — inisialisasi
- *   - SalinkSocial.openProfile(username) — buka profile user
- *   - SalinkSocial.openChat(username) — buka chat dengan user
- *   - SalinkSocial.sendInvite(username) — kirim undangan
- *   - SalinkSocial.getFriends() — daftar teman
- *   - SalinkSocial.getUser(username) — data user
- *   - Sinkronisasi via localStorage + BroadcastChannel
+ *   - Tema Universal (dark/light)
+ *   - PWA Install
+ *   - Header: Menu | Logo | Search | Notif | Theme | Profil | Back
+ *   - Sidebar + #sidebarMapBtn (Peta Darurat)
+ *   - Modal Search (4 tab 1 baris + chips selalu tampil)
+ *   - Modal Notif (filter + tandai semua)
+ *   - Modal Invite (persis Dashboard)
+ *   - Modal Peta Darurat (persis lokasi-bantuan)
+ *   - Bottom Nav: Home | Toko | FAB | Invite | Profil
+ *   - FAB Modal 2×2 → dashboard.html?emergency=TYPE
+ *   - Chat Room: nama/foto klik → profile-user.html
+ *   - Long-press chat bubble → menu Hapus BAWAH teks
+ *   - Long-press chat card → menu Hapus chat personal
+ *   - Emoji Picker: toggle show/hide + klik emoji auto-hide
+ *   - FAB Menu: Chat Baru, Grup Baru, Broadcast, Tambah Kontak
+ *   - Mute & Clear chat
+ *
+ * INTEGRASI dengan salink-social.js (GitHub version):
+ *   - Menggunakan SalinkSocial.sendInvite(from, to)
+ *   - Menggunakan SalinkSocial.getFriends(username)
+ *   - Menggunakan SalinkSocial.areFriends(a, b)
+ *   - Menggunakan SalinkSocial.isBlockedBy(target, requester)
  * ==================================================================== */
-(function(global) {
+(function() {
     'use strict';
 
+    // ================================================================
+    // 1. KONSTANTA
+    // ================================================================
     var API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
-    var PROFILE_USER_URL = 'profile-user.html';
-    var PESAN_MASUK_URL = 'pesan-masuk.html';
     var LOGIN_URL = 'login-register.html';
+    var DASHBOARD_URL = 'dashboard.html';
+    var PROFILE_URL = 'profil.html';
+    var PROFILE_USER_URL = 'profile-user.html';
+    var DETAIL_URL = 'detail-emergency.html';
+    var CURRENT_PAGE = 'pesan-masuk.html';
+    var REGULAR_SOUND_URL = '/Music/smsblackber_4a537f155087133.mp3';
 
-    var socialChannel = null;
-    try {
-        socialChannel = new BroadcastChannel('salink_social');
-    } catch(e) {}
-
-    var _initialized = false;
-    var _currentUser = null;
+    var EMERGENCY_LABELS = {
+        fire: '🔥 Kebakaran',
+        medical: '🚑 Medis & Kematian',
+        crime: '🚓 Kriminal',
+        disaster: '🌪️ Bencana Alam'
+    };
+    var EMERGENCY_ICONS = { fire: '🔥', medical: '🚑', crime: '🚓', disaster: '🌪️' };
 
     // ================================================================
-    // HELPERS
+    // 2. STATE
     // ================================================================
-    function getCurrentUser() {
-        if (_currentUser) return _currentUser;
-        try {
-            var raw = localStorage.getItem('salink_user');
-            if (raw) _currentUser = JSON.parse(raw);
-        } catch(e) {}
-        return _currentUser;
+    var currentUser = null;
+    var currentTheme = 'dark';
+    var allUsers = [];
+    var chatData = [];
+    var friendsList = [];
+    var currentChatId = null;
+    var activeFilter = 'all';
+    var searchQuery = '';
+    var regularSound = null;
+    var deferredPrompt = null;
+    var floatingNotifTimeout = null;
+    var mapCurrentLat = null;
+    var mapCurrentLng = null;
+
+    // Search Modal state
+    var searchTab = 'all';
+    var searchEmergencyFilter = 'all';
+    var searchModalDebounce = null;
+
+    // Notif state
+    var notifFilter = 'all';
+    var readNotifs = {};
+
+    // Invite state
+    var sentInvites = {};
+
+    // Voice recording
+    var isRecording = false;
+    var mediaRecorder = null;
+    var audioChunks = [];
+
+    // Lightbox
+    var lightboxImages = [];
+    var currentLightboxIndex = 0;
+
+    // Long-press timer
+    var longPressTimer = null;
+    var longPressTriggered = false;
+    var LONG_PRESS_MS = 500;
+
+    // ================================================================
+    // 3. HELPERS
+    // ================================================================
+    function getTimeAgo(ts) {
+        var diff = Date.now() - ts;
+        var sec = Math.floor(diff / 1000), min = Math.floor(sec / 60),
+            hr = Math.floor(min / 60), day = Math.floor(hr / 24);
+        if (sec < 60) return 'Baru saja';
+        if (min < 60) return min + 'm lalu';
+        if (hr < 24) return hr + 'j lalu';
+        if (day < 7) return day + 'h lalu';
+        return new Date(ts).toLocaleDateString('id-ID');
+    }
+    function formatTime(ts) {
+        return new Date(ts).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    }
+    function escapeHTML(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
     }
     function escapeAttr(str) {
         if (!str) return '';
-        return String(str).replace(/"/g, '&quot;').replace(/'/g, '&#039;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        return String(str)
+            .replace(/"/g, '&quot;').replace(/'/g, '&#039;')
+            .replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
-    function log(msg) { console.log('[SalinkSocial] ' + msg); }
+    function log(msg) { console.log('[SALINK PesanMasuk] ' + msg); }
 
     // ================================================================
-    // OPEN PROFILE — Buka halaman profile user
+    // 4. TOAST
     // ================================================================
-    function openProfile(username) {
-        if (!username) {
-            console.warn('[SalinkSocial] openProfile: username kosong');
-            return;
-        }
-        var me = getCurrentUser();
-        // Kalau buka profile sendiri → ke profil.html
-        if (me && me.username === username) {
-            window.location.href = 'profil.html';
-            return;
-        }
-        // Buka profile-user.html di tab baru
-        var url = PROFILE_USER_URL + '?username=' + encodeURIComponent(username);
-        window.open(url, '_blank');
+    function showToast(title, message, icon, playSound) {
+        icon = icon || 'fa-info-circle';
+        document.querySelectorAll('.toast').forEach(function(t) { t.remove(); });
+        var container = document.getElementById('toastContainer');
+        if (!container) return;
+        var toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerHTML =
+            '<div class="toast-icon"><i class="fas ' + icon + '"></i></div>' +
+            '<div class="toast-content">' +
+                '<div class="toast-title">' + escapeHTML(title) + '</div>' +
+                '<div class="toast-message">' + escapeHTML(message) + '</div>' +
+            '</div>' +
+            '<button class="toast-close" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>';
+        toast.querySelector('.toast-close').onclick = function() {
+            toast.classList.add('hide');
+            setTimeout(function() { toast.remove(); }, 400);
+        };
+        container.appendChild(toast);
+        setTimeout(function() {
+            toast.classList.add('hide');
+            setTimeout(function() { toast.remove(); }, 400);
+        }, 4000);
+        if (playSound) playRegularSound();
     }
-
-    // ================================================================
-    // OPEN CHAT — Buka chat dengan user
-    // ================================================================
-    function openChat(username) {
-        if (!username) return;
-        var me = getCurrentUser();
-        if (!me) {
-            window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(PESAN_MASUK_URL);
-            return;
-        }
-        // Simpan target chat di localStorage agar pesan-masuk.html bisa buka otomatis
+    function playRegularSound() {
         try {
-            localStorage.setItem('salink_pending_chat', JSON.stringify({
-                username: username,
-                timestamp: Date.now()
-            }));
+            if (!regularSound) regularSound = new Audio(REGULAR_SOUND_URL);
+            regularSound.currentTime = 0;
+            regularSound.play().catch(function() {});
         } catch(e) {}
-        // Kalau sudah di pesan-masuk.html → trigger langsung
-        if (window.location.pathname.indexOf('pesan-masuk.html') !== -1) {
-            if (typeof window.openChatRoom === 'function') {
-                setTimeout(function() { window.openChatRoom(username); }, 300);
-            }
-            return;
-        }
-        // Kalau di halaman lain → redirect ke pesan-masuk.html
-        window.location.href = PESAN_MASUK_URL + '?chat=' + encodeURIComponent(username);
     }
 
     // ================================================================
-    // SEND INVITE — Kirim undangan teman
+    // 5. THEME
     // ================================================================
-    async function sendInvite(username) {
-        var me = getCurrentUser();
-        if (!me) {
-            window.location.href = LOGIN_URL;
-            return false;
+    function loadTheme() {
+        var t = localStorage.getItem('salink_theme') || 'dark';
+        applyTheme(t);
+    }
+    function applyTheme(t) {
+        if (t === 'light') {
+            currentTheme = 'light';
+            document.documentElement.setAttribute('data-theme', 'light');
+            var tt = document.getElementById('themeToggle');
+            if (tt) tt.classList.add('active');
+            var ti = document.getElementById('toggleIcon');
+            if (ti) ti.className = 'fas fa-sun';
+            var meta = document.getElementById('themeColorMeta');
+            if (meta) meta.setAttribute('content', '#f5f7fa');
+        } else {
+            currentTheme = 'dark';
+            document.documentElement.removeAttribute('data-theme');
+            var tt2 = document.getElementById('themeToggle');
+            if (tt2) tt2.classList.remove('active');
+            var ti2 = document.getElementById('toggleIcon');
+            if (ti2) ti2.className = 'fas fa-moon';
+            var meta2 = document.getElementById('themeColorMeta');
+            if (meta2) meta2.setAttribute('content', '#0a0e1a');
         }
-        if (!username) return false;
+    }
+    function toggleTheme() {
+        var nt = currentTheme === 'dark' ? 'light' : 'dark';
+        applyTheme(nt);
+        localStorage.setItem('salink_theme', nt);
+    }
 
-        var sentInvites = {};
+    // ================================================================
+    // 6. MODAL GENERIC
+    // ================================================================
+    function openModal(titleHTML, bodyHTML) {
+        var t = document.getElementById('modalTitle');
+        if (t) t.innerHTML = titleHTML;
+        var b = document.getElementById('modalBody');
+        if (b) b.innerHTML = bodyHTML;
+        var m = document.getElementById('modalOverlay');
+        if (m) m.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeModal(id) {
+        var m = document.getElementById(id || 'modalOverlay');
+        if (m) m.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    function openModalById(id) {
+        var m = document.getElementById(id);
+        if (m) { m.classList.add('active'); document.body.style.overflow = 'hidden'; }
+    }
+    function closeModalById(id) {
+        var m = document.getElementById(id);
+        if (m) { m.classList.remove('active'); document.body.style.overflow = ''; }
+    }
+
+    // ================================================================
+    // 7. SIDEBAR
+    // ================================================================
+    function openSidebar() {
+        var s = document.getElementById('sidebar');
+        var o = document.getElementById('sidebarOverlay');
+        if (s) s.classList.add('active');
+        if (o) o.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeSidebar() {
+        var s = document.getElementById('sidebar');
+        var o = document.getElementById('sidebarOverlay');
+        if (s) s.classList.remove('active');
+        if (o) o.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    // ================================================================
+    // 8. USER
+    // ================================================================
+    function loadCurrentUser() {
+        try {
+            var raw = localStorage.getItem('salink_user');
+            if (raw) {
+                var u = JSON.parse(raw);
+                if (u && u.username && u.fullName) currentUser = u;
+            }
+        } catch(e) {}
+        updateUserUI();
+        updateSidebarUI();
+    }
+    function updateUserUI() {
+        var userBtn = document.getElementById('userBtn');
+        if (!userBtn) return;
+        if (!currentUser) { userBtn.innerHTML = '<i class="fas fa-user"></i>'; return; }
+        if (currentUser.profilePicture) {
+            userBtn.innerHTML = '<img src="' + escapeAttr(currentUser.profilePicture) + '" alt="Profile">';
+        } else {
+            var icon = currentUser.gender === 'female' ? 'fa-female' : 'fa-user';
+            userBtn.innerHTML = '<i class="fas ' + icon + '"></i>';
+        }
+    }
+    function updateSidebarUI() {
+        var nameEl = document.getElementById('sidebarUserName');
+        var emailEl = document.getElementById('sidebarUserEmail');
+        var avatarEl = document.getElementById('sidebarUserAvatar');
+        var logoutItem = document.getElementById('logoutNavItem');
+        if (!currentUser) {
+            if (nameEl) nameEl.textContent = 'Guest';
+            if (emailEl) emailEl.textContent = 'guest@salink.id';
+            if (avatarEl) avatarEl.innerHTML = '<i class="fas fa-user"></i>';
+            if (logoutItem) logoutItem.style.display = 'none';
+            return;
+        }
+        if (nameEl) nameEl.textContent = currentUser.fullName || 'User';
+        if (emailEl) emailEl.textContent = currentUser.email || currentUser.username || '-';
+        if (avatarEl) {
+            if (currentUser.profilePicture) {
+                avatarEl.innerHTML = '<img src="' + escapeAttr(currentUser.profilePicture) + '" alt="">';
+            } else {
+                avatarEl.innerHTML = currentUser.gender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>';
+            }
+        }
+        if (logoutItem) logoutItem.style.display = 'block';
+    }
+
+    // ================================================================
+    // 9. API CALL
+    // ================================================================
+    async function apiCall(action, data) {
+        data = data || {};
+        try {
+            if (action.indexOf('get_') === 0) {
+                var params = new URLSearchParams(Object.assign({ action: action, timestamp: Date.now() }, data));
+                var response = await fetch(API_URL + '?' + params.toString(), {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    cache: 'no-store'
+                });
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                return await response.json();
+            } else {
+                var response2 = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({ action: action, data: data, timestamp: Date.now() })
+                });
+                if (!response2.ok) throw new Error('HTTP ' + response2.status);
+                return await response2.json();
+            }
+        } catch (error) {
+            console.error('❌ API Error:', error);
+            return { status: 'error', message: error.message };
+        }
+    }
+    async function apiGetUsers() {
+        var r = await apiCall('get_users');
+        return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
+    }
+    async function apiGetMessages() {
+        var r = await apiCall('get_messages');
+        return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
+    }
+    async function apiGetFriends() {
+        var r = await apiCall('get_friends');
+        return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
+    }
+    async function apiSendMessage(payload) {
+        var r = await apiCall('send_message', payload);
+        return r.status === 'success';
+    }
+    async function apiSyncMessages(messages) {
+        var r = await apiCall('sync_messages', { messages: messages });
+        return r.status === 'success';
+    }
+
+    // ================================================================
+    // 10. ADAPTERS
+    // ================================================================
+    function adaptUser(u) {
+        var lastActive = u.lastActive ? new Date(u.lastActive).getTime() : 0;
+        return Object.assign({}, u, { isOnline: lastActive > (Date.now() - 5 * 60 * 1000) });
+    }
+    function adaptMessage(m) {
+        var ts = m.timestamp ? new Date(m.timestamp).getTime() : Date.now();
+        if (isNaN(ts)) ts = Date.now();
+        return {
+            id: m.id || 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8),
+            from: m.from || m.fromUsername || '',
+            fromName: m.fromName || m.sender || 'User',
+            fromGender: m.fromGender || 'male',
+            to: m.to || m.toUsername || '',
+            subject: m.subject || '',
+            message: m.message || m.text || '',
+            timestamp: ts,
+            read: m.read === 'TRUE' || m.read === true || m.read === 'true',
+            isOwn: m.isOwn === 'TRUE' || m.isOwn === true || m.isOwn === 'true'
+        };
+    }
+
+    // ================================================================
+    // 11. LOAD DATA
+    // ================================================================
+    async function loadAllUsers() {
+        try {
+            var users = await apiGetUsers();
+            if (users && users.length > 0) {
+                allUsers = users.map(adaptUser);
+                try { localStorage.setItem('salink_users', JSON.stringify(allUsers)); } catch(e) {}
+            } else {
+                allUsers = JSON.parse(localStorage.getItem('salink_users') || '[]').map(adaptUser);
+            }
+        } catch(e) {
+            allUsers = JSON.parse(localStorage.getItem('salink_users') || '[]').map(adaptUser);
+        }
+    }
+
+    async function loadFriends() {
+        // Baca dari SalinkSocial jika tersedia
+        if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.loadFriends === 'function') {
+            friendsList = SalinkSocial.loadFriends();
+            return;
+        }
+        // Fallback: baca langsung dari localStorage
+        try {
+            friendsList = JSON.parse(localStorage.getItem('salink_friends') || '[]');
+        } catch(e) { friendsList = []; }
+        // Coba ambil dari API juga
+        try {
+            var apiFriends = await apiGetFriends();
+            if (apiFriends && apiFriends.length > 0) {
+                var map = new Map();
+                friendsList.forEach(function(f) { if (f.id) map.set(f.id, f); });
+                apiFriends.forEach(function(f) { if (f.id) map.set(f.id, f); });
+                friendsList = Array.from(map.values());
+                try { localStorage.setItem('salink_friends', JSON.stringify(friendsList)); } catch(e) {}
+            }
+        } catch(e) {}
+    }
+
+    async function loadChatData() {
+        var allMessages = [];
+        try {
+            var remote = await apiGetMessages();
+            if (remote && remote.length > 0) allMessages = remote.map(adaptMessage);
+        } catch(e) {}
+
+        var localMsgs = [];
+        try {
+            var raw = localStorage.getItem('salink_messages');
+            if (raw) {
+                var parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) localMsgs = parsed.map(adaptMessage);
+            }
+        } catch(e) {}
+
+        var msgMap = new Map();
+        allMessages.forEach(function(m) { if (m.id) msgMap.set(m.id, m); });
+        localMsgs.forEach(function(m) { if (m.id) msgMap.set(m.id, m); });
+        var merged = Array.from(msgMap.values());
+        try { localStorage.setItem('salink_messages', JSON.stringify(merged)); } catch(e) {}
+
+        var chatMap = new Map();
+        if (!currentUser) return;
+
+        var myUsername = currentUser.username;
+        merged.forEach(function(msg) {
+            if (msg.from !== myUsername && msg.to !== myUsername) return;
+            var partnerUsername = msg.from === myUsername ? msg.to : msg.from;
+            if (!partnerUsername) return;
+
+            if (!chatMap.has(partnerUsername)) {
+                var user = allUsers.find(function(u) { return u.username === partnerUsername; });
+                chatMap.set(partnerUsername, {
+                    id: partnerUsername,
+                    name: user ? user.fullName : partnerUsername,
+                    username: partnerUsername,
+                    phone: user ? user.phone : '',
+                    profilePicture: user ? user.profilePicture : '',
+                    gender: user ? user.gender : 'male',
+                    isOnline: user ? user.isOnline : false,
+                    unread: 0,
+                    lastMessage: '',
+                    lastTime: 0,
+                    messages: [],
+                    muted: false
+                });
+            }
+
+            var chat = chatMap.get(partnerUsername);
+            var isMine = msg.from === myUsername;
+            chat.messages.push({
+                id: msg.id,
+                text: msg.message,
+                mine: isMine,
+                time: msg.timestamp
+            });
+
+            if (msg.timestamp > chat.lastTime) {
+                chat.lastMessage = msg.message;
+                chat.lastTime = msg.timestamp;
+            }
+            if (!isMine && !msg.read) chat.unread = (chat.unread || 0) + 1;
+        });
+
+        chatData = Array.from(chatMap.values());
+        chatData.sort(function(a, b) { return (b.lastTime || 0) - (a.lastTime || 0); });
+
+        // Merge with local chats (grup, dll)
+        var localChats = [];
+        try {
+            var raw2 = localStorage.getItem('salink_inbox_chats');
+            if (raw2) {
+                var parsed2 = JSON.parse(raw2);
+                if (Array.isArray(parsed2)) localChats = parsed2;
+            }
+        } catch(e) {}
+
+        localChats.forEach(function(lc) {
+            if (!chatData.find(function(c) { return c.id === lc.id; })) chatData.push(lc);
+        });
+
+        // Restore muted state
+        try {
+            var mutedMap = JSON.parse(localStorage.getItem('salink_muted_chats') || '{}');
+            chatData.forEach(function(c) { if (mutedMap[c.id]) c.muted = true; });
+        } catch(e) {}
+
+        try { localStorage.setItem('salink_inbox_chats', JSON.stringify(chatData)); } catch(e) {}
+    }
+
+    function saveChatData() {
+        try {
+            localStorage.setItem('salink_inbox_chats', JSON.stringify(chatData));
+            var allMsgs = [];
+            chatData.forEach(function(chat) {
+                if (chat.messages) {
+                    chat.messages.forEach(function(msg) {
+                        if (msg.media || msg.audioUrl) return;
+                        allMsgs.push({
+                            id: msg.id,
+                            from: msg.mine ? (currentUser ? currentUser.username : '') : chat.username,
+                            fromName: msg.mine ? (currentUser ? currentUser.fullName : '') : chat.name,
+                            fromGender: msg.mine ? (currentUser ? currentUser.gender : 'male') : (chat.gender || 'male'),
+                            to: msg.mine ? chat.username : (currentUser ? currentUser.username : ''),
+                            subject: '',
+                            message: msg.text || '',
+                            timestamp: new Date(msg.time).toISOString(),
+                            read: 'TRUE',
+                            isOwn: msg.mine ? 'TRUE' : 'FALSE'
+                        });
+                    });
+                }
+            });
+            try { localStorage.setItem('salink_messages', JSON.stringify(allMsgs)); } catch(e) {}
+            apiSyncMessages(allMsgs).catch(function() {});
+        } catch(e) {}
+    }
+
+    // ================================================================
+    // 12. RENDER CHAT LIST
+    // ================================================================
+    function renderChatList() {
+        var filtered = chatData.slice();
+        if (activeFilter === 'unread') filtered = filtered.filter(function(c) { return c.unread > 0; });
+        else if (activeFilter === 'grup') filtered = filtered.filter(function(c) { return c.isGroup === true; });
+        else if (activeFilter === 'pribadi') filtered = filtered.filter(function(c) { return !c.isGroup; });
+
+        if (searchQuery.trim()) {
+            var q = searchQuery.toLowerCase().trim();
+            filtered = filtered.filter(function(c) {
+                return (c.name || '').toLowerCase().indexOf(q) !== -1 ||
+                       (c.username || '').toLowerCase().indexOf(q) !== -1 ||
+                       (c.lastMessage || '').toLowerCase().indexOf(q) !== -1;
+            });
+        }
+        filtered.sort(function(a, b) { return (b.lastTime || 0) - (a.lastTime || 0); });
+
+        var list = document.getElementById('chatList');
+        if (!list) return;
+
+        if (filtered.length === 0) {
+            list.innerHTML =
+                '<div class="empty-state">' +
+                    '<div class="empty-icon">💬</div>' +
+                    '<h3>' + (searchQuery ? 'Tidak Ditemukan' : 'Belum Ada Percakapan') + '</h3>' +
+                    '<p>' + (searchQuery ? 'Tidak ada hasil untuk "' + escapeHTML(searchQuery) + '"' : 'Mulai chat dengan teman atau buat grup baru') + '</p>' +
+                '</div>';
+            updateBadges();
+            return;
+        }
+
+        list.innerHTML = filtered.map(function(c) {
+            var initial = (c.name || 'U').charAt(0).toUpperCase();
+            var avatarContent = c.profilePicture
+                ? '<img src="' + escapeAttr(c.profilePicture) + '" alt="">'
+                : initial;
+            var onlineDot = c.isOnline ? '<span class="online-dot"></span>' : '';
+            var badge = c.unread > 0 && !c.muted
+                ? '<div class="badge">' + (c.unread > 99 ? '99+' : c.unread) + '</div>'
+                : '';
+            var previewText = c.unread > 0
+                ? '<strong>' + escapeHTML(c.lastMessage || 'Pesan baru') + '</strong>'
+                : escapeHTML(c.lastMessage || 'Belum ada pesan');
+            var timeStr = c.lastTime ? getTimeAgo(c.lastTime) : '';
+            var mutedClass = c.muted ? ' muted' : '';
+
+            return '<div class="chat-card' + mutedClass + '" data-chat-id="' + escapeAttr(c.id) + '">' +
+                '<div class="avatar" data-profile-username="' + escapeAttr(c.username) + '">' + avatarContent + onlineDot + '</div>' +
+                '<div class="chat-content">' +
+                    '<div class="chat-row">' +
+                        '<span class="chat-name">' + escapeHTML(c.name) + '</span>' +
+                        '<span class="chat-time">' + timeStr + '</span>' +
+                    '</div>' +
+                    '<div class="chat-preview">' + previewText + '</div>' +
+                '</div>' +
+                badge +
+            '</div>';
+        }).join('');
+
+        // Attach listeners
+        list.querySelectorAll('.chat-card').forEach(function(card) {
+            var chatId = card.dataset.chatId;
+
+            // Click avatar → buka profil user
+            var avatarEl = card.querySelector('.avatar');
+            if (avatarEl) {
+                avatarEl.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    var username = this.dataset.profileUsername;
+                    if (username) openProfileUser(username);
+                });
+            }
+
+            // Long press → context menu Hapus
+            card.addEventListener('touchstart', function(e) {
+                longPressTriggered = false;
+                var touch = e.touches[0];
+                longPressTimer = setTimeout(function() {
+                    longPressTriggered = true;
+                    showChatContextMenu(chatId, touch.clientX, touch.clientY);
+                    if (navigator.vibrate) navigator.vibrate(30);
+                }, LONG_PRESS_MS);
+            }, { passive: true });
+            card.addEventListener('touchend', function(e) {
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+                if (longPressTriggered) { e.preventDefault(); }
+            });
+            card.addEventListener('touchmove', function() {
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+            }, { passive: true });
+
+            card.addEventListener('mousedown', function(e) {
+                if (e.button !== 0) return;
+                longPressTriggered = false;
+                longPressTimer = setTimeout(function() {
+                    longPressTriggered = true;
+                    showChatContextMenu(chatId, e.clientX, e.clientY);
+                }, LONG_PRESS_MS);
+            });
+            card.addEventListener('mouseup', function() {
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+            });
+            card.addEventListener('mouseleave', function() {
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+            });
+
+            // Normal click → open chat (kalau tidak long-press)
+            card.addEventListener('click', function(e) {
+                if (longPressTriggered) { longPressTriggered = false; return; }
+                if (e.target.closest('.avatar')) return;
+                openChatRoom(chatId);
+            });
+        });
+
+        updateBadges();
+    }
+
+    // ================================================================
+    // 13. OPEN PROFILE USER — Redirect ke profile-user.html
+    // ================================================================
+    function openProfileUser(username) {
+        if (!username) return;
+        if (currentUser && currentUser.username === username) {
+            window.location.href = PROFILE_URL;
+            return;
+        }
+        window.open(PROFILE_USER_URL + '?username=' + encodeURIComponent(username), '_blank');
+    }
+
+    // ================================================================
+    // 14. CONTEXT MENU (Long-press)
+    // ================================================================
+    function showChatContextMenu(chatId, x, y) {
+        var menu = document.getElementById('contextMenu');
+        if (!menu) return;
+        var chat = chatData.find(function(c) { return c.id === chatId; });
+        if (!chat) return;
+
+        var isMuted = chat.muted === true;
+        menu.innerHTML =
+            '<button class="context-menu-item" data-action="open"><i class="fas fa-comment"></i> Buka Chat</button>' +
+            '<button class="context-menu-item" data-action="profile"><i class="fas fa-user"></i> Lihat Profil</button>' +
+            '<button class="context-menu-item" data-action="mute"><i class="fas fa-bell' + (isMuted ? '' : '-slash') + '"></i> ' + (isMuted ? 'Aktifkan Notif' : 'Mute Notifikasi') + '</button>' +
+            '<button class="context-menu-item danger" data-action="delete"><i class="fas fa-trash"></i> Hapus Chat</button>';
+
+        // Position
+        var menuW = 200, menuH = 220;
+        var vw = window.innerWidth, vh = window.innerHeight;
+        var posX = Math.min(x, vw - menuW - 10);
+        var posY = Math.min(y, vh - menuH - 10);
+        if (posY < 10) posY = 10;
+        menu.style.left = posX + 'px';
+        menu.style.top = posY + 'px';
+        menu.classList.add('show');
+
+        // Attach handlers
+        menu.querySelectorAll('.context-menu-item').forEach(function(btn) {
+            btn.onclick = function() {
+                var action = this.dataset.action;
+                hideContextMenu();
+                if (action === 'open') openChatRoom(chatId);
+                else if (action === 'profile') openProfileUser(chat.username);
+                else if (action === 'mute') toggleMuteChat(chatId);
+                else if (action === 'delete') deleteChatConfirm(chatId);
+            };
+        });
+    }
+
+    function showMessageContextMenu(msgId, chatId, x, y) {
+        var menu = document.getElementById('contextMenu');
+        if (!menu) return;
+        menu.innerHTML =
+            '<button class="context-menu-item" data-action="reply"><i class="fas fa-reply"></i> Balas</button>' +
+            '<button class="context-menu-item" data-action="copy"><i class="fas fa-copy"></i> Salin</button>' +
+            '<button class="context-menu-item danger" data-action="delete"><i class="fas fa-trash"></i> Hapus</button>';
+
+        var menuW = 200, menuH = 180;
+        var vw = window.innerWidth, vh = window.innerHeight;
+        // PENTING: Posisikan menu DI BAWAH teks (bukan di atas — terhalang header)
+        var posX = Math.min(x, vw - menuW - 10);
+        var posY = y + 10; // 10px di bawah titik sentuh
+        if (posY + menuH > vh - 20) posY = y - menuH - 10; // fallback ke atas jika tidak cukup
+        if (posY < 10) posY = 10;
+        menu.style.left = posX + 'px';
+        menu.style.top = posY + 'px';
+        menu.classList.add('show');
+
+        menu.querySelectorAll('.context-menu-item').forEach(function(btn) {
+            btn.onclick = function() {
+                var action = this.dataset.action;
+                hideContextMenu();
+                if (action === 'reply') replyMessage(chatId, msgId);
+                else if (action === 'copy') copyMessage(chatId, msgId);
+                else if (action === 'delete') deleteMessageConfirm(chatId, msgId);
+            };
+        });
+    }
+
+    function hideContextMenu() {
+        var menu = document.getElementById('contextMenu');
+        if (menu) menu.classList.remove('show');
+    }
+
+    // ================================================================
+    // 15. MUTE / DELETE CHAT
+    // ================================================================
+    function toggleMuteChat(chatId) {
+        var chat = chatData.find(function(c) { return c.id === chatId; });
+        if (!chat) return;
+        chat.muted = !chat.muted;
+        try {
+            var mutedMap = JSON.parse(localStorage.getItem('salink_muted_chats') || '{}');
+            if (chat.muted) mutedMap[chatId] = true;
+            else delete mutedMap[chatId];
+            localStorage.setItem('salink_muted_chats', JSON.stringify(mutedMap));
+        } catch(e) {}
+        renderChatList();
+        showToast(chat.muted ? '🔕 Muted' : '🔔 Aktif', 'Notifikasi ' + chat.name + ' ' + (chat.muted ? 'dimute' : 'diaktifkan'), chat.muted ? 'fa-bell-slash' : 'fa-bell');
+    }
+
+    function deleteChatConfirm(chatId) {
+        var chat = chatData.find(function(c) { return c.id === chatId; });
+        if (!chat) return;
+        if (!confirm('Hapus semua obrolan dengan ' + chat.name + '?\n\nTindakan ini tidak bisa dibatalkan.')) return;
+        // Hapus dari chatData
+        chatData = chatData.filter(function(c) { return c.id !== chatId; });
+        // Hapus semua messages terkait dari salink_messages
+        try {
+            var allMsgs = JSON.parse(localStorage.getItem('salink_messages') || '[]');
+            allMsgs = allMsgs.filter(function(m) {
+                return !((m.from === chat.username && m.to === currentUser.username) ||
+                         (m.to === chat.username && m.from === currentUser.username));
+            });
+            localStorage.setItem('salink_messages', JSON.stringify(allMsgs));
+        } catch(e) {}
+        saveChatData();
+        renderChatList();
+        showToast('🗑️ Terhapus', 'Chat dengan ' + chat.name + ' dihapus', 'fa-trash');
+    }
+
+    function clearAllChatHistory(chatId) {
+        var chat = chatData.find(function(c) { return c.id === chatId; });
+        if (!chat) return;
+        if (!confirm('Bersihkan semua pesan dengan ' + chat.name + '?\n\nTindakan ini tidak bisa dibatalkan.')) return;
+        chat.messages = [];
+        chat.lastMessage = '';
+        chat.lastTime = 0;
+        chat.unread = 0;
+        saveChatData();
+        renderChatList();
+        renderMessages(chat);
+        closeModalById('modalOverlay');
+        showToast('🧹 Bersih', 'Semua obrolan dihapus', 'fa-broom');
+    }
+
+    // ================================================================
+    // 16. UPDATE BADGES
+    // ================================================================
+    function updateBadges() {
+        var total = chatData.reduce(function(sum, c) {
+            return sum + (c.muted ? 0 : (c.unread || 0));
+        }, 0);
+        var notifBadge = document.getElementById('notifBadge');
+        if (notifBadge) {
+            if (total > 0) {
+                notifBadge.textContent = total > 99 ? '99+' : total;
+                notifBadge.classList.add('show');
+            } else notifBadge.classList.remove('show');
+        }
+        var inviteBadge = document.getElementById('inviteBadge');
+        if (inviteBadge && currentUser) {
+            var pendingIncoming = 0;
+            try {
+                // Pakai SalinkSocial.getPendingFollowers jika tersedia
+                if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.getPendingFollowers === 'function') {
+                    pendingIncoming = SalinkSocial.getPendingFollowers(currentUser.username).length;
+                } else {
+                    pendingIncoming = (friendsList || []).filter(function(f) {
+                        var status = String(f.status || '').toLowerCase();
+                        var u2 = String(f.user2 || '').trim().toLowerCase();
+                        return u2 === currentUser.username.toLowerCase() && status !== 'accepted';
+                    }).length;
+                }
+            } catch(e) {}
+            var othersCount = (allUsers || []).filter(function(u) {
+                return u.username !== currentUser.username;
+            }).length;
+            var badgeCount = pendingIncoming > 0 ? pendingIncoming : othersCount;
+            if (badgeCount > 0) {
+                inviteBadge.textContent = badgeCount > 99 ? '99+' : badgeCount;
+                inviteBadge.classList.add('show');
+            } else inviteBadge.classList.remove('show');
+        }
+        updateNotifBadge();
+    }
+
+    // ================================================================
+    // 17. CHAT ROOM
+    // ================================================================
+    function openChatRoom(chatId) {
+        var chat = chatData.find(function(c) { return c.id === chatId; });
+        if (!chat) return;
+        currentChatId = chatId;
+        if (chat.unread > 0) {
+            chat.unread = 0;
+            saveChatData();
+            renderChatList();
+        }
+
+        var titleEl = document.getElementById('chatRoomTitle');
+        var statusEl = document.getElementById('chatRoomStatus');
+        var avatarEl = document.getElementById('chatRoomAvatar');
+        if (titleEl) titleEl.textContent = chat.name;
+        if (statusEl) statusEl.textContent = chat.isOnline ? '🟢 Online' : '⚪ Offline';
+        if (avatarEl) {
+            avatarEl.innerHTML = chat.profilePicture
+                ? '<img src="' + escapeAttr(chat.profilePicture) + '" alt="">'
+                : (chat.name || 'U').charAt(0).toUpperCase();
+        }
+
+        renderMessages(chat);
+        var room = document.getElementById('chatRoom');
+        if (room) room.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        setTimeout(function() {
+            var msgs = document.getElementById('chatMessages');
+            if (msgs) msgs.scrollTop = msgs.scrollHeight;
+        }, 100);
+    }
+
+    function closeChatRoom() {
+        var room = document.getElementById('chatRoom');
+        if (room) room.classList.remove('open');
+        document.body.style.overflow = '';
+        var picker = document.getElementById('emojiPicker');
+        if (picker) picker.classList.remove('show');
+        if (isRecording && mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+        currentChatId = null;
+    }
+
+    function renderMessages(chat) {
+        var container = document.getElementById('chatMessages');
+        if (!container) return;
+        if (!chat.messages || chat.messages.length === 0) {
+            container.innerHTML =
+                '<div class="empty-state" style="margin:auto;">' +
+                    '<div class="empty-icon">💬</div>' +
+                    '<h3>Mulai Percakapan</h3>' +
+                    '<p>Kirim pesan pertama Anda ke ' + escapeHTML(chat.name) + '</p>' +
+                '</div>';
+            return;
+        }
+        var sorted = chat.messages.slice().sort(function(a, b) { return (a.time || 0) - (b.time || 0); });
+        container.innerHTML = sorted.map(function(m) {
+            var contentHTML = '';
+            if (m.media && m.mediaType === 'image') {
+                contentHTML = '<img src="' + escapeAttr(m.media) + '" class="msg-media-img" data-lightbox-src="' + escapeAttr(m.media) + '" alt="">';
+            } else if (m.media && m.mediaType === 'video') {
+                contentHTML = '<video controls class="msg-media-video"><source src="' + escapeAttr(m.media) + '"></video>';
+            } else if (m.audioUrl) {
+                contentHTML = '<audio controls class="msg-media-audio"><source src="' + escapeAttr(m.audioUrl) + '"></audio>';
+            } else if (m.location) {
+                contentHTML = '📍 <a href="' + escapeAttr(m.location) + '" target="_blank" rel="noopener" style="color:' + (m.mine ? '#fff' : 'var(--primary)') + ';">Lihat Lokasi</a>';
+            } else if (m.isDocument) {
+                contentHTML = '📄 <strong>' + escapeHTML(m.fileName || 'Dokumen') + '</strong>';
+            } else if (m.isContact) {
+                contentHTML = '📇 <strong>' + escapeHTML(m.contactName || 'Kontak') + '</strong>';
+            } else {
+                contentHTML = escapeHTML(m.text || '');
+            }
+            return '<div class="msg-bubble ' + (m.mine ? 'mine' : '') + '" data-msg-id="' + escapeAttr(m.id) + '">' +
+                '<span class="msg-text">' + contentHTML + '</span>' +
+                '<span class="msg-time">' + formatTime(m.time) + '</span>' +
+            '</div>';
+        }).join('');
+
+        // Attach lightbox for images
+        container.querySelectorAll('[data-lightbox-src]').forEach(function(img) {
+            img.addEventListener('click', function(e) {
+                e.stopPropagation();
+                openLightbox(this.dataset.lightboxSrc);
+            });
+        });
+
+        // Attach long-press for message bubbles
+        container.querySelectorAll('.msg-bubble').forEach(function(bubble) {
+            var msgId = bubble.dataset.msgId;
+            bubble.addEventListener('touchstart', function(e) {
+                var touch = e.touches[0];
+                longPressTriggered = false;
+                longPressTimer = setTimeout(function() {
+                    longPressTriggered = true;
+                    showMessageContextMenu(msgId, chat.id, touch.clientX, touch.clientY);
+                    if (navigator.vibrate) navigator.vibrate(30);
+                }, LONG_PRESS_MS);
+            }, { passive: true });
+            bubble.addEventListener('touchend', function(e) {
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+                if (longPressTriggered) e.preventDefault();
+            });
+            bubble.addEventListener('touchmove', function() {
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+            }, { passive: true });
+
+            bubble.addEventListener('mousedown', function(e) {
+                if (e.button !== 0) return;
+                longPressTriggered = false;
+                longPressTimer = setTimeout(function() {
+                    longPressTriggered = true;
+                    showMessageContextMenu(msgId, chat.id, e.clientX, e.clientY);
+                }, LONG_PRESS_MS);
+            });
+            bubble.addEventListener('mouseup', function() {
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+            });
+            bubble.addEventListener('mouseleave', function() {
+                if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+            });
+        });
+    }
+
+    async function sendMessage() {
+        if (!currentUser) { showToast('🔒 Login', 'Silakan masuk untuk mengirim pesan', 'fa-lock'); return; }
+        if (!currentChatId) return;
+        var input = document.getElementById('chatInput');
+        if (!input) return;
+        var text = input.value.trim();
+        if (!text) return;
+
+        var chat = chatData.find(function(c) { return c.id === currentChatId; });
+        if (!chat) return;
+
+        // Cek blokir via SalinkSocial
+        if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.isBlockedBy === 'function') {
+            if (SalinkSocial.isBlockedBy(chat.username, currentUser.username)) {
+                showToast('🚫 Diblokir', 'Anda tidak dapat mengirim pesan ke ' + chat.name, 'fa-ban');
+                return;
+            }
+        }
+
+        var now = Date.now();
+        var msgId = 'msg-' + now + '-' + Math.random().toString(36).substring(2, 8);
+
+        if (!chat.messages) chat.messages = [];
+        chat.messages.push({ id: msgId, text: text, mine: true, time: now });
+        chat.lastMessage = text;
+        chat.lastTime = now;
+
+        input.value = '';
+        var cc = document.getElementById('charCounter');
+        if (cc) cc.textContent = '0/5000';
+
+        renderMessages(chat);
+        saveChatData();
+        renderChatList();
+        setTimeout(function() {
+            var msgs = document.getElementById('chatMessages');
+            if (msgs) msgs.scrollTop = msgs.scrollHeight;
+        }, 50);
+
+        await apiSendMessage({
+            id: msgId,
+            from: currentUser.username,
+            fromName: currentUser.fullName,
+            fromGender: currentUser.gender || 'male',
+            to: chat.username,
+            subject: '',
+            message: text,
+            timestamp: now,
+            read: false,
+            isOwn: true
+        });
+    }
+
+    function replyMessage(chatId, msgId) {
+        var chat = chatData.find(function(c) { return c.id === chatId; });
+        if (!chat) return;
+        var msg = (chat.messages || []).find(function(m) { return m.id === msgId; });
+        if (!msg) return;
+        var input = document.getElementById('chatInput');
+        if (!input) return;
+        input.value = '> ' + msg.text + '\n';
+        input.focus();
+    }
+
+    function copyMessage(chatId, msgId) {
+        var chat = chatData.find(function(c) { return c.id === chatId; });
+        if (!chat) return;
+        var msg = (chat.messages || []).find(function(m) { return m.id === msgId; });
+        if (!msg) return;
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(msg.text || '').then(function() {
+                showToast('📋 Disalin', 'Pesan disalin ke clipboard', 'fa-copy');
+            });
+        } else {
+            showToast('ℹ️ Info', 'Browser tidak mendukung clipboard', 'fa-info-circle');
+        }
+    }
+
+    function deleteMessageConfirm(chatId, msgId) {
+        if (!confirm('Hapus pesan ini?')) return;
+        var chat = chatData.find(function(c) { return c.id === chatId; });
+        if (!chat) return;
+        chat.messages = (chat.messages || []).filter(function(m) { return m.id !== msgId; });
+        if (chat.messages.length > 0) {
+            var last = chat.messages[chat.messages.length - 1];
+            chat.lastMessage = last.text;
+            chat.lastTime = last.time;
+        } else {
+            chat.lastMessage = '';
+            chat.lastTime = 0;
+        }
+        saveChatData();
+        renderMessages(chat);
+        renderChatList();
+        showToast('🗑️ Terhapus', 'Pesan dihapus', 'fa-trash');
+    }
+
+    // ================================================================
+    // 18. VOICE NOTE / ATTACH / CAMERA
+    // ================================================================
+    function toggleVoiceRecording() {
+        var btn = document.getElementById('voiceNoteBtn');
+        if (isRecording) {
+            if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop();
+            isRecording = false;
+            if (btn) btn.classList.remove('recording');
+            return;
+        }
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            showToast('❌ Error', 'Browser tidak mendukung voice note', 'fa-exclamation-triangle');
+            return;
+        }
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(function(stream) {
+                audioChunks = [];
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.ondataavailable = function(e) { if (e.data.size > 0) audioChunks.push(e.data); };
+                mediaRecorder.onstop = function() {
+                    var blob = new Blob(audioChunks, { type: 'audio/webm' });
+                    if (blob.size > 0) {
+                        var url = URL.createObjectURL(blob);
+                        var chat = chatData.find(function(c) { return c.id === currentChatId; });
+                        if (chat) {
+                            var now = Date.now();
+                            chat.messages.push({
+                                id: 'msg-' + now,
+                                text: '🎙️ Voice Note',
+                                mine: true,
+                                time: now,
+                                audioUrl: url
+                            });
+                            chat.lastMessage = '🎙️ Voice Note';
+                            chat.lastTime = now;
+                            saveChatData();
+                            renderMessages(chat);
+                            renderChatList();
+                        }
+                    }
+                    stream.getTracks().forEach(function(t) { t.stop(); });
+                };
+                mediaRecorder.start();
+                isRecording = true;
+                if (btn) btn.classList.add('recording');
+                showToast('🎙️ Merekam', 'Tekan lagi untuk berhenti', 'fa-microphone');
+                setTimeout(function() {
+                    if (isRecording && mediaRecorder && mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                        isRecording = false;
+                        if (btn) btn.classList.remove('recording');
+                    }
+                }, 60000);
+            })
+            .catch(function(err) {
+                showToast('❌ Error', 'Gagal akses mikrofon: ' + err.message, 'fa-exclamation-triangle');
+                isRecording = false;
+                if (btn) btn.classList.remove('recording');
+            });
+    }
+
+    function openAttachModal() {
+        if (!currentChatId) return;
+        openModal('📎 Lampiran',
+            '<div style="display:flex;flex-direction:column;gap:8px;">' +
+                '<button onclick="window._salinkAttach(\'doc\')" style="padding:12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:12px;cursor:pointer;text-align:left;color:var(--text-primary);font-size:0.8rem;font-family:inherit;"><i class="fas fa-file-alt" style="color:var(--primary);width:20px;"></i> Dokumen (PDF, Word, dll)</button>' +
+                '<button onclick="window._salinkAttach(\'contact\')" style="padding:12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:12px;cursor:pointer;text-align:left;color:var(--text-primary);font-size:0.8rem;font-family:inherit;"><i class="fas fa-address-card" style="color:var(--primary);width:20px;"></i> Kontak SALINK</button>' +
+                '<button onclick="window._salinkAttach(\'location\')" style="padding:12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:12px;cursor:pointer;text-align:left;color:var(--text-primary);font-size:0.8rem;font-family:inherit;"><i class="fas fa-map-marker-alt" style="color:var(--primary);width:20px;"></i> Lokasi Terkini</button>' +
+            '</div>'
+        );
+    }
+    function handleAttach(type) {
+        closeModal();
+        if (type === 'doc') {
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.mp4,.mp3,.wav';
+            input.onchange = function(e) {
+                if (e.target.files[0]) {
+                    var file = e.target.files[0];
+                    var size = (file.size / 1024).toFixed(1);
+                    addMediaMessage('📄 ' + file.name, 'document', { fileName: file.name });
+                    showToast('📄 Terkirim', file.name + ' (' + size + ' KB)', 'fa-file-alt');
+                }
+            };
+            input.click();
+        } else if (type === 'contact') {
+            openContactShareModal();
+        } else if (type === 'location') {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(pos) {
+                        var url = 'https://www.google.com/maps?q=' + pos.coords.latitude + ',' + pos.coords.longitude;
+                        addMediaMessage('📍 Lokasi Saya', 'location', { location: url });
+                    },
+                    function(err) { showToast('❌ Error', 'Gagal ambil lokasi: ' + err.message, 'fa-exclamation-triangle'); }
+                );
+            }
+        }
+    }
+    function openContactShareModal() {
+        var contactsList = allUsers.filter(function(u) { return u.username !== (currentUser ? currentUser.username : ''); });
+        if (contactsList.length === 0) {
+            openModal('📇 Kontak', '<div style="text-align:center;padding:20px;color:var(--text-muted);">Belum ada kontak</div>');
+            return;
+        }
+        openModal('📇 Bagikan Kontak', contactsList.slice(0, 20).map(function(u) {
+            return '<div onclick="window._salinkShareContact(\'' + escapeAttr(u.fullName || u.username) + '\', \'' + escapeAttr(u.phone || '') + '\')" style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;margin-bottom:6px;cursor:pointer;">' +
+                '<div style="width:36px;height:36px;border-radius:50%;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.9rem;font-weight:700;">' + (u.fullName || u.username).charAt(0).toUpperCase() + '</div>' +
+                '<div style="flex:1;"><div style="font-size:0.8rem;color:var(--text-primary);font-weight:600;">' + escapeHTML(u.fullName || u.username) + '</div><div style="font-size:0.6rem;color:var(--text-muted);">@' + escapeHTML(u.username) + '</div></div>' +
+            '</div>';
+        }).join(''));
+    }
+    function shareContact(name, phone) {
+        closeModal();
+        addMediaMessage('📇 ' + name, 'contact', { contactName: name, contactPhone: phone });
+    }
+    function addMediaMessage(text, type, extra) {
+        extra = extra || {};
+        var chat = chatData.find(function(c) { return c.id === currentChatId; });
+        if (!chat) return;
+        var now = Date.now();
+        var msg = Object.assign({
+            id: 'msg-' + now + '-' + Math.random().toString(36).substring(2, 8),
+            text: text,
+            mine: true,
+            time: now
+        }, extra);
+        if (type === 'document') msg.isDocument = true;
+        if (type === 'location') msg.location = extra.location;
+        if (type === 'contact') msg.isContact = true;
+        if (!chat.messages) chat.messages = [];
+        chat.messages.push(msg);
+        chat.lastMessage = text;
+        chat.lastTime = now;
+        saveChatData();
+        renderMessages(chat);
+        renderChatList();
+    }
+    function openCameraOptions() {
+        if (!currentChatId) return;
+        openModal('📸 Kamera / Galeri',
+            '<div style="display:flex;flex-direction:column;gap:8px;">' +
+                '<button onclick="window._salinkCamera(\'photo\')" style="padding:12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:12px;cursor:pointer;text-align:left;color:var(--text-primary);font-size:0.8rem;font-family:inherit;"><i class="fas fa-camera" style="color:var(--primary);width:20px;"></i> Ambil Foto</button>' +
+                '<button onclick="window._salinkCamera(\'video\')" style="padding:12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:12px;cursor:pointer;text-align:left;color:var(--text-primary);font-size:0.8rem;font-family:inherit;"><i class="fas fa-video" style="color:var(--primary);width:20px;"></i> Rekam Video</button>' +
+                '<button onclick="window._salinkCamera(\'gallery\')" style="padding:12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:12px;cursor:pointer;text-align:left;color:var(--text-primary);font-size:0.8rem;font-family:inherit;"><i class="fas fa-images" style="color:var(--primary);width:20px;"></i> Pilih dari Galeri</button>' +
+            '</div>'
+        );
+    }
+    function handleCamera(type) {
+        closeModal();
+        var input = document.createElement('input');
+        input.type = 'file';
+        if (type === 'photo') { input.accept = 'image/*'; input.capture = 'environment'; }
+        else if (type === 'video') { input.accept = 'video/*'; input.capture = 'environment'; }
+        else { input.accept = 'image/*,video/*'; }
+        input.onchange = function(e) {
+            var file = e.target.files[0];
+            if (!file) return;
+            if (file.size > 1024 * 1024) {
+                showToast('⚠️ File terlalu besar', 'Max 1MB', 'fa-exclamation-triangle');
+                return;
+            }
+            var reader = new FileReader();
+            reader.onload = function(ev) {
+                var isImage = file.type.indexOf('image/') === 0;
+                var chat = chatData.find(function(c) { return c.id === currentChatId; });
+                if (!chat) return;
+                var now = Date.now();
+                chat.messages.push({
+                    id: 'msg-' + now + '-' + Math.random().toString(36).substring(2, 8),
+                    text: isImage ? '📸 Foto' : '🎥 Video',
+                    mine: true,
+                    time: now,
+                    media: ev.target.result,
+                    mediaType: isImage ? 'image' : 'video'
+                });
+                chat.lastMessage = isImage ? '📸 Foto' : '🎥 Video';
+                chat.lastTime = now;
+                saveChatData();
+                renderMessages(chat);
+                renderChatList();
+                showToast('✅ Terkirim', isImage ? 'Foto terkirim' : 'Video terkirim', 'fa-check-circle');
+            };
+            reader.readAsDataURL(file);
+        };
+        input.click();
+    }
+
+    // ================================================================
+    // 19. LIGHTBOX
+    // ================================================================
+    function openLightbox(src) {
+        lightboxImages = [src];
+        currentLightboxIndex = 0;
+        var img = document.getElementById('lightboxImage');
+        if (img) img.src = src;
+        var counter = document.getElementById('lightboxCounter');
+        if (counter) counter.textContent = '1 / 1';
+        var lb = document.getElementById('lightboxOverlay');
+        if (lb) lb.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeLightbox() {
+        var lb = document.getElementById('lightboxOverlay');
+        if (lb) lb.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    // ================================================================
+    // 20. EMOJI PICKER — TOGGLE SHOW/HIDE
+    // ================================================================
+    var EMOJIS = ['😀','😃','😄','😁','😆','😅','😂','🤣','🥲','☺️','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🥸','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🤭','🤫','🤥','😶','😐','😑','😬','🙄','😯','😦','😧','😮','😲','🥱','😴','🤤','😪','😵','🤐','🥴','🤢','🤮','🤧','😷','🤒','🤕','🤑','🤠','😈','👿','👹','👺','🤡','💩','👻','💀','☠️','👽','👾','🤖','🎃'];
+    var STICKERS = ['🧸','🐻','🐼','🐨','🦊','🐰','🐭','🐹','🐶','🐱','🐺','🦝','🐮','🐷','🐗','🐸','🐵','🙈','🙉','🙊','🐔','🐧','🐦','🦆','🦅','🦉','🦇','🐴','🦄','🐝','🐛','🦋','🐌','🐞','🐜','🦗','🕷️','🦂','🐢','🐍','🦎'];
+    var GIFS = ['🎬️','📽️','🎬','📹','🎥','💿','📀','🖥️','⌨️','🖱️','📱','📲','📷','📸','🎞️','📺','🎙️','🎚️','🎛️','🎤','🎧','🎼','🎵','🎶','🎷','🎸','🎹','🎺','🎻'];
+
+    function initEmojiPicker() {
+        var emojiTab = document.getElementById('emojiTab');
+        var stickerTab = document.getElementById('stickerTab');
+        var gifTab = document.getElementById('gifTab');
+        if (emojiTab) emojiTab.innerHTML = EMOJIS.map(function(e) { return '<button class="item" type="button" data-emoji="' + e + '">' + e + '</button>'; }).join('');
+        if (stickerTab) stickerTab.innerHTML = STICKERS.map(function(e) { return '<button class="item" type="button" data-emoji="' + e + '">' + e + '</button>'; }).join('');
+        if (gifTab) gifTab.innerHTML = GIFS.map(function(e) { return '<button class="item" type="button" data-emoji="' + e + '">' + e + '</button>'; }).join('');
+
+        document.querySelectorAll('.picker-content .item').forEach(function(btn) {
+            btn.onclick = function() {
+                var emoji = this.dataset.emoji;
+                var input = document.getElementById('chatInput');
+                if (!input) return;
+                var pos = input.selectionStart;
+                var val = input.value;
+                input.value = val.substring(0, pos) + emoji + val.substring(pos);
+                input.focus();
+                input.selectionStart = input.selectionEnd = pos + emoji.length;
+                input.dispatchEvent(new Event('input'));
+                hideEmojiPicker();
+            };
+        });
+
+        document.querySelectorAll('.picker-tabs .tab').forEach(function(tab) {
+            tab.onclick = function() {
+                document.querySelectorAll('.picker-tabs .tab').forEach(function(t) { t.classList.remove('active'); });
+                this.classList.add('active');
+                var target = this.dataset.tab;
+                document.querySelectorAll('.picker-content').forEach(function(c) { c.classList.remove('active'); });
+                var targetContent = document.getElementById(target + 'Tab');
+                if (targetContent) targetContent.classList.add('active');
+            };
+        });
+    }
+
+    function toggleEmojiPicker() {
+        var picker = document.getElementById('emojiPicker');
+        if (!picker) return;
+        if (picker.classList.contains('show')) hideEmojiPicker();
+        else showEmojiPicker();
+    }
+    function showEmojiPicker() {
+        var picker = document.getElementById('emojiPicker');
+        if (!picker) return;
+        picker.classList.remove('hide');
+        picker.classList.add('show');
+        var btn = document.getElementById('emojiToggleBtn');
+        if (btn) btn.classList.add('active');
+    }
+    function hideEmojiPicker() {
+        var picker = document.getElementById('emojiPicker');
+        if (!picker) return;
+        picker.classList.add('hide');
+        setTimeout(function() {
+            picker.classList.remove('show');
+            picker.classList.remove('hide');
+        }, 300);
+        var btn = document.getElementById('emojiToggleBtn');
+        if (btn) btn.classList.remove('active');
+    }
+
+    // ================================================================
+    // 21. NEW CHAT / GROUP / BROADCAST / ADD CONTACT
+    // ================================================================
+    function openNewChatModal() {
+        if (!currentUser) { window.location.href = LOGIN_URL; return; }
+        var list = allUsers.filter(function(u) { return u.username !== currentUser.username; });
+        if (list.length === 0) {
+            openModal('💬 Chat Baru', '<div style="text-align:center;padding:30px;color:var(--text-muted);">Belum ada pengguna lain terdaftar</div>');
+            return;
+        }
+        openModal('💬 Chat Baru',
+            '<input type="text" id="newChatSearch" placeholder="🔍 Cari pengguna..." style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;color:var(--text-primary);font-size:0.8rem;margin-bottom:12px;font-family:inherit;">' +
+            '<div style="max-height:400px;overflow-y:auto;" id="newChatList">' +
+                list.slice(0, 30).map(function(u) {
+                    return '<div onclick="window._salinkStartChat(\'' + escapeAttr(u.username) + '\')" style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;margin-bottom:6px;cursor:pointer;">' +
+                        '<div style="width:40px;height:40px;border-radius:50%;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1rem;font-weight:700;overflow:hidden;">' +
+                            (u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" style="width:100%;height:100%;object-fit:cover;">' : (u.fullName || u.username).charAt(0).toUpperCase()) +
+                        '</div>' +
+                        '<div style="flex:1;">' +
+                            '<div style="font-size:0.8rem;color:var(--text-primary);font-weight:600;">' + escapeHTML(u.fullName || u.username) + '</div>' +
+                            '<div style="font-size:0.6rem;color:var(--text-muted);">@' + escapeHTML(u.username) + '</div>' +
+                        '</div>' +
+                        '<i class="fas fa-comment-dots" style="color:var(--primary);"></i>' +
+                    '</div>';
+                }).join('') +
+            '</div>'
+        );
+        setTimeout(function() {
+            var searchInput = document.getElementById('newChatSearch');
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    var q = this.value.toLowerCase().trim();
+                    var filtered = list.filter(function(u) {
+                        return (u.fullName || '').toLowerCase().indexOf(q) !== -1 ||
+                               (u.username || '').toLowerCase().indexOf(q) !== -1;
+                    });
+                    var listEl = document.getElementById('newChatList');
+                    if (!listEl) return;
+                    listEl.innerHTML = filtered.slice(0, 30).map(function(u) {
+                        return '<div onclick="window._salinkStartChat(\'' + escapeAttr(u.username) + '\')" style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;margin-bottom:6px;cursor:pointer;">' +
+                            '<div style="width:40px;height:40px;border-radius:50%;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1rem;font-weight:700;overflow:hidden;">' +
+                                (u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" style="width:100%;height:100%;object-fit:cover;">' : (u.fullName || u.username).charAt(0).toUpperCase()) +
+                            '</div>' +
+                            '<div style="flex:1;">' +
+                                '<div style="font-size:0.8rem;color:var(--text-primary);font-weight:600;">' + escapeHTML(u.fullName || u.username) + '</div>' +
+                                '<div style="font-size:0.6rem;color:var(--text-muted);">@' + escapeHTML(u.username) + '</div>' +
+                            '</div>' +
+                            '<i class="fas fa-comment-dots" style="color:var(--primary);"></i>' +
+                        '</div>';
+                    }).join('') || '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.75rem;">Tidak ditemukan</div>';
+                });
+            }
+        }, 100);
+    }
+
+    function startNewChat(username) {
+        if (!currentUser) return;
+        closeModal();
+        var user = allUsers.find(function(u) { return u.username === username; });
+        if (!user) return;
+        var chat = chatData.find(function(c) { return c.username === username; });
+        if (!chat) {
+            chat = {
+                id: username,
+                name: user.fullName || username,
+                username: user.username,
+                phone: user.phone || '',
+                profilePicture: user.profilePicture || '',
+                gender: user.gender || 'male',
+                isOnline: user.isOnline || false,
+                unread: 0,
+                lastMessage: '',
+                lastTime: 0,
+                messages: [],
+                muted: false
+            };
+            chatData.push(chat);
+            try { localStorage.setItem('salink_inbox_chats', JSON.stringify(chatData)); } catch(e) {}
+            renderChatList();
+        }
+        setTimeout(function() { openChatRoom(chat.id); }, 200);
+    }
+
+    function openNewGroupModal() {
+        if (!currentUser) { window.location.href = LOGIN_URL; return; }
+        var others = allUsers.filter(function(u) { return u.username !== currentUser.username; });
+        if (others.length === 0) {
+            openModal('👥 Grup Baru', '<div style="text-align:center;padding:30px;color:var(--text-muted);">Belum ada pengguna lain</div>');
+            return;
+        }
+        openModal('👥 Buat Grup Baru',
+            '<input type="text" id="groupNameInput" placeholder="Nama grup..." style="width:100%;padding:10px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;color:var(--text-primary);font-size:0.8rem;margin-bottom:12px;font-family:inherit;">' +
+            '<div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:8px;">Pilih anggota grup:</div>' +
+            '<div style="max-height:300px;overflow-y:auto;margin-bottom:12px;">' +
+                others.slice(0, 30).map(function(u) {
+                    return '<label style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;margin-bottom:6px;cursor:pointer;">' +
+                        '<input type="checkbox" class="group-member-check" value="' + escapeAttr(u.username) + '" style="width:18px;height:18px;accent-color:var(--primary);">' +
+                        '<div style="width:36px;height:36px;border-radius:50%;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.85rem;font-weight:700;overflow:hidden;">' +
+                            (u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" style="width:100%;height:100%;object-fit:cover;">' : (u.fullName || u.username).charAt(0).toUpperCase()) +
+                        '</div>' +
+                        '<div style="flex:1;">' +
+                            '<div style="font-size:0.78rem;color:var(--text-primary);font-weight:600;">' + escapeHTML(u.fullName || u.username) + '</div>' +
+                            '<div style="font-size:0.6rem;color:var(--text-muted);">@' + escapeHTML(u.username) + '</div>' +
+                        '</div>' +
+                    '</label>';
+                }).join('') +
+            '</div>' +
+            '<button id="createGroupBtn" type="button" style="width:100%;padding:12px;background:var(--accent-blue-gradient);color:#fff;border:none;border-radius:12px;font-size:0.8rem;font-weight:700;cursor:pointer;font-family:inherit;">' +
+                '<i class="fas fa-users"></i> Buat Grup' +
+            '</button>'
+        );
+        setTimeout(function() {
+            var btn = document.getElementById('createGroupBtn');
+            if (btn) {
+                btn.onclick = function() {
+                    var groupName = (document.getElementById('groupNameInput') || {}).value || '';
+                    groupName = groupName.trim();
+                    if (!groupName) { showToast('⚠️ Perhatian', 'Nama grup harus diisi', 'fa-exclamation-triangle'); return; }
+                    var checked = document.querySelectorAll('.group-member-check:checked');
+                    if (checked.length === 0) { showToast('⚠️ Perhatian', 'Pilih minimal 1 anggota', 'fa-exclamation-triangle'); return; }
+                    var members = Array.from(checked).map(function(c) { return c.value; });
+                    members.push(currentUser.username);
+                    createGroup(groupName, members);
+                };
+            }
+        }, 100);
+    }
+
+    function createGroup(groupName, members) {
+        var groupId = 'group-' + Date.now();
+        var groupChat = {
+            id: groupId,
+            name: groupName,
+            username: groupId,
+            isGroup: true,
+            members: members,
+            profilePicture: '',
+            isOnline: false,
+            unread: 0,
+            lastMessage: 'Grup dibuat',
+            lastTime: Date.now(),
+            messages: [{
+                id: 'msg-' + Date.now(),
+                text: '👥 Grup "' + groupName + '" dibuat oleh ' + currentUser.fullName,
+                mine: true,
+                time: Date.now()
+            }],
+            muted: false
+        };
+        chatData.push(groupChat);
+        saveChatData();
+        renderChatList();
+        closeModal();
+        showToast('✅ Grup Dibuat', 'Grup "' + groupName + '" berhasil dibuat', 'fa-check-circle');
+        setTimeout(function() { openChatRoom(groupId); }, 300);
+    }
+
+    function openBroadcastModal() {
+        if (!currentUser) { window.location.href = LOGIN_URL; return; }
+        var others = allUsers.filter(function(u) { return u.username !== currentUser.username; });
+        if (others.length === 0) {
+            openModal('📢 Broadcast', '<div style="text-align:center;padding:30px;color:var(--text-muted);">Belum ada pengguna lain</div>');
+            return;
+        }
+        openModal('📢 Broadcast Pesan',
+            '<textarea id="broadcastText" placeholder="Tulis pesan broadcast..." style="width:100%;min-height:100px;padding:10px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;color:var(--text-primary);font-size:0.8rem;font-family:inherit;resize:none;margin-bottom:12px;"></textarea>' +
+            '<div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:8px;">Pilih penerima:</div>' +
+            '<div style="max-height:300px;overflow-y:auto;margin-bottom:12px;">' +
+                others.slice(0, 30).map(function(u) {
+                    return '<label style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:10px;margin-bottom:6px;cursor:pointer;">' +
+                        '<input type="checkbox" class="broadcast-check" value="' + escapeAttr(u.username) + '" style="width:18px;height:18px;accent-color:var(--primary);">' +
+                        '<div style="width:36px;height:36px;border-radius:50%;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;color:#fff;font-size:0.85rem;font-weight:700;overflow:hidden;">' +
+                            (u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" style="width:100%;height:100%;object-fit:cover;">' : (u.fullName || u.username).charAt(0).toUpperCase()) +
+                        '</div>' +
+                        '<div style="flex:1;">' +
+                            '<div style="font-size:0.78rem;color:var(--text-primary);font-weight:600;">' + escapeHTML(u.fullName || u.username) + '</div>' +
+                            '<div style="font-size:0.6rem;color:var(--text-muted);">@' + escapeHTML(u.username) + '</div>' +
+                        '</div>' +
+                    '</label>';
+                }).join('') +
+            '</div>' +
+            '<button id="sendBroadcastBtn" type="button" style="width:100%;padding:12px;background:var(--accent-blue-gradient);color:#fff;border:none;border-radius:12px;font-size:0.8rem;font-weight:700;cursor:pointer;font-family:inherit;">' +
+                '<i class="fas fa-bullhorn"></i> Kirim Broadcast' +
+            '</button>'
+        );
+        setTimeout(function() {
+            var btn = document.getElementById('sendBroadcastBtn');
+            if (btn) {
+                btn.onclick = function() {
+                    var text = (document.getElementById('broadcastText') || {}).value || '';
+                    text = text.trim();
+                    if (!text) { showToast('⚠️ Perhatian', 'Pesan harus diisi', 'fa-exclamation-triangle'); return; }
+                    var checked = document.querySelectorAll('.broadcast-check:checked');
+                    if (checked.length === 0) { showToast('⚠️ Perhatian', 'Pilih minimal 1 penerima', 'fa-exclamation-triangle'); return; }
+                    var recipients = Array.from(checked).map(function(c) { return c.value; });
+                    sendBroadcast(text, recipients);
+                };
+            }
+        }, 100);
+    }
+
+    async function sendBroadcast(text, recipients) {
+        var now = Date.now();
+        var successCount = 0;
+        for (var i = 0; i < recipients.length; i++) {
+            var username = recipients[i];
+            var chat = chatData.find(function(c) { return c.username === username; });
+            if (!chat) {
+                var user = allUsers.find(function(u) { return u.username === username; });
+                if (user) {
+                    chat = {
+                        id: username,
+                        name: user.fullName || username,
+                        username: username,
+                        phone: user.phone || '',
+                        profilePicture: user.profilePicture || '',
+                        gender: user.gender || 'male',
+                        isOnline: user.isOnline || false,
+                        unread: 0,
+                        lastMessage: '',
+                        lastTime: 0,
+                        messages: [],
+                        muted: false
+                    };
+                    chatData.push(chat);
+                }
+            }
+            if (chat) {
+                var msgId = 'msg-' + now + '-' + i + '-' + Math.random().toString(36).substring(2, 6);
+                chat.messages.push({ id: msgId, text: text, mine: true, time: now });
+                chat.lastMessage = text;
+                chat.lastTime = now;
+                await apiSendMessage({
+                    id: msgId,
+                    from: currentUser.username,
+                    fromName: currentUser.fullName,
+                    fromGender: currentUser.gender || 'male',
+                    to: username,
+                    subject: '',
+                    message: text,
+                    timestamp: now,
+                    read: false,
+                    isOwn: true
+                });
+                successCount++;
+            }
+        }
+        saveChatData();
+        renderChatList();
+        closeModal();
+        showToast('📢 Broadcast', 'Pesan terkirim ke ' + successCount + ' penerima', 'fa-bullhorn');
+    }
+
+    function openAddContactModal() {
+        if (!currentUser) { window.location.href = LOGIN_URL; return; }
+        openInviteModal();
+    }
+
+    // ================================================================
+    // 22. INVITE MODAL (pakai SalinkSocial)
+    // ================================================================
+    function loadSentInvites() {
         try {
             sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}');
             if (Array.isArray(sentInvites)) {
@@ -3151,132 +4625,852 @@
                 sentInvites = obj;
             }
         } catch(e) { sentInvites = {}; }
-
-        if (sentInvites[username]) {
-            log('Invite sudah pernah dikirim ke ' + username);
-            return false;
-        }
-        sentInvites[username] = true;
+    }
+    function saveSentInvites() {
         try { localStorage.setItem('salink_sent_invites', JSON.stringify(sentInvites)); } catch(e) {}
-
-        var payload = {
-            id: 'invite-' + Date.now(),
-            user1: me.username,
-            user2: username,
-            status: 'pending',
-            requestedBy: me.username,
-            timestamp: new Date().toISOString(),
-            acceptedAt: ''
-        };
-
-        try {
-            await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action: 'save_invite', data: payload })
-            });
-            log('Invite terkirim ke ' + username);
-            broadcast('invite_sent', { to: username });
-            return true;
-        } catch(e) {
-            log('Invite disimpan lokal (offline)');
-            return true;
+    }
+    function updateInviteBadge() {
+        var badge = document.getElementById('inviteBadge');
+        if (badge) {
+            var pending = Object.keys(sentInvites).length;
+            badge.textContent = pending;
+            badge.classList.toggle('show', pending > 0);
         }
     }
+    function openInviteModal() {
+        if (!currentUser) { window.location.href = LOGIN_URL; return; }
+        loadSentInvites();
+        openModalById('inviteModal');
+        loadInviteUsers();
+        setupInviteFilters();
+    }
+    function closeInviteModal() { closeModalById('inviteModal'); }
 
-    // ================================================================
-    // GET FRIENDS — Ambil daftar teman dari localStorage
-    // ================================================================
-    function getFriends() {
-        try {
-            var friends = JSON.parse(localStorage.getItem('salink_friends') || '[]');
-            var me = getCurrentUser();
-            if (!me) return [];
-            return friends.filter(function(f) {
-                var status = String(f.status || '').toLowerCase();
-                var u1 = String(f.user1 || '').trim();
-                var u2 = String(f.user2 || '').trim();
-                return status === 'accepted' && (u1 === me.username || u2 === me.username);
+    function loadInviteUsers() {
+        var listEl = document.getElementById('inviteUserList');
+        if (!listEl) return;
+        if (!allUsers || allUsers.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-users-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada pengguna untuk diundang</p></div>';
+            return;
+        }
+        var filtered = allUsers.filter(function(u) { return !currentUser || u.username !== currentUser.username; });
+        var inputEl = document.getElementById('inviteSearchInput');
+        var q = (inputEl ? inputEl.value : '').toLowerCase().trim();
+        if (q) {
+            filtered = filtered.filter(function(u) {
+                return (u.fullName || '').toLowerCase().indexOf(q) !== -1 ||
+                       (u.username || '').toLowerCase().indexOf(q) !== -1;
             });
-        } catch(e) { return []; }
-    }
-
-    // ================================================================
-    // GET USER — Ambil data user
-    // ================================================================
-    function getUser(username) {
-        if (!username) return null;
-        try {
-            var users = JSON.parse(localStorage.getItem('salink_users') || '[]');
-            return users.find(function(u) { return u.username === username; }) || null;
-        } catch(e) { return null; }
-    }
-
-    // ================================================================
-    // GET MY SENT INVITES
-    // ================================================================
-    function getSentInvites() {
-        try {
-            var raw = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}');
-            if (Array.isArray(raw)) {
-                var obj = {};
-                raw.forEach(function(u) { obj[u] = true; });
-                return obj;
+        }
+        var countEl = document.getElementById('inviteModalCount');
+        if (countEl) countEl.textContent = filtered.length;
+        if (filtered.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-search" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada pengguna yang cocok</p></div>';
+            return;
+        }
+        listEl.innerHTML = filtered.map(function(u) {
+            var initial = (u.fullName || u.username || 'U').charAt(0).toUpperCase();
+            var avatar = u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" alt="">' : initial;
+            // Cek status pertemanan pakai SalinkSocial
+            var friendStatus = 'none';
+            if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.getFriendStatus === 'function' && currentUser) {
+                friendStatus = SalinkSocial.getFriendStatus(currentUser.username, u.username);
             }
-            return raw;
-        } catch(e) { return {}; }
+            var isSent = sentInvites[u.username] === true;
+            var location = [u.city, u.province].filter(Boolean).join(', ') || u.country || 'Lokasi tidak diketahui';
+            var statusDot = u.isOnline ? '🟢' : '⚪';
+            // Label tombol
+            var btnLabel = '<i class="fas fa-paper-plane"></i> Undang';
+            var btnClass = 'item-action-btn';
+            var btnDisabled = '';
+            if (friendStatus === 'accepted') { btnLabel = '<i class="fas fa-check"></i> Teman'; btnClass += ' sent'; btnDisabled = 'disabled'; }
+            else if (friendStatus === 'pending_out' || isSent) { btnLabel = '⏳ Terkirim'; btnClass += ' sent'; btnDisabled = 'disabled'; }
+            else if (friendStatus === 'pending_in') { btnLabel = '<i class="fas fa-check"></i> Terima'; }
+            else if (friendStatus === 'blocked') { btnLabel = '🚫 Diblokir'; btnClass += ' sent'; btnDisabled = 'disabled'; }
+            return '<div class="modal-list-item">' +
+                '<div class="item-avatar" data-profile-username="' + escapeAttr(u.username) + '">' + avatar + '</div>' +
+                '<div class="item-info">' +
+                    '<div class="item-name">' + statusDot + ' ' + escapeHTML(u.fullName || u.username) + '</div>' +
+                    '<div class="item-meta"><i class="fas fa-map-marker-alt" style="font-size:0.5rem;"></i> ' + escapeHTML(location) + '</div>' +
+                '</div>' +
+                '<button class="' + btnClass + '" data-invite-username="' + escapeAttr(u.username) + '" data-invite-status="' + friendStatus + '" ' + btnDisabled + '>' + btnLabel + '</button>' +
+            '</div>';
+        }).join('');
+
+        listEl.querySelectorAll('[data-invite-username]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                sendInvite(this.getAttribute('data-invite-username'), this);
+            });
+        });
+        listEl.querySelectorAll('[data-profile-username]').forEach(function(el) {
+            el.addEventListener('click', function() {
+                var username = this.getAttribute('data-profile-username');
+                openProfileUser(username);
+            });
+        });
+    }
+
+    function setupInviteFilters() {
+        var searchInput = document.getElementById('inviteSearchInput');
+        if (searchInput) searchInput.oninput = loadInviteUsers;
+        var refreshBtn = document.getElementById('inviteRefreshBtn');
+        if (refreshBtn) {
+            refreshBtn.onclick = function() {
+                var icon = this.querySelector('i');
+                if (icon) icon.classList.add('fa-spin');
+                try {
+                    var users = JSON.parse(localStorage.getItem('salink_users') || '[]');
+                    if (users && users.length > 0) allUsers = users;
+                    loadInviteUsers();
+                    showToast('🔄', 'Daftar pengguna diperbarui', 'fa-sync-alt');
+                } catch(e) { showToast('⚠️', 'Gagal refresh', 'fa-exclamation-triangle'); }
+                if (icon) setTimeout(function() { icon.classList.remove('fa-spin'); }, 800);
+            };
+        }
     }
 
     // ================================================================
-    // BROADCAST — Sinkronisasi antar-tab
+    // 23. SEND INVITE — pakai SalinkSocial.sendInvite(from, to)
     // ================================================================
-    function broadcast(type, data) {
-        if (socialChannel) {
-            try { socialChannel.postMessage({ type: type, data: data, timestamp: Date.now() }); } catch(e) {}
+    function sendInvite(username, btnEl) {
+        if (!currentUser) { window.location.href = LOGIN_URL; return; }
+        if (!username) return;
+
+        btnEl.disabled = true;
+        var originalHTML = btnEl.innerHTML;
+        btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+        // Cek status: kalau pending_in → terima
+        var status = 'none';
+        if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.getFriendStatus === 'function') {
+            status = SalinkSocial.getFriendStatus(currentUser.username, username);
         }
+
+        // Kalau target sudah invite kita → terima
+        if (status === 'pending_in' && typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.acceptInvite === 'function') {
+            var result = SalinkSocial.acceptInvite(currentUser.username, username);
+            if (result && result.ok) {
+                btnEl.classList.add('sent');
+                btnEl.innerHTML = '<i class="fas fa-check"></i> Teman';
+                showToast('✅ Berteman', 'Kamu sekarang berteman dengan @' + username, 'fa-user-check');
+            } else {
+                btnEl.disabled = false;
+                btnEl.innerHTML = originalHTML;
+                showToast('⚠️ Gagal', 'Tidak dapat menerima undangan', 'fa-exclamation-triangle');
+            }
+            return;
+        }
+
+        // Kalau belum → kirim invite via SalinkSocial
+        var ok = false;
+        var reason = '';
+        if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.sendInvite === 'function') {
+            var r = SalinkSocial.sendInvite(currentUser.username, username);
+            ok = r && r.ok;
+            reason = r && r.reason;
+        } else {
+            // Fallback: langsung ke localStorage
+            try {
+                var friends = JSON.parse(localStorage.getItem('salink_friends') || '[]');
+                friends.push({
+                    id: 'invite-' + Date.now(),
+                    user1: currentUser.username,
+                    user2: username,
+                    status: 'pending',
+                    requestedBy: currentUser.username,
+                    timestamp: new Date().toISOString(),
+                    acceptedAt: ''
+                });
+                localStorage.setItem('salink_friends', JSON.stringify(friends));
+                ok = true;
+            } catch(e) { ok = false; reason = e.message; }
+        }
+
+        // Simpan ke sentInvites lokal
+        if (ok) {
+            sentInvites[username] = true;
+            saveSentInvites();
+            btnEl.classList.add('sent');
+            btnEl.innerHTML = '<i class="fas fa-check"></i> Terkirim';
+            updateInviteBadge();
+            showToast('📨 Terkirim', 'Undangan dikirim ke @' + username, 'fa-paper-plane');
+        } else {
+            btnEl.disabled = false;
+            btnEl.innerHTML = originalHTML;
+            if (reason === 'already_friends') showToast('ℹ️ Info', 'Kamu sudah berteman dengan @' + username, 'fa-info-circle');
+            else if (reason === 'already_sent') showToast('ℹ️ Info', 'Undangan sudah pernah dikirim', 'fa-info-circle');
+            else if (reason === 'blocked_by_target') showToast('🚫 Diblokir', 'Tidak dapat mengirim undangan', 'fa-ban');
+            else showToast('⚠️ Gagal', 'Tidak dapat mengirim undangan', 'fa-exclamation-triangle');
+        }
+    }
+
+    // ================================================================
+    // 24. NOTIF MODAL
+    // ================================================================
+    function loadReadNotifs() {
+        try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); }
+        catch(e) { readNotifs = {}; }
+    }
+    function saveReadNotifs() {
+        try { localStorage.setItem('salink_read_notifs', JSON.stringify(readNotifs)); } catch(e) {}
+    }
+
+    function getAllNotifications() {
+        var list = [];
         try {
-            localStorage.setItem('salink_social_sync', JSON.stringify({
-                type: type, data: data, timestamp: Date.now()
-            }));
-            setTimeout(function() {
-                try { localStorage.removeItem('salink_social_sync'); } catch(e) {}
-            }, 100);
+            var ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+            ems.forEach(function(em) {
+                var ts = em.timestamp ? new Date(em.timestamp).getTime() : Date.now();
+                var isRead = readNotifs[em.id] === true;
+                list.push({
+                    id: em.id,
+                    type: 'emergency',
+                    emergencyType: em.type || em.emergencyType,
+                    title: (EMERGENCY_ICONS[em.type] || '🚨') + ' ' + (EMERGENCY_LABELS[em.type] || 'Emergency'),
+                    message: em.text || em.description || (em.sender + ' melaporkan darurat di ' + (em.location || '-')),
+                    sender: em.sender || 'Sistem',
+                    timestamp: ts,
+                    read: isRead
+                });
+            });
         } catch(e) {}
+        chatData.forEach(function(c) {
+            if (c.unread > 0 && c.lastMessage) {
+                list.push({
+                    id: 'msg-' + c.id,
+                    type: 'message',
+                    chatId: c.id,
+                    title: 'Pesan dari ' + c.name,
+                    message: c.lastMessage,
+                    sender: c.name,
+                    timestamp: c.lastTime || Date.now(),
+                    read: false
+                });
+            }
+        });
+        try {
+            var pendingInvites = [];
+            if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.getPendingFollowers === 'function' && currentUser) {
+                pendingInvites = SalinkSocial.getPendingFollowers(currentUser.username);
+            }
+            pendingInvites.forEach(function(inv) {
+                var fromUser = (allUsers || []).find(function(u) { return u.username === inv.username; });
+                list.push({
+                    id: 'inv-' + inv.username,
+                    type: 'friend',
+                    title: 'Undangan Berteman',
+                    message: (fromUser ? fromUser.fullName : inv.username) + ' ingin berteman',
+                    sender: fromUser ? fromUser.fullName : inv.username,
+                    timestamp: inv.since ? new Date(inv.since).getTime() : Date.now(),
+                    read: false
+                });
+            });
+        } catch(e) {}
+        try {
+            var notifs = JSON.parse(localStorage.getItem('salink_notifications') || '[]');
+            notifs.forEach(function(n) {
+                var ts = n.timestamp ? new Date(n.timestamp).getTime() : Date.now();
+                var isRead = readNotifs[n.id] === true || n.read === 'TRUE' || n.read === true;
+                list.push({
+                    id: n.id,
+                    type: 'regular',
+                    title: n.title || 'Notifikasi',
+                    message: n.message || n.text || '',
+                    sender: n.sender || 'Sistem',
+                    timestamp: ts,
+                    read: isRead
+                });
+            });
+        } catch(e) {}
+        list.sort(function(a, b) { return b.timestamp - a.timestamp; });
+        return list;
     }
 
-    // ================================================================
-    // HANDLE PENDING CHAT — Dipanggil di pesan-masuk.html
-    // ================================================================
-    function handlePendingChat() {
-        try {
-            var raw = localStorage.getItem('salink_pending_chat');
-            if (!raw) return;
-            var data = JSON.parse(raw);
-            if (!data || !data.username) return;
-            // Cek umur data (max 30 detik)
-            if (Date.now() - data.timestamp > 30000) {
-                localStorage.removeItem('salink_pending_chat');
-                return;
-            }
-            localStorage.removeItem('salink_pending_chat');
-            // Tunggu openChatRoom tersedia
-            var attempts = 0;
-            var checkInterval = setInterval(function() {
-                attempts++;
-                if (typeof window.openChatRoom === 'function') {
-                    clearInterval(checkInterval);
-                    setTimeout(function() {
-                        window.openChatRoom(data.username);
-                    }, 500);
-                } else if (attempts > 20) {
-                    clearInterval(checkInterval);
+    function updateNotifBadge() {
+        var all = getAllNotifications();
+        var unread = all.filter(function(n) { return !n.read; }).length;
+        var nmb = document.getElementById('notifModalBadge');
+        if (nmb) nmb.textContent = unread;
+    }
+
+    function renderNotifList() {
+        var listEl = document.getElementById('notifList');
+        if (!listEl) return;
+        var all = getAllNotifications();
+        var filtered = all;
+        if (notifFilter === 'unread') filtered = all.filter(function(n) { return !n.read; });
+        else if (notifFilter === 'emergency') filtered = all.filter(function(n) { return n.type === 'emergency'; });
+        else if (notifFilter === 'message') filtered = all.filter(function(n) { return n.type === 'message'; });
+
+        var unreadCount = all.filter(function(n) { return !n.read; }).length;
+        var statsEl = document.getElementById('notifStatsText');
+        if (statsEl) statsEl.textContent = all.length + ' total • ' + unreadCount + ' belum dibaca';
+        var badgeEl = document.getElementById('notifModalBadge');
+        if (badgeEl) badgeEl.textContent = unreadCount;
+
+        if (filtered.length === 0) {
+            listEl.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-muted);"><i class="fas fa-bell-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada notifikasi</p></div>';
+            return;
+        }
+        listEl.innerHTML = filtered.slice(0, 50).map(function(n) {
+            var iconMap = { emergency: '🚨', message: '💬', friend: '👥', regular: '🔔' };
+            var typeClass = n.type || 'regular';
+            return '<div class="notif-item ' + typeClass + '" data-notif-id="' + escapeAttr(n.id) + '" data-notif-chat="' + escapeAttr(n.chatId || '') + '">' +
+                '<div class="notif-icon">' + (iconMap[typeClass] || '🔔') + '</div>' +
+                '<div class="notif-body">' +
+                    '<div class="notif-title">' + escapeHTML(n.title) + '</div>' +
+                    '<div class="notif-desc">' + escapeHTML(n.message) + '</div>' +
+                    '<div class="notif-time">' + getTimeAgo(n.timestamp) + '</div>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+
+        listEl.querySelectorAll('[data-notif-id]').forEach(function(el) {
+            el.addEventListener('click', function() {
+                var id = this.getAttribute('data-notif-id');
+                var chatId = this.getAttribute('data-notif-chat');
+                if (id) markNotifRead(id);
+                closeNotifModal();
+                if (chatId) setTimeout(function() { openChatRoom(chatId); }, 200);
+                else if (id && id.indexOf('emg-') === 0) {
+                    var realId = id.replace('emg-', '');
+                    window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(realId);
                 }
-            }, 300);
-        } catch(e) {}
+            });
+        });
+    }
+
+    function setupNotifFilters() {
+        document.querySelectorAll('.notif-filter-btn').forEach(function(btn) {
+            btn.onclick = function() {
+                document.querySelectorAll('.notif-filter-btn').forEach(function(b) { b.classList.remove('active'); });
+                this.classList.add('active');
+                notifFilter = this.dataset.filter || 'all';
+                renderNotifList();
+            };
+        });
+        var markAllBtn = document.getElementById('markAllReadBtn');
+        if (markAllBtn) {
+            markAllBtn.onclick = function() {
+                var allNotifs = getAllNotifications();
+                allNotifs.forEach(function(n) { readNotifs[n.id] = true; });
+                saveReadNotifs();
+                renderNotifList();
+                updateNotifBadge();
+                showToast('✅', 'Semua notifikasi ditandai dibaca', 'fa-check-double');
+            };
+        }
+    }
+
+    function markNotifRead(id) {
+        if (!id) return;
+        readNotifs[id] = true;
+        saveReadNotifs();
+        updateNotifBadge();
+    }
+
+    function openNotifModal() {
+        if (!currentUser) { window.location.href = LOGIN_URL; return; }
+        loadReadNotifs();
+        openModalById('notifModal');
+        notifFilter = 'all';
+        document.querySelectorAll('.notif-filter-btn').forEach(function(b) { b.classList.remove('active'); });
+        var allBtn = document.querySelector('.notif-filter-btn[data-filter="all"]');
+        if (allBtn) allBtn.classList.add('active');
+        setupNotifFilters();
+        renderNotifList();
+    }
+    function closeNotifModal() { closeModalById('notifModal'); }
+
+    // ================================================================
+    // 25. SEARCH MODAL
+    // ================================================================
+    function openSearchModal() {
+        if (!currentUser) { window.location.href = LOGIN_URL; return; }
+        openModalById('searchModal');
+        var input = document.getElementById('searchModalInput');
+        if (input) { input.value = ''; setTimeout(function() { input.focus(); }, 200); }
+        var cb = document.getElementById('clearSearchModalBtn');
+        if (cb) cb.classList.remove('visible');
+        var sar = document.getElementById('searchActiveResults');
+        if (sar) sar.style.display = 'none';
+        var sdv = document.getElementById('searchDefaultView');
+        if (sdv) sdv.style.display = 'block';
+        searchTab = 'all';
+        document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
+        var allTab = document.querySelector('.search-tab[data-tab="all"]');
+        if (allTab) allTab.classList.add('active');
+        searchEmergencyFilter = 'all';
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
+        var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
+        if (allChip) allChip.classList.add('active');
+    }
+    function closeSearchModal() { closeModalById('searchModal'); }
+    function clearSearchModal() {
+        var input = document.getElementById('searchModalInput');
+        if (input) input.value = '';
+        var cb = document.getElementById('clearSearchModalBtn');
+        if (cb) cb.classList.remove('visible');
+        var sar = document.getElementById('searchActiveResults');
+        if (sar) sar.style.display = 'none';
+        var sdv = document.getElementById('searchDefaultView');
+        if (sdv) sdv.style.display = 'block';
+    }
+    function switchSearchTab(tab, btnEl) {
+        searchTab = tab;
+        document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
+        btnEl.classList.add('active');
+        var input = document.getElementById('searchModalInput');
+        if (input && input.value.trim()) performSearchModal(input.value.trim());
+    }
+    function setSearchEmergencyFilter(filter, btnEl) {
+        searchEmergencyFilter = filter;
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
+        btnEl.classList.add('active');
+        var input = document.getElementById('searchModalInput');
+        if (input && input.value.trim()) performSearchModal(input.value.trim());
+    }
+    function performSearchModal(query) {
+        var q = query.trim().toLowerCase();
+        if (!q) {
+            var sar = document.getElementById('searchActiveResults');
+            if (sar) sar.style.display = 'none';
+            var sdv = document.getElementById('searchDefaultView');
+            if (sdv) sdv.style.display = 'block';
+            return;
+        }
+        var sdv2 = document.getElementById('searchDefaultView');
+        if (sdv2) sdv2.style.display = 'none';
+        var sar2 = document.getElementById('searchActiveResults');
+        if (sar2) sar2.style.display = 'block';
+        var cb = document.getElementById('clearSearchModalBtn');
+        if (cb) cb.classList.add('visible');
+
+        var matchedUsers = allUsers.filter(function(u) {
+            return (u.fullName || '').toLowerCase().indexOf(q) !== -1 ||
+                   (u.username || '').toLowerCase().indexOf(q) !== -1;
+        });
+
+        var matchedMessages = [];
+        chatData.forEach(function(c) {
+            (c.messages || []).forEach(function(m) {
+                if ((m.text || '').toLowerCase().indexOf(q) !== -1) {
+                    matchedMessages.push({ chat: c, message: m });
+                }
+            });
+        });
+
+        var allEms = [];
+        try { allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) {}
+        var matchedEm = allEms.filter(function(e) {
+            if (searchEmergencyFilter !== 'all' && e.type !== searchEmergencyFilter) return false;
+            return (e.location || e.address || '').toLowerCase().indexOf(q) !== -1 ||
+                   (e.text || e.description || '').toLowerCase().indexOf(q) !== -1 ||
+                   (e.sender || '').toLowerCase().indexOf(q) !== -1;
+        });
+
+        var html = '';
+        var totalCount = 0;
+        var showUsers = (searchTab === 'all' || searchTab === 'users');
+        var showMessages = (searchTab === 'all' || searchTab === 'messages');
+        var showEm = (searchTab === 'all' || searchTab === 'emergency');
+
+        if (showUsers && matchedUsers.length > 0) {
+            totalCount += matchedUsers.length;
+            html += '<div class="search-section-title"><span>👤 Pengguna</span><span class="count-pill">' + matchedUsers.length + '</span></div>';
+            html += matchedUsers.slice(0, 10).map(function(u) {
+                var initial = (u.fullName || u.username || 'U').charAt(0).toUpperCase();
+                var avatar = u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" alt="">' : initial;
+                return '<div class="search-result-item" data-user="' + escapeAttr(u.username) + '">' +
+                    '<div class="result-avatar">' + avatar + '</div>' +
+                    '<div class="result-info"><div class="result-title">' + escapeHTML(u.fullName || u.username) + '</div><div class="result-sub">@' + escapeHTML(u.username) + '</div></div>' +
+                    '<i class="fas fa-chevron-right result-arrow"></i>' +
+                '</div>';
+            }).join('');
+        }
+        if (showMessages && matchedMessages.length > 0) {
+            totalCount += matchedMessages.length;
+            html += '<div class="search-section-title"><span>💬 Pesan</span><span class="count-pill">' + matchedMessages.length + '</span></div>';
+            html += matchedMessages.slice(0, 10).map(function(item) {
+                return '<div class="search-result-item" data-chat-id="' + escapeAttr(item.chat.id) + '">' +
+                    '<div class="result-icon post"><i class="fas fa-comment"></i></div>' +
+                    '<div class="result-info"><div class="result-title">' + escapeHTML((item.message.text || '').substring(0, 60)) + '</div><div class="result-sub">' + escapeHTML(item.chat.name) + ' • ' + getTimeAgo(item.message.time) + '</div></div>' +
+                '</div>';
+            }).join('');
+        }
+        if (showEm && matchedEm.length > 0) {
+            totalCount += matchedEm.length;
+            html += '<div class="search-section-title"><span>🚨 Emergency</span><span class="count-pill">' + matchedEm.length + '</span></div>';
+            html += matchedEm.slice(0, 10).map(function(em) {
+                var type = em.type || 'fire';
+                return '<div class="search-result-item" data-emergency-id="' + escapeAttr(em.id) + '">' +
+                    '<div class="result-icon ' + type + '">' + (EMERGENCY_ICONS[type] || '🚨') + '</div>' +
+                    '<div class="result-info"><div class="result-title">' + escapeHTML(EMERGENCY_LABELS[type]) + '</div><div class="result-sub">📍 ' + escapeHTML(em.location || '-') + '</div></div>' +
+                '</div>';
+            }).join('');
+        }
+        if (totalCount === 0) {
+            html = '<div class="search-empty-state"><div class="empty-big-icon">🔍</div><h4>Tidak ditemukan hasil</h4><p>Coba kata kunci lain.</p></div>';
+        }
+        if (sar2) {
+            sar2.innerHTML = html;
+            sar2.querySelectorAll('[data-user]').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    var username = this.getAttribute('data-user');
+                    closeSearchModal();
+                    setTimeout(function() { openProfileUser(username); }, 200);
+                });
+            });
+            sar2.querySelectorAll('[data-chat-id]').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    var cid = this.getAttribute('data-chat-id');
+                    closeSearchModal();
+                    setTimeout(function() { openChatRoom(cid); }, 200);
+                });
+            });
+            sar2.querySelectorAll('[data-emergency-id]').forEach(function(el) {
+                el.addEventListener('click', function() {
+                    var eid = this.getAttribute('data-emergency-id');
+                    closeSearchModal();
+                    setTimeout(function() { window.location.href = DETAIL_URL + '?id=' + encodeURIComponent(eid); }, 200);
+                });
+            });
+        }
     }
 
     // ================================================================
-    // HANDLE URL PARAM ?chat=username
+    // 26. FAB MODAL (Emergency 2×2)
+    // ================================================================
+    function openFabModal() {
+        var overlay = document.getElementById('fabModalOverlay');
+        if (!overlay) return;
+        overlay.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        if (navigator.vibrate) navigator.vibrate(50);
+    }
+    function closeFabModal() {
+        var overlay = document.getElementById('fabModalOverlay');
+        if (!overlay) return;
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    function initFabModal() {
+        var scanFab = document.getElementById('scanFab');
+        var fabModalOverlay = document.getElementById('fabModalOverlay');
+        var fabModalClose = document.getElementById('fabModalClose');
+        var fabEmergencyCards = document.querySelectorAll('.fab-emergency-card');
+        if (scanFab) {
+            scanFab.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                openFabModal();
+            });
+        }
+        if (fabModalClose) {
+            fabModalClose.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                closeFabModal();
+            });
+        }
+        if (fabModalOverlay) {
+            fabModalOverlay.addEventListener('click', function(e) {
+                if (e.target === fabModalOverlay) closeFabModal();
+            });
+        }
+        fabEmergencyCards.forEach(function(card) {
+            card.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                var type = card.dataset.fabType;
+                if (!type) return;
+                if (!currentUser) {
+                    closeFabModal();
+                    showToast('🔒 Login', 'Silakan login dulu untuk melaporkan darurat', 'fa-lock');
+                    setTimeout(function() { window.location.href = LOGIN_URL; }, 1200);
+                    return;
+                }
+                closeFabModal();
+                setTimeout(function() {
+                    window.location.href = DASHBOARD_URL + '?emergency=' + encodeURIComponent(type);
+                }, 250);
+                if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+            });
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && fabModalOverlay && fabModalOverlay.classList.contains('active')) {
+                closeFabModal();
+            }
+        });
+    }
+
+    // ================================================================
+    // 27. MAP MODAL (Peta Darurat)
+    // ================================================================
+    function openMapModal() {
+        var modal = document.getElementById('mapModal');
+        if (!modal) { showToast('⚠️ Error', 'Modal peta tidak tersedia', 'fa-exclamation-triangle'); return; }
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        if (navigator.vibrate) navigator.vibrate(30);
+        updateMapOwnerInfo();
+    }
+    function closeMapModal() {
+        var modal = document.getElementById('mapModal');
+        if (!modal) return;
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    function updateMapOwnerInfo() {
+        var ownerNameEl = document.getElementById('mapOwnerName');
+        var ownerLocEl = document.getElementById('mapOwnerLoc');
+        var ownerAvatarEl = document.getElementById('mapOwnerAvatar');
+        if (currentUser) {
+            var name = currentUser.fullName || currentUser.username || 'User';
+            var city = currentUser.city || '';
+            var province = currentUser.province || '';
+            var location = [city, province].filter(Boolean).join(', ') || 'Lokasi tidak diketahui';
+            if (ownerNameEl) ownerNameEl.textContent = name;
+            if (ownerLocEl) ownerLocEl.textContent = location;
+            if (ownerAvatarEl) {
+                if (currentUser.profilePicture) {
+                    ownerAvatarEl.innerHTML = '<img src="' + escapeAttr(currentUser.profilePicture) + '" alt="">';
+                } else {
+                    ownerAvatarEl.textContent = String(name).charAt(0).toUpperCase();
+                }
+            }
+        } else {
+            if (ownerNameEl) ownerNameEl.textContent = 'Guest';
+            if (ownerLocEl) ownerLocEl.textContent = 'Silakan login dulu';
+            if (ownerAvatarEl) ownerAvatarEl.innerHTML = '<i class="fas fa-user"></i>';
+        }
+        var savedLat = localStorage.getItem('salink_user_lat');
+        var savedLng = localStorage.getItem('salink_user_lng');
+        if (savedLat && savedLng) {
+            mapCurrentLat = parseFloat(savedLat);
+            mapCurrentLng = parseFloat(savedLng);
+            applyMapCoords(mapCurrentLat, mapCurrentLng);
+        }
+    }
+    function applyMapCoords(lat, lng) {
+        var coordsEl = document.getElementById('mapCoords');
+        if (coordsEl) coordsEl.textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
+        var regionEl = document.getElementById('mapRegion');
+        if (regionEl && regionEl.textContent === '-') regionEl.textContent = '🔄 Mengambil...';
+        var addressEl = document.getElementById('mapAddressValue');
+        if (addressEl) addressEl.textContent = lat.toFixed(4) + ', ' + lng.toFixed(4);
+        var iframe = document.getElementById('mapIframe');
+        if (iframe) iframe.src = 'https://www.google.com/maps?q=' + lat + ',' + lng + '&z=15&output=embed';
+        var gmapsBtn = document.getElementById('mapOpenGmaps');
+        if (gmapsBtn) gmapsBtn.href = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+        var statusCard = document.getElementById('mapStatusCard');
+        var statusTitle = document.getElementById('mapStatusTitle');
+        var statusDesc = document.getElementById('mapStatusDesc');
+        var statusIcon = document.getElementById('mapStatusIcon');
+        if (statusCard) statusCard.classList.add('detected');
+        if (statusTitle) statusTitle.textContent = '✅ Lokasi terdeteksi';
+        if (statusDesc) statusDesc.textContent = 'Koordinat: ' + lat.toFixed(6) + ', ' + lng.toFixed(6);
+        if (statusIcon) statusIcon.textContent = '✅';
+        if (regionEl) {
+            fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id', {
+                headers: { 'User-Agent': 'SALINK-App/15.1' }
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data && data.display_name) {
+                    regionEl.textContent = data.display_name;
+                    if (addressEl) addressEl.textContent = data.display_name;
+                } else {
+                    regionEl.textContent = lat.toFixed(4) + ', ' + lng.toFixed(4);
+                }
+            })
+            .catch(function() {
+                regionEl.textContent = lat.toFixed(4) + ', ' + lng.toFixed(4);
+            });
+        }
+    }
+    function activateMapGps() {
+        var btn = document.getElementById('mapLocationBtn');
+        var btnText = document.getElementById('mapLocationBtnText');
+        if (!navigator.geolocation) {
+            showToast('⚠️ GPS Tidak Tersedia', 'Browser tidak mendukung GPS', 'fa-exclamation-triangle');
+            return;
+        }
+        if (btn) { btn.classList.add('loading'); btn.disabled = true; }
+        if (btnText) btnText.textContent = '📍 Mengambil lokasi...';
+        var timeoutId = setTimeout(function() {
+            attemptMapGpsNetwork();
+        }, 30000);
+        navigator.geolocation.getCurrentPosition(
+            function(position) {
+                clearTimeout(timeoutId);
+                handleMapGpsSuccess(position);
+            },
+            function(error) {
+                clearTimeout(timeoutId);
+                if (error.code === 1) handleMapGpsError(error);
+                else attemptMapGpsNetwork();
+            },
+            { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+        );
+    }
+    function attemptMapGpsNetwork() {
+        navigator.geolocation.getCurrentPosition(
+            function(position) { handleMapGpsSuccess(position); },
+            function(error) { handleMapGpsError(error); },
+            { enableHighAccuracy: false, timeout: 20000, maximumAge: 300000 }
+        );
+    }
+    function handleMapGpsSuccess(position) {
+        var lat = position.coords.latitude;
+        var lng = position.coords.longitude;
+        var accuracy = Math.round(position.coords.accuracy || 0);
+        mapCurrentLat = lat;
+        mapCurrentLng = lng;
+        try {
+            localStorage.setItem('salink_user_lat', lat);
+            localStorage.setItem('salink_user_lng', lng);
+        } catch(e) {}
+        var btn = document.getElementById('mapLocationBtn');
+        var btnText = document.getElementById('mapLocationBtnText');
+        if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
+        if (btnText) btnText.textContent = '✅ Refresh Lokasi';
+        applyMapCoords(lat, lng);
+        showToast('📍 Lokasi Ditemukan', 'Akurasi ±' + accuracy + 'm', 'fa-location-arrow');
+        if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
+    }
+    function handleMapGpsError(error) {
+        var errMsg = 'Gagal mengambil lokasi. ';
+        switch(error.code) {
+            case 1: errMsg += 'Izin lokasi ditolak.'; break;
+            case 2: errMsg += 'Lokasi tidak tersedia.'; break;
+            case 3: errMsg += 'Timeout. Coba lagi.'; break;
+            default: errMsg += error.message || 'Coba lagi.';
+        }
+        var btn = document.getElementById('mapLocationBtn');
+        var btnText = document.getElementById('mapLocationBtnText');
+        if (btn) { btn.classList.remove('loading'); btn.disabled = false; }
+        if (btnText) btnText.textContent = '📍 Ambil Lokasi Saya';
+        showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle');
+    }
+    function mapSearchService(searchQuery) {
+        var lat = mapCurrentLat;
+        var lng = mapCurrentLng;
+        var url;
+        if (lat && lng) {
+            url = 'https://www.google.com/maps/search/' + encodeURIComponent(searchQuery) + '/@' + lat + ',' + lng + ',14z';
+        } else {
+            url = 'https://www.google.com/maps/search/' + encodeURIComponent(searchQuery);
+        }
+        window.open(url, '_blank');
+    }
+
+    // ================================================================
+    // 28. FLOATING NOTIFICATION
+    // ================================================================
+    function showFloatingNotification(type, title, message, subtitle, actionText, actionCallback) {
+        var notif = document.getElementById('floatingNotification');
+        var icon = document.getElementById('floatingIcon');
+        if (!notif) return;
+        clearTimeout(floatingNotifTimeout);
+        icon.className = 'notif-icon ' + type;
+        if (type === 'emergency') icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+        else if (type === 'install') icon.innerHTML = '<i class="fas fa-download"></i>';
+        else icon.innerHTML = '<i class="fas fa-bell"></i>';
+        var titleEl = document.getElementById('floatingTitle');
+        var msgEl = document.getElementById('floatingMessage');
+        var subEl = document.getElementById('floatingSubtitle');
+        if (titleEl) titleEl.textContent = title;
+        if (msgEl) msgEl.textContent = message;
+        if (subEl) subEl.textContent = subtitle || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+        var actionBtn = document.getElementById('floatingAction');
+        if (actionText && actionCallback) {
+            actionBtn.style.display = 'block';
+            actionBtn.textContent = actionText;
+            actionBtn.onclick = function(e) { e.stopPropagation(); actionCallback(); };
+        } else {
+            actionBtn.style.display = 'none';
+        }
+        var closeBtn = document.getElementById('floatingClose');
+        if (closeBtn) {
+            closeBtn.onclick = function(e) { e.stopPropagation(); hideFloatingNotification(); };
+        }
+        if (type === 'emergency') notif.classList.add('emergency-notif');
+        else notif.classList.remove('emergency-notif');
+        notif.onclick = function() { if (actionCallback) actionCallback(); };
+        notif.classList.add('active');
+        floatingNotifTimeout = setTimeout(function() { hideFloatingNotification(); }, 10000);
+    }
+    function hideFloatingNotification() {
+        var notif = document.getElementById('floatingNotification');
+        if (notif) {
+            notif.classList.remove('active');
+            notif.classList.add('hide');
+            setTimeout(function() { notif.classList.remove('hide'); }, 500);
+        }
+        clearTimeout(floatingNotifTimeout);
+    }
+    function showInstallPrompt() {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.then(function(r) {
+                if (r.outcome === 'accepted') {
+                    localStorage.setItem('salink_installed', 'true');
+                    showToast('✅ Berhasil', 'Aplikasi SALINK diinstall!', 'fa-check-circle');
+                }
+                deferredPrompt = null;
+            });
+        } else {
+            var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            showToast('📱 Install', isIOS ? 'Bagikan → Tambahkan ke Layar Utama' : 'Menu browser → Install Aplikasi', 'fa-mobile-alt');
+        }
+    }
+
+    // ================================================================
+    // 29. PWA
+    // ================================================================
+    function setupPWA() {
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(function() {});
+            });
+        }
+        window.addEventListener('beforeinstallprompt', function(e) {
+            e.preventDefault();
+            deferredPrompt = e;
+            setTimeout(function() {
+                if (deferredPrompt && !localStorage.getItem('salink_installed')) {
+                    showFloatingNotification('install', '📱 Install SALINK', 'Akses lebih cepat & offline', 'Tap untuk install aplikasi', 'Install', function() { showInstallPrompt(); });
+                }
+            }, 10000);
+        });
+        window.addEventListener('appinstalled', function() {
+            localStorage.setItem('salink_installed', 'true');
+            deferredPrompt = null;
+            showToast('🎉 Selamat!', 'Aplikasi SALINK berhasil diinstall!', 'fa-rocket');
+        });
+    }
+
+    // ================================================================
+    // 30. RIPPLE
+    // ================================================================
+    function initRipple() {
+        document.addEventListener('click', function(e) {
+            var rippleEl = e.target.closest('.ripple');
+            if (!rippleEl) return;
+            var rect = rippleEl.getBoundingClientRect();
+            var size = Math.max(rect.width, rect.height);
+            var x = e.clientX - rect.left - size / 2;
+            var y = e.clientY - rect.top - size / 2;
+            var ripple = document.createElement('span');
+            ripple.className = 'ripple-effect';
+            ripple.style.width = ripple.style.height = size + 'px';
+            ripple.style.left = x + 'px';
+            ripple.style.top = y + 'px';
+            rippleEl.appendChild(ripple);
+            setTimeout(function() { ripple.remove(); }, 600);
+        });
+    }
+
+    // ================================================================
+    // 31. HANDLE URL PARAM ?chat=username
     // ================================================================
     function handleUrlChatParam() {
         var params = new URLSearchParams(window.location.search);
@@ -3288,66 +5482,577 @@
             attempts++;
             if (typeof window.openChatRoom === 'function') {
                 clearInterval(checkInterval);
-                setTimeout(function() { window.openChatRoom(chatUser); }, 500);
+                setTimeout(function() { openChatRoom(chatUser); }, 500);
             } else if (attempts > 20) {
                 clearInterval(checkInterval);
             }
         }, 300);
     }
 
-    // ================================================================
-    // INIT
-    // ================================================================
-    function init() {
-        if (_initialized) return;
-        _initialized = true;
-        log('Initializing...');
-
-        // Listen storage event untuk sinkronisasi
-        window.addEventListener('storage', function(e) {
-            if (e.key === 'salink_user') {
-                _currentUser = null;
-                getCurrentUser();
+    function handlePendingChat() {
+        try {
+            var raw = localStorage.getItem('salink_pending_chat');
+            if (!raw) return;
+            var data = JSON.parse(raw);
+            if (!data || !data.username) return;
+            if (Date.now() - data.timestamp > 30000) {
+                localStorage.removeItem('salink_pending_chat');
+                return;
             }
-        });
-
-        // Handle pending chat
-        if (window.location.pathname.indexOf('pesan-masuk.html') !== -1) {
-            handlePendingChat();
-            handleUrlChatParam();
-        }
-
-        log('✓ Ready');
+            localStorage.removeItem('salink_pending_chat');
+            var attempts = 0;
+            var checkInterval = setInterval(function() {
+                attempts++;
+                if (typeof window.openChatRoom === 'function') {
+                    clearInterval(checkInterval);
+                    setTimeout(function() { openChatRoom(data.username); }, 500);
+                } else if (attempts > 20) {
+                    clearInterval(checkInterval);
+                }
+            }, 300);
+        } catch(e) {}
     }
 
     // ================================================================
-    // EXPOSE
+    // 32. EVENT LISTENERS
     // ================================================================
-    global.SalinkSocial = {
-        init: init,
-        openProfile: openProfile,
-        openChat: openChat,
-        sendInvite: sendInvite,
-        getFriends: getFriends,
-        getUser: getUser,
-        getSentInvites: getSentInvites,
-        getCurrentUser: getCurrentUser,
-        broadcast: broadcast,
-        version: '1.0.0'
+    function setupEventListeners() {
+        // MENU ☰
+        var menuBtn = document.getElementById('menuBtn');
+        if (menuBtn) {
+            menuBtn.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                if (navigator.vibrate) navigator.vibrate(10);
+                openSidebar();
+            });
+        }
+        var sidebarClose = document.getElementById('sidebarClose');
+        if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+        var sidebarOverlay = document.getElementById('sidebarOverlay');
+        if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
+
+        // SIDEBAR MAP BUTTON
+        var sidebarMapBtn = document.getElementById('sidebarMapBtn');
+        if (sidebarMapBtn) {
+            sidebarMapBtn.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                closeSidebar();
+                setTimeout(function() { openMapModal(); }, 400);
+            });
+        }
+
+        // Sidebar Star / Arsip
+        var sidebarStarBtn = document.getElementById('sidebarStarBtn');
+        if (sidebarStarBtn) {
+            sidebarStarBtn.addEventListener('click', function(e) {
+                e.preventDefault(); closeSidebar();
+                setTimeout(function() {
+                    openModal('⭐ Pesan Berbintang', '<div class="modal-empty"><span class="empty-icon">⭐</span><h4>Belum Ada Pesan Berbintang</h4><p>Tandai pesan penting sebagai berbintang</p></div>');
+                }, 250);
+            });
+        }
+        var sidebarArsipBtn = document.getElementById('sidebarArsipBtn');
+        if (sidebarArsipBtn) {
+            sidebarArsipBtn.addEventListener('click', function(e) {
+                e.preventDefault(); closeSidebar();
+                setTimeout(function() {
+                    openModal('📦 Arsip Chat', '<div class="modal-empty"><span class="empty-icon">📦</span><h4>Arsip Kosong</h4><p>Chat yang diarsipkan akan muncul di sini</p></div>');
+                }, 250);
+            });
+        }
+
+        // Header Search → Modal Search
+        var headerSearchBtn = document.getElementById('headerSearchBtn');
+        if (headerSearchBtn) {
+            headerSearchBtn.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                openSearchModal();
+            });
+        }
+        // Header Notif
+        var headerNotifBtn = document.getElementById('headerNotifBtn');
+        if (headerNotifBtn) {
+            headerNotifBtn.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                openNotifModal();
+            });
+        }
+        // Theme Toggle
+        var themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            themeToggle.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                toggleTheme();
+            });
+        }
+        // User Button → Profil
+        var userBtn = document.getElementById('userBtn');
+        if (userBtn) {
+            userBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                window.location.href = PROFILE_URL;
+            });
+        }
+
+        // Local search (search-wrap)
+        var localSearchInput = document.getElementById('localSearchInput');
+        if (localSearchInput) {
+            localSearchInput.addEventListener('input', function() {
+                searchQuery = this.value;
+                var clearBtn = document.getElementById('clearSearchBtn');
+                if (clearBtn) clearBtn.classList.toggle('visible', !!searchQuery);
+                renderChatList();
+            });
+        }
+        var clearSearchBtn = document.getElementById('clearSearchBtn');
+        if (clearSearchBtn) {
+            clearSearchBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                var input = document.getElementById('localSearchInput');
+                if (input) input.value = '';
+                searchQuery = '';
+                this.classList.remove('visible');
+                renderChatList();
+            });
+        }
+
+        // Chips filter
+        document.querySelectorAll('.chip').forEach(function(chip) {
+            chip.addEventListener('click', function(e) {
+                e.preventDefault();
+                document.querySelectorAll('.chip').forEach(function(c) { c.classList.remove('active'); });
+                this.classList.add('active');
+                activeFilter = this.dataset.filter;
+                renderChatList();
+            });
+        });
+
+        // FAB Chat Baru toggle menu
+        var fabButton = document.getElementById('fabButton');
+        if (fabButton) {
+            fabButton.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                var menu = document.getElementById('fabMenu');
+                if (menu) menu.classList.toggle('show');
+            });
+        }
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('#fabButton') && !e.target.closest('#fabMenu')) {
+                var menu = document.getElementById('fabMenu');
+                if (menu) menu.classList.remove('show');
+            }
+        });
+
+        // FAB Menu items
+        var fabNewChat = document.getElementById('fabNewChat');
+        if (fabNewChat) fabNewChat.addEventListener('click', function() {
+            document.getElementById('fabMenu').classList.remove('show');
+            openNewChatModal();
+        });
+        var fabNewGroup = document.getElementById('fabNewGroup');
+        if (fabNewGroup) fabNewGroup.addEventListener('click', function() {
+            document.getElementById('fabMenu').classList.remove('show');
+            openNewGroupModal();
+        });
+        var fabBroadcast = document.getElementById('fabBroadcast');
+        if (fabBroadcast) fabBroadcast.addEventListener('click', function() {
+            document.getElementById('fabMenu').classList.remove('show');
+            openBroadcastModal();
+        });
+        var fabAddContact = document.getElementById('fabAddContact');
+        if (fabAddContact) fabAddContact.addEventListener('click', function() {
+            document.getElementById('fabMenu').classList.remove('show');
+            openAddContactModal();
+        });
+
+        // Chat Room
+        var chatRoomBack = document.getElementById('chatRoomBack');
+        if (chatRoomBack) {
+            chatRoomBack.addEventListener('click', function(e) {
+                e.preventDefault();
+                closeChatRoom();
+            });
+        }
+
+        // Klik header chat room (nama/foto) → buka profil user
+        var chatRoomAvatarWrap = document.getElementById('chatRoomAvatarWrap');
+        if (chatRoomAvatarWrap) {
+            chatRoomAvatarWrap.addEventListener('click', function() {
+                var chat = chatData.find(function(c) { return c.id === currentChatId; });
+                if (!chat) return;
+                if (chat.isGroup) {
+                    showToast('👥 Grup', 'Ini adalah grup chat', 'fa-users');
+                    return;
+                }
+                openProfileUser(chat.username);
+            });
+        }
+
+        // Emoji Toggle
+        var emojiToggleBtn = document.getElementById('emojiToggleBtn');
+        if (emojiToggleBtn) {
+            emojiToggleBtn.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                toggleEmojiPicker();
+            });
+        }
+
+        // Voice Note
+        var voiceNoteBtn = document.getElementById('voiceNoteBtn');
+        if (voiceNoteBtn) {
+            voiceNoteBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                toggleVoiceRecording();
+            });
+        }
+
+        // Send Message
+        var sendMsgBtn = document.getElementById('sendMsgBtn');
+        if (sendMsgBtn) {
+            sendMsgBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                sendMessage();
+            });
+        }
+        var chatInput = document.getElementById('chatInput');
+        if (chatInput) {
+            chatInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+            chatInput.addEventListener('input', function() {
+                var len = this.value.length;
+                var cc = document.getElementById('charCounter');
+                if (cc) cc.textContent = len + '/5000';
+            });
+        }
+
+        // Attach & Camera
+        var attachBtn = document.getElementById('attachBtn');
+        if (attachBtn) attachBtn.addEventListener('click', function(e) { e.preventDefault(); openAttachModal(); });
+        var cameraBtn = document.getElementById('cameraBtn');
+        if (cameraBtn) cameraBtn.addEventListener('click', function(e) { e.preventDefault(); openCameraOptions(); });
+
+        // Chat Room More → Mute, Clear, Profile
+        var chatRoomMore = document.getElementById('chatRoomMore');
+        if (chatRoomMore) {
+            chatRoomMore.addEventListener('click', function(e) {
+                e.preventDefault();
+                var chat = chatData.find(function(c) { return c.id === currentChatId; });
+                if (!chat) return;
+                var isMuted = chat.muted === true;
+                openModal('📋 Opsi Chat',
+                    '<div style="display:flex;flex-direction:column;gap:8px;">' +
+                        (chat.isGroup ? '' : '<button onclick="window._salinkChatOption(\'profile\',\'' + escapeAttr(chat.id) + '\')" style="padding:12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:12px;cursor:pointer;text-align:left;color:var(--text-primary);font-size:0.8rem;font-family:inherit;"><i class="fas fa-user" style="color:var(--primary);width:20px;"></i> Lihat Profil</button>') +
+                        '<button onclick="window._salinkChatOption(\'mute\',\'' + escapeAttr(chat.id) + '\')" style="padding:12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:12px;cursor:pointer;text-align:left;color:var(--text-primary);font-size:0.8rem;font-family:inherit;"><i class="fas fa-bell' + (isMuted ? '' : '-slash') + '" style="color:var(--primary);width:20px;"></i> ' + (isMuted ? 'Aktifkan Notifikasi' : 'Mute Notifikasi') + '</button>' +
+                        '<button onclick="window._salinkChatOption(\'clear\',\'' + escapeAttr(chat.id) + '\')" style="padding:12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:12px;cursor:pointer;text-align:left;color:var(--text-primary);font-size:0.8rem;font-family:inherit;"><i class="fas fa-broom" style="color:var(--primary);width:20px;"></i> Bersihkan Obrolan</button>' +
+                        '<button onclick="window._salinkChatOption(\'delete\',\'' + escapeAttr(chat.id) + '\')" style="padding:12px;background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:12px;cursor:pointer;text-align:left;color:var(--accent-red);font-size:0.8rem;font-family:inherit;font-weight:700;"><i class="fas fa-trash" style="width:20px;"></i> Hapus Chat</button>' +
+                    '</div>'
+                );
+            });
+        }
+
+        // Modal generic close
+        var modalCloseBtn = document.getElementById('modalCloseBtn');
+        if (modalCloseBtn) modalCloseBtn.addEventListener('click', function() { closeModal(); });
+        var modalFooterCloseBtn = document.getElementById('modalFooterCloseBtn');
+        if (modalFooterCloseBtn) modalFooterCloseBtn.addEventListener('click', function() { closeModal(); });
+        var modalOverlay = document.getElementById('modalOverlay');
+        if (modalOverlay) {
+            modalOverlay.addEventListener('click', function(e) {
+                if (e.target === modalOverlay) closeModal();
+            });
+        }
+
+        // Search Modal close
+        var searchModalCloseBtn = document.getElementById('searchModalCloseBtn');
+        if (searchModalCloseBtn) searchModalCloseBtn.addEventListener('click', closeSearchModal);
+        var searchModalFooterCloseBtn = document.getElementById('searchModalFooterCloseBtn');
+        if (searchModalFooterCloseBtn) searchModalFooterCloseBtn.addEventListener('click', function(e) {
+            e.preventDefault(); e.stopPropagation(); closeSearchModal();
+        });
+        var searchModal = document.getElementById('searchModal');
+        if (searchModal) {
+            searchModal.addEventListener('click', function(e) {
+                if (e.target === searchModal) closeSearchModal();
+            });
+        }
+        document.querySelectorAll('.search-tab').forEach(function(t) {
+            t.addEventListener('click', function() {
+                switchSearchTab(this.getAttribute('data-tab'), this);
+            });
+        });
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) {
+            c.addEventListener('click', function() {
+                setSearchEmergencyFilter(this.getAttribute('data-filter'), this);
+            });
+        });
+        var searchModalInput = document.getElementById('searchModalInput');
+        if (searchModalInput) {
+            searchModalInput.addEventListener('input', function() {
+                var val = this.value.trim();
+                var cb = document.getElementById('clearSearchModalBtn');
+                if (val) { if (cb) cb.classList.add('visible'); }
+                else { if (cb) cb.classList.remove('visible'); }
+                clearTimeout(searchModalDebounce);
+                searchModalDebounce = setTimeout(function() { performSearchModal(val); }, 250);
+            });
+            searchModalInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') closeSearchModal();
+            });
+        }
+        var clearSearchModalBtn = document.getElementById('clearSearchModalBtn');
+        if (clearSearchModalBtn) clearSearchModalBtn.addEventListener('click', clearSearchModal);
+
+        // Notif Modal close
+        var notifModalCloseBtn = document.getElementById('notifModalCloseBtn');
+        if (notifModalCloseBtn) notifModalCloseBtn.addEventListener('click', closeNotifModal);
+        var notifModalFooterCloseBtn = document.getElementById('notifModalFooterCloseBtn');
+        if (notifModalFooterCloseBtn) notifModalFooterCloseBtn.addEventListener('click', function(e) {
+            e.preventDefault(); e.stopPropagation(); closeNotifModal();
+        });
+        var notifModal = document.getElementById('notifModal');
+        if (notifModal) {
+            notifModal.addEventListener('click', function(e) {
+                if (e.target === notifModal) closeNotifModal();
+            });
+        }
+
+        // Invite Modal close
+        var inviteModalCloseBtn = document.getElementById('inviteModalCloseBtn');
+        if (inviteModalCloseBtn) inviteModalCloseBtn.addEventListener('click', closeInviteModal);
+        var inviteModalFooterCloseBtn = document.getElementById('inviteModalFooterCloseBtn');
+        if (inviteModalFooterCloseBtn) inviteModalFooterCloseBtn.addEventListener('click', function(e) {
+            e.preventDefault(); e.stopPropagation(); closeInviteModal();
+        });
+        var inviteModal = document.getElementById('inviteModal');
+        if (inviteModal) {
+            inviteModal.addEventListener('click', function(e) {
+                if (e.target === inviteModal) closeInviteModal();
+            });
+        }
+
+        // Bottom Invite Nav
+        var bottomInviteNav = document.getElementById('bottomInviteNav');
+        if (bottomInviteNav) {
+            bottomInviteNav.addEventListener('click', function(e) {
+                e.preventDefault(); e.stopPropagation();
+                openInviteModal();
+            });
+        }
+
+        // Lightbox close
+        var lightboxCloseBtn = document.getElementById('lightboxCloseBtn');
+        if (lightboxCloseBtn) lightboxCloseBtn.addEventListener('click', function(e) { e.stopPropagation(); closeLightbox(); });
+        var lightboxDownloadBtn = document.getElementById('lightboxDownloadBtn');
+        if (lightboxDownloadBtn) lightboxDownloadBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var src = document.getElementById('lightboxImage').src;
+            if (!src) return;
+            var a = document.createElement('a');
+            a.href = src;
+            a.download = 'SALINK_' + Date.now() + '.jpg';
+            a.click();
+        });
+        var lightboxShareBtn = document.getElementById('lightboxShareBtn');
+        if (lightboxShareBtn) lightboxShareBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (navigator.share) navigator.share({ title: 'SALINK', url: window.location.href }).catch(function() {});
+            else navigator.clipboard.writeText(window.location.href).then(function() { showToast('📋 Disalin', 'Link disalin', 'fa-copy'); });
+        });
+        var lightboxOverlay = document.getElementById('lightboxOverlay');
+        if (lightboxOverlay) {
+            lightboxOverlay.addEventListener('click', function(e) {
+                if (e.target === lightboxOverlay || e.target.classList.contains('lightbox-stage')) closeLightbox();
+            });
+        }
+
+        // Logout
+        var logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                if (confirm('Keluar dari akun?')) {
+                    ['salink_user','salink_logged_in','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_muted_chats']
+                        .forEach(function(k) { try { localStorage.removeItem(k); } catch(e) {} });
+                    window.location.href = DASHBOARD_URL + '?logout=1';
+                }
+            });
+        }
+
+        // Map Modal close
+        var mapModalCloseBtn = document.getElementById('mapModalCloseBtn');
+        if (mapModalCloseBtn) mapModalCloseBtn.addEventListener('click', function(e) { e.preventDefault(); closeMapModal(); });
+        var mapModalCloseFooter = document.getElementById('mapModalCloseFooter');
+        if (mapModalCloseFooter) mapModalCloseFooter.addEventListener('click', function(e) { e.preventDefault(); closeMapModal(); });
+        var mapModal = document.getElementById('mapModal');
+        if (mapModal) {
+            mapModal.addEventListener('click', function(e) {
+                if (e.target === mapModal) closeMapModal();
+            });
+        }
+        var mapLocationBtn = document.getElementById('mapLocationBtn');
+        if (mapLocationBtn) mapLocationBtn.addEventListener('click', function(e) { e.preventDefault(); activateMapGps(); });
+        document.querySelectorAll('.map-service-card[data-search]').forEach(function(card) {
+            card.addEventListener('click', function(e) {
+                e.preventDefault();
+                var search = this.getAttribute('data-search');
+                if (search) mapSearchService(search);
+            });
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.key === '/' && !e.target.matches('input, textarea, select')) {
+                e.preventDefault();
+                openSearchModal();
+            }
+            if (e.key === 'Escape') {
+                closeModal();
+                closeSidebar();
+                closeFabModal();
+                closeLightbox();
+                closeMapModal();
+                closeSearchModal();
+                closeNotifModal();
+                closeInviteModal();
+                hideContextMenu();
+                if (currentChatId) closeChatRoom();
+            }
+        });
+
+        // Hide context menu on click outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.context-menu')) hideContextMenu();
+        });
+
+        // Storage events
+        window.addEventListener('storage', function(e) {
+            if (e.key === 'salink_posts' || e.key === 'salink_emergencies') {
+                renderChatList();
+                updateBadges();
+            }
+            if (e.key === 'salink_user') loadCurrentUser();
+            if (e.key === 'salink_theme') loadTheme();
+            if (e.key === 'salink_friends' || e.key === 'salink_invite_sent') {
+                loadFriends().then(function() {
+                    updateBadges();
+                    if (document.getElementById('inviteModal') && document.getElementById('inviteModal').classList.contains('active')) {
+                        loadInviteUsers();
+                    }
+                });
+            }
+        });
+
+        // FAB Modal
+        initFabModal();
+    }
+
+    // ================================================================
+    // 33. GLOBAL EXPOSE
+    // ================================================================
+    window._salinkStartChat = startNewChat;
+    window._salinkAttach = handleAttach;
+    window._salinkShareContact = shareContact;
+    window._salinkCamera = handleCamera;
+    window._salinkChatOption = function(action, chatId) {
+        closeModal();
+        if (action === 'profile') {
+            var chat = chatData.find(function(c) { return c.id === chatId; });
+            if (chat && !chat.isGroup) openProfileUser(chat.username);
+        } else if (action === 'mute') {
+            setTimeout(function() { toggleMuteChat(chatId); }, 200);
+        } else if (action === 'clear') {
+            setTimeout(function() { clearAllChatHistory(chatId); }, 200);
+        } else if (action === 'delete') {
+            setTimeout(function() {
+                deleteChatConfirm(chatId);
+                closeChatRoom();
+            }, 200);
+        }
     };
 
-    // Auto-init kalau DOM sudah ready
+    window.showToast = showToast;
+    window.openModal = openModal;
+    window.closeModal = closeModal;
+    window.openSidebar = openSidebar;
+    window.closeSidebar = closeSidebar;
+    window.openSearchModal = openSearchModal;
+    window.closeSearchModal = closeSearchModal;
+    window.openNotifModal = openNotifModal;
+    window.closeNotifModal = closeNotifModal;
+    window.openInviteModal = openInviteModal;
+    window.closeInviteModal = closeInviteModal;
+    window.openFabModal = openFabModal;
+    window.closeFabModal = closeFabModal;
+    window.openMapModal = openMapModal;
+    window.closeMapModal = closeMapModal;
+    window.openChatRoom = openChatRoom;
+    window.closeChatRoom = closeChatRoom;
+    window.toggleTheme = toggleTheme;
+    window.showInstallPrompt = showInstallPrompt;
+    window.activateMapGps = activateMapGps;
+    window.openNewChatModal = openNewChatModal;
+    window.openNewGroupModal = openNewGroupModal;
+    window.openBroadcastModal = openBroadcastModal;
+    window.openAddContactModal = openAddContactModal;
+    window.sendMessage = sendMessage;
+    window.toggleVoiceRecording = toggleVoiceRecording;
+    window.loadChatData = loadChatData;
+    window.openProfileUser = openProfileUser;
+    window.handleUrlChatParam = handleUrlChatParam;
+    window.handlePendingChat = handlePendingChat;
+
+    // ================================================================
+    // 34. INIT
+    // ================================================================
+    async function init() {
+        log('Initializing Pesan-Masuk v15.1...');
+
+        loadTheme();
+        loadCurrentUser();
+        loadSentInvites();
+        initEmojiPicker();
+        setupEventListeners();
+        initRipple();
+        setupPWA();
+
+        await loadAllUsers();
+        await loadFriends();
+        await loadChatData();
+        renderChatList();
+        updateBadges();
+        updateNotifBadge();
+        updateInviteBadge();
+
+        // Handle URL param ?chat=username & pending chat
+        handleUrlChatParam();
+        handlePendingChat();
+
+        // Auto refresh chat
+        setInterval(async function() {
+            if (!document.hidden && currentUser) {
+                await loadChatData();
+                renderChatList();
+                updateBadges();
+            }
+        }, 30000);
+
+        log('✓ Pesan-Masuk v15.1 Ready!');
+    }
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
     } else {
         init();
     }
 
-    log('✓ salink-social.js Loaded');
-})(window);
+    log('✓ Script Loaded');
+})();
+    </script>
 
-</script>
-    
     <!-- ============================================================ -->
     <!-- FCM SETUP SALINK + EMERGENCY ALERT + SOSIAL                    -->
     <!-- ============================================================ -->
@@ -3361,12 +6066,8 @@
 
       console.log('🔔 [FCM] Initializing on pesan-masuk.html...');
 
-      // ============================================================
-      // FCM INIT SETELAH PAGE LOAD
-      // ============================================================
       window.addEventListener('load', async function() {
         console.log('🔔 [FCM] Page fully loaded');
-
         const isLoggedIn = localStorage.getItem('salink_logged_in');
         const userData = localStorage.getItem('salink_user');
 
@@ -3376,135 +6077,93 @@
         }
 
         let user;
-        try {
-          user = JSON.parse(userData);
-        } catch (e) {
-          console.warn('⚠️ [FCM] Data salink_user tidak valid:', e.message);
-          return;
-        }
+        try { user = JSON.parse(userData); }
+        catch (e) { console.warn('⚠️ [FCM] Data salink_user tidak valid:', e.message); return; }
 
         if (!user || !user.username) {
           console.warn('⚠️ [FCM] salink_user tidak punya username');
           return;
         }
 
-        console.log('🚀 [FCM] Init untuk user:', user.username, '(' + (user.fullName || '') + ')');
+        console.log('🚀 [FCM] Init untuk user:', user.username);
 
         try {
           if (typeof SalinkFCM === 'undefined') {
-            console.warn('⚠️ [FCM] SalinkFCM tidak tersedia — cek /fcm-client.js');
+            console.warn('⚠️ [FCM] SalinkFCM tidak tersedia');
             return;
           }
-
           const initResult = await SalinkFCM.init();
-          if (!initResult.ok) {
-            console.warn('⚠️ [FCM] init gagal:', initResult.reason);
-            return;
-          }
-
+          if (!initResult.ok) { console.warn('⚠️ [FCM] init gagal:', initResult.reason); return; }
           console.log('✅ [FCM] Siap. Token:', initResult.token.substring(0, 30) + '...');
-
           const saveResult = await SalinkFCM.saveToken({
-            userId: user.id,
-            username: user.username,
-            email: user.email
+            userId: user.id, username: user.username, email: user.email
           });
-
-          if (saveResult.ok) {
-            console.log('✅ [FCM] Token tersimpan di backend');
-          } else {
-            console.warn('⚠️ [FCM] Gagal simpan token:', saveResult);
-          }
-        } catch (err) {
-          console.error('❌ [FCM] error:', err);
-        }
+          if (saveResult.ok) console.log('✅ [FCM] Token tersimpan di backend');
+          else console.warn('⚠️ [FCM] Gagal simpan token:', saveResult);
+        } catch (err) { console.error('❌ [FCM] error:', err); }
       });
 
-      // ============================================================
-      // CEK SALINK-EMERGENCY SETELAH SCRIPT DIMUAT
-      // ============================================================
+      // CEK SALINK-EMERGENCY
       var checkEmergency = setInterval(function() {
         if (typeof SalinkEmergency !== 'undefined') {
           clearInterval(checkEmergency);
-          console.log('✅ [SalinkEmergency] Ready — polling 15s');
+          console.log('✅ [SalinkEmergency] Ready');
         }
       }, 100);
-
       setTimeout(function() {
         clearInterval(checkEmergency);
-        if (typeof SalinkEmergency === 'undefined') {
-          console.warn('⚠️ [SalinkEmergency] Script belum tersedia — cek /salink-emergency.js');
-        }
+        if (typeof SalinkEmergency === 'undefined') console.warn('⚠️ [SalinkEmergency] Script belum tersedia');
       }, 10000);
 
-      // ============================================================
-      // CEK SALINK-SOCIAL SETELAH SCRIPT DIMUAT
-      // ============================================================
+      // CEK SALINK-SOCIAL
       var checkSocial = setInterval(function() {
         if (typeof SalinkSocial !== 'undefined') {
           clearInterval(checkSocial);
-          console.log('✅ [SalinkSocial] Ready — v' + (SalinkSocial.version || '?'));
-          try {
-            SalinkSocial.init();
-          } catch(e) {
-            console.warn('⚠️ [SalinkSocial] init error:', e.message);
-          }
+          console.log('✅ [SalinkSocial] Ready — v' + (SalinkSocial.VERSION || '?'));
         }
       }, 100);
-
       setTimeout(function() {
         clearInterval(checkSocial);
-        if (typeof SalinkSocial === 'undefined') {
-          console.warn('⚠️ [SalinkSocial] Script belum tersedia — cek /salink-social.js');
-        }
+        if (typeof SalinkSocial === 'undefined') console.warn('⚠️ [SalinkSocial] Script belum tersedia');
       }, 10000);
 
-      // ============================================================
       // SERVICE WORKER MESSAGE LISTENER
-      // ============================================================
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.addEventListener('message', function(event) {
           var data = event.data || {};
-
           if (data.type === 'EMERGENCY_PUSH_RECEIVED') {
-            console.log('🚨 [SW] Emergency push diterima:', data.emergency ? data.emergency.type : '?');
+            console.log('🚨 [SW] Emergency push diterima');
             if (typeof window.triggerEmergencyAutoAlarm === 'function' && data.emergency) {
               window.triggerEmergencyAutoAlarm(data.emergency);
             }
           }
-
           if (data.type === 'EMERGENCY_NOTIFICATION_CLICK') {
             if (data.emergencyId) {
-              console.log('👆 [SW] User tap emergency notif:', data.emergencyId);
               setTimeout(function() {
                 window.location.href = 'detail-emergency.html?id=' + encodeURIComponent(data.emergencyId);
               }, 300);
             }
           }
-
           if (data.type === 'NEW_CHAT_MESSAGE') {
             console.log('💬 [SW] Pesan baru diterima');
-            // Reload chat data
             if (typeof window.loadChatData === 'function') {
-              window.loadChatData();
+              window.loadChatData().then(function() {
+                if (typeof window.openChatRoom === 'function') {
+                  // Silent refresh chat list
+                }
+              });
             } else {
-              // Fallback: reload halaman
               setTimeout(function() { location.reload(); }, 1000);
             }
           }
-
           if (data.type === 'NOTIFICATION_CLICK') {
-            if (data.url) {
-              setTimeout(function() { window.location.href = data.url; }, 300);
-            }
+            if (data.url) setTimeout(function() { window.location.href = data.url; }, 300);
           }
         });
         console.log('✅ [SW] Message listener terpasang');
       }
 
-      // ============================================================
-      // VISIBILITY CHANGE → REFRESH TOKEN
-      // ============================================================
+      // VISIBILITY CHANGE
       document.addEventListener('visibilitychange', function() {
         if (!document.hidden && typeof SalinkFCM !== 'undefined') {
           if (typeof SalinkFCM.refreshToken === 'function') {
@@ -3513,9 +6172,6 @@
         }
       });
 
-      // ============================================================
-      // DEBUG HELPER
-      // ============================================================
       window.SALINK_FCM_DEBUG = {
         getStatus: function() {
           return {
@@ -3528,7 +6184,6 @@
           };
         }
       };
-
       console.log('✅ [FCM] Setup ready');
     })();
     </script>
@@ -3543,7 +6198,7 @@
         setTimeout(function() {
           console.log('');
           console.log('╔══════════════════════════════════════════════════╗');
-          console.log('║  SALINK pesan-masuk.html v15.0 — READY          ║');
+          console.log('║  SALINK pesan-masuk.html v15.1 — READY          ║');
           console.log('║  ✅ Tema Universal (dark/light)                  ║');
           console.log('║  ✅ PWA Install                                  ║');
           console.log('║  ✅ Header + Search + Notif + Theme + Profil    ║');
@@ -3554,7 +6209,7 @@
           console.log('║  ✅ Emoji Picker (toggle show/hide)              ║');
           console.log('║  ✅ Grup Baru + Broadcast + Tambah Kontak        ║');
           console.log('║  ✅ Mute & Clear Chat                            ║');
-          console.log('║  ✅ SalinkSocial (integrasi pesan ↔ profil)     ║');
+          console.log('║  ✅ Integrasi dengan salink-social.js v1.0      ║');
           console.log('║  ✅ FCM + SalinkEmergency                        ║');
           console.log('╚══════════════════════════════════════════════════╝');
           console.log('');
