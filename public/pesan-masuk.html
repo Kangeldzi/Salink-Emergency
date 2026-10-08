@@ -5738,19 +5738,40 @@
     // ================================================================
     // 33. HANDLE URL PARAM & PENDING CHAT
     // ================================================================
-    function handleUrlChatParam() {
+        function handleUrlChatParam() {
         var params = new URLSearchParams(window.location.search);
+
+        // ⭐ Format 1: ?chat=username (recommended)
         var chatUser = params.get('chat');
+
+        // ⭐ Format 2: ?openNewChat=1&to=username (backward-compatible)
+        var openNewChat = params.get('openNewChat');
+        var toUser = params.get('to');
+        if (!chatUser && openNewChat === '1' && toUser) {
+            chatUser = toUser;
+        }
+
         if (!chatUser) return;
+
+        // Hapus query param dari URL biar rapi
         try { window.history.replaceState({}, document.title, window.location.pathname); } catch(e) {}
+
+        // Tunggu openChatRoom tersedia, lalu buka
         var attempts = 0;
         var checkInterval = setInterval(function() {
             attempts++;
             if (typeof window.openChatRoom === 'function') {
                 clearInterval(checkInterval);
-                setTimeout(function() { openChatRoom(chatUser); }, 500);
+                setTimeout(function() {
+                    // Pastikan user sudah ter-load sebelum buka chat
+                    if (typeof window.openChatRoom === 'function') {
+                        openChatRoom(chatUser);
+                        log('✓ Auto-opened chat room via URL param: ' + chatUser);
+                    }
+                }, 500);
             } else if (attempts > 20) {
                 clearInterval(checkInterval);
+                console.warn('⚠️ openChatRoom tidak tersedia dalam 6 detik');
             }
         }, 300);
     }
