@@ -3074,34 +3074,33 @@
         <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <!-- ============================================================ -->
-    <!-- SCRIPT UTAMA — PESAN-MASUK v15.2 (NO PATCH)                   -->
-    <!-- ============================================================ -->
-    <script>
+        <script>
 /* ====================================================================
- * SALINK PESAN-MASUK v15.2 — FINAL (NO PATCH)
+ * SALINK PESAN-MASUK v15.3 — FINAL (NO PATCH, FIXED)
  * ====================================================================
- * Fitur:
+ * PERBAIKAN v15.3:
+ *   ✅ FIX: Search Modal — ID input konsisten (#searchModalInput)
+ *   ✅ FIX: Chips filter Emergency SHOW/HIDE sesuai tab
+ *   ✅ FIX: setSearchEmergencyFilter() panggil performSearch() (bukan performSearchModal)
+ *   ✅ FIX: Tombol PESAN dari profile-user.html auto-buka Chat Room
+ *   ✅ FIX: Dual-format URL param (?chat=USER & ?openNewChat=1&to=USER)
+ *   ✅ FIX: handleUrlChatParam tunggu chatData siap sebelum buka
+ *
+ * FITUR LENGKAP:
  *   - Tema Universal (dark/light)
  *   - PWA Install
  *   - Header: Menu | Logo | Search | Notif | Theme | Profil | Back
- *   - Sidebar + #sidebarMapBtn (Peta Darurat)
- *   - Modal Search (4 tab 1 baris + chips selalu tampil)
+ *   - Sidebar + Peta Darurat
+ *   - Modal Search (4 tab + chips Emergency conditional)
  *   - Modal Notif (filter + tandai semua)
- *   - Modal Invite (pakai SalinkSocial)
+ *   - Modal Invite (SalinkSocial)
  *   - Modal Peta Darurat
- *   - Bottom Nav: Home | Toko | FAB | Invite | Profil
- *   - FAB Modal 2×2 → dashboard.html?emergency=TYPE
- *   - Chat Room: nama/foto klik → profile-user.html
- *   - Long-press chat bubble → menu Hapus BAWAH teks
- *   - Long-press chat card → menu Hapus chat personal
- *   - Emoji Picker: toggle show/hide + klik emoji auto-hide
- *   - FAB Menu: Chat Baru, Grup Baru, Broadcast, Tambah Kontak
- *   - Mute & Clear chat
- *   - ⭐ BARU: Video/Voice Call Privacy-Aware
- *   - ⭐ BARU: Message Status Indicator (sending/sent/failed/pending)
- *   - ⭐ BARU: Toast notifikasi setiap status pesan
- *   - ⭐ BARU: Auto-retry saat online
+ *   - Bottom Nav + FAB Modal 2×2
+ *   - Chat Room + Long-press Menu
+ *   - Emoji Picker toggle
+ *   - Grup Baru + Broadcast + Tambah Kontak
+ *   - Message Status (sending/sent/failed/pending)
+ *   - Video/Voice Call Privacy-Aware
  * ==================================================================== */
 (function() {
     'use strict';
@@ -3143,28 +3142,21 @@
     var mapCurrentLat = null;
     var mapCurrentLng = null;
 
-    // Search Modal state
     var searchTab = 'all';
     var searchEmergencyFilter = 'all';
     var searchModalDebounce = null;
 
-    // Notif state
     var notifFilter = 'all';
     var readNotifs = {};
-
-    // Invite state
     var sentInvites = {};
 
-    // Voice recording
     var isRecording = false;
     var mediaRecorder = null;
     var audioChunks = [];
 
-    // Lightbox
     var lightboxImages = [];
     var currentLightboxIndex = 0;
 
-    // Long-press timer
     var longPressTimer = null;
     var longPressTriggered = false;
     var LONG_PRESS_MS = 500;
@@ -3524,7 +3516,6 @@
 
             var chat = chatMap.get(partnerUsername);
             var isMine = msg.from === myUsername;
-            // Restore status dari localStorage, default 'sent' untuk pesan lama
             var savedStatus = 'sent';
             try {
                 var statusMap = JSON.parse(localStorage.getItem('salink_msg_status') || '{}');
@@ -3559,7 +3550,6 @@
 
         localChats.forEach(function(lc) {
             if (!chatData.find(function(c) { return c.id === lc.id; })) {
-                // Preserve messages from localChats if they have media/audio
                 var existing = chatData.find(function(c) { return c.id === lc.id; });
                 if (!existing && lc.messages && lc.messages.length > 0) {
                     chatData.push(lc);
@@ -3998,7 +3988,6 @@
                 contentHTML = escapeHTML(m.text || '');
             }
 
-            // Status indicator untuk pesan milik sendiri
             var statusHTML = '';
             if (m.mine) {
                 var st = m.status || 'sent';
@@ -4028,12 +4017,10 @@
             });
         });
 
-        // Attach long-press AND tap-to-retry for failed messages
         container.querySelectorAll('.msg-bubble').forEach(function(bubble) {
             var msgId = bubble.dataset.msgId;
             var bubbleMsg = (chat.messages || []).find(function(x) { return x.id === msgId; });
 
-            // Tap for retry if failed
             bubble.addEventListener('click', function(e) {
                 if (longPressTriggered) { longPressTriggered = false; return; }
                 if (bubbleMsg && bubbleMsg.status === 'failed') {
@@ -4077,7 +4064,7 @@
     }
 
     // ================================================================
-    // 19. SEND MESSAGE (dengan status indicator)
+    // 19. SEND MESSAGE
     // ================================================================
     async function sendMessage() {
         if (!currentUser) { showToast('🔒 Login', 'Silakan masuk untuk mengirim pesan', 'fa-lock'); return; }
@@ -4118,7 +4105,6 @@
             if (msgs) msgs.scrollTop = msgs.scrollHeight;
         }, 50);
 
-        // Cek offline dulu
         if (!navigator.onLine) {
             newMsg.status = 'pending';
             renderMessages(chat);
@@ -4159,7 +4145,7 @@
     }
 
     // ================================================================
-    // 19b. RETRY MESSAGE — Coba kirim ulang pesan yang gagal
+    // 19b. RETRY MESSAGE
     // ================================================================
     async function retryMessage(chatId, msgId) {
         var chat = chatData.find(function(c) { return c.id === chatId; });
@@ -4687,7 +4673,10 @@
         if (!currentUser) return;
         closeModal();
         var user = allUsers.find(function(u) { return u.username === username; });
-        if (!user) return;
+        if (!user) {
+            // Fallback: buat chat minimal dari username
+            user = { username: username, fullName: username, gender: 'male', isOnline: false };
+        }
         var chat = chatData.find(function(c) { return c.username === username; });
         if (!chat) {
             chat = {
@@ -5249,46 +5238,51 @@
     function closeNotifModal() { closeModalById('notifModal'); }
 
     // ================================================================
-    // 27. SEARCH MODAL
+    // 27. SEARCH MODAL (FIXED — Konsisten ID)
     // ================================================================
-        function openSearchModal() {
-        if (isPreviewMode) { showPreviewOverlay(); return; }
+    function openSearchModal() {
+        if (!currentUser) { window.location.href = LOGIN_URL; return; }
         openModalById('searchModal');
-        var input = document.getElementById('searchInput');
+
+        // ✅ FIX: pakai #searchModalInput & #clearSearchModalBtn
+        var input = document.getElementById('searchModalInput');
         if (input) { input.value = ''; setTimeout(function() { input.focus(); }, 200); }
-        var cb = document.getElementById('clearSearchBtn');
+
+        var cb = document.getElementById('clearSearchModalBtn');
         if (cb) cb.classList.remove('visible');
+
         var sar = document.getElementById('searchActiveResults');
         if (sar) sar.style.display = 'none';
         var sdv = document.getElementById('searchDefaultView');
         if (sdv) sdv.style.display = 'block';
+
         searchTab = 'all';
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         var allTab = document.querySelector('.search-tab[data-tab="all"]');
         if (allTab) allTab.classList.add('active');
+
         searchEmergencyFilter = 'all';
         document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
         var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
         if (allChip) allChip.classList.add('active');
 
-        // ⭐ Reset chips filter emergency — HIDE saat modal baru dibuka
+        // ⭐ Chips filter emergency HIDE saat modal baru dibuka
         var chipsRow = document.getElementById('emergencyFilters');
         if (chipsRow) chipsRow.style.display = 'none';
     }
     function closeSearchModal() { closeModalById('searchModal'); }
-        function clearSearch() {
-        var input = document.getElementById('searchInput');
+
+    function clearSearch() {
+        var input = document.getElementById('searchModalInput');
         if (input) input.value = '';
-        var cb = document.getElementById('clearSearchBtn');
+
+        var cb = document.getElementById('clearSearchModalBtn');
         if (cb) cb.classList.remove('visible');
+
         var sar = document.getElementById('searchActiveResults');
         if (sar) sar.style.display = 'none';
         var sdv = document.getElementById('searchDefaultView');
         if (sdv) sdv.style.display = 'block';
-
-        // ⭐ Chips filter emergency HIDE saat clear search
-        var chipsRow = document.getElementById('emergencyFilters');
-        if (chipsRow) chipsRow.style.display = 'none';
 
         // ⭐ Reset tab ke "all"
         searchTab = 'all';
@@ -5296,47 +5290,50 @@
         var allTab = document.querySelector('.search-tab[data-tab="all"]');
         if (allTab) allTab.classList.add('active');
 
-        // ⭐ Reset emergency filter ke "all"
+        // ⭐ Chips filter emergency HIDE
+        var chipsRow = document.getElementById('emergencyFilters');
+        if (chipsRow) chipsRow.style.display = 'none';
+
+        // ⭐ Reset emergency filter
         searchEmergencyFilter = 'all';
         document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
         var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
         if (allChip) allChip.classList.add('active');
     }
-        function switchSearchTab(tab, btnEl) {
+
+    function switchSearchTab(tab, btnEl) {
         searchTab = tab;
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         if (btnEl) btnEl.classList.add('active');
 
-        // ⭐ Tampilkan/sembunyikan chips filter emergency
+        // ⭐ Chips filter emergency SHOW kalau tab=emergency, HIDE kalau tab lain
         var chipsRow = document.getElementById('emergencyFilters');
         if (chipsRow) {
-            if (tab === 'emergency') {
-                chipsRow.style.display = 'flex';
-            } else {
-                chipsRow.style.display = 'none';
-            }
+            chipsRow.style.display = (tab === 'emergency') ? 'flex' : 'none';
         }
 
-        var input = document.getElementById('searchInput');
+        var input = document.getElementById('searchModalInput');
         if (input && input.value.trim()) performSearch(input.value.trim());
     }
+
     function setSearchEmergencyFilter(filter, btnEl) {
         searchEmergencyFilter = filter;
         document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
-        btnEl.classList.add('active');
+        if (btnEl) btnEl.classList.add('active');
+
+        // ✅ FIX: panggil performSearch (bukan performSearchModal)
         var input = document.getElementById('searchModalInput');
-        if (input && input.value.trim()) performSearchModal(input.value.trim());
+        if (input && input.value.trim()) performSearch(input.value.trim());
     }
-        function performSearch(query) {
+
+    function performSearch(query) {
         var q = query.trim().toLowerCase();
         if (!q) {
             var sar = document.getElementById('searchActiveResults');
             if (sar) sar.style.display = 'none';
             var sdv = document.getElementById('searchDefaultView');
             if (sdv) sdv.style.display = 'block';
-            // ⭐ Chips filter emergency HIDE saat input kosong
-            var chipsRow = document.getElementById('emergencyFilters');
-            if (chipsRow) chipsRow.style.display = 'none';
+            // ⭐ JANGAN hide chips di sini — biarkan switchSearchTab yang urus
             return;
         }
         var sdv2 = document.getElementById('searchDefaultView');
@@ -5570,7 +5567,7 @@
         if (statusIcon) statusIcon.textContent = '✅';
         if (regionEl) {
             fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id', {
-                headers: { 'User-Agent': 'SALINK-App/15.2' }
+                headers: { 'User-Agent': 'SALINK-App/15.3' }
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -5772,13 +5769,13 @@
     // ================================================================
     // 33. HANDLE URL PARAM & PENDING CHAT
     // ================================================================
-            function handleUrlChatParam() {
+    function handleUrlChatParam() {
         var params = new URLSearchParams(window.location.search);
 
-        // ⭐ Format 1: ?chat=username (recommended)
+        // Format 1: ?chat=username
         var chatUser = params.get('chat');
 
-        // ⭐ Format 2: ?openNewChat=1&to=username (backward-compatible)
+        // Format 2: ?openNewChat=1&to=username
         var openNewChat = params.get('openNewChat');
         var toUser = params.get('to');
         if (!chatUser && openNewChat === '1' && toUser) {
@@ -5787,7 +5784,6 @@
 
         if (!chatUser) return;
 
-        // Simpan pending chat sebagai double-safety
         try {
             localStorage.setItem('salink_pending_chat', JSON.stringify({
                 username: chatUser,
@@ -5795,18 +5791,15 @@
             }));
         } catch(e) {}
 
-        // Hapus query param dari URL biar rapi
         try { window.history.replaceState({}, document.title, window.location.pathname); } catch(e) {}
 
         log('🔗 handleUrlChatParam: target=' + chatUser);
 
-        // ⭐ STRATEGI BARU: Tunggu chatData siap & target ada di chatData
         var attempts = 0;
-        var maxAttempts = 40; // 40 × 250ms = 10 detik max
+        var maxAttempts = 40;
         var checkInterval = setInterval(function() {
             attempts++;
 
-            // Cek apakah fungsi openChatRoom tersedia
             if (typeof window.openChatRoom !== 'function') {
                 if (attempts > maxAttempts) {
                     clearInterval(checkInterval);
@@ -5815,7 +5808,6 @@
                 return;
             }
 
-            // ⭐ Cek chatData — apakah sudah ada chat dengan username target?
             var normalizedTarget = String(chatUser).trim().toLowerCase();
             var existingChat = null;
 
@@ -5827,7 +5819,6 @@
                 });
             }
 
-            // Kalau chat sudah ada → langsung buka
             if (existingChat) {
                 clearInterval(checkInterval);
                 log('✓ Chat ditemukan di chatData: ' + existingChat.id);
@@ -5837,10 +5828,7 @@
                 return;
             }
 
-            // Kalau chatData sudah terisi (setidaknya ada data loaded) tapi target belum ada
-            // → paksa buat chat baru
             if (attempts > 8 && typeof chatData !== 'undefined' && Array.isArray(chatData)) {
-                // Cek apakah data user sudah ada di allUsers
                 var userExists = false;
                 if (typeof allUsers !== 'undefined' && Array.isArray(allUsers)) {
                     userExists = allUsers.some(function(u) {
@@ -5852,11 +5840,9 @@
                     clearInterval(checkInterval);
                     log('➕ Chat belum ada, buat baru: ' + chatUser);
                     setTimeout(function() {
-                        // Panggil startNewChat() — fungsi yang sudah ada di v15.2
                         if (typeof window.startNewChat === 'function') {
                             window.startNewChat(chatUser);
                         } else {
-                            // Fallback: panggil openChatRoom langsung (akan buat chat baru via internal logic)
                             openChatRoom(chatUser);
                         }
                     }, 200);
@@ -5864,7 +5850,6 @@
                 }
             }
 
-            // Timeout
             if (attempts > maxAttempts) {
                 clearInterval(checkInterval);
                 console.warn('⚠️ Timeout: chat room tidak bisa dibuka untuk ' + chatUser);
@@ -5872,6 +5857,7 @@
             }
         }, 250);
     }
+
     function handlePendingChat() {
         try {
             var raw = localStorage.getItem('salink_pending_chat');
@@ -6212,14 +6198,14 @@
                 if (val) { if (cb) cb.classList.add('visible'); }
                 else { if (cb) cb.classList.remove('visible'); }
                 clearTimeout(searchModalDebounce);
-                searchModalDebounce = setTimeout(function() { performSearchModal(val); }, 250);
+                searchModalDebounce = setTimeout(function() { performSearch(val); }, 250);
             });
             searchModalInput.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape') closeSearchModal();
             });
         }
         var clearSearchModalBtn = document.getElementById('clearSearchModalBtn');
-        if (clearSearchModalBtn) clearSearchModalBtn.addEventListener('click', clearSearchModal);
+        if (clearSearchModalBtn) clearSearchModalBtn.addEventListener('click', clearSearch);
 
         // Notif Modal
         var notifModalCloseBtn = document.getElementById('notifModalCloseBtn');
@@ -6426,7 +6412,7 @@
     // 37. INIT
     // ================================================================
     async function init() {
-        log('Initializing Pesan-Masuk v15.2...');
+        log('Initializing Pesan-Masuk v15.3...');
 
         loadTheme();
         loadCurrentUser();
@@ -6456,7 +6442,7 @@
             }
         }, 30000);
 
-        log('✓ Pesan-Masuk v15.2 Ready!');
+        log('✓ Pesan-Masuk v15.3 Ready!');
     }
 
     if (document.readyState === 'loading') {
@@ -6606,7 +6592,7 @@
         setTimeout(function() {
           console.log('');
           console.log('╔══════════════════════════════════════════════════╗');
-          console.log('║  SALINK pesan-masuk.html v15.2 — READY          ║');
+          console.log('║  SALINK pesan-masuk.html v15.3 — READY          ║');
           console.log('║  ✅ Tema Universal (dark/light)                  ║');
           console.log('║  ✅ PWA Install                                  ║');
           console.log('║  ✅ Header + Search + Notif + Theme + Profil    ║');
@@ -6620,6 +6606,9 @@
           console.log('║  ✅ Video/Voice Call Privacy-Aware               ║');
           console.log('║  ✅ Message Status (sending/sent/failed/pending) ║');
           console.log('║  ✅ Auto-retry saat online                       ║');
+          console.log('║  ✅ FIX: Search ID konsisten                     ║');
+          console.log('║  ✅ FIX: Chips Emergency conditional             ║');
+          console.log('║  ✅ FIX: Auto-open Chat Room dari URL param      ║');
           console.log('║  ✅ Integrasi salink-social.js v1.1              ║');
           console.log('║  ✅ FCM + SalinkEmergency                        ║');
           console.log('╚══════════════════════════════════════════════════╝');
@@ -6631,3 +6620,5 @@
 
 </body>
 </html>
+
+    
