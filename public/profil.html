@@ -3475,7 +3475,1135 @@
 
     <!-- TOAST CONTAINER -->
     <div class="toast-container" id="toastContainer"></div>
+       <!-- ============================================================ -->
+    <!-- SCRIPT UTAMA — PROFIL v7.0 (Part 1/2)                          -->
+    <!-- ============================================================ -->
+    <script>
+/* ====================================================================
+ * SALINK PROFIL v7.0 — PART 1/2 (Foundation + Core)
+ * ====================================================================
+ * - Konstanta, state, helpers, toast, theme, modal, sidebar
+ * - GPS, load data, render profile, render posts
+ * - Post input setup, submit handler (cross-tab sync + redirect emergency)
+ * ==================================================================== */
 
+const API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
+const LOGIN_URL = 'login-register.html';
+const DASHBOARD_URL = 'dashboard.html';
+const PROFILE_URL = 'profil.html';
+const PROFILE_USER_URL = 'profile-user.html';
+const DETAIL_URL = 'detail-emergency.html';
+const EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
+const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
+const REGULAR_SOUND_URL = '/Music/smsblackber_4a537f155087133.mp3';
+
+const EMERGENCY_LABELS = {
+    'fire': '🔥 Kebakaran',
+    'medical': '🚑 Medis & Kematian',
+    'crime': '🚓 Kriminal',
+    'disaster': '🌪️ Bencana Alam'
+};
+const EMERGENCY_ICONS = { 'fire': '🔥', 'medical': '🚑', 'crime': '🚓', 'disaster': '🌪️' };
+
+const POST_TYPE_MAP = {
+    'biasa':    { isSpecial: false, specialType: null },
+    'fire':     { isSpecial: true,  specialType: 'fire' },
+    'medical':  { isSpecial: true,  specialType: 'medical' },
+    'crime':    { isSpecial: true,  specialType: 'crime' },
+    'disaster': { isSpecial: true,  specialType: 'disaster' }
+};
+
+const DEFAULT_PRIVACY = {
+    allowWhatsApp: true,
+    allowVoiceCall: true,
+    allowVideoCall: true,
+    allowPhoneCall: false
+};
+
+/* ================================================================
+ * GLOBAL STATE
+ * ================================================================ */
+let currentUser = null;
+let profileUser = null;
+let posts = [];
+let allUsers = [];
+let allEmergencies = [];
+let notifications = [];
+let friends = [];
+let currentTheme = 'dark';
+let currentProfilePostType = 'biasa';
+let currentFotoFilter = 'semua';
+let currentFollowTab = 'followers';
+let currentNotifFilter = 'all';
+let lightboxImages = [];
+let currentLightboxIndex = 0;
+let pendingDelete = null;
+let readNotifs = {};
+let syncChannel = null;
+let mapLat = null;
+let mapLng = null;
+let currentGpsData = null;
+
+let regularSound = null;
+let floatingNotificationTimeout = null;
+let deferredPrompt = null;
+
+/* Init BroadcastChannel */
+try {
+    syncChannel = new BroadcastChannel('salink_sync');
+    syncChannel.onmessage = (event) => handleSyncMessage(event.data);
+} catch(e) {}
+
+/* ================================================================
+ * HELPERS
+ * ================================================================ */
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+function escapeAttr(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/"/g, '&quot;').replace(/'/g, '&#039;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function formatNumber(v) { return Number(v || 0).toLocaleString('id-ID'); }
+function formatDate(ts) {
+    const d = new Date(ts);
+    const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+    const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+    return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} • ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function getTimeAgo(ts) {
+    const diff = Date.now() - ts;
+    const sec = Math.floor(diff/1000), min = Math.floor(sec/60),
+          hr = Math.floor(min/60), day = Math.floor(hr/24);
+    if (sec < 60) return 'Baru saja';
+    if (min < 60) return `${min}m lalu`;
+    if (hr < 24) return `${hr}j lalu`;
+    if (day < 7) return `${day}h lalu`;
+    return new Date(ts).toLocaleDateString('id-ID');
+}
+function parseLikesCount(post) {
+    try {
+        if (typeof post.likes === 'string' && post.likes.trim().startsWith('[')) {
+            const arr = JSON.parse(post.likes);
+            if (Array.isArray(arr)) return arr.length;
+        }
+        if (Array.isArray(post.likes)) return post.likes.length;
+    } catch(e) {}
+    return 0;
+}
+function log(msg) { console.log('[SALINK Profil] ' + msg); }
+
+/* ================================================================
+ * TOAST
+ * ================================================================ */
+function showToast(title, message, icon = 'fa-info-circle', type = 'info') {
+    document.querySelectorAll('.toast').forEach(t => t.remove());
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = 'toast' + (type === 'error' ? ' toast-error' : type === 'success' ? ' toast-success' : '');
+    toast.innerHTML = `
+        <div class="toast-icon"><i class="fas ${icon}"></i></div>
+        <div class="toast-content">
+            <div class="toast-title">${escapeHTML(title)}</div>
+            <div class="toast-message">${escapeHTML(message)}</div>
+        </div>
+        <button class="toast-close" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
+    `;
+    toast.querySelector('.toast-close').onclick = () => {
+        toast.classList.add('hide');
+        setTimeout(() => toast.remove(), 400);
+    };
+    container.appendChild(toast);
+    setTimeout(() => {
+        toast.classList.add('hide');
+        setTimeout(() => toast.remove(), 400);
+    }, 4500);
+}
+
+/* ================================================================
+ * AUDIO
+ * ================================================================ */
+function playRegularSound() {
+    try {
+        if (!regularSound) regularSound = new Audio(REGULAR_SOUND_URL);
+        regularSound.currentTime = 0;
+        regularSound.volume = 1.0;
+        regularSound.play().catch(() => {});
+    } catch(e) {}
+}
+
+/* ================================================================
+ * THEME
+ * ================================================================ */
+function loadTheme() {
+    const t = localStorage.getItem('salink_theme') || 'dark';
+    applyTheme(t);
+}
+function applyTheme(t) {
+    if (t === 'light') {
+        currentTheme = 'light';
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.getElementById('themeToggle')?.classList.add('active');
+        const ti = document.getElementById('toggleIcon');
+        if (ti) ti.className = 'fas fa-sun';
+        const meta = document.getElementById('themeColorMeta');
+        if (meta) meta.setAttribute('content', '#f5f7fa');
+    } else {
+        currentTheme = 'dark';
+        document.documentElement.removeAttribute('data-theme');
+        document.getElementById('themeToggle')?.classList.remove('active');
+        const ti = document.getElementById('toggleIcon');
+        if (ti) ti.className = 'fas fa-moon';
+        const meta = document.getElementById('themeColorMeta');
+        if (meta) meta.setAttribute('content', '#0a0e1a');
+    }
+}
+function toggleTheme() {
+    const nt = currentTheme === 'dark' ? 'light' : 'dark';
+    applyTheme(nt);
+    localStorage.setItem('salink_theme', nt);
+}
+
+/* ================================================================
+ * SIDEBAR & MODAL
+ * ================================================================ */
+function openSidebar() {
+    document.getElementById('sidebar')?.classList.add('active');
+    document.getElementById('sidebarOverlay')?.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeSidebar() {
+    document.getElementById('sidebar')?.classList.remove('active');
+    document.getElementById('sidebarOverlay')?.classList.remove('active');
+    document.body.style.overflow = '';
+}
+function openModal(id) {
+    const m = document.getElementById(id);
+    if (m) { m.classList.add('active'); document.body.style.overflow = 'hidden'; }
+}
+function closeModal(id) {
+    const m = document.getElementById(id);
+    if (m) { m.classList.remove('active'); document.body.style.overflow = ''; }
+}
+
+/* ================================================================
+ * API CALL
+ * ================================================================ */
+async function apiCall(action, data = {}) {
+    try {
+        if (action.startsWith('get_')) {
+            const params = new URLSearchParams({ action, ...data, timestamp: Date.now() });
+            const response = await fetch(API_URL + '?' + params.toString(), {
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+                cache: 'no-store'
+            });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return await response.json();
+        } else {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action, data, timestamp: Date.now() })
+            });
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return await response.json();
+        }
+    } catch (error) {
+        return { status: 'error', message: error.message };
+    }
+}
+async function apiGetPosts() {
+    const r = await apiCall('get_posts');
+    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
+}
+async function apiGetEmergencies() {
+    const r = await apiCall('get_emergencies');
+    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
+}
+async function apiGetNotifications() {
+    const r = await apiCall('get_notifications');
+    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
+}
+async function apiGetUsers() {
+    const r = await apiCall('get_users');
+    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
+}
+async function apiGetFriends() {
+    const r = await apiCall('get_friends');
+    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
+}
+async function apiSavePost(postData) {
+    const payload = {
+        ...postData,
+        timestamp: new Date(postData.timestamp).toISOString(),
+        likes: postData.likes || '[]',
+        comments: postData.comments || '[]',
+        isSpecial: postData.isSpecial ? 'TRUE' : 'FALSE'
+    };
+    const r = await apiCall('save_post', payload);
+    return r.status === 'success';
+}
+async function apiSaveEmergency(emData) {
+    const payload = {
+        id: emData.id || 'emergency-' + Date.now(),
+        type: emData.type,
+        title: EMERGENCY_LABELS[emData.type] || 'Emergency',
+        sender: emData.sender,
+        senderUsername: emData.senderUsername,
+        senderPhone: emData.senderPhone || '',
+        location: emData.location,
+        address: emData.address,
+        latitude: emData.latitude || '',
+        longitude: emData.longitude || '',
+        mapsURL: emData.mapsURL || '',
+        mapEmbedURL: emData.latitude && emData.longitude ? `https://www.google.com/maps?q=${emData.latitude},${emData.longitude}&output=embed` : '',
+        timestamp: new Date().toISOString(),
+        status: 'active',
+        description: emData.description,
+        province: emData.province || '',
+        city: emData.city || '',
+        district: emData.district || '',
+        village: emData.village || '',
+        nearbyContacts: '[]'
+    };
+    const r = await apiCall('save_emergency', payload);
+    return r.status === 'success';
+}
+async function apiSaveNotification(notifData) {
+    const r = await apiCall('save_notification', notifData);
+    return r.status === 'success';
+}
+async function apiSaveUser(userData) {
+    if (!userData.id) userData.id = 'user-' + userData.username + '-' + Date.now();
+    const r = await apiCall('save_user', userData);
+    return r.status === 'success';
+}
+
+/* ================================================================
+ * CROSS-TAB SYNC
+ * ================================================================ */
+function handleSyncMessage(data) {
+    if (!data || !data.type) return;
+    showSyncIndicator();
+    loadData().then(() => {
+        renderProfile();
+        renderProfilePosts();
+        updateStats();
+    });
+    hideSyncIndicator();
+}
+function showSyncIndicator() { document.getElementById('syncIndicator')?.classList.add('active'); }
+function hideSyncIndicator() { setTimeout(() => document.getElementById('syncIndicator')?.classList.remove('active'), 1500); }
+function broadcastSync(type, data = {}) {
+    if (syncChannel) {
+        try { syncChannel.postMessage({ type, data, timestamp: Date.now() }); } catch(e) {}
+    }
+    try {
+        localStorage.setItem('salink_sync_trigger', JSON.stringify({ type, data, timestamp: Date.now() }));
+        setTimeout(() => localStorage.removeItem('salink_sync_trigger'), 100);
+    } catch(e) {}
+}
+
+/* ================================================================
+ * CENTRAL DELETE
+ * ================================================================ */
+function requestDelete(type, id, description) {
+    if (!confirm('⚠️ KONFIRMASI PERTAMA\n\nAnda akan menghapus ' + description + '.\n\nLanjutkan?')) return;
+    pendingDelete = { type, id, description };
+    const msg = document.getElementById('deleteConfirmMsg');
+    if (msg) msg.innerHTML = `Anda akan menghapus <strong>${escapeHTML(description)}</strong> dari SEMUA halaman.`;
+    document.getElementById('deleteConfirmModal')?.classList.add('active');
+}
+function closeDeleteConfirm() {
+    pendingDelete = null;
+    document.getElementById('deleteConfirmModal')?.classList.remove('active');
+}
+async function confirmDeleteNow() {
+    if (!pendingDelete) return;
+    const { type, id } = pendingDelete;
+    document.getElementById('deleteConfirmModal')?.classList.remove('active');
+    pendingDelete = null;
+    showSyncIndicator();
+    try {
+        let allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
+        allPosts = allPosts.filter(p => p.id !== id);
+        localStorage.setItem('salink_posts', JSON.stringify(allPosts));
+
+        let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+        ems = ems.filter(e => e.id !== id && e.postId !== id);
+        localStorage.setItem('salink_emergencies', JSON.stringify(ems));
+
+        try {
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    action: 'delete_content',
+                    data: { type, id, userId: currentUser?.username || '' }
+                })
+            });
+        } catch(e) {}
+
+        broadcastSync('delete_post', { id });
+        await loadData();
+        renderProfile();
+        renderProfilePosts();
+        updateStats();
+        showToast('✅ Dihapus', 'Data dihapus dari semua halaman', 'fa-check-circle', 'success');
+    } catch(e) {
+        showToast('⚠️ Gagal', 'Tidak dapat menghapus data', 'fa-exclamation-triangle', 'error');
+    }
+    hideSyncIndicator();
+}
+
+/* ================================================================
+ * LOAD USER
+ * ================================================================ */
+function loadUser() {
+    try {
+        const s = localStorage.getItem('salink_user');
+        if (s) {
+            const u = JSON.parse(s);
+            if (u && u.username && u.fullName) currentUser = u;
+        }
+    } catch(e) {}
+    if (currentUser) {
+        profileUser = { ...currentUser };
+        if (!profileUser.privacy) profileUser.privacy = { ...DEFAULT_PRIVACY };
+    } else {
+        profileUser = {
+            fullName: 'Pengguna SALINK',
+            username: 'pengguna',
+            email: 'pengguna@salink.id',
+            gender: 'male',
+            bio: 'Bergabung di SALINK untuk keamanan bersama',
+            joinedDate: formatDate(Date.now()),
+            privacy: { ...DEFAULT_PRIVACY }
+        };
+    }
+}
+function updateSidebar() {
+    const sidebarName = document.getElementById('sidebarUserName');
+    const sidebarEmail = document.getElementById('sidebarUserEmail');
+    const sidebarAvatar = document.getElementById('sidebarUserAvatar');
+    const logoutItem = document.getElementById('logoutNavItem');
+    if (!currentUser) {
+        if (sidebarName) sidebarName.textContent = 'Guest';
+        if (sidebarEmail) sidebarEmail.textContent = 'guest@salink.id';
+        if (sidebarAvatar) sidebarAvatar.innerHTML = '<i class="fas fa-user"></i>';
+        if (logoutItem) logoutItem.style.display = 'none';
+        return;
+    }
+    if (sidebarName) sidebarName.textContent = currentUser.fullName || 'User';
+    if (sidebarEmail) sidebarEmail.textContent = currentUser.email || currentUser.username || '-';
+    if (sidebarAvatar) {
+        if (currentUser.profilePicture) {
+            sidebarAvatar.innerHTML = `<img src="${escapeAttr(currentUser.profilePicture)}" alt="">`;
+        } else {
+            sidebarAvatar.innerHTML = currentUser.gender === 'female'
+                ? '<i class="fas fa-female"></i>'
+                : '<i class="fas fa-male"></i>';
+        }
+    }
+    if (logoutItem) logoutItem.style.display = 'block';
+}
+
+/* ================================================================
+ * LOAD DATA
+ * ================================================================ */
+async function loadData() {
+    // Load local posts
+    let localPosts = [];
+    try {
+        const raw = localStorage.getItem('salink_posts');
+        if (raw) {
+            const p = JSON.parse(raw);
+            if (Array.isArray(p)) {
+                const cleaned = p.filter(post => {
+                    if (!post || !post.id) return false;
+                    if (!post.userId || !post.userFullName) return false;
+                    const ts = post.timestamp;
+                    if (!ts) return false;
+                    const time = typeof ts === 'number' ? ts : new Date(ts).getTime();
+                    if (isNaN(time) || time <= 0) return false;
+                    const hasText = post.text && post.text.trim().length > 0;
+                    const hasMedia = post.mediaType && (post.mediaData || post.gdriveId);
+                    if (!hasText && !hasMedia) return false;
+                    return true;
+                });
+                if (cleaned.length !== p.length) {
+                    localStorage.setItem('salink_posts', JSON.stringify(cleaned));
+                }
+                localPosts = cleaned;
+            }
+        }
+    } catch(e) {}
+
+    let apiPosts = [];
+    try { apiPosts = await apiGetPosts(); } catch(e) {}
+
+    const postMap = new Map();
+    apiPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
+    localPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
+    posts = Array.from(postMap.values())
+        .filter(p => p && p.id)
+        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    try { localStorage.setItem('salink_posts', JSON.stringify(posts)); } catch(e) {}
+
+    // Load emergencies
+    let localEms = [];
+    try {
+        const raw = localStorage.getItem('salink_emergencies');
+        if (raw) { const e = JSON.parse(raw); if (Array.isArray(e)) localEms = e; }
+    } catch(e) {}
+    let apiEms = [];
+    try { apiEms = await apiGetEmergencies(); } catch(e) {}
+    const emMap = new Map();
+    apiEms.forEach(e => { if (e && e.id) emMap.set(e.id, e); });
+    localEms.forEach(e => { if (e && e.id) emMap.set(e.id, e); });
+    allEmergencies = Array.from(emMap.values());
+    try { localStorage.setItem('salink_emergencies', JSON.stringify(allEmergencies)); } catch(e) {}
+
+    // Load users
+    try { allUsers = await apiGetUsers(); } catch(e) { allUsers = []; }
+    try {
+        const localUsers = JSON.parse(localStorage.getItem('salink_users') || '[]');
+        const userMap = new Map();
+        localUsers.forEach(u => { if (u && u.username) userMap.set(u.username, u); });
+        allUsers.forEach(u => { if (u && u.username) userMap.set(u.username, u); });
+        allUsers = Array.from(userMap.values());
+        localStorage.setItem('salink_users', JSON.stringify(allUsers));
+    } catch(e) {}
+
+    // Load notifications
+    try { notifications = await apiGetNotifications(); } catch(e) { notifications = []; }
+    try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); } catch(e) { readNotifs = {}; }
+
+    // Load friends
+    let apiFriends = [];
+    try { apiFriends = await apiGetFriends(); } catch(e) {}
+    let localFriends = [];
+    try {
+        const f = JSON.parse(localStorage.getItem('salink_friends') || '[]');
+        localFriends = Array.isArray(f) ? f : [];
+    } catch(e) {}
+    const friendsMap = new Map();
+    localFriends.forEach(f => { if (f.id) friendsMap.set(f.id, f); });
+    apiFriends.forEach(f => { if (f.id) friendsMap.set(f.id, f); });
+    friends = Array.from(friendsMap.values());
+    try { localStorage.setItem('salink_friends', JSON.stringify(friends)); } catch(e) {}
+}
+
+/* ================================================================
+ * RENDER PROFILE
+ * ================================================================ */
+function renderProfile() {
+    const avatarEl = document.getElementById('profileAvatarLarge');
+    if (!avatarEl) return;
+    if (profileUser.profilePicture) {
+        avatarEl.innerHTML = `<img src="${escapeAttr(profileUser.profilePicture)}" alt="Profile">`;
+    } else {
+        avatarEl.innerHTML = profileUser.gender === 'female'
+            ? '<i class="fas fa-female"></i>'
+            : '<i class="fas fa-male"></i>';
+    }
+    document.getElementById('profileName').textContent = profileUser.fullName || 'Nama Pengguna';
+    document.getElementById('profileUsername').textContent = '@' + (profileUser.username || 'username');
+    document.getElementById('profileBio').textContent = profileUser.bio || 'Bergabung di SALINK untuk keamanan bersama';
+    updateStats();
+    updateSidebar();
+    renderProfilePosts();
+
+    const reportedBy = document.getElementById('profilePostReportedBy');
+    if (reportedBy && currentUser) reportedBy.value = currentUser.fullName || '';
+}
+
+function updateStats() {
+    if (!profileUser) return;
+    const myPosts = posts.filter(p => p.userId === profileUser.username);
+    let totalLikes = 0;
+    myPosts.forEach(p => { totalLikes += parseLikesCount(p); });
+
+    const upd = (el, value) => {
+        if (!el) return;
+        const formatted = formatNumber(value);
+        if (el.textContent !== formatted) {
+            el.classList.remove('bump');
+            void el.offsetWidth;
+            el.classList.add('bump');
+            setTimeout(() => el.classList.remove('bump'), 600);
+        }
+        el.textContent = formatted;
+    };
+    upd(document.getElementById('profileStatPosts'), myPosts.length);
+    upd(document.getElementById('profileStatLikes'), totalLikes);
+
+    const myUsername = profileUser.username;
+    const following = friends.filter(f => String(f.user1 || '').trim() === myUsername);
+    const followers = friends.filter(f => String(f.user2 || '').trim() === myUsername);
+    upd(document.getElementById('profileStatFollowers'), followers.length);
+    upd(document.getElementById('profileStatFollowing'), following.length);
+}
+
+function renderProfilePosts() {
+    const container = document.getElementById('profilePosts');
+    if (!container) return;
+    const myPosts = posts
+        .filter(p => {
+            if (!p || !p.id) return false;
+            if (p.userId !== profileUser.username) return false;
+            const ts = p.timestamp;
+            if (!ts) return false;
+            const time = typeof ts === 'number' ? ts : new Date(ts).getTime();
+            if (isNaN(time) || time <= 0) return false;
+            const hasText = p.text && p.text.trim().length > 0;
+            const hasMedia = p.mediaType && (p.mediaData || p.gdriveId);
+            if (!hasText && !hasMedia) return false;
+            return true;
+        })
+        .sort((a, b) => {
+            const ta = typeof a.timestamp === 'number' ? a.timestamp : new Date(a.timestamp).getTime();
+            const tb = typeof b.timestamp === 'number' ? b.timestamp : new Date(b.timestamp).getTime();
+            return tb - ta;
+        });
+
+    const countEl = document.getElementById('myPostsCount');
+    if (countEl) countEl.textContent = myPosts.length;
+
+    container.innerHTML = '';
+    if (myPosts.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-file-alt empty-icon"></i>
+                <div class="empty-title">Belum ada postingan</div>
+                <div class="empty-desc">Postingan akan muncul saat Anda membuat postingan</div>
+            </div>
+        `;
+        return;
+    }
+
+    myPosts.forEach(post => {
+        const el = document.createElement('div');
+        el.className = 'post';
+        el.id = `post-${post.id}`;
+        el.style.position = 'relative';
+
+        const profilePic = post.userProfilePic
+            ? `<img src="${escapeAttr(post.userProfilePic)}" alt="">`
+            : (post.userGender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>');
+
+        const specialBadge = (post.isSpecial && post.specialType)
+            ? `<span style="background:rgba(230,0,18,0.15);padding:2px 8px;border-radius:10px;font-size:0.5rem;color:var(--primary);margin-left:6px;">${EMERGENCY_ICONS[post.specialType]} ${EMERGENCY_LABELS[post.specialType]}</span>`
+            : '';
+
+        let mediaHTML = '';
+        if (post.mediaType === 'image' && post.mediaData) {
+            mediaHTML = `<div class="post-media"><img src="${escapeAttr(post.mediaData)}" alt=""></div>`;
+        } else if (post.mediaType === 'video' && post.mediaData) {
+            mediaHTML = `<div class="post-media"><video controls><source src="${escapeAttr(post.mediaData)}"></video></div>`;
+        }
+
+        let likes = [], comments = [];
+        try { likes = JSON.parse(post.likes || '[]') || []; } catch(e) {}
+        try { comments = JSON.parse(post.comments || '[]') || []; } catch(e) {}
+        const isLiked = currentUser && likes.includes(currentUser.username);
+
+        el.innerHTML = `
+            <div class="post-header">
+                <div class="post-profile-pic">${profilePic}</div>
+                <div class="post-user-info" style="margin-left:10px;">
+                    <h4>${escapeHTML(post.userFullName || 'Pengguna SALINK')} ${specialBadge}</h4>
+                    <small>${formatDate(new Date(post.timestamp).getTime())}</small>
+                </div>
+                <button class="post-menu-toggle" data-post-id="${escapeAttr(post.id)}" aria-label="Menu"><i class="fas fa-ellipsis-v"></i></button>
+                <div class="post-menu-dropdown" id="postMenu-${escapeAttr(post.id)}">
+                    <button class="menu-item" onclick="editPost('${escapeAttr(post.id)}')" type="button"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="menu-item danger" onclick="requestDelete('post', '${escapeAttr(post.id)}', 'Postingan')" type="button"><i class="fas fa-trash"></i> Hapus</button>
+                </div>
+            </div>
+            ${post.text ? `<div class="post-text">${escapeHTML(post.text)}</div>` : ''}
+            ${mediaHTML}
+            <div class="post-actions">
+                <div class="post-action ${isLiked ? 'liked' : ''}" onclick="toggleLike('${escapeAttr(post.id)}')">
+                    <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i><span>Suka</span><span>${likes.length > 0 ? likes.length : ''}</span>
+                </div>
+                <div class="post-action"><i class="far fa-comment"></i><span>Komentar</span><span>(${comments.length})</span></div>
+                <div class="post-action" onclick="sharePost('${escapeAttr(post.id)}')"><i class="fas fa-share-alt"></i><span>Bagikan</span></div>
+                <div class="post-action" onclick="requestDelete('post', '${escapeAttr(post.id)}', 'Postingan')" style="color:var(--accent-red);"><i class="fas fa-trash"></i><span>Hapus</span></div>
+            </div>
+        `;
+        container.appendChild(el);
+    });
+
+    document.querySelectorAll('.post-menu-toggle').forEach(el => {
+        el.onclick = function(e) {
+            e.stopPropagation();
+            const m = document.getElementById('postMenu-' + this.dataset.postId);
+            if (m) m.classList.toggle('active');
+        };
+    });
+}
+
+/* ================================================================
+ * POST ACTIONS
+ * ================================================================ */
+function editPost(postId) {
+    const p = posts.find(x => x.id === postId);
+    if (!p) return;
+    const nt = prompt('Edit postingan:', p.text || '');
+    if (nt !== null && nt.trim() !== '') {
+        p.text = nt.trim();
+        localStorage.setItem('salink_posts', JSON.stringify(posts));
+        renderProfilePosts();
+        broadcastSync('new_post', { id: postId });
+        showToast('✅', 'Postingan diedit', 'fa-edit', 'success');
+    }
+}
+function toggleLike(postId) {
+    if (!currentUser) return;
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    let likes = [];
+    try { likes = JSON.parse(post.likes || '[]') || []; } catch(e) {}
+    const idx = likes.indexOf(currentUser.username);
+    if (idx > -1) likes.splice(idx, 1);
+    else likes.push(currentUser.username);
+    post.likes = JSON.stringify(likes);
+    localStorage.setItem('salink_posts', JSON.stringify(posts));
+    renderProfilePosts();
+    updateStats();
+    playRegularSound();
+    broadcastSync('stats_update', { postId });
+}
+function sharePost(postId) {
+    const p = posts.find(x => x.id === postId);
+    if (!p) return;
+    const text = p.text || 'Postingan SALINK';
+    if (navigator.share) {
+        navigator.share({ title: 'SALINK', text, url: window.location.href }).catch(() => {});
+    } else {
+        navigator.clipboard.writeText(text + '\n' + window.location.href)
+            .then(() => showToast('📋', 'Link disalin', 'fa-copy', 'success'));
+    }
+}
+
+/* ================================================================
+ * POST INPUT SETUP
+ * ================================================================ */
+function setupPostInput() {
+    const select = document.getElementById('profilePostTypeSelect');
+    const specialFields = document.getElementById('profilePostSpecialFields');
+    const biasaForm = document.getElementById('profilePostBiasaForm');
+    const mediaUpload = document.getElementById('profileMediaUpload');
+    const mediaPreview = document.getElementById('profileMediaPreview');
+    const reportedBy = document.getElementById('profilePostReportedBy');
+    const gpsBtn = document.getElementById('profileGpsLocationBtn');
+
+    if (reportedBy && currentUser) reportedBy.value = currentUser.fullName || '';
+
+    select?.addEventListener('change', function() {
+        const val = this.value;
+        const mapping = POST_TYPE_MAP[val] || POST_TYPE_MAP['biasa'];
+        currentProfilePostType = val;
+        if (mapping.isSpecial) {
+            specialFields.classList.add('active');
+            biasaForm.style.display = 'none';
+            if (reportedBy && currentUser) reportedBy.value = currentUser.fullName || '';
+        } else {
+            specialFields.classList.remove('active');
+            biasaForm.style.display = 'block';
+        }
+        validateProfilePost();
+    });
+
+    gpsBtn?.addEventListener('click', ambilLokasiSaya);
+
+    mediaUpload?.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
+            const f = this.files[0];
+            if (f.size > 500 * 1024) {
+                showToast('⚠️ File terlalu besar', 'Max 500KB', 'fa-exclamation-triangle', 'error');
+                this.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                if (f.type.startsWith('image/')) {
+                    mediaPreview.innerHTML = `<span class="remove-media" id="profileRemoveMedia">&times;</span><img src="${e.target.result}" alt="Preview">`;
+                } else {
+                    mediaPreview.innerHTML = `<span class="remove-media" id="profileRemoveMedia">&times;</span><video controls><source src="${e.target.result}"></video>`;
+                }
+                mediaPreview.style.display = 'block';
+                const rm = document.getElementById('profileRemoveMedia');
+                if (rm) rm.onclick = () => {
+                    mediaPreview.style.display = 'none';
+                    mediaUpload.value = '';
+                };
+                validateProfilePost();
+            };
+            reader.readAsDataURL(f);
+        }
+    });
+
+    document.getElementById('profilePostInput')?.addEventListener('input', validateProfilePost);
+    document.getElementById('profilePostSpecialText')?.addEventListener('input', validateProfilePost);
+
+    document.getElementById('profilePostSubmit')?.addEventListener('click', handleProfilePostSubmit);
+
+    validateProfilePost();
+}
+
+function validateProfilePost() {
+    const val = document.getElementById('profilePostTypeSelect')?.value || 'biasa';
+    const mapping = POST_TYPE_MAP[val] || POST_TYPE_MAP['biasa'];
+    const isSpecial = mapping.isSpecial;
+    const text = isSpecial
+        ? (document.getElementById('profilePostSpecialText')?.value || '').trim()
+        : (document.getElementById('profilePostInput')?.value || '').trim();
+    const mediaInput = document.getElementById('profileMediaUpload');
+    const hasFile = mediaInput && mediaInput.files && mediaInput.files.length > 0;
+    const btn = document.getElementById('profilePostSubmit');
+    if (!btn) return;
+    if (isSpecial) {
+        btn.disabled = !((text || hasFile) && currentGpsData);
+    } else {
+        btn.disabled = !(text || hasFile);
+    }
+}
+
+/* ================================================================
+ * GPS — Ambil Lokasi Saya
+ * ================================================================ */
+async function ambilLokasiSaya() {
+    const btn = document.getElementById('profileGpsLocationBtn');
+    const btnText = document.getElementById('profileGpsLocationBtnText');
+    const resultBox = document.getElementById('profileGpsLocationResult');
+    const errorBox = document.getElementById('profileGpsError');
+    const addrEl = document.getElementById('profileGpsAddress');
+    const coordsEl = document.getElementById('profileGpsCoords');
+    const mapsLink = document.getElementById('profileGpsMapsLink');
+
+    if (!navigator.geolocation) {
+        if (errorBox) {
+            errorBox.textContent = '❌ Browser Anda tidak mendukung GPS.';
+            errorBox.classList.add('active');
+        }
+        return;
+    }
+
+    if (btn) btn.classList.add('loading');
+    if (btnText) btnText.innerHTML = '<span class="gps-location-loading"></span> Mengambil lokasi...';
+    if (resultBox) resultBox.classList.remove('active');
+    if (errorBox) errorBox.classList.remove('active');
+
+    try {
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true, timeout: 15000, maximumAge: 0
+            });
+        });
+
+        const lat = position.coords.latitude.toFixed(6);
+        const lng = position.coords.longitude.toFixed(6);
+        const accuracy = Math.round(position.coords.accuracy || 0);
+        const mapsURL = `https://www.google.com/maps?q=${lat},${lng}`;
+
+        if (coordsEl) coordsEl.textContent = `${lat}, ${lng} (±${accuracy}m)`;
+        if (addrEl) addrEl.textContent = '🔄 Mengambil alamat...';
+        if (resultBox) resultBox.classList.add('active');
+        if (mapsLink) mapsLink.href = mapsURL;
+
+        currentGpsData = {
+            lat: parseFloat(lat), lng: parseFloat(lng), accuracy,
+            address: `${lat}, ${lng}`, mapsURL
+        };
+
+        try {
+            const nominatimUrl = `${NOMINATIM_URL}?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=id`;
+            const response = await fetch(nominatimUrl, {
+                method: 'GET',
+                headers: { 'User-Agent': 'SALINK-Emergency-App/7.0' }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (data && data.display_name) {
+                    if (addrEl) addrEl.textContent = '📍 ' + data.display_name;
+                    currentGpsData.address = data.display_name;
+                } else {
+                    if (addrEl) addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
+                }
+            } else {
+                if (addrEl) addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
+            }
+        } catch(e) {
+            if (addrEl) addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
+        }
+
+        if (btn) btn.classList.remove('loading');
+        if (btnText) btnText.textContent = '✅ Lokasi Ditemukan — Tap untuk Ambil Ulang';
+        if (btn) btn.style.background = 'linear-gradient(135deg, #3fb950, #2ea44f)';
+
+        showToast('📍 Lokasi Ditemukan', `Akurasi ±${accuracy}m`, 'fa-location-arrow', 'success');
+        validateProfilePost();
+
+    } catch(error) {
+        if (btn) {
+            btn.classList.remove('loading');
+            btn.style.background = '';
+        }
+        if (btnText) btnText.textContent = '📍 Ambil Lokasi Saya';
+
+        let errMsg = 'Gagal mengambil lokasi. ';
+        switch(error.code) {
+            case 1: errMsg += 'Izin lokasi ditolak.'; break;
+            case 2: errMsg += 'Lokasi tidak tersedia.'; break;
+            case 3: errMsg += 'Timeout. Coba lagi.'; break;
+            default: errMsg += error.message || 'Coba lagi.';
+        }
+        if (errorBox) {
+            errorBox.textContent = '❌ ' + errMsg;
+            errorBox.classList.add('active');
+        }
+        showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle', 'error');
+    }
+}
+
+/* ================================================================
+ * SUBMIT POSTINGAN — Cross-tab sync + Redirect emergency
+ * ================================================================ */
+async function handleProfilePostSubmit() {
+    if (!currentUser) {
+        showToast('🔒 Login', 'Silakan login dulu', 'fa-lock', 'error');
+        setTimeout(() => window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(PROFILE_URL), 800);
+        return;
+    }
+
+    const val = document.getElementById('profilePostTypeSelect')?.value || 'biasa';
+    const mapping = POST_TYPE_MAP[val] || POST_TYPE_MAP['biasa'];
+    const isSpecial = mapping.isSpecial;
+    const specialType = mapping.specialType;
+    const text = isSpecial
+        ? (document.getElementById('profilePostSpecialText')?.value || '').trim()
+        : (document.getElementById('profilePostInput')?.value || '').trim();
+    const file = document.getElementById('profileMediaUpload')?.files[0];
+
+    if (!text && !file) {
+        showToast('⚠️ Perhatian', 'Isi teks atau upload media', 'fa-exclamation-triangle', 'error');
+        return;
+    }
+    if (isSpecial && !currentGpsData) {
+        showToast('⚠️ Perhatian', 'Ambil lokasi GPS dulu', 'fa-exclamation-triangle', 'error');
+        return;
+    }
+
+    const submitBtn = document.getElementById('profilePostSubmit');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mengirim...';
+
+    const postId = 'post-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+    const emergencyId = 'emergency-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+    let mediaType = '', mediaData = '';
+
+    const finish = async () => {
+        const now = Date.now();
+        const post = {
+            id: postId,
+            userId: currentUser.username,
+            userFullName: currentUser.fullName,
+            userGender: currentUser.gender || 'male',
+            userProfilePic: currentUser.profilePicture || '',
+            text: text || '',
+            mediaType, mediaData,
+            timestamp: now,
+            likes: '[]', comments: '[]',
+            viewerCount: 0,
+            isSpecial: isSpecial || false,
+            specialType: isSpecial && specialType ? specialType : '',
+            specialLocation: isSpecial && currentGpsData ? currentGpsData.address : '',
+            specialAddress: isSpecial && currentGpsData ? currentGpsData.address : '',
+            latitude: isSpecial && currentGpsData ? currentGpsData.lat : '',
+            longitude: isSpecial && currentGpsData ? currentGpsData.lng : '',
+            mapsURL: isSpecial && currentGpsData ? currentGpsData.mapsURL : '',
+            postType: isSpecial ? 'khusus' : 'biasa',
+            country: currentUser.country || '',
+            province: currentUser.province || '',
+            city: currentUser.city || '',
+            district: currentUser.district || '',
+            village: currentUser.village || '',
+            address: currentUser.address || ''
+        };
+
+        // Save ke localStorage (untuk cross-tab sync)
+        posts.unshift(post);
+        try { localStorage.setItem('salink_posts', JSON.stringify(posts)); } catch(e) {}
+        renderProfilePosts();
+        updateStats();
+
+        // Save ke server
+        apiSavePost(post).then(ok => { if (ok) log('Post saved to server'); });
+
+        if (isSpecial && currentGpsData) {
+            // ==================== EMERGENCY POSTING ====================
+            const emPayload = {
+                id: emergencyId,
+                type: specialType,
+                title: EMERGENCY_LABELS[specialType],
+                sender: currentUser.fullName,
+                senderUsername: currentUser.username,
+                senderPhone: currentUser.phone || '',
+                location: currentGpsData.address,
+                address: currentGpsData.address,
+                latitude: currentGpsData.lat,
+                longitude: currentGpsData.lng,
+                mapsURL: currentGpsData.mapsURL,
+                description: text,
+                province: currentUser.province || '',
+                city: currentUser.city || '',
+                district: currentUser.district || '',
+                village: currentUser.village || ''
+            };
+            await apiSaveEmergency(emPayload);
+
+            const notifPayload = {
+                id: 'notif-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8),
+                type: specialType,
+                title: EMERGENCY_LABELS[specialType] + ' — ' + (text.substring(0, 50) || 'Darurat'),
+                message: text.substring(0, 200),
+                sender: currentUser.fullName,
+                senderUsername: currentUser.username,
+                link: DASHBOARD_URL + '?emergency=' + encodeURIComponent(postId),
+                postId: postId,
+                timestamp: new Date().toISOString(),
+                read: 'FALSE',
+                soundKey: specialType
+            };
+            try { await apiSaveNotification(notifPayload); } catch(e) {}
+
+            // Save emergency ke localStorage
+            try {
+                let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+                ems.unshift({
+                    id: emergencyId,
+                    postId: postId,
+                    type: specialType,
+                    sender: currentUser.fullName,
+                    senderUsername: currentUser.username,
+                    senderPhone: currentUser.phone || '',
+                    location: currentGpsData.address,
+                    address: currentGpsData.address,
+                    text: text,
+                    title: EMERGENCY_LABELS[specialType],
+                    mapsURL: currentGpsData.mapsURL,
+                    coords: `${currentGpsData.lat}, ${currentGpsData.lng}`,
+                    latitude: currentGpsData.lat,
+                    longitude: currentGpsData.lng,
+                    timestamp: now,
+                    expiresAt: now + EMERGENCY_DURATION
+                });
+                ems = ems.filter(e => e.expiresAt > Date.now());
+                localStorage.setItem('salink_emergencies', JSON.stringify(ems));
+            } catch(e) {}
+
+            // Broadcast emergency ke semua tab
+            broadcastSync('new_emergency', {
+                id: postId,
+                type: specialType,
+                sender: currentUser.fullName,
+                senderUsername: currentUser.username,
+                message: text,
+                timestamp: now
+            });
+
+            // Sync trigger untuk dashboard
+            try {
+                localStorage.setItem('salink_sync_trigger', JSON.stringify({
+                    type: 'new_emergency',
+                    data: {
+                        id: postId,
+                        type: specialType,
+                        sender: currentUser.fullName,
+                        senderUsername: currentUser.username,
+                        message: text,
+                        timestamp: now
+                    },
+                    timestamp: Date.now()
+                }));
+                setTimeout(() => localStorage.removeItem('salink_sync_trigger'), 200);
+            } catch(e) {}
+
+            showToast('🚨 EMERGENCY TERKIRIM', 'Redirect ke dashboard...', 'fa-exclamation-triangle', 'success');
+
+            // Reset form
+            resetProfilePostForm();
+
+            // ✅ REDIRECT ke dashboard setelah 1.2s
+            setTimeout(() => {
+                window.location.href = DASHBOARD_URL + '?emergency=' + encodeURIComponent(postId);
+            }, 1200);
+
+        } else {
+            // ==================== POSTINGAN BIASA ====================
+            playRegularSound();
+            showToast('📝 Berhasil', 'Postingan Anda sudah dibagikan', 'fa-check-circle', 'success');
+            broadcastSync('new_post', { id: postId });
+
+            // Reset form
+            resetProfilePostForm();
+
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+            validateProfilePost();
+        }
+    };
+
+    const resetProfilePostForm = () => {
+        const input = document.getElementById('profilePostInput');
+        const specialText = document.getElementById('profilePostSpecialText');
+        const mediaUpload = document.getElementById('profileMediaUpload');
+        const mediaPreview = document.getElementById('profileMediaPreview');
+        const select = document.getElementById('profilePostTypeSelect');
+        const specialFields = document.getElementById('profilePostSpecialFields');
+        const biasaForm = document.getElementById('profilePostBiasaForm');
+        if (input) input.value = '';
+        if (specialText) specialText.value = '';
+        if (mediaUpload) mediaUpload.value = '';
+        if (mediaPreview) mediaPreview.style.display = 'none';
+        if (select) select.value = 'biasa';
+        currentProfilePostType = 'biasa';
+        if (specialFields) specialFields.classList.remove('active');
+        if (biasaForm) biasaForm.style.display = 'block';
+        currentGpsData = null;
+        const gpsResult = document.getElementById('profileGpsLocationResult');
+        if (gpsResult) gpsResult.classList.remove('active');
+        const gpsBtn = document.getElementById('profileGpsLocationBtn');
+        if (gpsBtn) gpsBtn.style.background = '';
+        const gpsBtnText = document.getElementById('profileGpsLocationBtnText');
+        if (gpsBtnText) gpsBtnText.textContent = '📍 Ambil Lokasi Saya';
+    };
+
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            mediaData = e.target.result;
+            mediaType = file.type.startsWith('image/') ? 'image' : 'video';
+            finish();
+        };
+        reader.readAsDataURL(file);
+    } else {
+        finish();
+    }
+}
+
+log('✅ Part 1/2 — Foundation loaded');
+    </script>
     <!-- ============================================================ -->
     <!-- SCRIPT UTAMA — PROFIL v7.0 (Part 2/2)                          -->
     <!-- ============================================================ -->
