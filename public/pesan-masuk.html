@@ -2804,14 +2804,14 @@
                     <button class="search-tab" data-tab="emergency" type="button"><i class="fas fa-exclamation-triangle"></i> Emergency</button>
                 </div>
 
-                <div class="search-filter-row" id="emergencyFilters">
+                <div class="search-filter-row" id="emergencyFilters" style="display:none;">
                     <button class="search-filter-chip active" data-filter="all" type="button">🎯 Semua</button>
                     <button class="search-filter-chip" data-filter="fire" type="button">🔥 Kebakaran</button>
                     <button class="search-filter-chip" data-filter="medical" type="button">🚑 Medis</button>
                     <button class="search-filter-chip" data-filter="crime" type="button">🚓 Kriminal</button>
                     <button class="search-filter-chip" data-filter="disaster" type="button">🌪️ Bencana</button>
                 </div>
-
+                
                 <div id="searchResultsBody">
                     <div id="searchDefaultView">
                         <div class="search-empty-state">
@@ -5251,12 +5251,12 @@
     // ================================================================
     // 27. SEARCH MODAL
     // ================================================================
-    function openSearchModal() {
-        if (!currentUser) { window.location.href = LOGIN_URL; return; }
+        function openSearchModal() {
+        if (isPreviewMode) { showPreviewOverlay(); return; }
         openModalById('searchModal');
-        var input = document.getElementById('searchModalInput');
+        var input = document.getElementById('searchInput');
         if (input) { input.value = ''; setTimeout(function() { input.focus(); }, 200); }
-        var cb = document.getElementById('clearSearchModalBtn');
+        var cb = document.getElementById('clearSearchBtn');
         if (cb) cb.classList.remove('visible');
         var sar = document.getElementById('searchActiveResults');
         if (sar) sar.style.display = 'none';
@@ -5270,24 +5270,55 @@
         document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
         var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
         if (allChip) allChip.classList.add('active');
+
+        // ⭐ Reset chips filter emergency — HIDE saat modal baru dibuka
+        var chipsRow = document.getElementById('emergencyFilters');
+        if (chipsRow) chipsRow.style.display = 'none';
     }
     function closeSearchModal() { closeModalById('searchModal'); }
-    function clearSearchModal() {
-        var input = document.getElementById('searchModalInput');
+        function clearSearch() {
+        var input = document.getElementById('searchInput');
         if (input) input.value = '';
-        var cb = document.getElementById('clearSearchModalBtn');
+        var cb = document.getElementById('clearSearchBtn');
         if (cb) cb.classList.remove('visible');
         var sar = document.getElementById('searchActiveResults');
         if (sar) sar.style.display = 'none';
         var sdv = document.getElementById('searchDefaultView');
         if (sdv) sdv.style.display = 'block';
+
+        // ⭐ Chips filter emergency HIDE saat clear search
+        var chipsRow = document.getElementById('emergencyFilters');
+        if (chipsRow) chipsRow.style.display = 'none';
+
+        // ⭐ Reset tab ke "all"
+        searchTab = 'all';
+        document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
+        var allTab = document.querySelector('.search-tab[data-tab="all"]');
+        if (allTab) allTab.classList.add('active');
+
+        // ⭐ Reset emergency filter ke "all"
+        searchEmergencyFilter = 'all';
+        document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
+        var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
+        if (allChip) allChip.classList.add('active');
     }
-    function switchSearchTab(tab, btnEl) {
+        function switchSearchTab(tab, btnEl) {
         searchTab = tab;
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
-        btnEl.classList.add('active');
-        var input = document.getElementById('searchModalInput');
-        if (input && input.value.trim()) performSearchModal(input.value.trim());
+        if (btnEl) btnEl.classList.add('active');
+
+        // ⭐ Tampilkan/sembunyikan chips filter emergency
+        var chipsRow = document.getElementById('emergencyFilters');
+        if (chipsRow) {
+            if (tab === 'emergency') {
+                chipsRow.style.display = 'flex';
+            } else {
+                chipsRow.style.display = 'none';
+            }
+        }
+
+        var input = document.getElementById('searchInput');
+        if (input && input.value.trim()) performSearch(input.value.trim());
     }
     function setSearchEmergencyFilter(filter, btnEl) {
         searchEmergencyFilter = filter;
@@ -5296,13 +5327,16 @@
         var input = document.getElementById('searchModalInput');
         if (input && input.value.trim()) performSearchModal(input.value.trim());
     }
-    function performSearchModal(query) {
+        function performSearch(query) {
         var q = query.trim().toLowerCase();
         if (!q) {
             var sar = document.getElementById('searchActiveResults');
             if (sar) sar.style.display = 'none';
             var sdv = document.getElementById('searchDefaultView');
             if (sdv) sdv.style.display = 'block';
+            // ⭐ Chips filter emergency HIDE saat input kosong
+            var chipsRow = document.getElementById('emergencyFilters');
+            if (chipsRow) chipsRow.style.display = 'none';
             return;
         }
         var sdv2 = document.getElementById('searchDefaultView');
@@ -5738,7 +5772,7 @@
     // ================================================================
     // 33. HANDLE URL PARAM & PENDING CHAT
     // ================================================================
-        function handleUrlChatParam() {
+            function handleUrlChatParam() {
         var params = new URLSearchParams(window.location.search);
 
         // ⭐ Format 1: ?chat=username (recommended)
@@ -5753,27 +5787,90 @@
 
         if (!chatUser) return;
 
+        // Simpan pending chat sebagai double-safety
+        try {
+            localStorage.setItem('salink_pending_chat', JSON.stringify({
+                username: chatUser,
+                timestamp: Date.now()
+            }));
+        } catch(e) {}
+
         // Hapus query param dari URL biar rapi
         try { window.history.replaceState({}, document.title, window.location.pathname); } catch(e) {}
 
-        // Tunggu openChatRoom tersedia, lalu buka
+        log('🔗 handleUrlChatParam: target=' + chatUser);
+
+        // ⭐ STRATEGI BARU: Tunggu chatData siap & target ada di chatData
         var attempts = 0;
+        var maxAttempts = 40; // 40 × 250ms = 10 detik max
         var checkInterval = setInterval(function() {
             attempts++;
-            if (typeof window.openChatRoom === 'function') {
-                clearInterval(checkInterval);
-                setTimeout(function() {
-                    // Pastikan user sudah ter-load sebelum buka chat
-                    if (typeof window.openChatRoom === 'function') {
-                        openChatRoom(chatUser);
-                        log('✓ Auto-opened chat room via URL param: ' + chatUser);
-                    }
-                }, 500);
-            } else if (attempts > 20) {
-                clearInterval(checkInterval);
-                console.warn('⚠️ openChatRoom tidak tersedia dalam 6 detik');
+
+            // Cek apakah fungsi openChatRoom tersedia
+            if (typeof window.openChatRoom !== 'function') {
+                if (attempts > maxAttempts) {
+                    clearInterval(checkInterval);
+                    console.warn('⚠️ openChatRoom tidak tersedia setelah 10 detik');
+                }
+                return;
             }
-        }, 300);
+
+            // ⭐ Cek chatData — apakah sudah ada chat dengan username target?
+            var normalizedTarget = String(chatUser).trim().toLowerCase();
+            var existingChat = null;
+
+            if (typeof chatData !== 'undefined' && Array.isArray(chatData)) {
+                existingChat = chatData.find(function(c) {
+                    var cId = String(c.id || '').trim().toLowerCase();
+                    var cUsername = String(c.username || '').trim().toLowerCase();
+                    return cId === normalizedTarget || cUsername === normalizedTarget;
+                });
+            }
+
+            // Kalau chat sudah ada → langsung buka
+            if (existingChat) {
+                clearInterval(checkInterval);
+                log('✓ Chat ditemukan di chatData: ' + existingChat.id);
+                setTimeout(function() {
+                    openChatRoom(existingChat.id);
+                }, 200);
+                return;
+            }
+
+            // Kalau chatData sudah terisi (setidaknya ada data loaded) tapi target belum ada
+            // → paksa buat chat baru
+            if (attempts > 8 && typeof chatData !== 'undefined' && Array.isArray(chatData)) {
+                // Cek apakah data user sudah ada di allUsers
+                var userExists = false;
+                if (typeof allUsers !== 'undefined' && Array.isArray(allUsers)) {
+                    userExists = allUsers.some(function(u) {
+                        return String(u.username || '').trim().toLowerCase() === normalizedTarget;
+                    });
+                }
+
+                if (userExists || attempts > 16) {
+                    clearInterval(checkInterval);
+                    log('➕ Chat belum ada, buat baru: ' + chatUser);
+                    setTimeout(function() {
+                        // Panggil startNewChat() — fungsi yang sudah ada di v15.2
+                        if (typeof window.startNewChat === 'function') {
+                            window.startNewChat(chatUser);
+                        } else {
+                            // Fallback: panggil openChatRoom langsung (akan buat chat baru via internal logic)
+                            openChatRoom(chatUser);
+                        }
+                    }, 200);
+                    return;
+                }
+            }
+
+            // Timeout
+            if (attempts > maxAttempts) {
+                clearInterval(checkInterval);
+                console.warn('⚠️ Timeout: chat room tidak bisa dibuka untuk ' + chatUser);
+                showToast('⚠️ Gagal', 'Tidak dapat membuka chat dengan ' + chatUser, 'fa-exclamation-triangle');
+            }
+        }, 250);
     }
     function handlePendingChat() {
         try {
@@ -6270,6 +6367,7 @@
     // 36. GLOBAL EXPOSE
     // ================================================================
     window._salinkStartChat = startNewChat;
+    window.startNewChat = startNewChat;
     window._salinkAttach = handleAttach;
     window._salinkShareContact = shareContact;
     window._salinkCamera = handleCamera;
