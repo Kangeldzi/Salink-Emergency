@@ -1,5 +1,5 @@
 /* ====================================================================
- * SALINK-SOCIAL.JS v1.0 — Shared Social Library
+ * SALINK-SOCIAL.JS v1.1 — Shared Social Library
  * ====================================================================
  * Shared library untuk 3 file:
  *   - profile-user.html
@@ -10,6 +10,7 @@
  *   - Friend operations (invite, accept, remove, block)
  *   - Reports (laporkan user)
  *   - Helper status (areFriends, getFriendStatus, isBlocked)
+ *   - ⭐ PRIVACY HELPERS (v1.1) — getPrivacy, isAllowed
  *
  * Storage keys (single source of truth):
  *   - salink_friends   : [{ id, user1, user2, status, requestedBy, timestamp, acceptedAt }]
@@ -17,6 +18,12 @@
  *   - salink_blocked   : [{ blocker, blocked, timestamp }]
  *   - salink_reports   : [{ id, reporter, target, reason, timestamp }]
  *   - salink_users     : [ user object ]
+ *                        user.privacy = {
+ *                          allowWhatsApp: boolean (default true),
+ *                          allowVoiceCall: boolean (default true),
+ *                          allowVideoCall: boolean (default true),
+ *                          allowPhoneCall: boolean (default false)
+ *                        }
  *
  * Catatan penting:
  *   - BLOKIR hanya memblokir CHAT, TIDAK menyembunyikan postingan/notif/search/invite
@@ -36,6 +43,14 @@
         USERS: 'salink_users'
     };
 
+    // Privacy defaults
+    var DEFAULT_PRIVACY = {
+        allowWhatsApp: true,
+        allowVoiceCall: true,
+        allowVideoCall: true,
+        allowPhoneCall: false
+    };
+
     // ================================================================
     // 2. INTERNAL HELPERS
     // ================================================================
@@ -53,7 +68,6 @@
     function _safeSave(key, arr) {
         try {
             localStorage.setItem(key, JSON.stringify(arr));
-            // Trigger cross-tab sync
             try {
                 localStorage.setItem('salink_sync_trigger', JSON.stringify({
                     type: 'social_' + key,
@@ -115,26 +129,15 @@
     // ================================================================
     // 4. STATUS HELPERS
     // ================================================================
-    /**
-     * Cek status pertemanan antara 2 user
-     * @returns {string} 'none' | 'pending_out' | 'pending_in' | 'accepted' | 'blocked'
-     *   none         : belum ada relasi
-     *   pending_out  : A sudah invite B, B belum accept
-     *   pending_in   : B sudah invite A, A belum accept
-     *   accepted     : sudah berteman (2 arah)
-     *   blocked      : A diblokir B (atau sebaliknya)
-     */
     function getFriendStatus(userA, userB) {
         if (!userA || !userB || _areSame(userA, userB)) return 'none';
 
-        // Cek blokir dulu
         if (isBlocked(userA, userB)) return 'blocked';
 
         var friends = loadFriends();
         var normA = _normalizeUsername(userA);
         var normB = _normalizeUsername(userB);
 
-        // Cari relasi apapun antara A dan B
         for (var i = 0; i < friends.length; i++) {
             var f = friends[i];
             if (!f) continue;
@@ -151,9 +154,8 @@
                 return 'accepted';
             }
 
-            // Pending
-            if (matchDirect) return 'pending_out'; // A invite B
-            if (matchReverse) return 'pending_in'; // B invite A
+            if (matchDirect) return 'pending_out';
+            if (matchReverse) return 'pending_in';
         }
 
         return 'none';
@@ -178,16 +180,11 @@
             if (!b) continue;
             var bl = _normalizeUsername(b.blocker);
             var bd = _normalizeUsername(b.blocked);
-            // Blokir 1 arah: cek blocker→blocked
             if (bl === normA && bd === normB) return true;
         }
         return false;
     }
 
-    /**
-     * Cek apakah A diblokir oleh B (spesifik arah)
-     * Digunakan di chat: A tidak bisa kirim pesan ke B
-     */
     function isBlockedBy(targetUser, requesterUser) {
         if (!targetUser || !requesterUser) return false;
         var blocked = loadBlocked();
@@ -196,9 +193,8 @@
         for (var i = 0; i < blocked.length; i++) {
             var b = blocked[i];
             if (!b) continue;
-            var bl = _normalizeUsername(b.blocker);   // yang memblokir
-            var bd = _normalizeUsername(b.blocked);   // yang diblokir
-            // target (B) memblokir requester (A)
+            var bl = _normalizeUsername(b.blocker);
+            var bd = _normalizeUsername(b.blocked);
             if (bl === normTarget && bd === normReq) return true;
         }
         return false;
@@ -207,10 +203,6 @@
     // ================================================================
     // 5. FRIEND LIST
     // ================================================================
-    /**
-     * Ambil daftar teman (status accepted) milik username
-     * @returns {Array} [{ username, since, friendData }]
-     */
     function getFriends(username) {
         if (!username) return [];
         var normUser = _normalizeUsername(username);
@@ -243,9 +235,6 @@
         return result;
     }
 
-    /**
-     * Ambil daftar pengikut (yang meng-invite kita dan sudah accepted)
-     */
     function getFollowers(username) {
         if (!username) return [];
         var normUser = _normalizeUsername(username);
@@ -266,9 +255,6 @@
         return result;
     }
 
-    /**
-     * Ambil daftar yang kita follow (kita invite dan sudah accepted)
-     */
     function getFollowing(username) {
         if (!username) return [];
         var normUser = _normalizeUsername(username);
@@ -289,9 +275,6 @@
         return result;
     }
 
-    /**
-     * Ambil daftar followers (status pending, orang yang meng-invite kita)
-     */
     function getPendingFollowers(username) {
         if (!username) return [];
         var normUser = _normalizeUsername(username);
@@ -312,9 +295,6 @@
         return result;
     }
 
-    /**
-     * Ambil daftar following (status pending, orang yang kita invite)
-     */
     function getPendingFollowing(username) {
         if (!username) return [];
         var normUser = _normalizeUsername(username);
@@ -338,10 +318,6 @@
     // ================================================================
     // 6. FRIEND OPERATIONS
     // ================================================================
-    /**
-     * Kirim undangan pertemanan dari fromUser ke toUser
-     * @returns {Object} { ok: boolean, reason: string, data: object|null }
-     */
     function sendInvite(fromUser, toUser) {
         if (!fromUser || !toUser) {
             return { ok: false, reason: 'invalid_params', data: null };
@@ -353,14 +329,12 @@
         var normFrom = _normalizeUsername(fromUser);
         var normTo = _normalizeUsername(toUser);
 
-        // Cek blokir
         if (isBlockedBy(normTo, normFrom)) {
             return { ok: false, reason: 'blocked_by_target', data: null };
         }
 
         var friends = loadFriends();
 
-        // Cek sudah ada relasi?
         var status = getFriendStatus(normFrom, normTo);
         if (status === 'accepted') {
             return { ok: false, reason: 'already_friends', data: null };
@@ -369,9 +343,7 @@
             return { ok: false, reason: 'already_sent', data: null };
         }
 
-        // Kalau target sudah invite kita duluan → langsung accept
         if (status === 'pending_in') {
-            // Auto-accept
             for (var i = 0; i < friends.length; i++) {
                 var f = friends[i];
                 if (!f) continue;
@@ -386,7 +358,6 @@
             }
         }
 
-        // Buat invite baru
         var invite = {
             id: _genId('invite'),
             user1: normFrom,
@@ -401,9 +372,6 @@
         return { ok: true, reason: 'sent', data: invite };
     }
 
-    /**
-     * Terima undangan pertemanan
-     */
     function acceptInvite(userA, userB) {
         if (!userA || !userB) return { ok: false, reason: 'invalid_params' };
         var normA = _normalizeUsername(userA);
@@ -427,9 +395,6 @@
         return { ok: false, reason: 'invite_not_found' };
     }
 
-    /**
-     * Hapus pertemanan (bisa invite lagi setelahnya)
-     */
     function removeFriend(userA, userB) {
         if (!userA || !userB) return { ok: false, reason: 'invalid_params' };
         var normA = _normalizeUsername(userA);
@@ -452,9 +417,6 @@
         return { ok: true };
     }
 
-    /**
-     * Blokir user — HANYA block chat, TIDAK hide dari feed
-     */
     function blockUser(blocker, blocked) {
         if (!blocker || !blocked) return { ok: false, reason: 'invalid_params' };
         if (_areSame(blocker, blocked)) return { ok: false, reason: 'self_block' };
@@ -464,14 +426,12 @@
 
         var blockedList = loadBlocked();
 
-        // Cek sudah ada?
         var exists = blockedList.some(function(b) {
             return _normalizeUsername(b.blocker) === normBlocker &&
                    _normalizeUsername(b.blocked) === normBlocked;
         });
         if (exists) return { ok: false, reason: 'already_blocked' };
 
-        // Tambah blokir
         blockedList.push({
             id: _genId('block'),
             blocker: normBlocker,
@@ -480,15 +440,11 @@
         });
         saveBlocked(blockedList);
 
-        // Hapus relasi pertemanan (jika ada)
         removeFriend(normBlocker, normBlocked);
 
         return { ok: true };
     }
 
-    /**
-     * Buka blokir
-     */
     function unblockUser(blocker, blocked) {
         if (!blocker || !blocked) return { ok: false, reason: 'invalid_params' };
         var normBlocker = _normalizeUsername(blocker);
@@ -504,9 +460,6 @@
         return { ok: true };
     }
 
-    /**
-     * Ambil daftar user yang diblokir oleh username
-     */
     function getBlockedList(username) {
         if (!username) return [];
         var normUser = _normalizeUsername(username);
@@ -518,13 +471,6 @@
     // ================================================================
     // 7. REPORTS
     // ================================================================
-    /**
-     * Laporkan user
-     * @param {string} reporter - username yang melaporkan
-     * @param {string} target - username yang dilaporkan
-     * @param {string} reason - alasan laporan
-     * @returns {Object} { ok, data }
-     */
     function reportUser(reporter, target, reason) {
         if (!reporter || !target) {
             return { ok: false, reason: 'invalid_params' };
@@ -545,9 +491,6 @@
         return { ok: true, data: report };
     }
 
-    /**
-     * Hitung jumlah laporan terhadap user
-     */
     function getReportCount(username) {
         if (!username) return 0;
         var normUser = _normalizeUsername(username);
@@ -556,9 +499,6 @@
         }).length;
     }
 
-    /**
-     * Cek apakah user A pernah lapor user B
-     */
     function hasReported(reporter, target) {
         if (!reporter || !target) return false;
         var normRep = _normalizeUsername(reporter);
@@ -601,7 +541,70 @@
     }
 
     // ================================================================
-    // 9. UTILITIES
+    // 9. ⭐ PRIVACY HELPERS (v1.1)
+    // ================================================================
+    /**
+     * Ambil pengaturan privasi user
+     * @returns {Object} { allowWhatsApp, allowVoiceCall, allowVideoCall, allowPhoneCall }
+     */
+    function getPrivacy(username) {
+        var u = getUserByUsername(username);
+        if (!u) return Object.assign({}, DEFAULT_PRIVACY);
+        var p = u.privacy || {};
+        return {
+            allowWhatsApp: p.allowWhatsApp !== false,
+            allowVoiceCall: p.allowVoiceCall !== false,
+            allowVideoCall: p.allowVideoCall !== false,
+            allowPhoneCall: p.allowPhoneCall === true
+        };
+    }
+
+    /**
+     * Cek apakah user mengizinkan fitur tertentu
+     * @param {string} username - target user
+     * @param {string} feature - 'whatsapp' | 'voiceCall' | 'videoCall' | 'phoneCall'
+     * @returns {boolean}
+     */
+    function isAllowed(username, feature) {
+        if (!username || !feature) return false;
+        var p = getPrivacy(username);
+        if (feature === 'whatsapp') return p.allowWhatsApp === true;
+        if (feature === 'voiceCall') return p.allowVoiceCall === true;
+        if (feature === 'videoCall') return p.allowVideoCall === true;
+        if (feature === 'phoneCall') return p.allowPhoneCall === true;
+        return false;
+    }
+
+    /**
+     * Simpan pengaturan privasi user
+     * @param {string} username - user yang mengubah privasi
+     * @param {Object} newPrivacy - { allowWhatsApp, allowVoiceCall, allowVideoCall, allowPhoneCall }
+     * @returns {Object} { ok: boolean }
+     */
+    function savePrivacy(username, newPrivacy) {
+        if (!username) return { ok: false, reason: 'invalid_username' };
+        var users = loadUsers();
+        var found = false;
+        var normUser = _normalizeUsername(username);
+        for (var i = 0; i < users.length; i++) {
+            if (_normalizeUsername(users[i].username) === normUser) {
+                var current = users[i].privacy || {};
+                users[i].privacy = {
+                    allowWhatsApp: newPrivacy.allowWhatsApp !== undefined ? newPrivacy.allowWhatsApp : (current.allowWhatsApp !== false),
+                    allowVoiceCall: newPrivacy.allowVoiceCall !== undefined ? newPrivacy.allowVoiceCall : (current.allowVoiceCall !== false),
+                    allowVideoCall: newPrivacy.allowVideoCall !== undefined ? newPrivacy.allowVideoCall : (current.allowVideoCall !== false),
+                    allowPhoneCall: newPrivacy.allowPhoneCall !== undefined ? newPrivacy.allowPhoneCall : (current.allowPhoneCall === true)
+                };
+                found = true;
+                break;
+            }
+        }
+        if (!found) return { ok: false, reason: 'user_not_found' };
+        return _safeSave(KEYS.USERS, users) ? { ok: true } : { ok: false, reason: 'save_failed' };
+    }
+
+    // ================================================================
+    // 10. UTILITIES
     // ================================================================
     function isCurrentUser(username) {
         try {
@@ -626,11 +629,12 @@
     }
 
     // ================================================================
-    // 10. EXPORT
+    // 11. EXPORT
     // ================================================================
     var SalinkSocial = {
         // Constants
         KEYS: KEYS,
+        DEFAULT_PRIVACY: DEFAULT_PRIVACY,
 
         // Load/Save
         loadFriends: loadFriends,
@@ -674,15 +678,19 @@
         getUserAvatar: getUserAvatar,
         getUserGender: getUserGender,
 
+        // Privacy (v1.1)
+        getPrivacy: getPrivacy,
+        isAllowed: isAllowed,
+        savePrivacy: savePrivacy,
+
         // Utilities
         isCurrentUser: isCurrentUser,
         getCurrentUser: getCurrentUser,
 
         // Version
-        VERSION: '1.0.0'
+        VERSION: '1.1.0'
     };
 
-    // Expose ke window
     global.SalinkSocial = SalinkSocial;
 
     console.log('✅ [SalinkSocial] v' + SalinkSocial.VERSION + ' loaded');
