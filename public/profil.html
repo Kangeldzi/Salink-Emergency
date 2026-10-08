@@ -16,40 +16,37 @@
 
     <style>
         /* ==================================================================
-           SALINK PROFIL v6.0 — TELKOMSEL PREMIUM REDESIGN
+           SALINK PROFIL v7.0 — TELKOMSEL PREMIUM REDESIGN
            ==================================================================
            Tema    : Dark Navy + Telkomsel Red + Colorful Cards
            Font    : Inter (body) + Poppins (heading)
            Layout  : Mobile-first, max 430px, centered
-           Konsisten dengan dashboard.html
+           Konsisten dengan dashboard.html, pesan-masuk.html, lokasi-bantuan.html
            ================================================================== */
 
         /* ============ ROOT VARIABLES ============ */
         :root {
-            /* Base */
             --bg-primary: #0a0e1a;
             --bg-secondary: #111827;
             --bg-card: #141b2e;
             --bg-card-2: #1a2235;
             --bg-input: rgba(255,255,255,0.06);
 
-            /* Text */
             --text-primary: #f5f7fa;
             --text-secondary: #a8b2c1;
             --text-muted: #6b7688;
             --text-dark: #0a0e1a;
             --text-white: #ffffff;
 
-            /* Border & Shadow */
             --border-color: rgba(255,255,255,0.08);
             --border-light: rgba(255,255,255,0.12);
             --shadow-color: rgba(0,0,0,0.4);
+            --shadow-light: rgba(0,0,0,0.2);
             --shadow-sm: 0 4px 12px rgba(0,0,0,0.2);
             --shadow-md: 0 10px 30px rgba(0,0,0,0.3);
             --shadow-lg: 0 20px 50px rgba(0,0,0,0.4);
             --shadow-glow: 0 8px 32px rgba(230,0,18,0.35);
 
-            /* Telkomsel Colors */
             --primary: #e60012;
             --primary-dark: #b8000d;
             --primary-glow: #ff0033;
@@ -57,13 +54,16 @@
             --accent-blue-dark: #b8000d;
             --accent-blue-gradient: linear-gradient(135deg, #e60012, #ff0033);
 
-            /* Preserved */
             --accent-red: #f85149;
             --accent-green: #25D366;
             --accent-gold: #ffa726;
             --accent-purple: #e57373;
 
-            /* Section Colors */
+            --emergency-fire: #f85149;
+            --emergency-medical: #4fc3f7;
+            --emergency-crime: #f0d080;
+            --emergency-disaster: #c792ea;
+
             --grad-header: linear-gradient(180deg, #0a0e1a 0%, #0f1420 100%);
             --grad-stat-red: linear-gradient(135deg, #e60012 0%, #b8000d 100%);
             --grad-stat-green: linear-gradient(135deg, #10b981 0%, #059669 100%);
@@ -75,7 +75,6 @@
             --grad-storage: linear-gradient(135deg, #78350f 0%, #9a3412 100%);
             --grad-brand: linear-gradient(135deg, #0a0e1a 0%, #141b2e 100%);
 
-            /* UI State */
             --toggle-bg: rgba(255,255,255,0.1);
             --toggle-thumb: #e60012;
             --header-bg: rgba(10,14,26,0.88);
@@ -83,20 +82,13 @@
             --modal-bg: #141b2e;
             --input-border: rgba(255,255,255,0.1);
 
-            /* Layout */
             --header-height: 60px;
             --footer-height: 68px;
             --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --radius: 14px;
 
-            /* Status */
             --danger: #f85149;
             --success: #3fb950;
-
-            /* Emergency Colors */
-            --accent-emergency: #f85149;
-            --accent-medical: #4fc3f7;
-            --accent-crime: #f0d080;
-            --accent-disaster: #c792ea;
         }
 
         [data-theme="light"] {
@@ -115,6 +107,7 @@
             --border-color: rgba(0,0,0,0.08);
             --border-light: rgba(0,0,0,0.06);
             --shadow-color: rgba(0,0,0,0.08);
+            --shadow-light: rgba(0,0,0,0.04);
             --shadow-sm: 0 4px 12px rgba(0,0,0,0.06);
             --shadow-md: 0 10px 30px rgba(0,0,0,0.08);
             --shadow-lg: 0 20px 50px rgba(0,0,0,0.12);
@@ -154,7 +147,7 @@
         ::-webkit-scrollbar-track { background: rgba(0,0,0,0.15); }
         ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 3px; }
 
-        /* App Shell */
+        /* ============ APP SHELL ============ */
         .app-shell {
             width: 100%;
             max-width: 430px;
@@ -173,16 +166,15 @@
         @keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         @keyframes toastIn { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes toastOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(30px); opacity: 0; } }
         @keyframes blink { 0%, 100% { color: #ff0000; text-shadow: 0 0 16px rgba(255,0,0,0.8); transform: scale(1); } 50% { color: #00C2FF; text-shadow: 0 0 16px rgba(0,194,255,0.8); transform: scale(1.08); } }
         @keyframes statBump { 0% { transform: scale(1); } 50% { transform: scale(1.25); color: var(--accent-green); } 100% { transform: scale(1); } }
         @keyframes syncPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
         @keyframes fabFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
         @keyframes fabRing { 0% { transform: scale(.9); opacity: .8; } 100% { transform: scale(1.3); opacity: 0; } }
         @keyframes rippleAnim { to { transform: scale(4); opacity: 0; } }
-        @keyframes fullScreenAlarmFlash { 0%, 100% { background-color: #0a0e1a; } 50% { background-color: #4a0000; } }
-        @keyframes fullScreenAlarmPulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 60px rgba(248,81,73,0.6); } 50% { transform: scale(1.06); box-shadow: 0 0 120px rgba(248,81,73,1); } }
-        @keyframes fullScreenAlarmZoom { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.12); } }
-        @keyframes fullScreenAlarmShakeX { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+        @keyframes floatingNotifIn { from { transform: translateX(-50%) translateY(-100px) scale(0.8); opacity: 0; } to { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; } }
+        @keyframes floatingNotifOut { from { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; } to { transform: translateX(-50%) translateY(-100px) scale(0.8); opacity: 0; } }
 
         /* ============ LOGO BLINK ============ */
         .siren-icon-header {
@@ -234,22 +226,40 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 0 12px;
+            padding: 0 10px;
             z-index: 1000;
             border-bottom: 1px solid var(--border-color);
             box-shadow: 0 2px 20px rgba(0,0,0,0.25);
-            gap: 8px;
+            gap: 4px;
         }
-        .header-left {
+        .header-left { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .header-center { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center; }
+        .header-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+        .app-title {
             display: flex;
             align-items: center;
-            gap: 8px;
-            flex: 1;
-            min-width: 0;
+            gap: 6px;
+            font-weight: 800;
+            color: var(--text-white);
+            font-size: 0.95rem;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            font-family: 'Poppins', sans-serif;
+            flex-shrink: 0;
         }
-        .menu-btn {
-            width: 40px; height: 40px;
-            min-width: 40px;
+        .app-title .title-text {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 800;
+            letter-spacing: 1px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .menu-btn, .search-btn, .user-btn, .back-btn, .refresh-btn {
+            width: 38px;
+            height: 38px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -258,67 +268,42 @@
             border: 1px solid rgba(255,255,255,0.12);
             color: var(--text-white);
             cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            position: relative;
             flex-shrink: 0;
-            transition: all 0.2s;
+            font-family: inherit;
+            padding: 0;
         }
-        .menu-btn:active {
-            transform: scale(0.92);
-            background: rgba(230,0,18,0.2);
+        .menu-btn:active, .search-btn:active, .user-btn:active, .back-btn:active, .refresh-btn:active {
+            transform: scale(0.9);
             border-color: var(--primary);
+            background: rgba(230,0,18,0.2);
         }
-        .menu-btn i { font-size: 1rem; pointer-events: none; }
-        .app-title {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .user-btn img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+        .user-btn .user-initials { font-size: 0.85rem; font-weight: 700; color: #fff; }
+
+        #headerNotifBtn { position: relative; }
+        #headerNotifBtn #notifBadge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: var(--primary);
+            color: #fff;
+            font-size: 0.55rem;
             font-weight: 800;
-            color: var(--text-white);
-            font-size: 0.95rem;
-            cursor: pointer;
-            letter-spacing: 0.5px;
-            font-family: 'Poppins', sans-serif;
-            flex: 1;
-            min-width: 0;
-            padding: 6px 8px;
             border-radius: 10px;
-        }
-        .app-title .title-text {
-            font-size: 0.95rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .header-right {
-            display: flex;
+            min-width: 18px;
+            height: 18px;
+            display: none;
             align-items: center;
-            gap: 6px;
-            flex-shrink: 0;
+            justify-content: center;
+            padding: 0 5px;
+            border: 2px solid var(--header-bg);
+            animation: notifPulse 1.8s infinite;
         }
-      
-        .header-right .menu-btn {
-    background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.12);
-    color: var(--text-white);
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-.header-right .menu-btn:active {
-    transform: scale(0.92);
-    background: rgba(230,0,18,0.2);
-    border-color: var(--primary);
-}
-.header-right .menu-btn i {
-    font-size: 0.95rem;
-    pointer-events: none;
-}
-        
+        #headerNotifBtn #notifBadge.show { display: flex !important; }
+
         /* ============ SYNC INDICATOR ============ */
         .sync-indicator {
             position: fixed;
@@ -359,8 +344,6 @@
             max-width: 85%;
             height: 100vh;
             height: 100dvh;
-            max-height: 100vh;
-            max-height: 100dvh;
             background: var(--bg-secondary);
             z-index: 1101;
             overflow-y: auto;
@@ -393,7 +376,8 @@
             z-index: 10;
         }
         .sidebar-close:active { transform: scale(0.9); }
-                .sidebar-header {
+
+        .sidebar-header {
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -404,7 +388,7 @@
             position: relative;
         }
         .sidebar-user-avatar {
-            width: 44px; height: 44px;
+            width: 64px; height: 64px;
             border-radius: 50%;
             background: var(--accent-blue-gradient);
             display: flex;
@@ -412,13 +396,28 @@
             justify-content: center;
             color: #fff;
             font-weight: bold;
-            font-size: 1.1rem;
+            font-size: 1.5rem;
             overflow: hidden;
-            border: 2px solid var(--primary);
+            border: 3px solid var(--primary);
+            box-shadow: 0 4px 16px rgba(230,0,18,0.3);
         }
         .sidebar-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .sidebar-user-name { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); text-align: center; }
-        .sidebar-user-email { font-size: 0.6rem; color: var(--text-muted); text-align: center; }
+        .sidebar-user-name {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-align: center;
+            margin-top: 4px;
+            font-family: 'Poppins', sans-serif;
+        }
+        .sidebar-user-email {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+            text-align: center;
+            word-break: break-all;
+            padding: 0 8px;
+        }
+
         .nav-menu {
             list-style: none;
             padding: 6px 12px calc(40px + env(safe-area-inset-bottom, 0px));
@@ -427,48 +426,58 @@
             -webkit-overflow-scrolling: touch;
         }
         .nav-section-title {
-            font-size: 0.55rem;
+            font-size: 0.58rem;
             color: var(--text-muted);
             text-transform: uppercase;
-            letter-spacing: 1px;
-            padding: 10px 14px 4px;
+            letter-spacing: 1.2px;
+            padding: 14px 14px 6px;
             font-weight: 700;
         }
-        .nav-item { margin-bottom: 2px; }
+        .nav-item { margin-bottom: 3px; }
         .nav-link {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 9px 14px;
+            gap: 14px;
+            padding: 11px 14px;
             color: var(--text-primary);
             text-decoration: none;
-            border-radius: 8px;
-            font-size: 0.78rem;
-            background: var(--bg-input);
+            border-radius: 10px;
+            font-size: 0.82rem;
+            background: transparent;
             border: 1px solid transparent;
             cursor: pointer;
             font-weight: 500;
             transition: all 0.2s;
+            font-family: inherit;
+            width: 100%;
+            text-align: left;
         }
-        .nav-link:hover { border-color: var(--primary); }
+        .nav-link:active { transform: scale(0.98); background: var(--bg-input); }
         .nav-link.active {
             background: rgba(230,0,18,0.15);
             color: var(--primary);
             border: 1px solid var(--primary);
+            font-weight: 700;
         }
-        .nav-link i { width: 22px; text-align: center; font-size: 0.9rem; color: var(--primary); }
-        .nav-link.special {
-            background: rgba(230,0,18,0.1);
-            border: 1px dashed var(--primary);
+        .nav-link i {
+            width: 24px;
+            text-align: center;
+            font-size: 1.05rem;
+            color: var(--accent-gold);
+            flex-shrink: 0;
         }
+        .nav-link.active i { color: var(--primary); }
         .nav-logout {
-            margin-top: 12px;
+            margin-top: 14px;
             margin-bottom: 16px;
             border-top: 1px solid var(--border-color);
-            padding-top: 12px;
+            padding-top: 14px;
         }
         .nav-logout .nav-link,
-        .nav-logout .nav-link i { color: var(--accent-red); }
+        .nav-logout .nav-link i {
+            color: var(--accent-red);
+            font-weight: 700;
+        }
 
         /* ============ MAIN CONTENT ============ */
         .main-content {
@@ -563,12 +572,6 @@
             font-weight: 700;
             position: relative;
             z-index: 1;
-        }
-        @media (max-width: 480px) {
-            .profile-stats { gap: 4px; }
-            .profile-stat-item { padding: 8px 3px; }
-            .profile-stat-number { font-size: 0.95rem; }
-            .profile-stat-label { font-size: 0.45rem; }
         }
 
         /* ============ PROFILE ACTIONS ============ */
@@ -783,7 +786,6 @@
         .gps-location-btn:active { transform: scale(0.97); }
         .gps-location-btn:disabled { opacity: 0.6; cursor: wait; }
         .gps-location-btn.loading { pointer-events: none; }
-        .gps-location-btn .fa-location-arrow { font-size: 1rem; }
 
         .gps-location-result {
             margin-top: 10px;
@@ -1096,7 +1098,7 @@
             justify-content: center;
             padding: 16px;
         }
-        .modal-overlay.active { display: flex; animation: fadeIn 0.3s ease; }
+        .modal-overlay.active { display: flex !important; animation: fadeIn 0.3s ease; }
         .modal-content {
             background: var(--modal-bg);
             border-radius: 18px;
@@ -1254,7 +1256,7 @@
         .map-info-row {
             display: flex;
             justify-content: space-between;
-            padding: 6px 0;
+            padding: 8px 0;
             font-size: 0.65rem;
             color: var(--text-secondary);
             border-bottom: 1px solid var(--border-color);
@@ -1262,7 +1264,10 @@
             gap: 4px;
         }
         .map-info-row:last-of-type { border-bottom: none; }
-        .map-info-row .map-value { color: var(--primary); font-weight: 700; }
+        .map-info-row .map-value {
+            color: var(--text-primary);
+            font-weight: 700;
+        }
 
         .map-iframe-wrapper {
             width: 100%;
@@ -1432,9 +1437,10 @@
             flex-shrink: 0;
             overflow: hidden;
             border: 2px solid var(--primary);
+            cursor: pointer;
         }
         .invite-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
-        .invite-user-info { flex: 1; min-width: 0; }
+        .invite-user-info { flex: 1; min-width: 0; cursor: pointer; }
         .invite-user-name {
             font-size: 0.78rem;
             font-weight: 700;
@@ -1601,7 +1607,9 @@
             border-radius: 10px;
             margin-bottom: 8px;
             border: 1px solid var(--border-color);
+            cursor: pointer;
         }
+        .teman-item:active { border-color: var(--primary); }
         .teman-avatar {
             width: 40px; height: 40px;
             border-radius: 50%;
@@ -1612,7 +1620,9 @@
             color: #fff;
             font-size: 1.1rem;
             overflow: hidden;
+            flex-shrink: 0;
         }
+        .teman-avatar img { width: 100%; height: 100%; object-fit: cover; }
         .teman-info { flex: 1; min-width: 0; }
         .teman-name { font-size: 0.78rem; font-weight: 700; color: var(--text-primary); }
         .teman-username { font-size: 0.6rem; color: var(--text-muted); }
@@ -1696,7 +1706,7 @@
             overflow: hidden;
             touch-action: none;
         }
-        .lightbox-overlay.active { display: flex; }
+        .lightbox-overlay.active { display: flex !important; }
         .lightbox-header {
             position: absolute;
             top: 0; left: 0; right: 0;
@@ -1940,22 +1950,123 @@
             gap: 4px;
         }
         .settings-form-hint i { color: var(--primary); font-size: 0.55rem; }
-        .settings-maps-preview {
-            margin-top: 6px;
-            padding: 8px 10px;
+
+        /* ============ PRIVACY SECTION (BARU — v7.0) ============ */
+        .privacy-section {
             background: var(--bg-input);
             border: 1px solid var(--border-color);
-            border-radius: 8px;
-            font-size: 0.62rem;
-            color: var(--text-secondary);
-            display: none;
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+        }
+        .privacy-section h3 {
+            font-size: 0.78rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 12px;
+            display: flex;
             align-items: center;
             gap: 6px;
+            font-family: 'Poppins', sans-serif;
+            letter-spacing: 0.3px;
         }
-        .settings-maps-preview.show { display: flex; }
-        .settings-maps-preview i { color: var(--primary); }
+        .privacy-section label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            margin-bottom: 6px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .privacy-section label:active { transform: scale(0.98); }
+        .privacy-section label:hover { border-color: var(--primary); }
+        .privacy-section label:last-child { margin-bottom: 0; }
+        .privacy-section input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--primary);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .privacy-section label .privacy-icon {
+            font-size: 1rem;
+            width: 22px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .privacy-section label .privacy-label-text {
+            flex: 1;
+            min-width: 0;
+        }
+        .privacy-section label .privacy-desc {
+            display: block;
+            font-size: 0.58rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+            font-weight: 500;
+        }
 
-                /* ============ MODAL SEARCH ============ */
+        /* ============ GPS BUTTON DI SETTINGS (BARU — v7.0) ============ */
+        .settings-gps-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .settings-gps-result {
+            display: none;
+            padding: 10px 12px;
+            background: rgba(63,185,80,0.12);
+            border: 1px solid rgba(63,185,80,0.4);
+            border-radius: 10px;
+            font-size: 0.65rem;
+            color: var(--text-primary);
+            line-height: 1.5;
+        }
+        .settings-gps-result.active { display: block; animation: fadeIn 0.3s ease; }
+        .settings-gps-result .gps-address {
+            font-weight: 700;
+            color: #4ade80;
+            margin-bottom: 3px;
+            word-break: break-word;
+        }
+        .settings-gps-result .gps-coords {
+            font-family: 'Courier New', monospace;
+            font-size: 0.6rem;
+            color: var(--primary);
+        }
+        .settings-gps-result .gps-maps-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 6px;
+            padding: 4px 10px;
+            background: rgba(230,0,18,0.15);
+            border-radius: 6px;
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 0.58rem;
+            font-weight: 700;
+        }
+        .settings-gps-error {
+            display: none;
+            padding: 10px 12px;
+            background: rgba(248,81,73,0.12);
+            border: 1px solid rgba(248,81,73,0.4);
+            border-radius: 10px;
+            font-size: 0.65rem;
+            color: var(--accent-red);
+        }
+        .settings-gps-error.active { display: block; }
+
+        /* ============ MODAL SEARCH ============ */
         .search-modal-content { max-width: 500px; max-height: 90vh; }
         .search-input-wrapper { position: relative; margin-bottom: 12px; }
         .search-input-wrapper i.search-icon {
@@ -2051,10 +2162,7 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        .search-result-item:active {
-            transform: scale(0.98);
-            border-color: var(--primary);
-        }
+        .search-result-item:active { transform: scale(0.98); border-color: var(--primary); }
         .search-result-item .result-avatar {
             width: 40px; height: 40px;
             border-radius: 50%;
@@ -2186,12 +2294,12 @@
             font-family: monospace;
         }
 
-        /* ============ FLOATING NOTIFICATION (PWA Install dll) ============ */
+        /* ============ FLOATING NOTIFICATION ============ */
         .floating-notification {
             position: fixed;
             top: calc(var(--header-height) + 8px);
             left: 50%;
-            transform: translateX(-50%);
+            transform: translateX(-50%) translateY(-100px);
             width: calc(100% - 20px);
             max-width: 410px;
             background: var(--bg-card);
@@ -2200,27 +2308,25 @@
             padding: 12px 14px;
             z-index: 9998;
             display: none;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
             box-shadow: 0 10px 40px rgba(0,0,0,0.5);
-            cursor: pointer;
-            color: #ffffff;
-            transition: all 0.3s ease;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .floating-notification.active {
             display: flex;
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+            transform: translateX(-50%) translateY(0);
             align-items: center;
             gap: 12px;
             animation: floatingNotifIn 0.5s ease;
         }
-        @keyframes floatingNotifIn {
-            from { transform: translateX(-50%) translateY(-100px) scale(0.8); opacity: 0; }
-            to { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
-        }
-        @keyframes floatingNotifOut {
-            from { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
-            to { transform: translateX(-50%) translateY(-100px) scale(0.8); opacity: 0; }
-        }
         .floating-notification.hide {
-            animation: floatingNotifOut 0.5s ease;
+            opacity: 0;
+            transform: translateX(-50%) translateY(-100px);
         }
         .floating-notification.emergency-notif {
             border-color: var(--accent-red);
@@ -2236,38 +2342,19 @@
             flex-shrink: 0;
             font-size: 1rem;
         }
-        .floating-notification .notif-icon.emergency {
-            background: rgba(248, 81, 73, 0.2);
-            color: var(--accent-red);
-        }
-        .floating-notification .notif-icon.install {
-            background: rgba(230, 0, 18, 0.2);
-            color: var(--primary);
-        }
-        .floating-notification .notif-icon.regular {
-            background: rgba(230, 0, 18, 0.15);
-            color: var(--primary);
-        }
-        .floating-notification .notif-content {
-            flex: 1;
-            min-width: 0;
-        }
-        .floating-notification .notif-content .notif-title {
-            font-size: 0.78rem;
-            font-weight: 700;
-            color: #ffffff;
-        }
+        .floating-notification .notif-icon.emergency { background: rgba(248, 81, 73, 0.2); color: var(--accent-red); }
+        .floating-notification .notif-icon.install { background: rgba(230, 0, 18, 0.2); color: var(--primary); }
+        .floating-notification .notif-icon.regular { background: rgba(230, 0, 18, 0.15); color: var(--primary); }
+        .floating-notification .notif-content { flex: 1; min-width: 0; }
+        .floating-notification .notif-content .notif-title { font-size: 0.78rem; font-weight: 700; color: var(--text-primary); }
         .floating-notification .notif-content .notif-message {
             font-size: 0.65rem;
-            color: #a8b2c1;
+            color: var(--text-secondary);
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .floating-notification .notif-content .notif-subtitle {
-            font-size: 0.58rem;
-            color: #6b7688;
-        }
+        .floating-notification .notif-content .notif-subtitle { font-size: 0.58rem; color: var(--text-muted); }
         .floating-notification .notif-action {
             padding: 5px 14px;
             border-radius: 8px;
@@ -2279,9 +2366,6 @@
             cursor: pointer;
             font-family: inherit;
             flex-shrink: 0;
-        }
-        .floating-notification .notif-action:active {
-            transform: scale(0.95);
         }
         .floating-notification .notif-close {
             background: none;
@@ -2427,7 +2511,7 @@
             opacity: 0;
             transition: opacity 0.3s;
         }
-        .fab-modal-overlay.active { display: flex; opacity: 1; }
+        .fab-modal-overlay.active { display: flex !important; opacity: 1; }
         .fab-modal-content {
             background: var(--modal-bg);
             border-radius: 24px;
@@ -2572,13 +2656,7 @@
             margin-bottom: 8px;
             color: var(--text-primary);
         }
-        .toast.hide {
-            animation: toastOut 0.4s ease forwards;
-        }
-        @keyframes toastOut {
-            from { transform: translateY(0); opacity: 1; }
-            to { transform: translateY(30px); opacity: 0; }
-        }
+        .toast.hide { animation: toastOut 0.4s ease forwards; }
         .toast .toast-icon {
             width: 32px; height: 32px;
             border-radius: 50%;
@@ -2615,7 +2693,7 @@
             justify-content: center;
             padding: 20px;
         }
-        .delete-confirm-modal.active { display: flex; animation: fadeIn 0.3s ease; }
+        .delete-confirm-modal.active { display: flex !important; animation: fadeIn 0.3s ease; }
         .delete-confirm-content {
             background: var(--modal-bg);
             border-radius: 18px;
@@ -2712,20 +2790,77 @@
             .sidebar { width: 85%; }
             .settings-form-grid, .bio-data-content { grid-template-columns: 1fr; }
             .foto-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+            .header-center { gap: 4px; }
+            .header-left { gap: 4px; }
+            .header-right { gap: 4px; }
+            .profile-stats { gap: 4px; }
+            .profile-stat-item { padding: 8px 3px; }
+            .profile-stat-number { font-size: 0.95rem; }
+            .profile-stat-label { font-size: 0.45rem; }
         }
         @media (max-width: 360px) {
+            .menu-btn, .search-btn, .user-btn, .back-btn, .refresh-btn { width: 34px; height: 34px; }
             .nav-fab { width: 64px; height: 64px; }
             .nav-fab .fab-emoji { font-size: 1.7rem; }
             .profile-stats { gap: 3px; }
             .profile-stat-item { padding: 6px 2px; }
+            .profile-stat-number { font-size: 0.85rem; }
         }
+
+        /* ============ UNIVERSAL THEME (NO PATCH) ============ */
+        body, body * { transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease; }
+        body { color: var(--text-primary); }
+        h1, h2, h3, h4, h5, h6 { color: var(--text-primary); }
+        p, span, div, li, td, th, label, strong, em, small, b, i { color: inherit; }
+
+        a { color: var(--primary); text-decoration: none; transition: color 0.2s ease; }
+        a:hover { color: var(--primary-glow); }
+
+        input, textarea, select, button { color: var(--text-primary); font-family: inherit; }
+        input::placeholder, textarea::placeholder { color: var(--text-muted); opacity: 1; }
+        input:focus, textarea:focus, select:focus { color: var(--text-primary); background: var(--bg-input); border-color: var(--primary); }
+        select option { background: var(--bg-card); color: var(--text-primary); }
+
+        [data-theme="light"] .app-bar { background: rgba(255,255,255,0.92); }
+        [data-theme="light"] .app-title,
+        [data-theme="light"] .app-title .title-text { color: var(--text-primary); }
+        [data-theme="light"] .menu-btn,
+        [data-theme="light"] .search-btn,
+        [data-theme="light"] .user-btn,
+        [data-theme="light"] .back-btn,
+        [data-theme="light"] .refresh-btn {
+            color: var(--text-primary);
+            background: rgba(0,0,0,0.06);
+            border-color: rgba(0,0,0,0.1);
+        }
+        [data-theme="light"] .sidebar { background: #ffffff; }
+        [data-theme="light"] .bottom-nav { background: rgba(255,255,255,0.98); }
+        [data-theme="light"] .modal-content { background: #ffffff; color: var(--text-primary); }
+        [data-theme="light"] .modal-header,
+        [data-theme="light"] .modal-footer { background: #ffffff; }
+        [data-theme="light"] .modal-footer .btn-close-modal {
+            background: rgba(0,0,0,0.04);
+            color: var(--text-primary);
+            border-color: rgba(0,0,0,0.1);
+        }
+        [data-theme="light"] .toast { background: #ffffff; }
+        [data-theme="light"] .floating-notification { background: #ffffff; }
+        [data-theme="light"] .post { background: #ffffff; color: #0a0e1a; }
+        [data-theme="light"] .post-text { color: #0a0e1a; }
+        [data-theme="light"] .post-user-info h4 { color: #0a0e1a; }
+        [data-theme="light"] .post-user-info small { color: #6b7688; }
+        [data-theme="light"] .post-action { color: #6b7688; }
+        [data-theme="light"] .comment { background: #f5f7fa; }
+        [data-theme="light"] .comment-text { color: #0a0e1a; }
+        [data-theme="light"] .comment-user { color: var(--primary); }
+        [data-theme="light"] .comment-time { color: #6b7688; }
+        [data-theme="light"] .comment-input { background: #f5f7fa; color: #0a0e1a; }
     </style>
 </head>
-
 <body>
 
     <!-- APP SHELL (Max 430px, centered) -->
-        <div class="app-shell">
+    <div class="app-shell">
 
     <!-- ============================================================ -->
     <!-- FLOATING NOTIFICATION (PWA Install, Emergency, dll)          -->
@@ -2737,8 +2872,8 @@
             <div class="notif-message" id="floatingMessage">Emergency Alert System</div>
             <div class="notif-subtitle" id="floatingSubtitle"></div>
         </div>
-        <button class="notif-action" id="floatingAction">Lihat</button>
-        <button class="notif-close" id="floatingClose"><i class="fas fa-times"></i></button>
+        <button class="notif-action" id="floatingAction" type="button">Lihat</button>
+        <button class="notif-close" id="floatingClose" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
     </div>
 
     <!-- SYNC INDICATOR -->
@@ -2758,57 +2893,140 @@
         </div>
     </div>
 
-    <!-- HEADER -->
+    <!-- ============================================================ -->
+    <!-- HEADER — KONSISTEN SEMUA FILE                                 -->
+    <!-- ============================================================ -->
     <header class="app-bar" id="appBar">
-    <div class="header-left">
-        <button class="menu-btn" id="menuBtn" type="button" aria-label="Buka Menu"><i class="fas fa-bars"></i></button>
-        <div class="app-title" id="appTitle" role="button">
-            <span class="siren-icon-header">🚨</span>
-            <span class="title-text">Profil Saya</span>
+        <div class="header-left">
+            <button class="menu-btn" id="menuBtn" type="button" title="Menu" aria-label="Menu">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="app-title" id="appTitle" role="button" aria-label="Ke Dashboard">
+                <span class="siren-icon-header">🚨</span>
+                <span class="title-text">Profil</span>
+            </div>
         </div>
-    </div>
-    <div class="header-right">
-        <button class="menu-btn" id="headerSearchBtn" type="button" aria-label="Cari" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); width: 40px; height: 40px; min-width: 40px;">
-            <i class="fas fa-search"></i>
-        </button>
-        <div class="theme-toggle" id="themeToggle">
-            <div class="toggle-thumb" id="toggleThumb"><i class="fas fa-moon" id="toggleIcon"></i></div>
+
+        <div class="header-center">
+            <button class="search-btn" id="headerSearchBtn" type="button" title="Cari" aria-label="Cari">
+                <i class="fas fa-search"></i>
+            </button>
+            <button class="search-btn" id="headerNotifBtn" type="button" title="Notifikasi" aria-label="Notifikasi">
+                <i class="fas fa-bell"></i>
+                <span class="badge" id="notifBadge">0</span>
+            </button>
         </div>
-    </div>
-</header>
-        
-    <!-- SIDEBAR -->
+
+        <div class="header-right">
+            <div class="theme-toggle" id="themeToggle" role="button" aria-label="Ganti tema" tabindex="0">
+                <div class="toggle-thumb" id="toggleThumb">
+                    <i class="fas fa-moon" id="toggleIcon"></i>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ============================================================ -->
+    <!-- SIDEBAR                                                       -->
+    <!-- ============================================================ -->
     <div class="sidebar-overlay-bg" id="sidebarOverlay"></div>
-    <div class="sidebar" id="sidebar">
-        <button class="sidebar-close" id="sidebarClose" type="button"><i class="fas fa-times"></i></button>
+    <div class="sidebar" id="sidebar" role="navigation" aria-label="Menu Utama">
+        <button class="sidebar-close" id="sidebarClose" type="button" aria-label="Tutup Menu"><i class="fas fa-times"></i></button>
+
         <div class="sidebar-header">
             <div class="sidebar-user-avatar" id="sidebarUserAvatar"><i class="fas fa-user"></i></div>
             <div class="sidebar-user-name" id="sidebarUserName">Guest</div>
             <div class="sidebar-user-email" id="sidebarUserEmail">guest@salink.id</div>
         </div>
+
         <ul class="nav-menu">
-            <li class="nav-item"><a href="dashboard.html" class="nav-link"><i class="fas fa-home"></i><span>Home</span></a></li>
-            <li class="nav-item"><a href="#" class="nav-link" id="historyPostinganNavLink"><i class="fas fa-history"></i><span>Riwayat Postingan</span></a></li>
+            <li class="nav-item">
+                <a href="dashboard.html" class="nav-link">
+                    <i class="fas fa-home"></i>
+                    <span>Home</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link" id="historyPostinganNavLink">
+                    <i class="fas fa-history"></i>
+                    <span>Riwayat Postingan</span>
+                </a>
+            </li>
+
             <div class="nav-section-title">🚨 MENU DARURAT</div>
-            <li class="nav-item"><a href="#" class="nav-link" id="mapNavLink"><i class="fas fa-map-marked-alt"></i><span>Peta Darurat</span></a></li>
-            <li class="nav-item"><a href="kontak-darurat.html" class="nav-link"><i class="fas fa-phone-alt"></i><span>Kontak Darurat</span></a></li>
-            <li class="nav-item"><a href="laporan-darurat.html" class="nav-link"><i class="fas fa-exclamation-circle"></i><span>Laporan Darurat</span></a></li>
-            <li class="nav-item"><a href="lokasi-bantuan.html" class="nav-link"><i class="fas fa-hospital"></i><span>Lokasi Bantuan</span></a></li>
-            <li class="nav-item"><a href="alert-sekitar.html" class="nav-link"><i class="fas fa-bell"></i><span>Alert Sekitar</span></a></li>
+            <li class="nav-item">
+                <button type="button" class="nav-link" id="sidebarMapBtn">
+                    <i class="fas fa-map-marked-alt"></i>
+                    <span>Peta Darurat</span>
+                </button>
+            </li>
+            <li class="nav-item">
+                <a href="kontak-darurat.html" class="nav-link">
+                    <i class="fas fa-phone-alt"></i>
+                    <span>Kontak Darurat</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="laporan-darurat.html" class="nav-link">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <span>Laporan Darurat</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="lokasi-bantuan.html" class="nav-link">
+                    <i class="fas fa-hospital"></i>
+                    <span>Lokasi Bantuan</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="alert-sekitar.html" class="nav-link">
+                    <i class="fas fa-bell"></i>
+                    <span>Alert Sekitar</span>
+                </a>
+            </li>
+
             <div class="nav-section-title">📊 STATISTIK & INFO</div>
-            <li class="nav-item"><a href="statistik.html" class="nav-link"><i class="fas fa-chart-pie"></i><span>Statistik Emergency</span></a></li>
-            <li class="nav-item"><a href="statistik-emergency.html" class="nav-link"><i class="fas fa-satellite-dish"></i><span>Command Center</span></a></li>
-            <li class="nav-item"><a href="laporan-saya.html" class="nav-link"><i class="fas fa-clipboard-list"></i><span>Laporan Saya</span></a></li>
+            <li class="nav-item">
+                <a href="statistik.html" class="nav-link">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>Statistik Emergency</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="statistik-emergency.html" class="nav-link">
+                    <i class="fas fa-satellite-dish"></i>
+                    <span>Command Center</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="laporan-saya.html" class="nav-link">
+                    <i class="fas fa-clipboard-list"></i>
+                    <span>Laporan Saya</span>
+                </a>
+            </li>
+
             <div class="nav-section-title">👤 AKUN SAYA</div>
-            <li class="nav-item"><a href="#" class="nav-link" id="settingsNavLink"><i class="fas fa-cog"></i><span>Pengaturan</span></a></li>
+            <li class="nav-item">
+                <a href="#" class="nav-link" id="settingsNavLink">
+                    <i class="fas fa-cog"></i>
+                    <span>Pengaturan</span>
+                </a>
+            </li>
             <li class="nav-item nav-logout" id="logoutNavItem" style="display:none;">
-                <a href="#" class="nav-link" id="logoutBtn"><i class="fas fa-sign-out-alt"></i><span>Keluar</span></a>
+                <a href="#" class="nav-link" id="logoutBtn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Keluar</span>
+                </a>
             </li>
         </ul>
     </div>
 
-    <!-- MAIN -->
+    <!-- ============================================================ -->
+    <!-- MAIN CONTENT                                                  -->
+    <!-- ============================================================ -->
     <main class="main-content">
+
+        <!-- PROFILE HEADER -->
         <div class="profile-header">
             <div class="profile-avatar-large" id="profileAvatarLarge"><i class="fas fa-user"></i></div>
             <div class="profile-name" id="profileName">Memuat...</div>
@@ -2816,7 +3034,7 @@
             <div class="profile-bio" id="profileBio">Bergabung di SALINK untuk keamanan bersama</div>
         </div>
 
-        <!-- STATS — 4 WARNA BERBEDA -->
+        <!-- PROFILE STATS — 4 WARNA BERBEDA -->
         <div class="profile-stats">
             <div class="profile-stat-item card-red" id="statPosts">
                 <span class="profile-stat-number" id="profileStatPosts">0</span>
@@ -2836,11 +3054,13 @@
             </div>
         </div>
 
+        <!-- PROFILE ACTIONS -->
         <div class="profile-actions">
             <a href="pesan-masuk.html" class="profile-pesan-btn"><i class="fas fa-paper-plane"></i> PESAN</a>
             <button class="profile-invite-btn" id="profileInviteBtn" type="button"><i class="fas fa-user-plus"></i> INVITE</button>
         </div>
 
+        <!-- PROFILE NAV GRID -->
         <div class="profile-nav-grid">
             <button class="profile-nav-item" id="profileFotoBtn" type="button"><span>🖼️</span><span>Foto</span></button>
             <button class="profile-nav-item" id="profileTemanBtn" type="button"><span>🧑‍🤝‍🧑</span><span>Teman</span></button>
@@ -2848,9 +3068,12 @@
             <a href="jual.html" class="profile-nav-item"><span>🛍️</span><span>Jual</span></a>
         </div>
 
-        <!-- POSTINGAN BARU -->
+        <!-- POSTINGAN BARU (form buat postingan) -->
         <div class="post-section" style="margin-top:12px;">
-            <div class="section-title-small"><i class="fas fa-pen"></i><span>📝 Postingan Baru</span></div>
+            <div class="section-title-small">
+                <i class="fas fa-pen"></i>
+                <span>📝 Postingan Baru</span>
+            </div>
 
             <div class="post-type-dropdown-wrapper">
                 <label><i class="fas fa-list"></i> Pilih Jenis Postingan:</label>
@@ -2900,54 +3123,80 @@
 
             <div class="post-actions-bottom">
                 <div>
-                    <label for="profileMediaUpload" class="media-upload-btn"><i class="fas fa-camera"></i><span>Foto/Video</span></label>
+                    <label for="profileMediaUpload" class="media-upload-btn">
+                        <i class="fas fa-camera"></i><span>Foto/Video</span>
+                    </label>
                     <input type="file" id="profileMediaUpload" class="file-input" accept="image/*, video/*">
                 </div>
                 <button class="post-submit-btn" id="profilePostSubmit" type="button">Posting</button>
             </div>
         </div>
 
-        <!-- POSTINGAN SAYA -->
+        <!-- POSTINGAN BARU (list semua postingan milik user) -->
         <div class="post-section" style="margin-top:12px;">
             <div class="section-title-small">
-                <div style="display:flex;align-items:center;gap:8px;"><i class="fas fa-file-alt"></i><span>📄 Postingan Saya</span></div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <i class="fas fa-file-alt"></i>
+                    <span>📄 Postingan Baru</span>
+                </div>
                 <span class="count-badge" id="myPostsCount">0</span>
             </div>
             <div id="profilePosts"></div>
         </div>
     </main>
 
-    <!-- BOTTOM NAV -->
-    <nav class="bottom-nav" id="sl-bottom-nav">
-        <a href="dashboard.html" class="nav-item-bottom" data-workspace="home"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></a>
-        <a href="toko.html" class="nav-item-bottom" data-workspace="toko"><span class="nav-icon">🛒</span><span class="nav-label">Toko</span></a>
+    <!-- ============================================================ -->
+    <!-- BOTTOM NAV                                                    -->
+    <!-- ============================================================ -->
+    <nav class="bottom-nav" id="sl-bottom-nav" role="navigation" aria-label="Main Navigation">
+        <a href="dashboard.html" class="nav-item-bottom" data-workspace="home" aria-label="Home">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">Home</span>
+        </a>
+        <a href="toko.html" class="nav-item-bottom" data-workspace="toko" aria-label="Toko">
+            <span class="nav-icon">🛒</span>
+            <span class="nav-label">Toko</span>
+        </a>
         <div class="nav-fab-wrap">
-            <button class="nav-fab ripple" id="scanFab" aria-label="Emergency Alert Menu" type="button">
+            <button class="nav-fab ripple" id="scanFab" type="button" aria-label="Emergency Alert Menu">
                 <span class="fab-emoji">🚨</span>
             </button>
         </div>
-        <button class="nav-item-bottom" id="bottomInviteNav" type="button" data-workspace="invite"><span class="nav-icon">📨</span><span class="nav-label">Invite</span><span class="badge" id="inviteBadge">0</span></button>
-        <a href="profil.html" class="nav-item-bottom active" data-workspace="profile"><span class="nav-icon">👤</span><span class="nav-label">Profil</span></a>
+        <button class="nav-item-bottom" id="bottomInviteNav" data-workspace="invite" type="button" aria-label="Invite">
+            <span class="nav-icon">📨</span>
+            <span class="nav-label">Invite</span>
+            <span class="badge" id="inviteBadge">0</span>
+        </button>
+        <a href="profil.html" class="nav-item-bottom active" data-workspace="profile" aria-label="Profil">
+            <span class="nav-icon">👤</span>
+            <span class="nav-label">Profil</span>
+        </a>
     </nav>
 
-    <!-- MODAL BIODATA -->
+    </div> <!-- /app-shell -->
+
+    <!-- ============================================================ -->
+    <!-- MODAL BIODATA                                                 -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="biodataModal">
         <div class="modal-content">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-id-card"></i><span>🕵🏻 Biodata Profil</span></div>
-                <button class="modal-close" onclick="closeModal('biodataModal')" type="button"><i class="fas fa-times"></i></button>
+                <button class="modal-close" onclick="closeModal('biodataModal')" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body" id="biodataModalBody"></div>
             <div class="modal-footer"><button class="btn-close-modal" onclick="closeModal('biodataModal')" type="button">Tutup</button></div>
         </div>
     </div>
 
-    <!-- MODAL PETA DARURAT -->
+    <!-- ============================================================ -->
+    <!-- MODAL PETA DARURAT                                            -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="mapModal">
         <div class="modal-content" style="max-width:600px;">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-map-marked-alt"></i><span>📍 Peta Darurat</span></div>
-                <button class="modal-close" onclick="closeMapModal()" type="button"><i class="fas fa-times"></i></button>
+                <button class="modal-close" onclick="closeMapModal()" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <div class="map-location-status">
@@ -2987,12 +3236,14 @@
         </div>
     </div>
 
-    <!-- MODAL GALERI FOTO -->
+    <!-- ============================================================ -->
+    <!-- MODAL GALERI FOTO/VIDEO                                       -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="fotoModal">
         <div class="modal-content" style="max-width:600px;">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-images"></i><span>📸 Foto & Video</span><span class="badge-count" id="fotoModalCount">0</span></div>
-                <button class="modal-close" onclick="closeModal('fotoModal')" type="button"><i class="fas fa-times"></i></button>
+                <button class="modal-close" onclick="closeModal('fotoModal')" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
@@ -3007,12 +3258,14 @@
         </div>
     </div>
 
-    <!-- MODAL INVITE -->
+    <!-- ============================================================ -->
+    <!-- MODAL INVITE                                                  -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="inviteModal">
         <div class="modal-content" style="max-width:520px;">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-user-plus"></i><span>📨 Undang Pengguna</span><span class="badge-count" id="inviteModalCount">0</span></div>
-                <button class="modal-close" onclick="closeModal('inviteModal')" type="button"><i class="fas fa-times"></i></button>
+                <button class="modal-close" onclick="closeModal('inviteModal')" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <div style="display:flex;gap:8px;margin-bottom:12px;">
@@ -3025,12 +3278,14 @@
         </div>
     </div>
 
-    <!-- MODAL NOTIFIKASI -->
+    <!-- ============================================================ -->
+    <!-- MODAL NOTIFIKASI                                              -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="notifModal">
         <div class="modal-content" style="max-width:520px;">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-bell"></i><span>🔔 Notifikasi</span><span class="badge-count" id="notifModalBadge">0</span></div>
-                <button class="modal-close" onclick="closeModal('notifModal')" type="button"><i class="fas fa-times"></i></button>
+                <button class="modal-close" onclick="closeModal('notifModal')" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <div class="notif-filter-row">
@@ -3049,36 +3304,42 @@
         </div>
     </div>
 
-    <!-- MODAL RIWAYAT POSTINGAN -->
+    <!-- ============================================================ -->
+    <!-- MODAL RIWAYAT POSTINGAN                                       -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="historyPostinganModal">
         <div class="modal-content">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-history"></i><span>📜 Riwayat Postingan</span><span class="badge-count" id="historyPostinganCount">0</span></div>
-                <button class="modal-close" onclick="closeModal('historyPostinganModal')" type="button"><i class="fas fa-times"></i></button>
+                <button class="modal-close" onclick="closeModal('historyPostinganModal')" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body" id="historyPostinganModalBody"></div>
             <div class="modal-footer"><button class="btn-close-modal" onclick="closeModal('historyPostinganModal')" type="button">Tutup</button></div>
         </div>
     </div>
 
-    <!-- MODAL TEMAN -->
+    <!-- ============================================================ -->
+    <!-- MODAL TEMAN                                                   -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="temanModal">
         <div class="modal-content">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-users"></i><span>🧑‍🤝‍🧑 Daftar Teman</span><span class="badge-count" id="totalTemanCount">0</span></div>
-                <button class="modal-close" onclick="closeModal('temanModal')" type="button"><i class="fas fa-times"></i></button>
+                <button class="modal-close" onclick="closeModal('temanModal')" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body" id="temanModalBody"></div>
             <div class="modal-footer"><button class="btn-close-modal" onclick="closeModal('temanModal')" type="button">Tutup</button></div>
         </div>
     </div>
 
-    <!-- MODAL FOLLOW -->
+    <!-- ============================================================ -->
+    <!-- MODAL FOLLOW                                                  -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="followModal">
         <div class="modal-content">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-users"></i><span id="followModalTitle">👥 Daftar Pengikut</span><span class="badge-count" id="followModalCount">0</span></div>
-                <button class="modal-close" onclick="closeModal('followModal')" type="button"><i class="fas fa-times"></i></button>
+                <button class="modal-close" onclick="closeModal('followModal')" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <div class="follow-modal-tabs">
@@ -3092,21 +3353,20 @@
         </div>
     </div>
 
-    <!-- MODAL PENGATURAN -->
-        <!-- ============================================================ -->
-    <!-- MODAL SEARCH (SAMA PERSIS DENGAN DASHBOARD)                   -->
+    <!-- ============================================================ -->
+    <!-- MODAL SEARCH                                                  -->
     <!-- ============================================================ -->
     <div class="modal-overlay" id="searchModal">
         <div class="modal-content search-modal-content">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-search"></i><span>🔍 Cari di SALINK</span></div>
-                <button class="modal-close" onclick="closeSearchModal()" type="button"><i class="fas fa-times"></i></button>
+                <button class="modal-close" onclick="closeSearchModal()" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <div class="search-input-wrapper">
                     <i class="fas fa-search search-icon"></i>
                     <input type="text" id="searchInput" placeholder="Ketik nama, postingan, lokasi, atau emergency..." autocomplete="off">
-                    <button class="clear-search-btn" id="clearSearchBtn" onclick="clearSearch()" type="button"><i class="fas fa-times"></i></button>
+                    <button class="clear-search-btn" id="clearSearchBtn" onclick="clearSearch()" type="button" aria-label="Bersihkan"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="search-tabs">
                     <button class="search-tab active" data-tab="all" onclick="switchSearchTab('all', this)" type="button"><i class="fas fa-globe"></i> Semua</button>
@@ -3137,40 +3397,43 @@
         </div>
     </div>
 
-    <!-- MODAL PENGATURAN -->
+    <!-- ============================================================ -->
+    <!-- MODAL PENGATURAN (SETTINGS)                                   -->
+    <!-- ============================================================ -->
     <div class="modal-overlay" id="settingsModal">
         <div class="modal-content" style="max-width:560px;">
             <div class="modal-header">
                 <div class="modal-title"><i class="fas fa-cog"></i><span>⚙️ Pengaturan Profil</span></div>
-                <button class="modal-close" onclick="closeModal('settingsModal')" type="button"><i class="fas fa-times"></i></button>
+                <button class="modal-close" onclick="closeModal('settingsModal')" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body" id="settingsModalBody"></div>
             <div class="modal-footer"><button class="btn-close-modal" onclick="closeModal('settingsModal')" type="button">Tutup</button></div>
         </div>
     </div>
 
-    <!-- LIGHTBOX -->
+    <!-- ============================================================ -->
+    <!-- LIGHTBOX                                                      -->
+    <!-- ============================================================ -->
     <div class="lightbox-overlay" id="lightboxOverlay">
         <div class="lightbox-header">
             <div class="lightbox-counter" id="lightboxCounter">1 / 1</div>
             <div class="lightbox-actions">
-                <button class="lightbox-btn" id="lightboxDownloadBtn" type="button"><i class="fas fa-download"></i></button>
-                <button class="lightbox-btn" id="lightboxShareBtn" type="button"><i class="fas fa-share-alt"></i></button>
-                <button class="lightbox-btn" id="lightboxCloseBtn" type="button"><i class="fas fa-times"></i></button>
+                <button class="lightbox-btn" id="lightboxDownloadBtn" type="button" title="Download"><i class="fas fa-download"></i></button>
+                <button class="lightbox-btn" id="lightboxShareBtn" type="button" title="Bagikan"><i class="fas fa-share-alt"></i></button>
+                <button class="lightbox-btn" id="lightboxCloseBtn" type="button" title="Tutup"><i class="fas fa-times"></i></button>
             </div>
         </div>
         <div class="lightbox-stage" id="lightboxStage">
-            <button class="lightbox-nav prev" id="lightboxPrevBtn" type="button"><i class="fas fa-chevron-left"></i></button>
+            <button class="lightbox-nav prev" id="lightboxPrevBtn" type="button" aria-label="Sebelumnya"><i class="fas fa-chevron-left"></i></button>
             <img id="lightboxImage" class="lightbox-img" src="" alt="Preview">
-            <button class="lightbox-nav next" id="lightboxNextBtn" type="button"><i class="fas fa-chevron-right"></i></button>
+            <button class="lightbox-nav next" id="lightboxNextBtn" type="button" aria-label="Selanjutnya"><i class="fas fa-chevron-right"></i></button>
         </div>
         <div class="lightbox-info" id="lightboxInfo">-</div>
     </div>
 
-    <!-- TOAST CONTAINER -->
-    <div class="toast-container" id="toastContainer"></div>
-
-    <!-- FAB MODAL — GRID 2x2 EMERGENCY -->
+    <!-- ============================================================ -->
+    <!-- FAB MODAL — GRID 2x2 EMERGENCY                                -->
+    <!-- ============================================================ -->
     <div class="fab-modal-overlay" id="fabModalOverlay">
         <div class="fab-modal-content" id="fabModalContent">
             <button class="fab-modal-close" id="fabModalClose" aria-label="Tutup" type="button">
@@ -3210,1123 +3473,71 @@
         </div>
     </div>
 
-    </div> <!-- /app-shell -->
+    <!-- TOAST CONTAINER -->
+    <div class="toast-container" id="toastContainer"></div>
 
-    <!-- ============================================================ -->
-    <!-- SCRIPT — PART A                                              -->
+        <!-- ============================================================ -->
+    <!-- SCRIPT UTAMA — PROFIL v7.0 (Part 2/2)                          -->
     <!-- ============================================================ -->
     <script>
 /* ====================================================================
- * SALINK PROFIL v6.0 — PART A (1 dari 2)
+ * SALINK PROFIL v7.0 — PART 2/2 (Modal & Features)
  * ====================================================================
- * FITUR (tidak diubah dari v5.0):
- *   - Posting dropdown (Biasa, Fire, Medical, Crime, Disaster)
- *   - GPS + Nominatim reverse geocoding
- *   - Auto-emergency trigger (save post + emergency + notification)
- *   - Redirect ke dashboard.html setelah posting emergency ✅
- *   - Cross-tab sync
- *   - Semua modal (Biodata, Peta, Foto, Invite, Notif, Follow, Teman, Settings, Lightbox)
+ * - Semua fungsi modal: Biodata, Peta, Foto, Invite, Notif, Teman, Follow
+ * - Modal Settings dengan Privacy Section + GPS button
+ * - Lightbox
+ * - FAB Modal, Search Modal
+ * - PWA Install
+ * - Init & Event Listeners
  * ==================================================================== */
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbzSxSHnPpyNi-W0p_5tXV4fCXHLpMXX3nrLVCLmiSRrpxqDNSN2CZcLlpZqThpryjPj/exec';
-const LOGIN_URL = 'login-register.html';
-const DASHBOARD_URL = 'dashboard.html';
-const PROFILE_URL = 'profil.html';
-const DETAIL_URL = 'detail-emergency.html';
-const EMERGENCY_DURATION = 24 * 60 * 60 * 1000;
-const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
-
-const EMERGENCY_LABELS = {
-    'fire': '🔥 Kebakaran',
-    'medical': '🚑 Medis & Kematian',
-    'crime': '🚓 Kriminal',
-    'disaster': '🌪️ Bencana Alam'
-};
-const EMERGENCY_ICONS = { 'fire': '🔥', 'medical': '🚑', 'crime': '🚓', 'disaster': '🌪️' };
-const EMERGENCY_AUDIO = {
-    'fire':     '/Music/Kebakaran.mp3',
-    'medical':  '/Music/kematian.mp3',
-    'crime':    '/Music/pencurian.mp3',
-    'disaster': '/Music/bencana_tsunami.mp3'
-};
-const REGULAR_SOUND_URL = '/Music/smsblackber_4a537f155087133.mp3';
-
-const POST_TYPE_MAP = {
-    'biasa':    { isSpecial: false, specialType: null },
-    'fire':     { isSpecial: true, specialType: 'fire' },
-    'medical':  { isSpecial: true, specialType: 'medical' },
-    'crime':    { isSpecial: true, specialType: 'crime' },
-    'disaster': { isSpecial: true, specialType: 'disaster' }
-};
-
 /* ================================================================
- * GLOBAL STATE
+ * MODAL BIODATA
  * ================================================================ */
-let currentUser = null;
-let profileUser = null;
-let posts = [];
-let allUsers = [];
-let allEmergencies = [];
-let notifications = [];
-let friends = [];
-let currentTheme = 'dark';
-let currentProfilePostType = 'biasa';
-let currentFotoFilter = 'semua';
-let currentFollowTab = 'followers';
-let currentNotifFilter = 'all';
-let lightboxImages = [];
-let currentLightboxIndex = 0;
-let pendingDelete = null;
-let readNotifs = {};
-let syncChannel = null;
-let mapLat = null;
-let mapLng = null;
-let currentGpsData = null;
-
-let regularSound = null;
-let emergencySound = null;
-
-/* Init BroadcastChannel */
-try {
-    syncChannel = new BroadcastChannel('salink_sync');
-    syncChannel.onmessage = (event) => handleSyncMessage(event.data);
-} catch(e) {}
-
-/* ================================================================
- * CENTRAL DELETE
- * ================================================================ */
-function requestDelete(type, id, description) {
-    if (!confirm('⚠️ KONFIRMASI PERTAMA\n\nAnda akan menghapus ' + description + '.\n\nLanjutkan?')) return;
-    pendingDelete = { type, id, description };
-    document.getElementById('deleteConfirmMsg').innerHTML =
-        `Anda akan menghapus <strong>${description}</strong> dari SEMUA halaman:<br><br>
-         ✅ Dashboard<br>✅ Profil<br>✅ Laporan Saya<br>✅ Statistik<br>✅ Command Center`;
-    document.getElementById('deleteConfirmModal').classList.add('active');
-}
-function closeDeleteConfirm() {
-    pendingDelete = null;
-    document.getElementById('deleteConfirmModal').classList.remove('active');
-}
-async function confirmDeleteNow() {
-    if (!pendingDelete) return;
-    const { type, id } = pendingDelete;
-    document.getElementById('deleteConfirmModal').classList.remove('active');
-    pendingDelete = null;
-    showSyncIndicator();
-    try {
-        let allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
-        allPosts = allPosts.filter(p => p.id !== id);
-        localStorage.setItem('salink_posts', JSON.stringify(allPosts));
-
-        let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-        ems = ems.filter(e => e.id !== id);
-        localStorage.setItem('salink_emergencies', JSON.stringify(ems));
-
-        try {
-            await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({
-                    action: 'delete_content',
-                    data: { type, id, userId: currentUser?.username || '' }
-                })
-            });
-        } catch(e) {}
-
-        broadcastSync('delete_post', { id });
-        await loadData();
-        renderProfile();
-        renderProfilePosts();
-        updateStats();
-        showToast('✅ Dihapus', 'Data dihapus dari semua halaman', 'fa-check-circle', 'success');
-    } catch(e) {
-        showToast('⚠️ Gagal', 'Tidak dapat menghapus data', 'fa-exclamation-triangle', 'error');
-    }
-    hideSyncIndicator();
-}
-
-/* ================================================================
- * CROSS-TAB SYNC
- * ================================================================ */
-function handleSyncMessage(data) {
-    if (!data || !data.type) return;
-    showSyncIndicator();
-    loadData().then(() => {
-        renderProfile();
-        renderProfilePosts();
-        updateStats();
-    });
-    hideSyncIndicator();
-}
-function showSyncIndicator() { document.getElementById('syncIndicator')?.classList.add('active'); }
-function hideSyncIndicator() { setTimeout(() => document.getElementById('syncIndicator')?.classList.remove('active'), 1500); }
-function broadcastSync(type, data = {}) {
-    if (syncChannel) {
-        try { syncChannel.postMessage({ type, data, timestamp: Date.now() }); } catch(e) {}
-    }
-    try {
-        localStorage.setItem('salink_sync_trigger', JSON.stringify({ type, data, timestamp: Date.now() }));
-        setTimeout(() => localStorage.removeItem('salink_sync_trigger'), 100);
-    } catch(e) {}
-}
-
-/* ================================================================
- * HELPERS
- * ================================================================ */
-function escapeHTML(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-        .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-}
-function escapeAttr(str) {
-    if (!str) return '';
-    return String(str)
-        .replace(/"/g, '&quot;').replace(/'/g, '&#039;')
-        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-function formatNumber(v) { return Number(v || 0).toLocaleString('id-ID'); }
-function formatDate(ts) {
-    const d = new Date(ts);
-    const days = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
-    const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-    return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} • ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
-}
-function getTimeAgo(ts) {
-    const diff = Date.now() - ts;
-    const sec = Math.floor(diff/1000), min = Math.floor(sec/60),
-          hr = Math.floor(min/60), day = Math.floor(hr/24);
-    if (sec < 60) return 'Baru saja';
-    if (min < 60) return `${min}m lalu`;
-    if (hr < 24) return `${hr}j lalu`;
-    if (day < 7) return `${day}h lalu`;
-    return new Date(ts).toLocaleDateString('id-ID');
-}
-function parseLikesCount(post) {
-    try {
-        if (typeof post.likes === 'string' && post.likes.trim().startsWith('[')) {
-            const arr = JSON.parse(post.likes);
-            if (Array.isArray(arr)) return arr.length;
-        }
-        if (Array.isArray(post.likes)) return post.likes.length;
-    } catch(e) {}
-    return 0;
-}
-
-/* ================================================================
- * TOAST
- * ================================================================ */
-function showToast(title, message, icon = 'fa-info-circle', type = 'info') {
-    document.querySelectorAll('.toast').forEach(t => t.remove());
-    const container = document.getElementById('toastContainer');
-    if (!container) return;
-    const toast = document.createElement('div');
-    toast.className = 'toast' + (type === 'error' ? ' toast-error' : type === 'success' ? ' toast-success' : '');
-    toast.innerHTML = `
-        <div class="toast-icon"><i class="fas ${icon}"></i></div>
-        <div class="toast-content">
-            <div class="toast-title">${escapeHTML(title)}</div>
-            <div class="toast-message">${escapeHTML(message)}</div>
-        </div>
-        <button class="toast-close"><i class="fas fa-times"></i></button>
-    `;
-    toast.querySelector('.toast-close').onclick = () => {
-        toast.classList.add('hide');
-        setTimeout(() => toast.remove(), 400);
+function openBiodataModal() {
+    const body = document.getElementById('biodataModalBody');
+    if (!body) return;
+    const bioData = {
+        'Foto Profil': profileUser.profilePicture
+            ? `<img src="${escapeAttr(profileUser.profilePicture)}" alt="">`
+            : `<div style="width:60px;height:60px;border-radius:50%;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:2rem;color:#fff;">${profileUser.gender === 'female' ? '👩' : '👨'}</div>`,
+        'Nama Lengkap': profileUser.fullName || '-',
+        'Jenis Kelamin': profileUser.gender === 'female' ? 'Perempuan' : 'Laki-laki',
+        'Username': profileUser.username || '-',
+        'Email': profileUser.email || '-',
+        'No WhatsApp': profileUser.phone || '-',
+        'Negara': profileUser.country || '-',
+        'Provinsi': profileUser.province || '-',
+        'Kabupaten/Kota': profileUser.city || '-',
+        'Kecamatan': profileUser.district || '-',
+        'Desa/Kelurahan': profileUser.village || '-',
+        'Alamat Lengkap': profileUser.address || '-',
+        'Bio': profileUser.bio || '-',
+        'Bergabung': profileUser.joinedDate || '-'
     };
-    container.appendChild(toast);
-    setTimeout(() => {
-        toast.classList.add('hide');
-        setTimeout(() => toast.remove(), 400);
-    }, 4500);
-}
-
-/* ================================================================
- * AUDIO
- * ================================================================ */
-function playRegularSound() {
-    try {
-        if (!regularSound) regularSound = new Audio(REGULAR_SOUND_URL);
-        regularSound.currentTime = 0;
-        regularSound.volume = 1.0;
-        regularSound.play().catch(() => {});
-    } catch(e) {}
-}
-
-/* ================================================================
- * API CALL
- * ================================================================ */
-async function apiCall(action, data = {}) {
-    try {
-        if (action.startsWith('get_')) {
-            const params = new URLSearchParams({ action, ...data, timestamp: Date.now() });
-            const response = await fetch(API_URL + '?' + params.toString(), {
-                method: 'GET',
-                headers: { 'Accept': 'application/json' },
-                cache: 'no-store'
-            });
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            return await response.json();
-        } else {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({ action, data, timestamp: Date.now() })
-            });
-            if (!response.ok) throw new Error('HTTP ' + response.status);
-            return await response.json();
-        }
-    } catch (error) {
-        return { status: 'error', message: error.message };
-    }
-}
-async function apiGetPosts() {
-    const r = await apiCall('get_posts');
-    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
-}
-async function apiGetEmergencies() {
-    const r = await apiCall('get_emergencies');
-    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
-}
-async function apiGetNotifications() {
-    const r = await apiCall('get_notifications');
-    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
-}
-async function apiGetUsers() {
-    const r = await apiCall('get_users');
-    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
-}
-async function apiGetFriends() {
-    const r = await apiCall('get_friends');
-    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
-}
-async function apiSavePost(postData) {
-    const payload = {
-        ...postData,
-        timestamp: new Date(postData.timestamp).toISOString(),
-        likes: '[]', comments: '[]',
-        isSpecial: postData.isSpecial ? 'TRUE' : 'FALSE'
-    };
-    const r = await apiCall('save_post', payload);
-    return r.status === 'success';
-}
-async function apiSaveEmergency(emData) {
-    const payload = {
-        id: emData.id || 'emergency-' + Date.now(),
-        type: emData.type,
-        title: EMERGENCY_LABELS[emData.type] || 'Emergency',
-        sender: emData.sender,
-        senderUsername: emData.senderUsername,
-        senderPhone: emData.senderPhone || '',
-        location: emData.location,
-        address: emData.address,
-        latitude: emData.latitude || '',
-        longitude: emData.longitude || '',
-        mapsURL: emData.mapsURL || '',
-        mapEmbedURL: emData.latitude && emData.longitude ? `https://www.google.com/maps?q=${emData.latitude},${emData.longitude}&output=embed` : '',
-        timestamp: new Date().toISOString(),
-        status: 'active',
-        description: emData.description,
-        province: emData.province,
-        city: emData.city,
-        district: emData.district,
-        village: emData.village,
-        nearbyContacts: '[]',
-        mediaType: emData.mediaType || '',
-        mediaData: emData.mediaData || '',
-        images: emData.images || '[]'
-    };
-    const r = await apiCall('save_emergency', payload);
-    return r.status === 'success';
-}
-async function apiSaveNotification(notifData) {
-    const r = await apiCall('save_notification', notifData);
-    return r.status === 'success';
-}
-async function apiSaveUser(userData) {
-    if (!userData.id) userData.id = 'user-' + userData.username + '-' + Date.now();
-    const r = await apiCall('save_user', userData);
-    return r.status === 'success';
-}
-
-/* ================================================================
- * THEME
- * ================================================================ */
-function loadTheme() {
-    const t = localStorage.getItem('salink_theme');
-    if (t === 'light') {
-        currentTheme = 'light';
-        document.documentElement.setAttribute('data-theme', 'light');
-        document.getElementById('themeToggle')?.classList.add('active');
-        const ti = document.getElementById('toggleIcon');
-        if (ti) ti.className = 'fas fa-sun';
-    }
-}
-function toggleTheme() {
-    const html = document.documentElement;
-    const tt = document.getElementById('themeToggle');
-    const ti = document.getElementById('toggleIcon');
-    if (currentTheme === 'dark') {
-        currentTheme = 'light';
-        html.setAttribute('data-theme', 'light');
-        tt?.classList.add('active');
-        if (ti) ti.className = 'fas fa-sun';
-        localStorage.setItem('salink_theme', 'light');
-    } else {
-        currentTheme = 'dark';
-        html.removeAttribute('data-theme');
-        tt?.classList.remove('active');
-        if (ti) ti.className = 'fas fa-moon';
-        localStorage.setItem('salink_theme', 'dark');
-    }
-}
-
-/* ================================================================
- * SIDEBAR & MODAL
- * ================================================================ */
-function openSidebar() {
-    document.getElementById('sidebar')?.classList.add('active');
-    document.getElementById('sidebarOverlay')?.classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
-function closeSidebar() {
-    document.getElementById('sidebar')?.classList.remove('active');
-    document.getElementById('sidebarOverlay')?.classList.remove('active');
-    document.body.style.overflow = '';
-}
-function openModal(id) {
-    document.getElementById(id)?.classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
-function closeModal(id) {
-    document.getElementById(id)?.classList.remove('active');
-    document.body.style.overflow = '';
-}
-
-/* ================================================================
- * ✅ PENTING: AUTH GUARD — Redirect ke login jika belum login
- * ================================================================ */
-function requireLogin() {
-    if (!currentUser) {
-        showToast('🔒 Login', 'Silakan masuk untuk akses halaman ini', 'fa-lock', 'error');
-        setTimeout(() => {
-            window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(PROFILE_URL);
-        }, 800);
-        return false;
-    }
-    return true;
-}
-
-/* ================================================================
- * LOAD USER
- * ================================================================ */
-function loadUser() {
-    try {
-        const s = localStorage.getItem('salink_user');
-        if (s) {
-            const u = JSON.parse(s);
-            if (u && u.username && u.fullName) currentUser = u;
-        }
-    } catch(e) {}
-    if (currentUser) {
-        profileUser = { ...currentUser };
-    } else {
-        // Default guest (tapi nanti di-guard)
-        profileUser = {
-            fullName: 'Pengguna SALINK',
-            username: 'pengguna',
-            email: 'pengguna@salink.id',
-            gender: 'male',
-            bio: 'Bergabung di SALINK untuk keamanan bersama',
-            joinedDate: formatDate(Date.now())
-        };
-    }
-}
-function updateSidebar() {
-    const sidebarName = document.getElementById('sidebarUserName');
-    const sidebarEmail = document.getElementById('sidebarUserEmail');
-    const sidebarAvatar = document.getElementById('sidebarUserAvatar');
-    const logoutItem = document.getElementById('logoutNavItem');
-    if (!currentUser) {
-        if (sidebarName) sidebarName.textContent = 'Guest';
-        if (sidebarEmail) sidebarEmail.textContent = 'guest@salink.id';
-        if (sidebarAvatar) sidebarAvatar.innerHTML = '<i class="fas fa-user"></i>';
-        if (logoutItem) logoutItem.style.display = 'none';
-        return;
-    }
-    if (sidebarName) sidebarName.textContent = currentUser.fullName || 'User';
-    if (sidebarEmail) sidebarEmail.textContent = currentUser.email || currentUser.username || '-';
-    if (sidebarAvatar) {
-        if (currentUser.profilePicture) {
-            sidebarAvatar.innerHTML = `<img src="${escapeAttr(currentUser.profilePicture)}" alt="">`;
-        } else {
-            sidebarAvatar.innerHTML = currentUser.gender === 'female'
-                ? '<i class="fas fa-female"></i>'
-                : '<i class="fas fa-male"></i>';
-        }
-    }
-    if (logoutItem) logoutItem.style.display = 'block';
-}
-
-/* ================================================================
- * GPS — Ambil Lokasi Saya
- * ================================================================ */
-async function ambilLokasiSaya() {
-    const btn = document.getElementById('profileGpsLocationBtn');
-    const btnText = document.getElementById('profileGpsLocationBtnText');
-    const resultBox = document.getElementById('profileGpsLocationResult');
-    const errorBox = document.getElementById('profileGpsError');
-    const addrEl = document.getElementById('profileGpsAddress');
-    const coordsEl = document.getElementById('profileGpsCoords');
-    const mapsLink = document.getElementById('profileGpsMapsLink');
-
-    if (!navigator.geolocation) {
-        errorBox.textContent = '❌ Browser Anda tidak mendukung GPS.';
-        errorBox.classList.add('active');
-        return;
-    }
-
-    btn.classList.add('loading');
-    btnText.innerHTML = '<span class="gps-location-loading"></span> Mengambil lokasi...';
-    resultBox.classList.remove('active');
-    errorBox.classList.remove('active');
-
-    try {
-        const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-                enableHighAccuracy: true, timeout: 15000, maximumAge: 0
-            });
-        });
-
-        const lat = position.coords.latitude.toFixed(6);
-        const lng = position.coords.longitude.toFixed(6);
-        const accuracy = Math.round(position.coords.accuracy || 0);
-        const mapsURL = `https://www.google.com/maps?q=${lat},${lng}`;
-
-        coordsEl.textContent = `${lat}, ${lng} (±${accuracy}m)`;
-        addrEl.textContent = '🔄 Mengambil alamat...';
-        resultBox.classList.add('active');
-        mapsLink.href = mapsURL;
-
-        currentGpsData = {
-            lat: parseFloat(lat),
-            lng: parseFloat(lng),
-            accuracy: accuracy,
-            address: `${lat}, ${lng}`,
-            mapsURL: mapsURL
-        };
-
-        try {
-            const nominatimUrl = `${NOMINATIM_URL}?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=id`;
-            const response = await fetch(nominatimUrl, {
-                method: 'GET',
-                headers: { 'User-Agent': 'SALINK-Emergency-App/6.0' }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                if (data && data.display_name) {
-                    addrEl.textContent = '📍 ' + data.display_name;
-                    currentGpsData.address = data.display_name;
-                } else {
-                    addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
-                }
-            } else {
-                addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
-            }
-        } catch(e) {
-            addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
-        }
-
-        btn.classList.remove('loading');
-        btnText.textContent = '✅ Lokasi Ditemukan — Tap untuk Ambil Ulang';
-        btn.style.background = 'linear-gradient(135deg, #3fb950, #2ea44f)';
-
-        showToast('📍 Lokasi Ditemukan', `Akurasi ±${accuracy}m`, 'fa-location-arrow', 'success');
-        validateProfilePost();
-
-    } catch(error) {
-        btn.classList.remove('loading');
-        btnText.textContent = '📍 Ambil Lokasi Saya';
-        btn.style.background = '';
-
-        let errMsg = 'Gagal mengambil lokasi. ';
-        switch(error.code) {
-            case 1: errMsg += 'Izin lokasi ditolak.'; break;
-            case 2: errMsg += 'Lokasi tidak tersedia.'; break;
-            case 3: errMsg += 'Timeout. Coba lagi.'; break;
-            default: errMsg += error.message || 'Coba lagi.';
-        }
-        errorBox.textContent = '❌ ' + errMsg;
-        errorBox.classList.add('active');
-        showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle', 'error');
-    }
-}
-
-/* ================================================================
- * LOAD DATA
- * ================================================================ */
-async function loadData() {
-    let localPosts = [];
-    try {
-        const raw = localStorage.getItem('salink_posts');
-        if (raw) {
-            const p = JSON.parse(raw);
-            if (Array.isArray(p)) {
-                // ✅ Auto-cleanup: hapus post sampah (timestamp NaN/undefined, konten kosong)
-                const cleaned = p.filter(post => {
-                    if (!post || !post.id) return false;
-                    if (!post.userId || !post.userFullName) return false;
-                    const ts = post.timestamp;
-                    if (!ts) return false;
-                    const time = typeof ts === 'number' ? ts : new Date(ts).getTime();
-                    if (isNaN(time) || time <= 0) return false;
-                    const hasText = post.text && post.text.trim().length > 0;
-                    const hasMedia = post.mediaType && (post.mediaData || post.gdriveId);
-                    if (!hasText && !hasMedia) return false;
-                    return true;
-                });
-                if (cleaned.length !== p.length) {
-                    console.log(`🧹 Auto-cleanup: ${p.length - cleaned.length} post sampah dihapus`);
-                    localStorage.setItem('salink_posts', JSON.stringify(cleaned));
-                }
-                localPosts = cleaned;
-            }
-        }
-    } catch(e) {}
-    let apiPosts = [];
-    try { apiPosts = await apiGetPosts(); } catch(e) {}
-    const postMap = new Map();
-    apiPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
-    localPosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
-    posts = Array.from(postMap.values())
-        .filter(p => p && p.id)
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    localStorage.setItem('salink_posts', JSON.stringify(posts));
-
-    let localEms = [];
-    try {
-        const raw = localStorage.getItem('salink_emergencies');
-        if (raw) { const e = JSON.parse(raw); if (Array.isArray(e)) localEms = e; }
-    } catch(e) {}
-    let apiEms = [];
-    try { apiEms = await apiGetEmergencies(); } catch(e) {}
-    const emMap = new Map();
-    apiEms.forEach(e => { if (e && e.id) emMap.set(e.id, e); });
-    localEms.forEach(e => { if (e && e.id) emMap.set(e.id, e); });
-    allEmergencies = Array.from(emMap.values());
-    localStorage.setItem('salink_emergencies', JSON.stringify(allEmergencies));
-
-    try { allUsers = await apiGetUsers(); } catch(e) { allUsers = []; }
-
-    try { notifications = await apiGetNotifications(); } catch(e) { notifications = []; }
-    try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); } catch(e) { readNotifs = {}; }
-
-    let apiFriends = [];
-    try { apiFriends = await apiGetFriends(); } catch(e) {}
-    let localFriends = [];
-    try {
-        const f = JSON.parse(localStorage.getItem('salink_friends') || '[]');
-        localFriends = Array.isArray(f) ? f : [];
-    } catch(e) {}
-    const friendsMap = new Map();
-    localFriends.forEach(f => { if (f.id) friendsMap.set(f.id, f); });
-    apiFriends.forEach(f => { if (f.id) friendsMap.set(f.id, f); });
-    friends = Array.from(friendsMap.values());
-    localStorage.setItem('salink_friends', JSON.stringify(friends));
-}
-
-/* ================================================================
- * RENDER PROFILE
- * ================================================================ */
-function renderProfile() {
-    const avatarEl = document.getElementById('profileAvatarLarge');
-    if (!avatarEl) return;
-    if (profileUser.profilePicture) {
-        avatarEl.innerHTML = `<img src="${escapeAttr(profileUser.profilePicture)}" alt="Profile">`;
-    } else {
-        avatarEl.innerHTML = profileUser.gender === 'female'
-            ? '<i class="fas fa-female"></i>'
-            : '<i class="fas fa-male"></i>';
-    }
-    document.getElementById('profileName').textContent = profileUser.fullName || 'Nama Pengguna';
-    document.getElementById('profileUsername').textContent = '@' + (profileUser.username || 'username');
-    document.getElementById('profileBio').textContent = profileUser.bio || 'Bergabung di SALINK untuk keamanan bersama';
-    updateStats();
-    updateSidebar();
-    renderProfilePosts();
-
-    const reportedBy = document.getElementById('profilePostReportedBy');
-    if (reportedBy && currentUser) reportedBy.value = currentUser.fullName || '';
-}
-
-function updateStats() {
-    if (!profileUser) return;
-    const myPosts = posts.filter(p => p.userId === profileUser.username);
-    let totalLikes = 0;
-    myPosts.forEach(p => { totalLikes += parseLikesCount(p); });
-
-    const upd = (el, value) => {
-        if (!el) return;
-        const formatted = formatNumber(value);
-        if (el.textContent !== formatted) {
-            el.classList.remove('bump');
-            void el.offsetWidth;
-            el.classList.add('bump');
-            setTimeout(() => el.classList.remove('bump'), 600);
-        }
-        el.textContent = formatted;
-    };
-    upd(document.getElementById('profileStatPosts'), myPosts.length);
-    upd(document.getElementById('profileStatLikes'), totalLikes);
-
-    const myUsername = profileUser.username;
-    const following = friends.filter(f => String(f.user1 || '').trim() === myUsername);
-    const followers = friends.filter(f => String(f.user2 || '').trim() === myUsername);
-    upd(document.getElementById('profileStatFollowers'), followers.length);
-    upd(document.getElementById('profileStatFollowing'), following.length);
-}
-
-function renderProfilePosts() {
-    const container = document.getElementById('profilePosts');
-    if (!container) return;
-    const myPosts = posts
-        .filter(p => {
-            // ✅ Filter post valid saja
-            if (!p || !p.id) return false;
-            if (p.userId !== profileUser.username) return false;
-            // Skip post tanpa timestamp valid
-            const ts = p.timestamp;
-            if (!ts) return false;
-            const time = typeof ts === 'number' ? ts : new Date(ts).getTime();
-            if (isNaN(time) || time <= 0) return false;
-            // Skip post tanpa konten
-            const hasText = p.text && p.text.trim().length > 0;
-            const hasMedia = p.mediaType && (p.mediaData || p.gdriveId);
-            if (!hasText && !hasMedia) return false;
-            return true;
-        })
-        .sort((a, b) => {
-            const ta = typeof a.timestamp === 'number' ? a.timestamp : new Date(a.timestamp).getTime();
-            const tb = typeof b.timestamp === 'number' ? b.timestamp : new Date(b.timestamp).getTime();
-            return tb - ta;
-        });
-
-    const countEl = document.getElementById('myPostsCount');
-    if (countEl) countEl.textContent = myPosts.length;
-
-    container.innerHTML = '';
-    if (myPosts.length === 0) {
-        container.innerHTML = `
-            <div class="empty-state">
-                <i class="fas fa-file-alt empty-icon"></i>
-                <div class="empty-title">Belum ada postingan</div>
-                <div class="empty-desc">Postingan akan muncul saat Anda membuat postingan</div>
-            </div>
-        `;
-        return;
-    }
-
-    myPosts.forEach(post => {
-        const el = document.createElement('div');
-        el.className = 'post';
-        el.id = `post-${post.id}`;
-        el.style.position = 'relative';
-
-        const profilePic = post.userProfilePic
-            ? `<img src="${escapeAttr(post.userProfilePic)}" alt="">`
-            : (post.userGender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>');
-
-        const specialBadge = (post.isSpecial && post.specialType)
-            ? `<span style="background:rgba(230,0,18,0.15);padding:2px 8px;border-radius:10px;font-size:0.5rem;color:var(--primary);margin-left:6px;">${EMERGENCY_ICONS[post.specialType]} ${EMERGENCY_LABELS[post.specialType]}</span>`
-            : '';
-
-        let mediaHTML = '';
-        if (post.mediaType === 'image') {
-            mediaHTML = `<div class="post-media"><img src="${escapeAttr(post.mediaData)}" alt=""></div>`;
-        } else if (post.mediaType === 'video') {
-            mediaHTML = `<div class="post-media"><video controls><source src="${escapeAttr(post.mediaData)}"></video></div>`;
-        }
-
-        let likes = [], comments = [];
-        try { likes = JSON.parse(post.likes || '[]') || []; } catch(e) {}
-        try { comments = JSON.parse(post.comments || '[]') || []; } catch(e) {}
-        const isLiked = currentUser && likes.includes(currentUser.username);
-
-        el.innerHTML = `
-            <div class="post-header">
-                <div class="post-profile-pic">${profilePic}</div>
-                <div class="post-user-info" style="margin-left:10px;">
-                    <h4>${escapeHTML(post.userFullName || 'Pengguna SALINK')} ${specialBadge}</h4>
-                    <small>${formatDate(new Date(post.timestamp).getTime())}</small>
-                </div>
-                <button class="post-menu-toggle" data-post-id="${escapeAttr(post.id)}"><i class="fas fa-ellipsis-v"></i></button>
-                <div class="post-menu-dropdown" id="postMenu-${escapeAttr(post.id)}">
-                    <button class="menu-item" onclick="editPost('${escapeAttr(post.id)}')"><i class="fas fa-edit"></i> Edit</button>
-                    <button class="menu-item danger" onclick="requestDelete('post', '${escapeAttr(post.id)}', 'Postingan')"><i class="fas fa-trash"></i> Hapus</button>
-                </div>
-            </div>
-            ${post.text ? `<div class="post-text">${escapeHTML(post.text)}</div>` : ''}
-            ${mediaHTML}
-            <div class="post-actions">
-                <div class="post-action ${isLiked ? 'liked' : ''}" onclick="toggleLike('${escapeAttr(post.id)}')">
-                    <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i><span>Suka</span><span>${likes.length > 0 ? likes.length : ''}</span>
-                </div>
-                <div class="post-action"><i class="far fa-comment"></i><span>Komentar</span><span>(${comments.length})</span></div>
-                <div class="post-action" onclick="sharePost('${escapeAttr(post.id)}')"><i class="fas fa-share-alt"></i><span>Bagikan</span></div>
-                <div class="post-action" onclick="requestDelete('post', '${escapeAttr(post.id)}', 'Postingan')" style="color:var(--accent-red);"><i class="fas fa-trash"></i><span>Hapus</span></div>
-            </div>
-        `;
-        container.appendChild(el);
+    let html = '<div class="bio-data-content">';
+    Object.keys(bioData).forEach(k => {
+        html += `<div class="bio-data-item"><span class="bio-label">${escapeHTML(k)}</span><span class="bio-value">${bioData[k]}</span></div>`;
     });
-
-    document.querySelectorAll('.post-menu-toggle').forEach(el => {
-        el.onclick = function(e) {
-            e.stopPropagation();
-            const m = document.getElementById('postMenu-' + this.dataset.postId);
-            if (m) m.classList.toggle('active');
-        };
-    });
+    html += '</div>';
+    body.innerHTML = html;
+    openModal('biodataModal');
 }
-
-/* ================================================================
- * POST ACTIONS
- * ================================================================ */
-function editPost(postId) {
-    const p = posts.find(x => x.id === postId);
-    if (!p) return;
-    const nt = prompt('Edit postingan:', p.text || '');
-    if (nt !== null && nt.trim() !== '') {
-        p.text = nt.trim();
-        localStorage.setItem('salink_posts', JSON.stringify(posts));
-        renderProfilePosts();
-        broadcastSync('new_post', { id: postId });
-        showToast('✅', 'Postingan diedit', 'fa-edit', 'success');
-    }
-}
-function toggleLike(postId) {
-    if (!currentUser) return;
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-    let likes = [];
-    try { likes = JSON.parse(post.likes || '[]') || []; } catch(e) {}
-    const idx = likes.indexOf(currentUser.username);
-    if (idx > -1) likes.splice(idx, 1);
-    else likes.push(currentUser.username);
-    post.likes = JSON.stringify(likes);
-    localStorage.setItem('salink_posts', JSON.stringify(posts));
-    renderProfilePosts();
-    updateStats();
-    playRegularSound();
-    broadcastSync('stats_update', { postId });
-}
-function sharePost(postId) {
-    const p = posts.find(x => x.id === postId);
-    if (!p) return;
-    const text = p.text || 'Postingan SALINK';
-    if (navigator.share) {
-        navigator.share({ title: 'SALINK', text, url: window.location.href }).catch(() => {});
-    } else {
-        navigator.clipboard.writeText(text + '\n' + window.location.href)
-            .then(() => showToast('📋', 'Link disalin', 'fa-copy', 'success'));
-    }
-}
-
-/* ================================================================
- * POST INPUT SETUP
- * ================================================================ */
-function setupPostInput() {
-    const select = document.getElementById('profilePostTypeSelect');
-    const specialFields = document.getElementById('profilePostSpecialFields');
-    const biasaForm = document.getElementById('profilePostBiasaForm');
-    const submitBtn = document.getElementById('profilePostSubmit');
-    const mediaUpload = document.getElementById('profileMediaUpload');
-    const mediaPreview = document.getElementById('profileMediaPreview');
-    const reportedBy = document.getElementById('profilePostReportedBy');
-    const gpsBtn = document.getElementById('profileGpsLocationBtn');
-
-    if (reportedBy && currentUser) reportedBy.value = currentUser.fullName || '';
-
-    select?.addEventListener('change', function() {
-        const val = this.value;
-        const mapping = POST_TYPE_MAP[val] || POST_TYPE_MAP['biasa'];
-        currentProfilePostType = val;
-        if (mapping.isSpecial) {
-            specialFields.classList.add('active');
-            biasaForm.style.display = 'none';
-            if (reportedBy && currentUser) reportedBy.value = currentUser.fullName || '';
-        } else {
-            specialFields.classList.remove('active');
-            biasaForm.style.display = 'block';
-        }
-        validateProfilePost();
-    });
-
-    gpsBtn?.addEventListener('click', ambilLokasiSaya);
-
-    mediaUpload?.addEventListener('change', function() {
-        if (this.files && this.files[0]) {
-            const f = this.files[0];
-            if (f.size > 500 * 1024) {
-                showToast('⚠️ File terlalu besar', 'Max 500KB', 'fa-exclamation-triangle', 'error');
-                this.value = '';
-                return;
-            }
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                if (f.type.startsWith('image/')) {
-                    mediaPreview.innerHTML = `<span class="remove-media" id="profileRemoveMedia">&times;</span><img src="${e.target.result}">`;
-                } else {
-                    mediaPreview.innerHTML = `<span class="remove-media" id="profileRemoveMedia">&times;</span><video controls><source src="${e.target.result}"></video>`;
-                }
-                mediaPreview.style.display = 'block';
-                document.getElementById('profileRemoveMedia').onclick = () => {
-                    mediaPreview.style.display = 'none';
-                    mediaUpload.value = '';
-                };
-                validateProfilePost();
-            };
-            reader.readAsDataURL(f);
-        }
-    });
-
-    document.getElementById('profilePostInput')?.addEventListener('input', validateProfilePost);
-    document.getElementById('profilePostSpecialText')?.addEventListener('input', validateProfilePost);
-
-    submitBtn?.addEventListener('click', handleProfilePostSubmit);
-
-    validateProfilePost();
-}
-
-function validateProfilePost() {
-    const val = document.getElementById('profilePostTypeSelect')?.value || 'biasa';
-    const mapping = POST_TYPE_MAP[val] || POST_TYPE_MAP['biasa'];
-    const isSpecial = mapping.isSpecial;
-    const text = isSpecial
-        ? (document.getElementById('profilePostSpecialText')?.value || '').trim()
-        : (document.getElementById('profilePostInput')?.value || '').trim();
-    const mediaInput = document.getElementById('profileMediaUpload');
-    const hasFile = mediaInput && mediaInput.files && mediaInput.files.length > 0;
-    const btn = document.getElementById('profilePostSubmit');
-    if (!btn) return;
-    if (isSpecial) {
-        btn.disabled = !((text || hasFile) && currentGpsData);
-    } else {
-        btn.disabled = !(text || hasFile);
-    }
-}
-
-/* ================================================================
- * SUBMIT POSTINGAN (dengan auto-emergency + REDIRECT ke dashboard)
- * ================================================================ */
-async function handleProfilePostSubmit() {
-    if (!requireLogin()) return;
-
-    const val = document.getElementById('profilePostTypeSelect')?.value || 'biasa';
-    const mapping = POST_TYPE_MAP[val] || POST_TYPE_MAP['biasa'];
-    const isSpecial = mapping.isSpecial;
-    const specialType = mapping.specialType;
-    const text = isSpecial
-        ? (document.getElementById('profilePostSpecialText')?.value || '').trim()
-        : (document.getElementById('profilePostInput')?.value || '').trim();
-    const file = document.getElementById('profileMediaUpload')?.files[0];
-
-    if (!text && !file) {
-        showToast('⚠️ Perhatian', 'Isi teks atau upload media', 'fa-exclamation-triangle', 'error');
-        return;
-    }
-    if (isSpecial && !currentGpsData) {
-        showToast('⚠️ Perhatian', 'Ambil lokasi GPS dulu', 'fa-exclamation-triangle', 'error');
-        return;
-    }
-
-    const submitBtn = document.getElementById('profilePostSubmit');
-    const originalText = submitBtn.textContent;
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mengirim...';
-
-    const postId = 'post-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
-    let mediaType = '', mediaData = '';
-
-    const finish = async () => {
-        const now = Date.now();
-        const post = {
-            id: postId,
-            userId: currentUser.username,
-            userFullName: currentUser.fullName,
-            userGender: currentUser.gender || 'male',
-            userProfilePic: currentUser.profilePicture || '',
-            text: text || '',
-            mediaType, mediaData,
-            timestamp: now,
-            likes: '[]', comments: '[]',
-            viewerCount: 0,
-            isSpecial: isSpecial || false,
-            specialType: isSpecial && specialType ? specialType : '',
-            specialLocation: isSpecial && currentGpsData ? currentGpsData.address : '',
-            specialAddress: isSpecial && currentGpsData ? currentGpsData.address : '',
-            latitude: isSpecial && currentGpsData ? currentGpsData.lat : '',
-            longitude: isSpecial && currentGpsData ? currentGpsData.lng : '',
-            mapsURL: isSpecial && currentGpsData ? currentGpsData.mapsURL : '',
-            postType: isSpecial ? 'khusus' : 'biasa',
-            country: currentUser.country || '',
-            province: currentUser.province || '',
-            city: currentUser.city || '',
-            district: currentUser.district || '',
-            village: currentUser.village || '',
-            address: currentUser.address || ''
-        };
-
-        posts.unshift(post);
-        localStorage.setItem('salink_posts', JSON.stringify(posts));
-        renderProfilePosts();
-        updateStats();
-
-        apiSavePost(post).then(ok => { if (ok) console.log('✅ Post saved'); });
-
-        if (isSpecial && currentGpsData) {
-            const emPayload = {
-                id: 'emergency-' + postId,
-                type: specialType,
-                title: EMERGENCY_LABELS[specialType],
-                sender: currentUser.fullName,
-                senderUsername: currentUser.username,
-                senderPhone: currentUser.phone || '',
-                location: currentGpsData.address,
-                address: currentGpsData.address,
-                latitude: currentGpsData.lat,
-                longitude: currentGpsData.lng,
-                mapsURL: currentGpsData.mapsURL,
-                description: text,
-                province: currentUser.province || '',
-                city: currentUser.city || '',
-                district: currentUser.district || '',
-                village: currentUser.village || '',
-                mediaType: mediaType,
-                mediaData: mediaData,
-                images: '[]'
-            };
-            await apiSaveEmergency(emPayload);
-
-            const notifPayload = {
-                id: 'notif-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8),
-                type: specialType,
-                title: EMERGENCY_LABELS[specialType] + ' — ' + (text.substring(0, 50) || 'Darurat'),
-                message: text.substring(0, 200),
-                sender: currentUser.fullName,
-                senderUsername: currentUser.username,
-                link: DASHBOARD_URL + '?emergency=' + encodeURIComponent(postId),
-                postId: postId,
-                timestamp: new Date().toISOString(),
-                read: 'FALSE',
-                soundKey: specialType
-            };
-            try { await apiSaveNotification(notifPayload); } catch(e) {}
-
-            try {
-                let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-                ems.unshift({
-                    id: 'emergency-' + postId,
-                    postId: postId,
-                    type: specialType,
-                    sender: currentUser.fullName,
-                    senderUsername: currentUser.username,
-                    senderPhone: currentUser.phone || '',
-                    location: currentGpsData.address,
-                    address: currentGpsData.address,
-                    text: text,
-                    title: EMERGENCY_LABELS[specialType],
-                    mapsURL: currentGpsData.mapsURL,
-                    coords: `${currentGpsData.lat}, ${currentGpsData.lng}`,
-                    latitude: currentGpsData.lat,
-                    longitude: currentGpsData.lng,
-                    timestamp: now,
-                    expiresAt: now + EMERGENCY_DURATION
-                });
-                ems = ems.filter(e => e.expiresAt > Date.now());
-                localStorage.setItem('salink_emergencies', JSON.stringify(ems));
-            } catch(e) {}
-
-            // ✅ Broadcast emergency ke semua tab
-            broadcastSync('new_emergency', {
-                id: postId,
-                type: specialType,
-                sender: currentUser.fullName,
-                senderUsername: currentUser.username,
-                message: text,
-                timestamp: now
-            });
-
-            // ✅ Save sync trigger untuk dashboard
-            try {
-                localStorage.setItem('salink_sync_trigger', JSON.stringify({
-                    type: 'new_emergency',
-                    data: {
-                        id: postId,
-                        type: specialType,
-                        sender: currentUser.fullName,
-                        senderUsername: currentUser.username,
-                        message: text,
-                        timestamp: now
-                    },
-                    timestamp: Date.now()
-                }));
-                setTimeout(() => localStorage.removeItem('salink_sync_trigger'), 200);
-            } catch(e) {}
-
-            showToast('🚨 EMERGENCY TERKIRIM', 'Redirect ke dashboard...', 'fa-exclamation-triangle', 'success');
-
-            // ✅ REDIRECT KE DASHBOARD (bukan detail-emergency.html)
-            setTimeout(() => {
-                window.location.href = DASHBOARD_URL + '?emergency=' + encodeURIComponent(postId);
-            }, 1200);
-        } else {
-            playRegularSound();
-            showToast('📝', 'Postingan berhasil', 'fa-check-circle', 'success');
-            broadcastSync('new_post', { id: postId });
-
-            // Reset form
-            document.getElementById('profilePostInput').value = '';
-            document.getElementById('profilePostSpecialText').value = '';
-            document.getElementById('profileMediaUpload').value = '';
-            document.getElementById('profileMediaPreview').style.display = 'none';
-            document.getElementById('profilePostTypeSelect').value = 'biasa';
-            currentProfilePostType = 'biasa';
-            document.getElementById('profilePostSpecialFields')?.classList.remove('active');
-            document.getElementById('profilePostBiasaForm').style.display = 'block';
-
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
-            validateProfilePost();
-        }
-    };
-
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            mediaData = e.target.result;
-            mediaType = file.type.startsWith('image/') ? 'image' : 'video';
-            finish();
-        };
-        reader.readAsDataURL(file);
-    } else {
-        finish();
-    }
-}
-
-// ====================================================================
-// PART B — Modal & Feature Functions
-// ====================================================================
 
 /* ================================================================
  * MODAL PETA DARURAT
  * ================================================================ */
 function openMapModal() {
-    if (!requireLogin()) return;
+    if (!currentUser) return;
     openModal('mapModal');
-    document.getElementById('mapDistrict').textContent = currentUser.district || currentUser.city || 'Tidak diketahui';
-    document.getElementById('mapOwnerName').textContent = currentUser.fullName || '-';
-    document.getElementById('mapLocationName').textContent = currentUser.address || currentUser.city || '-';
-    document.getElementById('emergencyLocationDetail').style.display = 'none';
+    const districtEl = document.getElementById('mapDistrict');
+    const ownerEl = document.getElementById('mapOwnerName');
+    const locEl = document.getElementById('mapLocationName');
+    const detailEl = document.getElementById('emergencyLocationDetail');
+    if (districtEl) districtEl.textContent = currentUser.district || currentUser.city || 'Tidak diketahui';
+    if (ownerEl) ownerEl.textContent = currentUser.fullName || '-';
+    if (locEl) locEl.textContent = currentUser.address || currentUser.city || '-';
+    if (detailEl) detailEl.style.display = 'none';
 
     const savedLat = localStorage.getItem('salink_user_lat');
     const savedLng = localStorage.getItem('salink_user_lng');
@@ -4334,15 +3545,21 @@ function openMapModal() {
         mapLat = parseFloat(savedLat);
         mapLng = parseFloat(savedLng);
         updateMapFrame(mapLat, mapLng);
-        document.getElementById('mapCoords').textContent = `${mapLat.toFixed(6)}, ${mapLng.toFixed(6)}`;
-        document.getElementById('mapStatusText').textContent = '✅ Lokasi terdeteksi';
-        document.getElementById('mapStatusSub').textContent = `📍 ${mapLat.toFixed(6)}, ${mapLng.toFixed(6)}`;
+        const coordsEl = document.getElementById('mapCoords');
+        if (coordsEl) coordsEl.textContent = `${mapLat.toFixed(6)}, ${mapLng.toFixed(6)}`;
+        const statusText = document.getElementById('mapStatusText');
+        const statusSub = document.getElementById('mapStatusSub');
+        if (statusText) statusText.textContent = '✅ Lokasi terdeteksi';
+        if (statusSub) statusSub.textContent = `📍 ${mapLat.toFixed(6)}, ${mapLng.toFixed(6)}`;
         const ml = document.getElementById('mapOpenGmaps');
         if (ml) ml.href = `https://www.google.com/maps?q=${mapLat},${mapLng}`;
     } else {
-        document.getElementById('mapStatusText').textContent = 'Lokasi belum terdeteksi';
-        document.getElementById('mapStatusSub').textContent = 'Aktifkan GPS untuk mencari bantuan terdekat';
-        document.getElementById('mapCoords').textContent = '-';
+        const statusText = document.getElementById('mapStatusText');
+        const statusSub = document.getElementById('mapStatusSub');
+        if (statusText) statusText.textContent = 'Lokasi belum terdeteksi';
+        if (statusSub) statusSub.textContent = 'Aktifkan GPS untuk mencari bantuan terdekat';
+        const coordsEl = document.getElementById('mapCoords');
+        if (coordsEl) coordsEl.textContent = '-';
     }
 }
 function closeMapModal() { closeModal('mapModal'); }
@@ -4369,11 +3586,16 @@ function getMapLocation() {
         function(pos) {
             mapLat = pos.coords.latitude;
             mapLng = pos.coords.longitude;
-            localStorage.setItem('salink_user_lat', mapLat);
-            localStorage.setItem('salink_user_lng', mapLng);
-            document.getElementById('mapCoords').textContent = `${mapLat.toFixed(6)}, ${mapLng.toFixed(6)}`;
-            document.getElementById('mapStatusText').textContent = '✅ Lokasi terdeteksi';
-            document.getElementById('mapStatusSub').textContent = `📍 ${mapLat.toFixed(6)}, ${mapLng.toFixed(6)}`;
+            try {
+                localStorage.setItem('salink_user_lat', mapLat);
+                localStorage.setItem('salink_user_lng', mapLng);
+            } catch(e) {}
+            const coordsEl = document.getElementById('mapCoords');
+            if (coordsEl) coordsEl.textContent = `${mapLat.toFixed(6)}, ${mapLng.toFixed(6)}`;
+            const statusText = document.getElementById('mapStatusText');
+            const statusSub = document.getElementById('mapStatusSub');
+            if (statusText) statusText.textContent = '✅ Lokasi terdeteksi';
+            if (statusSub) statusSub.textContent = `📍 ${mapLat.toFixed(6)}, ${mapLng.toFixed(6)}`;
             updateMapFrame(mapLat, mapLng);
             const ml = document.getElementById('mapOpenGmaps');
             if (ml) ml.href = `https://www.google.com/maps?q=${mapLat},${mapLng}`;
@@ -4386,7 +3608,7 @@ function getMapLocation() {
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-map-marker-alt"></i> Ambil Lokasi Saya';
         },
-        { enableHighAccuracy: true, timeout: 15000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
 }
 async function openEmergencyLocation(type) {
@@ -4472,7 +3694,6 @@ async function openEmergencyLocation(type) {
  * MODAL GALERI FOTO/VIDEO
  * ================================================================ */
 function openFotoModal() {
-    if (!requireLogin()) return;
     openModal('fotoModal');
     renderFotoPosts(currentFotoFilter);
 }
@@ -4493,8 +3714,10 @@ function renderFotoPosts(filter) {
     if (filter === 'foto') filtered = userPosts.filter(p => p.mediaType === 'image');
     else if (filter === 'video') filtered = userPosts.filter(p => p.mediaType === 'video');
 
-    document.getElementById('fotoModalCount').textContent = filtered.length;
-    document.getElementById('fotoTotalCount').textContent = `Total: ${filtered.length}`;
+    const cnt1 = document.getElementById('fotoModalCount');
+    const cnt2 = document.getElementById('fotoTotalCount');
+    if (cnt1) cnt1.textContent = filtered.length;
+    if (cnt2) cnt2.textContent = `Total: ${filtered.length}`;
 
     if (filtered.length === 0) {
         grid.innerHTML = `
@@ -4530,7 +3753,6 @@ function renderFotoPosts(filter) {
  * MODAL INVITE
  * ================================================================ */
 function openInviteModal() {
-    if (!requireLogin()) return;
     openModal('inviteModal');
     renderInviteUsers('');
     const si = document.getElementById('inviteSearchInput');
@@ -4566,11 +3788,12 @@ function renderInviteUsers(query) {
                 <p style="font-size:0.75rem;">Belum ada pengguna lain</p>
             </div>
         `;
-        document.getElementById('inviteModalCount').textContent = '0';
+        const cnt = document.getElementById('inviteModalCount');
+        if (cnt) cnt.textContent = '0';
         return;
     }
 
-    let users = allUsers.filter(u => u.username !== currentUser?.username);
+    let users = allUsers.filter(u => u.username !== (currentUser ? currentUser.username : ''));
     if (query) {
         const q = query.toLowerCase();
         users = users.filter(u =>
@@ -4579,7 +3802,8 @@ function renderInviteUsers(query) {
             (u.email || '').toLowerCase().includes(q)
         );
     }
-    document.getElementById('inviteModalCount').textContent = users.length;
+    const cnt = document.getElementById('inviteModalCount');
+    if (cnt) cnt.textContent = users.length;
 
     if (users.length === 0) {
         container.innerHTML = `
@@ -4592,7 +3816,20 @@ function renderInviteUsers(query) {
     }
 
     let sentInvites = {};
-    try { sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}'); } catch(e) {}
+    try {
+        const raw = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}');
+        if (Array.isArray(raw)) {
+            raw.forEach(u => { sentInvites[u] = true; });
+        } else {
+            sentInvites = raw;
+        }
+    } catch(e) { sentInvites = {}; }
+
+    // Cek status pertemanan via SalinkSocial
+    let friendStatusFn = null;
+    if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.getFriendStatus === 'function') {
+        friendStatusFn = SalinkSocial.getFriendStatus;
+    }
 
     container.innerHTML = users.map(u => {
         const initial = (u.fullName || u.username || 'U').charAt(0).toUpperCase();
@@ -4601,15 +3838,29 @@ function renderInviteUsers(query) {
         const loc = [u.city, u.province].filter(Boolean).join(', ') || u.country || 'Lokasi tidak diketahui';
         const statusDot = (u.lastActive && new Date(u.lastActive).getTime() > Date.now() - 5 * 60 * 1000) ? '🟢' : '⚪';
 
+        // Status pertemanan
+        let friendStatus = 'none';
+        if (friendStatusFn && currentUser) {
+            friendStatus = friendStatusFn(currentUser.username, u.username);
+        }
+
+        let btnLabel = '<i class="fas fa-paper-plane"></i> Invite';
+        let btnClass = 'invite-user-btn';
+        let btnDisabled = '';
+        if (friendStatus === 'accepted') { btnLabel = '<i class="fas fa-check"></i> Teman'; btnClass += ' sent'; btnDisabled = 'disabled'; }
+        else if (friendStatus === 'pending_out' || isSent) { btnLabel = '⏳ Terkirim'; btnClass += ' sent'; btnDisabled = 'disabled'; }
+        else if (friendStatus === 'pending_in') { btnLabel = '<i class="fas fa-check"></i> Terima'; }
+        else if (friendStatus === 'blocked') { btnLabel = '🚫 Diblokir'; btnClass += ' sent'; btnDisabled = 'disabled'; }
+
         return `
             <div class="invite-user-item">
-                <div class="invite-user-avatar">${avatar}</div>
-                <div class="invite-user-info">
+                <div class="invite-user-avatar" onclick="openProfileUser('${escapeAttr(u.username)}')">${avatar}</div>
+                <div class="invite-user-info" onclick="openProfileUser('${escapeAttr(u.username)}')">
                     <div class="invite-user-name">${statusDot} ${escapeHTML(u.fullName || u.username)}</div>
                     <div class="invite-user-sub">@${escapeHTML(u.username)} • 📍 ${escapeHTML(loc)}</div>
                 </div>
-                <button class="invite-user-btn ${isSent ? 'sent' : ''}" onclick="sendInvite('${escapeAttr(u.username)}', this)" ${isSent ? 'disabled' : ''}>
-                    ${isSent ? '<i class="fas fa-check"></i> Terkirim' : '<i class="fas fa-paper-plane"></i> Invite'}
+                <button class="${btnClass}" onclick="sendInvite('${escapeAttr(u.username)}', this)" ${btnDisabled} type="button">
+                    ${btnLabel}
                 </button>
             </div>
         `;
@@ -4618,14 +3869,68 @@ function renderInviteUsers(query) {
 async function sendInvite(username, btnEl) {
     if (!currentUser || !username) return;
     btnEl.disabled = true;
+    const originalHTML = btnEl.innerHTML;
     btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    // Cek pending_in → auto-accept
+    let status = 'none';
+    if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.getFriendStatus === 'function') {
+        status = SalinkSocial.getFriendStatus(currentUser.username, username);
+    }
+
+    if (status === 'pending_in' && typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.acceptInvite === 'function') {
+        const r = SalinkSocial.acceptInvite(currentUser.username, username);
+        if (r && r.ok) {
+            btnEl.classList.add('sent');
+            btnEl.innerHTML = '<i class="fas fa-check"></i> Teman';
+            showToast('✅ Berteman', 'Kamu sekarang berteman dengan @' + username, 'fa-user-check', 'success');
+        } else {
+            btnEl.disabled = false;
+            btnEl.innerHTML = originalHTML;
+            showToast('⚠️ Gagal', 'Tidak dapat menerima undangan', 'fa-exclamation-triangle', 'error');
+        }
+        return;
+    }
+
+    // Kirim invite baru via SalinkSocial
+    let ok = false;
+    let reason = '';
+    if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.sendInvite === 'function') {
+        const r = SalinkSocial.sendInvite(currentUser.username, username);
+        ok = r && r.ok;
+        reason = r && r.reason;
+    } else {
+        try {
+            const friends = JSON.parse(localStorage.getItem('salink_friends') || '[]');
+            friends.push({
+                id: 'invite-' + Date.now(),
+                user1: currentUser.username,
+                user2: username,
+                status: 'pending',
+                requestedBy: currentUser.username,
+                timestamp: new Date().toISOString(),
+                acceptedAt: ''
+            });
+            localStorage.setItem('salink_friends', JSON.stringify(friends));
+            ok = true;
+        } catch(e) { ok = false; reason = e.message; }
+    }
+
+    // Simpan di sentInvites
     try {
-        let sentInvites = {};
-        try { sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}'); } catch(e) {}
+        let sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}');
+        if (Array.isArray(sentInvites)) {
+            const obj = {};
+            sentInvites.forEach(u => { obj[u] = true; });
+            sentInvites = obj;
+        }
         sentInvites[username] = true;
         localStorage.setItem('salink_sent_invites', JSON.stringify(sentInvites));
+    } catch(e) {}
 
-        const invitePayload = {
+    // Kirim ke API (opsional)
+    try {
+        await apiCall('save_invite', {
             id: 'invite-' + Date.now(),
             user1: currentUser.username,
             user2: username,
@@ -4633,18 +3938,22 @@ async function sendInvite(username, btnEl) {
             requestedBy: currentUser.username,
             timestamp: new Date().toISOString(),
             acceptedAt: ''
-        };
-        await apiCall('save_invite', invitePayload);
+        });
+    } catch(e) {}
 
+    if (ok) {
         btnEl.classList.add('sent');
         btnEl.innerHTML = '<i class="fas fa-check"></i> Terkirim';
         broadcastSync('new_invite', { to: username });
         playRegularSound();
-        showToast('📨 Terkirim', `Undangan dikirim ke ${username}`, 'fa-paper-plane', 'success');
-    } catch(e) {
+        showToast('📨 Terkirim', `Undangan dikirim ke @${username}`, 'fa-paper-plane', 'success');
+    } else {
         btnEl.disabled = false;
-        btnEl.innerHTML = '<i class="fas fa-paper-plane"></i> Invite';
-        showToast('⚠️ Gagal', 'Tidak dapat mengirim undangan', 'fa-exclamation-triangle', 'error');
+        btnEl.innerHTML = originalHTML;
+        if (reason === 'already_friends') showToast('ℹ️ Info', 'Kamu sudah berteman dengan @' + username, 'fa-info-circle', 'success');
+        else if (reason === 'already_sent') showToast('ℹ️ Info', 'Undangan sudah pernah dikirim', 'fa-info-circle', 'success');
+        else if (reason === 'blocked_by_target') showToast('🚫 Diblokir', 'Tidak dapat mengirim undangan', 'fa-ban', 'error');
+        else showToast('⚠️ Gagal', 'Tidak dapat mengirim undangan', 'fa-exclamation-triangle', 'error');
     }
 }
 
@@ -4654,6 +3963,7 @@ async function sendInvite(username, btnEl) {
 function getAllNotifications() {
     const list = [];
     allEmergencies.forEach(em => {
+        const ts = em.timestamp ? new Date(em.timestamp).getTime() : Date.now();
         list.push({
             id: em.id,
             type: 'emergency',
@@ -4662,11 +3972,12 @@ function getAllNotifications() {
             message: em.description || em.text || `${em.sender || 'User'} melaporkan darurat di ${em.location || '-'}`,
             sender: em.sender,
             senderUsername: em.senderUsername,
-            timestamp: new Date(em.timestamp).getTime(),
+            timestamp: ts,
             read: readNotifs[em.id] === true
         });
     });
     notifications.forEach(n => {
+        const ts = n.timestamp ? new Date(n.timestamp).getTime() : Date.now();
         list.push({
             id: n.id || 'notif-' + Math.random(),
             type: n.type || 'regular',
@@ -4674,7 +3985,7 @@ function getAllNotifications() {
             title: n.title || 'Notifikasi',
             message: n.message || n.text || '',
             sender: n.sender || 'Sistem',
-            timestamp: new Date(n.timestamp || Date.now()).getTime(),
+            timestamp: ts,
             read: readNotifs[n.id] === true || n.read === 'TRUE' || n.read === true
         });
     });
@@ -4682,7 +3993,11 @@ function getAllNotifications() {
     return list;
 }
 function openNotifModal() {
-    if (!requireLogin()) return;
+    if (!currentUser) {
+        showToast('🔒 Login', 'Silakan login dulu', 'fa-lock', 'error');
+        setTimeout(() => window.location.href = LOGIN_URL, 800);
+        return;
+    }
     openModal('notifModal');
     renderNotifList();
     document.querySelectorAll('.notif-filter-btn').forEach(btn => {
@@ -4698,7 +4013,7 @@ function openNotifModal() {
         mar.onclick = function() {
             const all = getAllNotifications();
             all.forEach(n => { readNotifs[n.id] = true; });
-            localStorage.setItem('salink_read_notifs', JSON.stringify(readNotifs));
+            try { localStorage.setItem('salink_read_notifs', JSON.stringify(readNotifs)); } catch(e) {}
             renderNotifList();
             updateNotifBadge();
             showToast('✅', 'Semua ditandai dibaca', 'fa-check-double', 'success');
@@ -4715,8 +4030,10 @@ function renderNotifList() {
     else if (currentNotifFilter === 'regular') filtered = allNotifs.filter(n => n.type !== 'emergency');
 
     const unread = allNotifs.filter(n => !n.read).length;
-    document.getElementById('notifStatsText').textContent = `${allNotifs.length} total • ${unread} belum dibaca`;
-    document.getElementById('notifModalBadge').textContent = unread;
+    const statsEl = document.getElementById('notifStatsText');
+    const badgeEl = document.getElementById('notifModalBadge');
+    if (statsEl) statsEl.textContent = `${allNotifs.length} total • ${unread} belum dibaca`;
+    if (badgeEl) badgeEl.textContent = unread;
 
     if (filtered.length === 0) {
         listEl.innerHTML = `
@@ -4731,19 +4048,24 @@ function renderNotifList() {
     listEl.innerHTML = filtered.map(n => {
         let iconClass = 'regular';
         let iconHtml = '<i class="fas fa-bell"></i>';
-        if (n.type === 'emergency') { iconClass = 'emergency'; iconHtml = EMERGENCY_ICONS[n.emergencyType] || '🚨'; }
+        if (n.type === 'emergency') {
+            iconClass = 'emergency';
+            iconHtml = EMERGENCY_ICONS[n.emergencyType] || '🚨';
+        } else if (n.type === 'post') {
+            iconClass = 'post';
+            iconHtml = '<i class="fas fa-file-alt"></i>';
+        }
         const unreadClass = n.read ? '' : 'unread';
         const typeClass = n.type === 'emergency' ? 'emergency' : '';
         return `
-            <div class="notif-item ${unreadClass} ${typeClass}" onclick="openNotifDetail('${escapeAttr(n.id)}')">
+            <div class="notif-item ${unreadClass} ${typeClass}" onclick="openNotifDetail('${escapeAttr(n.id)}','${escapeAttr(n.type)}')">
                 <div class="notif-item-icon ${iconClass}">${iconHtml}</div>
                 <div class="notif-item-content">
                     <div class="notif-item-title">${escapeHTML(n.title)}</div>
                     <div class="notif-item-message">${escapeHTML(n.message)}</div>
                     <div class="notif-item-time"><i class="fas fa-clock"></i> ${getTimeAgo(n.timestamp)}${n.sender ? ` • ${escapeHTML(n.sender)}` : ''}</div>
                     <div class="notif-item-actions">
-                        ${!n.read ? `<button onclick="event.stopPropagation();markNotifRead('${escapeAttr(n.id)}')"><i class="fas fa-check"></i> Tandai</button>` : ''}
-                        <button onclick="event.stopPropagation();deleteNotif('${escapeAttr(n.id)}')"><i class="fas fa-trash"></i> Hapus</button>
+                        ${!n.read ? `<button onclick="event.stopPropagation();markNotifRead('${escapeAttr(n.id)}')" type="button"><i class="fas fa-check"></i> Tandai</button>` : ''}
                     </div>
                 </div>
             </div>
@@ -4752,27 +4074,16 @@ function renderNotifList() {
 }
 function markNotifRead(id) {
     readNotifs[id] = true;
-    localStorage.setItem('salink_read_notifs', JSON.stringify(readNotifs));
+    try { localStorage.setItem('salink_read_notifs', JSON.stringify(readNotifs)); } catch(e) {}
     renderNotifList();
     updateNotifBadge();
 }
-function deleteNotif(id) {
-    if (!confirm('Hapus notifikasi ini?')) return;
-    delete readNotifs[id];
-    localStorage.setItem('salink_read_notifs', JSON.stringify(readNotifs));
-    renderNotifList();
-    updateNotifBadge();
-    showToast('🗑️', 'Notifikasi dihapus', 'fa-trash', 'success');
-}
-function openNotifDetail(id) {
-    const all = getAllNotifications();
-    const n = all.find(x => x.id === id);
-    if (!n) return;
+function openNotifDetail(id, type) {
     markNotifRead(id);
-    if (n.type === 'emergency' && n.id) {
-        closeModal('notifModal');
+    closeModal('notifModal');
+    if (type === 'emergency' && id) {
         setTimeout(() => {
-            window.location.href = DASHBOARD_URL + '?emergency=' + encodeURIComponent(n.id);
+            window.location.href = DASHBOARD_URL + '?emergency=' + encodeURIComponent(id);
         }, 200);
     }
 }
@@ -4790,11 +4101,12 @@ function updateNotifBadge() {
  * MODAL RIWAYAT POSTINGAN
  * ================================================================ */
 function openHistoryPostinganModal() {
-    if (!requireLogin()) return;
     const body = document.getElementById('historyPostinganModalBody');
+    if (!body) return;
     const myPosts = posts.filter(p => p.userId === profileUser.username);
     const sorted = [...myPosts].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    document.getElementById('historyPostinganCount').textContent = sorted.length;
+    const cnt = document.getElementById('historyPostinganCount');
+    if (cnt) cnt.textContent = sorted.length;
 
     if (sorted.length === 0) {
         body.innerHTML = `<div class="empty-state"><i class="fas fa-inbox empty-icon"></i><div class="empty-title">Belum ada postingan</div></div>`;
@@ -4824,9 +4136,10 @@ function openHistoryPostinganModal() {
  * MODAL TEMAN
  * ================================================================ */
 function openTemanModal() {
-    if (!requireLogin()) return;
     const body = document.getElementById('temanModalBody');
-    document.getElementById('totalTemanCount').textContent = friends.length;
+    if (!body) return;
+    const cnt = document.getElementById('totalTemanCount');
+    if (cnt) cnt.textContent = friends.length;
 
     if (friends.length === 0) {
         body.innerHTML = `
@@ -4840,16 +4153,15 @@ function openTemanModal() {
         body.innerHTML = friends.map(f => {
             const name = f.name || f.user2 || f.user1 || 'User';
             const username = f.username || f.user2 || f.user1 || '';
+            const initial = (name || 'U').charAt(0).toUpperCase();
             return `
-                <div class="teman-item">
-                    <div class="teman-avatar"><i class="fas fa-user"></i></div>
+                <div class="teman-item" onclick="openProfileUser('${escapeAttr(username)}')">
+                    <div class="teman-avatar">${initial}</div>
                     <div class="teman-info">
                         <div class="teman-name">${escapeHTML(name)}</div>
                         <div class="teman-username">@${escapeHTML(username)}</div>
                     </div>
-                    <button onclick="openProfileUser('${escapeAttr(username)}')" type="button" style="background:var(--bg-card);color:var(--primary);border:1px solid var(--primary);padding:4px 12px;border-radius:12px;cursor:pointer;font-size:0.6rem;font-family:inherit;font-weight:700;">
-                        <i class="fas fa-eye"></i> Lihat
-                    </button>
+                    <i class="fas fa-chevron-right" style="color:var(--text-muted);"></i>
                 </div>
             `;
         }).join('');
@@ -4861,7 +4173,7 @@ function openTemanModal() {
  * MODAL FOLLOW
  * ================================================================ */
 function openFollowModal(tab) {
-    if (!requireLogin()) return;
+    if (!currentUser) return;
     currentFollowTab = tab || 'followers';
     openModal('followModal');
     document.querySelectorAll('.follow-modal-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === currentFollowTab));
@@ -4906,7 +4218,8 @@ function renderFollowList(query) {
             (u.username || '').toLowerCase().includes(q)
         );
     }
-    document.getElementById('followModalCount').textContent = filtered.length;
+    const cnt = document.getElementById('followModalCount');
+    if (cnt) cnt.textContent = filtered.length;
 
     if (filtered.length === 0) {
         container.innerHTML = `
@@ -4935,43 +4248,22 @@ function renderFollowList(query) {
 }
 
 /* ================================================================
- * MODAL BIODATA
- * ================================================================ */
-function openBiodataModal() {
-    if (!requireLogin()) return;
-    const body = document.getElementById('biodataModalBody');
-    const bioData = {
-        'Foto Profil': profileUser.profilePicture
-            ? `<img src="${escapeAttr(profileUser.profilePicture)}" alt="">`
-            : `<div style="width:60px;height:60px;border-radius:50%;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:2rem;color:#fff;">${profileUser.gender === 'female' ? '👩' : '👨'}</div>`,
-        'Nama Lengkap': profileUser.fullName || '-',
-        'Jenis Kelamin': profileUser.gender === 'female' ? 'Perempuan' : 'Laki-laki',
-        'Username': profileUser.username || '-',
-        'Email': profileUser.email || '-',
-        'No WhatsApp': profileUser.phone || '-',
-        'Negara': profileUser.country || '-',
-        'Provinsi': profileUser.province || '-',
-        'Kabupaten/Kota': profileUser.city || '-',
-        'Kecamatan': profileUser.district || '-',
-        'Desa/Kelurahan': profileUser.village || '-',
-        'Alamat Lengkap': profileUser.address || '-',
-        'Bio': profileUser.bio || '-',
-        'Bergabung': profileUser.joinedDate || '-'
-    };
-    let html = '<div class="bio-data-content">';
-    Object.keys(bioData).forEach(k => {
-        html += `<div class="bio-data-item"><span class="bio-label">${escapeHTML(k)}</span><span class="bio-value">${bioData[k]}</span></div>`;
-    });
-    html += '</div>';
-    body.innerHTML = html;
-    openModal('biodataModal');
-}
-
-/* ================================================================
- * MODAL PENGATURAN (EDIT PROFIL)
+ * MODAL PENGATURAN — dengan Privacy Section + GPS Button
  * ================================================================ */
 function openSettingsModal() {
-    if (!requireLogin()) return;
+    if (!currentUser) {
+        showToast('🔒 Login', 'Silakan login dulu', 'fa-lock', 'error');
+        return;
+    }
+
+    // Load privacy dari SalinkSocial atau dari currentUser
+    let privacy = { ...DEFAULT_PRIVACY };
+    if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.getPrivacy === 'function') {
+        privacy = SalinkSocial.getPrivacy(currentUser.username);
+    } else if (currentUser.privacy) {
+        privacy = { ...DEFAULT_PRIVACY, ...currentUser.privacy };
+    }
+
     let joinedText = '-';
     if (currentUser.joinedDate || currentUser.createdAt || currentUser.timestamp) {
         const jd = currentUser.joinedDate || currentUser.createdAt || currentUser.timestamp;
@@ -4988,6 +4280,7 @@ function openSettingsModal() {
             : '<i class="fas fa-male" id="settingsAvatarIcon"></i>');
 
     const body = document.getElementById('settingsModalBody');
+    if (!body) return;
     body.innerHTML = `
         <div class="settings-section-title"><i class="fas fa-camera"></i> Foto Profil</div>
         <div class="settings-avatar-upload">
@@ -5053,12 +4346,24 @@ function openSettingsModal() {
                 <label>Alamat Lengkap</label>
                 <textarea id="settingsAddress" class="form-control" rows="2" placeholder="Jalan, nomor rumah, RT/RW, kode pos...">${escapeAttr(currentUser.address || '')}</textarea>
             </div>
+
+            <!-- ⭐ GPS BUTTON (GANTI Link Google Maps) -->
             <div class="settings-form-group full-width">
-                <label>Link Google Maps</label>
-                <input type="url" id="settingsMapsLink" class="form-control" value="${escapeAttr(currentUser.mapsLink || '')}" placeholder="https://maps.app.goo.gl/...">
-                <div class="settings-maps-preview" id="settingsMapsPreview">
-                    <i class="fas fa-map-marker-alt"></i>
-                    <span id="settingsMapsText">Link Google Maps tersimpan</span>
+                <label>📍 Lokasi GPS</label>
+                <div class="settings-gps-wrapper">
+                    <button type="button" class="gps-location-btn" id="settingsGpsBtn">
+                        <i class="fas fa-location-arrow"></i>
+                        <span id="settingsGpsBtnText">📍 Gunakan Lokasi Saya</span>
+                    </button>
+                    <div class="settings-gps-result" id="settingsGpsResult">
+                        <div class="gps-address" id="settingsGpsAddress">📍 Alamat</div>
+                        <div class="gps-coords" id="settingsGpsCoords">-6.2000, 106.8166</div>
+                        <a href="#" class="gps-maps-link" id="settingsGpsMapsLink" target="_blank" rel="noopener">
+                            <i class="fas fa-external-link-alt"></i> Buka di Google Maps
+                        </a>
+                    </div>
+                    <div class="settings-gps-error" id="settingsGpsError"></div>
+                    <div class="settings-form-hint"><i class="fas fa-info-circle"></i> Tap tombol untuk mengambil lokasi GPS Anda saat ini</div>
                 </div>
             </div>
         </div>
@@ -5067,6 +4372,44 @@ function openSettingsModal() {
         <div class="settings-form-group full-width">
             <textarea id="settingsBio" class="form-control" rows="3" maxlength="200" placeholder="Ceritakan sedikit tentang Anda...">${escapeAttr(currentUser.bio || '')}</textarea>
             <div class="settings-form-hint"><i class="fas fa-pen"></i> Maksimal 200 karakter</div>
+        </div>
+
+        <!-- ⭐ PRIVACY SECTION -->
+        <div class="settings-section-title"><i class="fas fa-shield-alt"></i> Privasi Kontak & Panggilan</div>
+        <div class="privacy-section">
+            <h3>🔒 Pengaturan Privasi</h3>
+            <label>
+                <input type="checkbox" id="privacyWhatsApp" ${privacy.allowWhatsApp !== false ? 'checked' : ''}>
+                <span class="privacy-icon">💬</span>
+                <span class="privacy-label-text">
+                    Izinkan WhatsApp
+                    <span class="privacy-desc">Pengguna lain dapat menghubungi via WhatsApp</span>
+                </span>
+            </label>
+            <label>
+                <input type="checkbox" id="privacyVoiceCall" ${privacy.allowVoiceCall !== false ? 'checked' : ''}>
+                <span class="privacy-icon">📞</span>
+                <span class="privacy-label-text">
+                    Izinkan Voice Call
+                    <span class="privacy-desc">Pengguna lain dapat melakukan panggilan suara</span>
+                </span>
+            </label>
+            <label>
+                <input type="checkbox" id="privacyVideoCall" ${privacy.allowVideoCall !== false ? 'checked' : ''}>
+                <span class="privacy-icon">📹</span>
+                <span class="privacy-label-text">
+                    Izinkan Video Call
+                    <span class="privacy-desc">Pengguna lain dapat melakukan panggilan video</span>
+                </span>
+            </label>
+            <label>
+                <input type="checkbox" id="privacyPhoneCall" ${privacy.allowPhoneCall === true ? 'checked' : ''}>
+                <span class="privacy-icon">☎️</span>
+                <span class="privacy-label-text">
+                    Izinkan Telepon Langsung
+                    <span class="privacy-desc">Tampilkan nomor telepon Anda ke pengguna lain</span>
+                </span>
+            </label>
         </div>
 
         <div class="settings-section-title"><i class="fas fa-calendar-check"></i> Informasi Akun</div>
@@ -5111,6 +4454,7 @@ function openSettingsModal() {
 }
 
 function setupSettingsHandlers() {
+    // Password toggle
     document.querySelectorAll('.settings-password-toggle').forEach(btn => {
         btn.onclick = function(e) {
             e.preventDefault();
@@ -5131,6 +4475,7 @@ function setupSettingsHandlers() {
         };
     });
 
+    // Avatar upload
     const avatarInput = document.getElementById('settingsAvatarInput');
     const avatarPreview = document.getElementById('settingsAvatarPreview');
     if (avatarInput && avatarPreview) {
@@ -5157,32 +4502,123 @@ function setupSettingsHandlers() {
         };
     }
 
-    const mapsInput = document.getElementById('settingsMapsLink');
-    const mapsPreview = document.getElementById('settingsMapsPreview');
-    const mapsText = document.getElementById('settingsMapsText');
-    if (mapsInput && mapsPreview) {
-        const updateMapsPreview = () => {
-            const url = mapsInput.value.trim();
-            if (url) {
-                mapsPreview.classList.add('show');
-                if (url.includes('maps.app.goo.gl') || url.includes('goo.gl/maps')) {
-                    mapsText.textContent = '🔗 Link Google Maps (short link) tersimpan';
-                } else if (url.includes('google.com/maps')) {
-                    mapsText.textContent = '🔗 Link Google Maps tersimpan';
-                } else {
-                    mapsText.textContent = '⚠️ Sepertinya bukan link Google Maps';
-                }
-            } else {
-                mapsPreview.classList.remove('show');
-            }
-        };
-        mapsInput.oninput = updateMapsPreview;
-        if (mapsInput.value.trim()) updateMapsPreview();
+    // ⭐ GPS BUTTON di Settings
+    const gpsBtn = document.getElementById('settingsGpsBtn');
+    if (gpsBtn) {
+        gpsBtn.onclick = ambilLokasiSettings;
     }
 }
 
+/* ================================================================
+ * GPS — Ambil Lokasi dari Settings Modal
+ * ================================================================ */
+async function ambilLokasiSettings() {
+    const btn = document.getElementById('settingsGpsBtn');
+    const btnText = document.getElementById('settingsGpsBtnText');
+    const resultBox = document.getElementById('settingsGpsResult');
+    const errorBox = document.getElementById('settingsGpsError');
+    const addrEl = document.getElementById('settingsGpsAddress');
+    const coordsEl = document.getElementById('settingsGpsCoords');
+    const mapsLink = document.getElementById('settingsGpsMapsLink');
+
+    if (!navigator.geolocation) {
+        if (errorBox) {
+            errorBox.textContent = '❌ Browser tidak mendukung GPS.';
+            errorBox.classList.add('active');
+        }
+        return;
+    }
+
+    if (btn) btn.classList.add('loading');
+    if (btnText) btnText.innerHTML = '<span class="gps-location-loading"></span> Mengambil...';
+    if (resultBox) resultBox.classList.remove('active');
+    if (errorBox) errorBox.classList.remove('active');
+
+    try {
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true, timeout: 15000, maximumAge: 0
+            });
+        });
+
+        const lat = position.coords.latitude.toFixed(6);
+        const lng = position.coords.longitude.toFixed(6);
+        const accuracy = Math.round(position.coords.accuracy || 0);
+        const mapsURL = `https://www.google.com/maps?q=${lat},${lng}`;
+
+        if (coordsEl) coordsEl.textContent = `${lat}, ${lng} (±${accuracy}m)`;
+        if (addrEl) addrEl.textContent = '🔄 Mengambil alamat...';
+        if (resultBox) resultBox.classList.add('active');
+        if (mapsLink) mapsLink.href = mapsURL;
+
+        // Simpan ke global (akan dipakai saat saveSettings)
+        window._settingsGpsData = {
+            lat: parseFloat(lat),
+            lng: parseFloat(lng),
+            mapsURL: mapsURL,
+            address: `${lat}, ${lng}`
+        };
+
+        // Reverse geocode
+        try {
+            const nominatimUrl = `${NOMINATIM_URL}?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=id`;
+            const response = await fetch(nominatimUrl, {
+                method: 'GET',
+                headers: { 'User-Agent': 'SALINK-Emergency-App/7.0' }
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (data && data.display_name) {
+                    if (addrEl) addrEl.textContent = '📍 ' + data.display_name;
+                    window._settingsGpsData.address = data.display_name;
+                    // Auto-fill alamat jika kosong
+                    const addressInput = document.getElementById('settingsAddress');
+                    if (addressInput && !addressInput.value.trim()) {
+                        addressInput.value = data.display_name;
+                    }
+                } else {
+                    if (addrEl) addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
+                }
+            } else {
+                if (addrEl) addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
+            }
+        } catch(e) {
+            if (addrEl) addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
+        }
+
+        if (btn) btn.classList.remove('loading');
+        if (btnText) btnText.textContent = '✅ Lokasi Ditemukan — Tap untuk Ambil Ulang';
+        if (btn) btn.style.background = 'linear-gradient(135deg, #3fb950, #2ea44f)';
+
+        showToast('📍 Lokasi Ditemukan', `Akurasi ±${accuracy}m`, 'fa-location-arrow', 'success');
+
+    } catch(error) {
+        if (btn) {
+            btn.classList.remove('loading');
+            btn.style.background = '';
+        }
+        if (btnText) btnText.textContent = '📍 Gunakan Lokasi Saya';
+
+        let errMsg = 'Gagal mengambil lokasi. ';
+        switch(error.code) {
+            case 1: errMsg += 'Izin lokasi ditolak.'; break;
+            case 2: errMsg += 'Lokasi tidak tersedia.'; break;
+            case 3: errMsg += 'Timeout. Coba lagi.'; break;
+            default: errMsg += error.message || 'Coba lagi.';
+        }
+        if (errorBox) {
+            errorBox.textContent = '❌ ' + errMsg;
+            errorBox.classList.add('active');
+        }
+        showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle', 'error');
+    }
+}
+
+/* ================================================================
+ * SAVE SETTINGS — dengan Privacy
+ * ================================================================ */
 async function saveSettings() {
-    if (!requireLogin()) return;
+    if (!currentUser) return;
 
     const fullName = (document.getElementById('settingsFullName')?.value || '').trim();
     const gender = document.getElementById('settingsGender')?.value || currentUser.gender || 'male';
@@ -5194,12 +4630,18 @@ async function saveSettings() {
     const district = (document.getElementById('settingsDistrict')?.value || '').trim();
     const village = (document.getElementById('settingsVillage')?.value || '').trim();
     const address = (document.getElementById('settingsAddress')?.value || '').trim();
-    const mapsLink = (document.getElementById('settingsMapsLink')?.value || '').trim();
     const bio = (document.getElementById('settingsBio')?.value || '').trim();
 
+    // Password
     const oldPassword = document.getElementById('settingsOldPassword')?.value || '';
     const newPassword = document.getElementById('settingsNewPassword')?.value || '';
     const confirmPassword = document.getElementById('settingsConfirmPassword')?.value || '';
+
+    // Privacy
+    const allowWhatsApp = document.getElementById('privacyWhatsApp')?.checked ?? true;
+    const allowVoiceCall = document.getElementById('privacyVoiceCall')?.checked ?? true;
+    const allowVideoCall = document.getElementById('privacyVideoCall')?.checked ?? true;
+    const allowPhoneCall = document.getElementById('privacyPhoneCall')?.checked ?? false;
 
     if (!fullName) {
         showToast('⚠️ Perhatian', 'Nama lengkap harus diisi', 'fa-exclamation-triangle', 'error');
@@ -5215,7 +4657,7 @@ async function saveSettings() {
     if (oldPassword || newPassword || confirmPassword) {
         if (!oldPassword) { showToast('⚠️ Perhatian', 'Password lama harus diisi', 'fa-exclamation-triangle', 'error'); return; }
         if (!newPassword) { showToast('⚠️ Perhatian', 'Password baru harus diisi', 'fa-exclamation-triangle', 'error'); return; }
-        if (newPassword.length < 6) { showToast('⚠️ Perhatian', 'Password baru minimal 6 karakter', 'fa-exclamation-triangle', 'error'); return; }
+        if (newPassword.length < 6) { showToast('⚠️ Perhatian', 'Password minimal 6 karakter', 'fa-exclamation-triangle', 'error'); return; }
         if (newPassword !== confirmPassword) { showToast('⚠️ Perhatian', 'Konfirmasi password tidak cocok', 'fa-exclamation-triangle', 'error'); return; }
         const savedPassword = currentUser.password || currentUser.pass || '';
         if (savedPassword && oldPassword !== savedPassword) {
@@ -5235,39 +4677,84 @@ async function saveSettings() {
     const avatarPreview = document.getElementById('settingsAvatarPreview');
     const newProfilePic = avatarPreview?.dataset?.newImage || currentUser.profilePicture || '';
 
+    // Ambil GPS data jika ada
+    const gpsData = window._settingsGpsData || null;
+
     const updated = {
         ...currentUser,
         fullName, gender, email, phone,
         country, province, city, district, village, address,
-        mapsLink, bio,
-        profilePicture: newProfilePic
+        bio,
+        profilePicture: newProfilePic,
+        privacy: {
+            allowWhatsApp,
+            allowVoiceCall,
+            allowVideoCall,
+            allowPhoneCall
+        }
     };
+
+    // Update GPS / Maps Link
+    if (gpsData) {
+        updated.latitude = gpsData.lat;
+        updated.longitude = gpsData.lng;
+        updated.mapsURL = gpsData.mapsURL;
+        try {
+            localStorage.setItem('salink_user_lat', gpsData.lat);
+            localStorage.setItem('salink_user_lng', gpsData.lng);
+        } catch(e) {}
+    }
+
     if (passwordChanged) updated.password = newPassword;
 
     try {
+        // Save ke localStorage user
         localStorage.setItem('salink_user', JSON.stringify(updated));
 
+        // Save ke localStorage users (allUsers)
         try {
             const users = JSON.parse(localStorage.getItem('salink_users') || '[]');
             const idx = users.findIndex(u => u.username === currentUser.username);
             if (idx !== -1) {
                 users[idx] = { ...users[idx], ...updated };
-                localStorage.setItem('salink_users', JSON.stringify(users));
+            } else {
+                users.push(updated);
             }
+            localStorage.setItem('salink_users', JSON.stringify(users));
         } catch(e) {}
+
+        // ⭐ Save privacy via SalinkSocial (sinkron dengan profile-user.html & pesan-masuk.html)
+        if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.savePrivacy === 'function') {
+            try {
+                SalinkSocial.savePrivacy(currentUser.username, {
+                    allowWhatsApp,
+                    allowVoiceCall,
+                    allowVideoCall,
+                    allowPhoneCall
+                });
+                log('Privacy saved via SalinkSocial');
+            } catch(e) {
+                console.warn('SalinkSocial.savePrivacy error:', e);
+            }
+        }
 
         currentUser = updated;
         profileUser = { ...updated };
 
-        try { await apiSaveUser({ ...updated, password: passwordChanged ? newPassword : undefined }); } catch(e) {}
+        // Save ke server (opsional)
+        try {
+            await apiSaveUser({ ...updated, password: passwordChanged ? newPassword : undefined });
+        } catch(e) {}
 
-        try { broadcastSync('new_post', { type: 'profile_update' }); } catch(e) {}
+        // Broadcast sync
+        try { broadcastSync('profile_update', { username: currentUser.username }); } catch(e) {}
 
         renderProfile();
         updateSidebar();
         renderProfilePosts();
 
         closeModal('settingsModal');
+        window._settingsGpsData = null;
 
         if (passwordChanged) {
             showToast('🔐 Password Diganti', 'Password berhasil diperbarui!', 'fa-key', 'success');
@@ -5275,6 +4762,7 @@ async function saveSettings() {
             showToast('✅ Berhasil', 'Profil berhasil diperbarui!', 'fa-check-circle', 'success');
         }
     } catch (err) {
+        console.error(err);
         showToast('❌ Gagal', 'Tidak dapat menyimpan perubahan', 'fa-times-circle', 'error');
         if (saveBtn) {
             saveBtn.disabled = false;
@@ -5299,21 +4787,25 @@ function openLightboxFromPost(postId) {
     const idx = lightboxImages.findIndex(img => img.postId === postId);
     currentLightboxIndex = idx >= 0 ? idx : 0;
     renderLightbox();
-    document.getElementById('lightboxOverlay').classList.add('active');
+    document.getElementById('lightboxOverlay')?.classList.add('active');
     document.body.style.overflow = 'hidden';
 }
 function renderLightbox() {
     const img = lightboxImages[currentLightboxIndex];
     if (!img) return;
-    document.getElementById('lightboxImage').src = img.src;
-    document.getElementById('lightboxCounter').textContent = `${currentLightboxIndex + 1} / ${lightboxImages.length}`;
-    document.getElementById('lightboxInfo').innerHTML =
-        `<div>📷 ${escapeHTML(img.userFullName)}</div><div style="font-size:0.6rem;opacity:0.7;">🕐 ${formatDate(new Date(img.timestamp).getTime())}</div>`;
-    document.getElementById('lightboxPrevBtn').disabled = currentLightboxIndex === 0;
-    document.getElementById('lightboxNextBtn').disabled = currentLightboxIndex === lightboxImages.length - 1;
+    const imgEl = document.getElementById('lightboxImage');
+    if (imgEl) imgEl.src = img.src;
+    const cntEl = document.getElementById('lightboxCounter');
+    if (cntEl) cntEl.textContent = `${currentLightboxIndex + 1} / ${lightboxImages.length}`;
+    const infoEl = document.getElementById('lightboxInfo');
+    if (infoEl) infoEl.innerHTML = `<div>📷 ${escapeHTML(img.userFullName)}</div><div style="font-size:0.6rem;opacity:0.7;">🕐 ${formatDate(new Date(img.timestamp).getTime())}</div>`;
+    const prev = document.getElementById('lightboxPrevBtn');
+    const next = document.getElementById('lightboxNextBtn');
+    if (prev) prev.disabled = currentLightboxIndex === 0;
+    if (next) next.disabled = currentLightboxIndex === lightboxImages.length - 1;
 }
 function closeLightbox() {
-    document.getElementById('lightboxOverlay').classList.remove('active');
+    document.getElementById('lightboxOverlay')?.classList.remove('active');
     document.body.style.overflow = '';
 }
 function lightboxPrev() { if (currentLightboxIndex > 0) { currentLightboxIndex--; renderLightbox(); } }
@@ -5341,131 +4833,17 @@ function lightboxShare() {
 }
 
 /* ================================================================
- * FLOATING NOTIFICATION (untuk PWA Install & Emergency Alert)
- * ================================================================ */
-let floatingNotificationTimeout = null;
-let deferredPrompt = null;
-
-function showFloatingNotification(type, title, message, subtitle, actionText, actionCallback) {
-    const notif = document.getElementById('floatingNotification');
-    const icon = document.getElementById('floatingIcon');
-    if (!notif) return;
-    clearTimeout(floatingNotificationTimeout);
-
-    icon.className = 'notif-icon ' + type;
-    if (type === 'emergency') {
-        icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
-    } else if (type === 'install') {
-        icon.innerHTML = '<i class="fas fa-download"></i>';
-    } else {
-        icon.innerHTML = '<i class="fas fa-bell"></i>';
-    }
-
-    document.getElementById('floatingTitle').textContent = title;
-    document.getElementById('floatingMessage').textContent = message;
-    document.getElementById('floatingSubtitle').textContent = subtitle || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-
-    const actionBtn = document.getElementById('floatingAction');
-    if (actionText && actionCallback) {
-        actionBtn.style.display = 'block';
-        actionBtn.textContent = actionText;
-        actionBtn.onclick = (e) => {
-            e.stopPropagation();
-            actionCallback();
-        };
-    } else {
-        actionBtn.style.display = 'none';
-    }
-
-    document.getElementById('floatingClose').onclick = (e) => {
-        e.stopPropagation();
-        hideFloatingNotification();
-    };
-
-    if (type === 'emergency') {
-        notif.classList.add('emergency-notif');
-    } else {
-        notif.classList.remove('emergency-notif');
-    }
-
-    notif.onclick = () => {
-        if (actionCallback) actionCallback();
-    };
-
-    notif.classList.add('active');
-    floatingNotificationTimeout = setTimeout(() => hideFloatingNotification(), 10000);
-}
-
-function hideFloatingNotification() {
-    const notif = document.getElementById('floatingNotification');
-    if (notif) {
-        notif.classList.remove('active');
-        notif.classList.add('hide');
-        setTimeout(() => notif.classList.remove('hide'), 500);
-    }
-    clearTimeout(floatingNotificationTimeout);
-}
-
-/* ================================================================
- * PWA INSTALL PROMPT
- * ================================================================ */
-function setupPWA() {
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
-        });
-    }
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        setTimeout(() => {
-            if (deferredPrompt && !localStorage.getItem('salink_installed')) {
-                showFloatingNotification(
-                    'install',
-                    '📱 Install SALINK',
-                    'Akses lebih cepat & offline',
-                    'Tap untuk install aplikasi',
-                    'Install',
-                    () => showInstallPrompt()
-                );
-            }
-        }, 10000);
-    });
-
-    window.addEventListener('appinstalled', () => {
-        localStorage.setItem('salink_installed', 'true');
-        deferredPrompt = null;
-        showToast('🎉 Selamat!', 'Aplikasi SALINK berhasil diinstall!', 'fa-rocket', 'success');
-    });
-}
-
-function showInstallPrompt() {
-    if (deferredPrompt) {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then((r) => {
-            if (r.outcome === 'accepted') {
-                localStorage.setItem('salink_installed', 'true');
-                showToast('✅ Berhasil', 'Aplikasi SALINK diinstall!', 'fa-check-circle', 'success');
-            }
-            deferredPrompt = null;
-        });
-    } else {
-        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-        showToast('📱 Install', isIOS ? 'Bagikan → Tambahkan ke Layar Utama' : 'Menu browser → Install Aplikasi', 'fa-mobile-alt', 'success');
-    }
-}
-
-/* ================================================================
- * MODAL SEARCH (SAMA DENGAN DASHBOARD)
+ * MODAL SEARCH
  * ================================================================ */
 let searchTab = 'all';
 let searchEmergencyFilter = 'all';
 let searchDebounceTimer = null;
-let recentSearches = [];
 
 function openSearchModal() {
-    if (!requireLogin()) return;
+    if (!currentUser) {
+        showToast('🔒 Login', 'Silakan login dulu', 'fa-lock', 'error');
+        return;
+    }
     openModal('searchModal');
     const input = document.getElementById('searchInput');
     if (input) {
@@ -5478,7 +4856,6 @@ function openSearchModal() {
     if (sar) sar.style.display = 'none';
     const sdv = document.getElementById('searchDefaultView');
     if (sdv) sdv.style.display = 'block';
-    renderSearchDefaultView();
     searchTab = 'all';
     document.querySelectorAll('.search-tab').forEach(t => t.classList.remove('active'));
     const allTab = document.querySelector('.search-tab[data-tab="all"]');
@@ -5491,23 +4868,17 @@ function openSearchModal() {
     if (allChip) allChip.classList.add('active');
     setupSearchInput();
 }
-
-function closeSearchModal() {
-    closeModal('searchModal');
+function closeSearchModal() { closeModal('searchModal'); }
+function clearSearch() {
+    const input = document.getElementById('searchInput');
+    if (input) input.value = '';
+    const cb = document.getElementById('clearSearchBtn');
+    if (cb) cb.classList.remove('visible');
+    const sar = document.getElementById('searchActiveResults');
+    if (sar) sar.style.display = 'none';
+    const sdv = document.getElementById('searchDefaultView');
+    if (sdv) sdv.style.display = 'block';
 }
-
-function renderSearchDefaultView() {
-    const container = document.getElementById('searchDefaultView');
-    if (!container) return;
-    container.innerHTML = `
-        <div class="search-empty-state">
-            <div class="empty-big-icon">🔍</div>
-            <h4>Mulai Pencarian</h4>
-            <p>Ketik nama pengguna, isi postingan, lokasi, atau jenis emergency.</p>
-        </div>
-    `;
-}
-
 function setupSearchInput() {
     const input = document.getElementById('searchInput');
     const clearBtn = document.getElementById('clearSearchBtn');
@@ -5521,9 +4892,7 @@ function setupSearchInput() {
             if (clearBtn) clearBtn.classList.remove('visible');
         }
         clearTimeout(searchDebounceTimer);
-        searchDebounceTimer = setTimeout(() => {
-            performSearch(val);
-        }, 250);
+        searchDebounceTimer = setTimeout(() => performSearch(val), 250);
     });
     input.addEventListener('keydown', function(e) {
         if (e.key === 'Escape') closeSearchModal();
@@ -5539,19 +4908,6 @@ function setupSearchInput() {
         });
     }
 }
-
-function clearSearch() {
-    const input = document.getElementById('searchInput');
-    if (input) input.value = '';
-    const cb = document.getElementById('clearSearchBtn');
-    if (cb) cb.classList.remove('visible');
-    const sar = document.getElementById('searchActiveResults');
-    if (sar) sar.style.display = 'none';
-    const sdv = document.getElementById('searchDefaultView');
-    if (sdv) sdv.style.display = 'block';
-    renderSearchDefaultView();
-}
-
 function switchSearchTab(tab, btnEl) {
     searchTab = tab;
     document.querySelectorAll('.search-tab').forEach(t => t.classList.remove('active'));
@@ -5561,7 +4917,6 @@ function switchSearchTab(tab, btnEl) {
     const input = document.getElementById('searchInput');
     if (input && input.value.trim()) performSearch(input.value.trim());
 }
-
 function setEmergencyFilter(filter, btnEl) {
     searchEmergencyFilter = filter;
     document.querySelectorAll('.search-filter-chip').forEach(c => c.classList.remove('active'));
@@ -5569,7 +4924,6 @@ function setEmergencyFilter(filter, btnEl) {
     const input = document.getElementById('searchInput');
     if (input && input.value.trim()) performSearch(input.value.trim());
 }
-
 function highlightText(text, query) {
     if (!text || !query) return escapeHTML(text || '');
     const safeText = escapeHTML(text);
@@ -5577,7 +4931,6 @@ function highlightText(text, query) {
     const regex = new RegExp('(' + safeQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
     return safeText.replace(regex, '<mark>$1</mark>');
 }
-
 function performSearch(query) {
     const q = query.trim().toLowerCase();
     if (!q) {
@@ -5594,19 +4947,16 @@ function performSearch(query) {
     const cb = document.getElementById('clearSearchBtn');
     if (cb) cb.classList.add('visible');
 
-    // Search users
     const users = (allUsers.length > 0 ? allUsers : []).filter(u =>
         (u.fullName || '').toLowerCase().indexOf(q) !== -1 ||
         (u.username || '').toLowerCase().indexOf(q) !== -1 ||
         (u.email || '').toLowerCase().indexOf(q) !== -1
     );
-    // Search posts
     const matchedPosts = posts.filter(p =>
         (p.text || '').toLowerCase().indexOf(q) !== -1 ||
         (p.userFullName || '').toLowerCase().indexOf(q) !== -1 ||
         (p.specialLocation || '').toLowerCase().indexOf(q) !== -1
     );
-    // Search emergencies
     let matchedEm = allEmergencies.slice();
     if (searchEmergencyFilter !== 'all') matchedEm = matchedEm.filter(e => e.type === searchEmergencyFilter);
     matchedEm = matchedEm.filter(e =>
@@ -5628,8 +4978,7 @@ function performSearch(query) {
             const initial = (u.fullName || u.username || 'U').charAt(0).toUpperCase();
             const avatar = u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" alt="">' : initial;
             const statusDot = (u.lastActive && new Date(u.lastActive).getTime() > Date.now() - 5 * 60 * 1000)
-                ? '<span class="online-dot"></span>'
-                : '<span class="offline-dot"></span>';
+                ? '<span class="online-dot"></span>' : '<span class="offline-dot"></span>';
             const loc = [u.city, u.province].filter(Boolean).join(', ') || u.country || 'Lokasi tidak diketahui';
             return '<div class="search-result-item" onclick="goToUserFromSearch(\'' + escapeAttr(u.username) + '\')">' +
                 '<div class="result-avatar">' + avatar + statusDot + '</div>' +
@@ -5641,7 +4990,6 @@ function performSearch(query) {
             '</div>';
         }).join('');
     }
-
     if (showPosts && matchedPosts.length > 0) {
         totalCount += matchedPosts.length;
         html += '<div class="search-section-title"><span>📝 Postingan</span><span class="count-pill">' + matchedPosts.length + '</span></div>';
@@ -5659,7 +5007,6 @@ function performSearch(query) {
             '</div>';
         }).join('');
     }
-
     if (showEm && matchedEm.length > 0) {
         totalCount += matchedEm.length;
         html += '<div class="search-section-title"><span>🚨 Emergency</span><span class="count-pill">' + matchedEm.length + '</span></div>';
@@ -5675,7 +5022,6 @@ function performSearch(query) {
             '</div>';
         }).join('');
     }
-
     if (totalCount === 0) {
         html = '<div class="search-empty-state">' +
             '<div class="empty-big-icon">🔍</div>' +
@@ -5685,14 +5031,12 @@ function performSearch(query) {
     }
     if (sar) sar.innerHTML = html;
 }
-
 function goToUserFromSearch(username) {
     closeSearchModal();
     setTimeout(() => {
-        window.open('profile-user.html?username=' + encodeURIComponent(username), '_blank');
+        window.open(PROFILE_USER_URL + '?username=' + encodeURIComponent(username), '_blank');
     }, 200);
 }
-
 function goToPostFromSearch(postId) {
     closeSearchModal();
     setTimeout(() => {
@@ -5708,7 +5052,6 @@ function goToPostFromSearch(postId) {
         }
     }, 300);
 }
-
 function goToEmergencyFromSearch(emergencyId) {
     closeSearchModal();
     setTimeout(() => {
@@ -5721,39 +5064,31 @@ function goToEmergencyFromSearch(emergencyId) {
  * ================================================================ */
 function openProfileUser(username) {
     if (!username) return;
-    if (username === currentUser?.username) {
+    if (username === (currentUser ? currentUser.username : '')) {
         window.location.href = PROFILE_URL;
         return;
     }
-    window.open(`profile-user.html?username=${encodeURIComponent(username)}`, '_blank');
+    window.open(PROFILE_USER_URL + '?username=' + encodeURIComponent(username), '_blank');
 }
 
 /* ================================================================
- * LOGOUT
- * ================================================================ */
-function handleLogout() {
-    if (confirm('Keluar dari akun?')) {
-        ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies']
-            .forEach(k => localStorage.removeItem(k));
-        window.location.href = DASHBOARD_URL + '?logout=1';
-    }
-}
-
-/* ================================================================
- * FAB MODAL — GRID 2x2 EMERGENCY
+ * FAB MODAL 2x2 EMERGENCY
  * ================================================================ */
 function openFabModal() {
-    if (!requireLogin()) return;
-    const fabModalOverlay = document.getElementById('fabModalOverlay');
-    if (!fabModalOverlay) return;
-    fabModalOverlay.classList.add('active');
+    if (!currentUser) {
+        showToast('🔒 Login', 'Silakan login dulu', 'fa-lock', 'error');
+        return;
+    }
+    const overlay = document.getElementById('fabModalOverlay');
+    if (!overlay) return;
+    overlay.classList.add('active');
     document.body.style.overflow = 'hidden';
     if (navigator.vibrate) navigator.vibrate(50);
 }
 function closeFabModal() {
-    const fabModalOverlay = document.getElementById('fabModalOverlay');
-    if (!fabModalOverlay) return;
-    fabModalOverlay.classList.remove('active');
+    const overlay = document.getElementById('fabModalOverlay');
+    if (!overlay) return;
+    overlay.classList.remove('active');
     document.body.style.overflow = '';
 }
 function initFabModal() {
@@ -5775,29 +5110,24 @@ function initFabModal() {
             if (e.target === fabModalOverlay) closeFabModal();
         });
     }
-
     fabEmergencyCards.forEach(card => {
         card.addEventListener('click', function() {
             const type = card.dataset.fabType;
             if (!type) return;
             closeFabModal();
 
-            // Set dropdown ke tipe yang dipilih
             const select = document.getElementById('profilePostTypeSelect');
             if (select) {
                 select.value = type;
                 const evt = new Event('change', { bubbles: true });
                 select.dispatchEvent(evt);
             }
-
-            // Scroll ke form postingan
             const postSection = document.querySelector('.post-section');
             if (postSection) {
                 setTimeout(() => {
                     postSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }, 250);
             }
-
             const typeLabels = {
                 fire: '🔥 Kebakaran', medical: '🚑 Medis & Kematian',
                 crime: '🚓 Kriminal', disaster: '🌪️ Bencana Alam'
@@ -5806,7 +5136,6 @@ function initFabModal() {
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
         });
     });
-
     document.addEventListener('keydown', function(e) {
         if (e.key === 'Escape' && fabModalOverlay && fabModalOverlay.classList.contains('active')) {
             closeFabModal();
@@ -5815,17 +5144,123 @@ function initFabModal() {
 }
 
 /* ================================================================
+ * FLOATING NOTIFICATION
+ * ================================================================ */
+function showFloatingNotification(type, title, message, subtitle, actionText, actionCallback) {
+    const notif = document.getElementById('floatingNotification');
+    const icon = document.getElementById('floatingIcon');
+    if (!notif) return;
+    clearTimeout(floatingNotificationTimeout);
+    icon.className = 'notif-icon ' + type;
+    if (type === 'emergency') icon.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+    else if (type === 'install') icon.innerHTML = '<i class="fas fa-download"></i>';
+    else icon.innerHTML = '<i class="fas fa-bell"></i>';
+
+    const titleEl = document.getElementById('floatingTitle');
+    const msgEl = document.getElementById('floatingMessage');
+    const subEl = document.getElementById('floatingSubtitle');
+    if (titleEl) titleEl.textContent = title;
+    if (msgEl) msgEl.textContent = message;
+    if (subEl) subEl.textContent = subtitle || new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+    const actionBtn = document.getElementById('floatingAction');
+    if (actionText && actionCallback) {
+        actionBtn.style.display = 'block';
+        actionBtn.textContent = actionText;
+        actionBtn.onclick = (e) => { e.stopPropagation(); actionCallback(); };
+    } else {
+        actionBtn.style.display = 'none';
+    }
+    const closeBtn = document.getElementById('floatingClose');
+    if (closeBtn) {
+        closeBtn.onclick = (e) => { e.stopPropagation(); hideFloatingNotification(); };
+    }
+    if (type === 'emergency') notif.classList.add('emergency-notif');
+    else notif.classList.remove('emergency-notif');
+    notif.onclick = () => { if (actionCallback) actionCallback(); };
+    notif.classList.add('active');
+    floatingNotificationTimeout = setTimeout(() => hideFloatingNotification(), 10000);
+}
+function hideFloatingNotification() {
+    const notif = document.getElementById('floatingNotification');
+    if (notif) {
+        notif.classList.remove('active');
+        notif.classList.add('hide');
+        setTimeout(() => notif.classList.remove('hide'), 500);
+    }
+    clearTimeout(floatingNotificationTimeout);
+}
+function showInstallPrompt() {
+    if (deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then((r) => {
+            if (r.outcome === 'accepted') {
+                localStorage.setItem('salink_installed', 'true');
+                showToast('✅ Berhasil', 'Aplikasi SALINK diinstall!', 'fa-check-circle', 'success');
+            }
+            deferredPrompt = null;
+        });
+    } else {
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        showToast('📱 Install', isIOS ? 'Bagikan → Tambahkan ke Layar Utama' : 'Menu browser → Install Aplikasi', 'fa-mobile-alt', 'success');
+    }
+}
+
+/* ================================================================
+ * PWA
+ * ================================================================ */
+function setupPWA() {
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {});
+        });
+    }
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        setTimeout(() => {
+            if (deferredPrompt && !localStorage.getItem('salink_installed')) {
+                showFloatingNotification(
+                    'install',
+                    '📱 Install SALINK',
+                    'Akses lebih cepat & offline',
+                    'Tap untuk install aplikasi',
+                    'Install',
+                    () => showInstallPrompt()
+                );
+            }
+        }, 10000);
+    });
+    window.addEventListener('appinstalled', () => {
+        localStorage.setItem('salink_installed', 'true');
+        deferredPrompt = null;
+        showToast('🎉 Selamat!', 'Aplikasi SALINK berhasil diinstall!', 'fa-rocket', 'success');
+    });
+}
+
+/* ================================================================
+ * LOGOUT
+ * ================================================================ */
+function handleLogout() {
+    if (confirm('Keluar dari akun?')) {
+        ['salink_user','salink_emergencies','salink_posts','salink_sent_invites','salink_read_notifs','salink_dismissed_emergencies','salink_muted_chats','salink_msg_status']
+            .forEach(k => { try { localStorage.removeItem(k); } catch(e) {} });
+        window.location.href = DASHBOARD_URL + '?logout=1';
+    }
+}
+
+/* ================================================================
  * INIT — DOMContentLoaded
  * ================================================================ */
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('🚀 SALINK Profil v6.0 Initializing...');
+    log('🚀 SALINK Profil v7.0 Initializing...');
 
     loadTheme();
     loadUser();
 
-    // ✅ AUTH GUARD — Redirect ke login kalau belum login
+    // ✅ AUTH GUARD
     if (!currentUser) {
-        console.log('🔒 Belum login — redirect ke login');
+        log('🔒 Belum login — redirect ke login');
         window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(PROFILE_URL);
         return;
     }
@@ -5833,7 +5268,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderProfile();
     updateSidebar();
 
-    // Theme
+    // Theme toggle
     document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
 
     // Sidebar
@@ -5847,6 +5282,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     // App title → Home
     document.getElementById('appTitle')?.addEventListener('click', () => {
         window.location.href = DASHBOARD_URL;
+    });
+
+    // Header Search → Modal Search
+    document.getElementById('headerSearchBtn')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openSearchModal();
+    });
+
+    // Header Notif → Modal Notif
+    document.getElementById('headerNotifBtn')?.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openNotifModal();
     });
 
     // Logout
@@ -5873,7 +5322,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         openHistoryPostinganModal();
         closeSidebar();
     });
-    document.getElementById('mapNavLink')?.addEventListener('click', (e) => {
+    document.getElementById('sidebarMapBtn')?.addEventListener('click', (e) => {
         e.preventDefault();
         openMapModal();
         closeSidebar();
@@ -5884,13 +5333,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         closeSidebar();
     });
 
-    // ✅ Header Search — buka Modal Search
-document.getElementById('headerSearchBtn')?.addEventListener('click', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    openSearchModal();
-});
-    // Bottom nav
+    // Bottom nav invite
     document.getElementById('bottomInviteNav')?.addEventListener('click', openInviteModal);
 
     // Map GPS button
@@ -5904,7 +5347,7 @@ document.getElementById('headerSearchBtn')?.addEventListener('click', function(e
     document.getElementById('lightboxShareBtn')?.addEventListener('click', lightboxShare);
 
     // Modal close on overlay click
-    ['biodataModal','mapModal','fotoModal','temanModal','historyPostinganModal','settingsModal','notifModal','inviteModal','followModal']
+    ['biodataModal','mapModal','fotoModal','temanModal','historyPostinganModal','settingsModal','notifModal','inviteModal','followModal','searchModal']
         .forEach(id => {
             const el = document.getElementById(id);
             if (!el) return;
@@ -5930,10 +5373,10 @@ document.getElementById('headerSearchBtn')?.addEventListener('click', function(e
         setTimeout(() => ripple.remove(), 600);
     });
 
-    // Init FAB modal
+    // Init FAB
     initFabModal();
 
-    // ✅ Setup PWA Install
+    // Setup PWA
     setupPWA();
 
     // Setup post input
@@ -5977,7 +5420,7 @@ document.getElementById('headerSearchBtn')?.addEventListener('click', function(e
         if (!document.hidden) updateNotifBadge();
     }, 15000);
 
-    console.log('✅ SALINK Profil v6.0 Ready!');
+    log('✅ SALINK Profil v7.0 Ready!');
 });
 
 /* ================================================================
@@ -5996,7 +5439,6 @@ window.openInviteModal = openInviteModal;
 window.sendInvite = sendInvite;
 window.openNotifModal = openNotifModal;
 window.markNotifRead = markNotifRead;
-window.deleteNotif = deleteNotif;
 window.openNotifDetail = openNotifDetail;
 window.openHistoryPostinganModal = openHistoryPostinganModal;
 window.openTemanModal = openTemanModal;
@@ -6031,32 +5473,37 @@ window.goToUserFromSearch = goToUserFromSearch;
 window.goToPostFromSearch = goToPostFromSearch;
 window.goToEmergencyFromSearch = goToEmergencyFromSearch;
 
-console.log('✅ SALINK Profil v6.0 Script Loaded — Telkomsel Redesign');
+log('✅ SALINK Profil v7.0 Part 2/2 Loaded');
     </script>
 
-    <!-- ============================================================ -->
+        <!-- ============================================================ -->
     <!-- FCM SETUP SALINK + EMERGENCY ALERT                           -->
     <!-- ============================================================ -->
     <script src="/firebase-config.js"></script>
     <script src="/fcm-client.js"></script>
     <script src="/salink-emergency.js"></script>
+    <script src="/salink-social.js"></script>
     <script>
     (function() {
       'use strict';
 
+      console.log('🔔 [FCM] Initializing on profil.html...');
+
+      // ============================================================
+      // FCM INIT SETELAH PAGE LOAD
+      // ============================================================
       window.addEventListener('load', async function() {
         const isLoggedIn = localStorage.getItem('salink_logged_in');
         const userData = localStorage.getItem('salink_user');
         if (isLoggedIn !== 'true' || !userData) {
-          console.log('ℹ️ [FCM] User belum login — FCM skip');
+          console.log('ℹ️ [FCM] User belum login — skip');
           return;
         }
 
         let user;
-        try { user = JSON.parse(userData); } catch(e) {
-          console.warn('⚠️ [FCM] salink_user tidak valid');
-          return;
-        }
+        try { user = JSON.parse(userData); }
+        catch(e) { console.warn('⚠️ [FCM] salink_user tidak valid'); return; }
+
         if (!user || !user.username) {
           console.warn('⚠️ [FCM] salink_user tidak punya username');
           return;
@@ -6069,39 +5516,144 @@ console.log('✅ SALINK Profil v6.0 Script Loaded — Telkomsel Redesign');
             console.warn('⚠️ [FCM] SalinkFCM tidak tersedia — cek /fcm-client.js');
             return;
           }
-
           const initResult = await SalinkFCM.init();
           if (!initResult.ok) {
             console.warn('⚠️ [FCM] init gagal:', initResult.reason);
             return;
           }
-
           console.log('✅ [FCM] Siap. Token:', initResult.token.substring(0, 30) + '...');
-
           const saveResult = await SalinkFCM.saveToken({
             userId: user.id,
             username: user.username,
             email: user.email
           });
-
-          if (saveResult.ok) {
-            console.log('✅ [FCM] Token tersimpan di backend');
-          } else {
-            console.warn('⚠️ [FCM] Gagal simpan token:', saveResult);
-          }
+          if (saveResult.ok) console.log('✅ [FCM] Token tersimpan di backend');
+          else console.warn('⚠️ [FCM] Gagal simpan token:', saveResult);
         } catch (err) {
           console.error('❌ [FCM] error:', err);
         }
       });
 
-      window.addEventListener('load', function() {
-        if (typeof SalinkEmergency === 'undefined') {
-          console.warn('⚠️ [SalinkEmergency] Script belum tersedia');
-        } else {
+      // ============================================================
+      // CEK SALINK-EMERGENCY
+      // ============================================================
+      var checkEmergency = setInterval(function() {
+        if (typeof SalinkEmergency !== 'undefined') {
+          clearInterval(checkEmergency);
           console.log('✅ [SalinkEmergency] Ready');
         }
+      }, 100);
+      setTimeout(function() {
+        clearInterval(checkEmergency);
+        if (typeof SalinkEmergency === 'undefined') {
+          console.warn('⚠️ [SalinkEmergency] Script belum tersedia');
+        }
+      }, 10000);
+
+      // ============================================================
+      // CEK SALINK-SOCIAL
+      // ============================================================
+      var checkSocial = setInterval(function() {
+        if (typeof SalinkSocial !== 'undefined') {
+          clearInterval(checkSocial);
+          console.log('✅ [SalinkSocial] Ready — v' + (SalinkSocial.VERSION || '?'));
+        }
+      }, 100);
+      setTimeout(function() {
+        clearInterval(checkSocial);
+        if (typeof SalinkSocial === 'undefined') {
+          console.warn('⚠️ [SalinkSocial] Script belum tersedia — cek /salink-social.js');
+        }
+      }, 10000);
+
+      // ============================================================
+      // SERVICE WORKER MESSAGE LISTENER
+      // ============================================================
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', function(event) {
+          var data = event.data || {};
+          if (data.type === 'EMERGENCY_PUSH_RECEIVED') {
+            console.log('🚨 [SW] Emergency push diterima');
+            if (typeof window.triggerEmergencyAutoAlarm === 'function' && data.emergency) {
+              window.triggerEmergencyAutoAlarm(data.emergency);
+            }
+          }
+          if (data.type === 'EMERGENCY_NOTIFICATION_CLICK') {
+            if (data.emergencyId) {
+              setTimeout(function() {
+                window.location.href = 'detail-emergency.html?id=' + encodeURIComponent(data.emergencyId);
+              }, 300);
+            }
+          }
+          if (data.type === 'NOTIFICATION_CLICK') {
+            if (data.url) setTimeout(function() { window.location.href = data.url; }, 300);
+          }
+        });
+        console.log('✅ [SW] Message listener terpasang');
+      }
+
+      // ============================================================
+      // VISIBILITY CHANGE → REFRESH TOKEN
+      // ============================================================
+      document.addEventListener('visibilitychange', function() {
+        if (!document.hidden && typeof SalinkFCM !== 'undefined') {
+          if (typeof SalinkFCM.refreshToken === 'function') {
+            SalinkFCM.refreshToken().catch(function() {});
+          }
+        }
+      });
+
+      // ============================================================
+      // DEBUG HELPER
+      // ============================================================
+      window.SALINK_FCM_DEBUG = {
+        getStatus: function() {
+          return {
+            isLoggedIn: localStorage.getItem('salink_logged_in'),
+            hasUser: !!localStorage.getItem('salink_user'),
+            hasFCM: typeof SalinkFCM !== 'undefined',
+            hasEmergency: typeof SalinkEmergency !== 'undefined',
+            hasSocial: typeof SalinkSocial !== 'undefined',
+            currentPage: window.location.pathname
+          };
+        }
+      };
+
+      console.log('✅ [FCM] Setup ready');
+    })();
+    </script>
+
+    <!-- ============================================================ -->
+    <!-- FINAL LOG                                                     -->
+    <!-- ============================================================ -->
+    <script>
+    (function() {
+      'use strict';
+      window.addEventListener('load', function() {
+        setTimeout(function() {
+          console.log('');
+          console.log('╔══════════════════════════════════════════════════╗');
+          console.log('║  SALINK profil.html v7.0 — READY                ║');
+          console.log('║  ✅ Tema Universal (dark/light)                  ║');
+          console.log('║  ✅ Header + Search 🔍 + Notif 🔔 + Theme       ║');
+          console.log('║  ✅ Sidebar + Peta Darurat                       ║');
+          console.log('║  ✅ Bottom Nav (Home/Toko/FAB/Invite/Profil)    ║');
+          console.log('║  ✅ Stats: Postingan/Pengikut/Mengikuti/Likes   ║');
+          console.log('║  ✅ Postingan Baru + Postingan Baru             ║');
+          console.log('║  ✅ Privacy Section (WhatsApp/Voice/Video/Phone)║');
+          console.log('║  ✅ GPS Button di Settings                       ║');
+          console.log('║  ✅ Modal: Biodata, Peta, Foto, Invite, Notif   ║');
+          console.log('║  ✅ Modal: Teman, Follow, History, Search       ║');
+          console.log('║  ✅ Lightbox, FAB Modal 2x2                      ║');
+          console.log('║  ✅ Integrasi salink-social.js v1.1             ║');
+          console.log('║  ✅ FCM + SalinkEmergency                        ║');
+          console.log('║  ✅ Redirect emergency → dashboard + alarm       ║');
+          console.log('╚══════════════════════════════════════════════════╝');
+          console.log('');
+        }, 1000);
       });
     })();
     </script>
+
 </body>
 </html>
