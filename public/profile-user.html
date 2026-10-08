@@ -4845,7 +4845,7 @@
         updateFollowButton();
     }
 
-        function updateFollowStats() {
+                function updateFollowStats() {
         if (!profileUser) return;
         var targetUser = profileUser.username;
 
@@ -6743,7 +6743,7 @@
         });
     }
 
-    // ================================================================
+        // ================================================================
     // 40. EVENT LISTENERS
     // ================================================================
     function setupEventListeners() {
@@ -7029,132 +7029,7 @@
     }
 
     // ================================================================
-    // 41. INIT — OPTIMASI LOADING CEPAT
-    // ================================================================
-        async function init() {
-        log('Initializing Profile-User v16.0...');
-
-        loadTheme();
-        loadReadNotifs();
-        loadSentInvites();
-        setupPWA();
-        loadCurrentUser();
-        setupLoginGuard();
-        setupEventListeners();
-        setupProfileActionsListeners();
-        initRipple();
-        initStorageEvents();
-
-        updateNotifBadge();
-        updateInviteBadge();
-        setInterval(updateNotifBadge, 30000);
-
-        // ⭐ MAX LOADING 500ms — auto-hide loading overlay
-        setTimeout(function() {
-            var lo = document.getElementById('loadingOverlay');
-            if (lo && lo.classList.contains('active')) {
-                lo.classList.remove('active');
-            }
-        }, 500);
-
-        // Load posts + friends dulu (paralel untuk cepat)
-        await Promise.allSettled([
-            loadPosts(),
-            loadFriends()
-        ]);
-
-        // Load profile (cache-first, fetch background)
-        try {
-            await loadProfileData();
-        } catch(e) {
-            console.error('❌ Init error:', e);
-            showNotFound();
-        }
-
-        if (isPreviewMode) setTimeout(function() { showPreviewOverlay(); }, 1200);
-
-        log('✓ Profile-User v16.0 Ready!');
-        log('  Mode: ' + (isPreviewMode ? 'PREVIEW' : 'FULL'));
-        log('  User: ' + (currentUser ? currentUser.username : 'Guest'));
-        log('  Target: ' + (profileUser ? profileUser.username : 'Not found'));
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
-
-    // ================================================================
-    // 42. EXPOSE GLOBAL
-    // ================================================================
-    window.handleLike = handleLike;
-    window.sendComment = sendComment;
-    window.deleteComment = deleteComment;
-    window.sharePost = sharePost;
-    window.toggleComments = toggleComments;
-    window.openProfileUser = openProfileUser;
-    window.sendMessage = sendMessage;
-    window.handleFollowClick = handleFollowClick;
-    window.openBiodataModal = openBiodataModal;
-    window.closeBiodataModal = closeBiodataModal;
-    window.openFotoModal = openFotoModal;
-    window.closeFotoModal = closeFotoModal;
-    window.setFotoFilter = setFotoFilter;
-    window.openTemanModal = openTemanModal;
-    window.closeTemanModal = closeTemanModal;
-    window.openFollowModal = openFollowModal;
-    window.closeFollowModal = closeFollowModal;
-    window.switchFollowTab = switchFollowTab;
-    window.openLightboxFromPost = openLightboxFromPost;
-    window.closeLightbox = closeLightbox;
-    window.lightboxPrev = lightboxPrev;
-    window.lightboxNext = lightboxNext;
-    window.openSearchModal = openSearchModal;
-    window.closeSearchModal = closeSearchModal;
-    window.clearSearch = clearSearch;
-    window.switchSearchTab = switchSearchTab;
-    window.setSearchEmergencyFilter = setSearchEmergencyFilter;
-    window.openNotifModal = openNotifModal;
-    window.closeNotifModal = closeNotifModal;
-    window.markNotifRead = markNotifRead;
-    window.openInviteModal = openInviteModal;
-    window.closeInviteModal = closeInviteModal;
-    window.updateInviteBadge = updateInviteBadge;
-    window.openFabModal = openFabModal;
-    window.closeFabModal = closeFabModal;
-    window.openMapModal = openMapModal;
-    window.closeMapModal = closeMapModal;
-    window.toggleTheme = toggleTheme;
-    window.showToast = showToast;
-    window.showPreviewOverlay = showPreviewOverlay;
-    window.hidePreviewOverlay = hidePreviewOverlay;
-    window.activateMapGps = activateMapGps;
-    window.mapSearchService = mapSearchService;
-    window.setReplyTo = setReplyTo;
-    window.cancelReply = cancelReply;
-    window.handleViewer = handleViewer;
-    window.showInstallPrompt = showInstallPrompt;
-    window.showFloatingNotification = showFloatingNotification;
-    window.hideFloatingNotification = hideFloatingNotification;
-
-    // ================================================================
-    // v16.0 — EXPOSE GLOBAL (Profile Actions)
-    // ================================================================
-    window.openProfileActionsModal = openProfileActionsModal;
-    window.openReportUserModal = openReportUserModal;
-    window.closeReportUserModal = closeReportUserModal;
-    window.submitReportUser = submitReportUser;
-    window.openConfirmActionModal = openConfirmActionModal;
-    window.doRemoveFriend = doRemoveFriend;
-    window.doBlockUser = doBlockUser;
-    window.refreshFriendsFromLibrary = refreshFriendsFromLibrary;
-
-    log('✓ Profile-User v16.0 Script Loaded');
-})();
-
-    // ================================================================
-    // 43. PROFILE ACTIONS (v16.0) — Hapus / Laporkan / Blokir
+    // 41. PROFILE ACTIONS (v16.0) — Hapus / Laporkan / Blokir
     // ================================================================
 
     // Refresh friends array dari SalinkSocial (biar selalu sinkron)
@@ -7431,7 +7306,7 @@
     }
 
     // ================================================================
-    // 44. EVENT LISTENERS v16.0 (Profile Actions)
+    // 42. EVENT LISTENERS v16.0 (Profile Actions)
     // ================================================================
     function setupProfileActionsListeners() {
         // Tombol ⋮
@@ -7500,8 +7375,176 @@
         }
     }
 
+    // ================================================================
+    // 43. INIT — ULTRA FAST LOADING (GERCEP)
+    // ================================================================
+    function init() {
+        log('Initializing Profile-User v16.0 — ULTRA FAST...');
+
+        // Setup dasar (sinkron, cepat)
+        loadTheme();
+        loadReadNotifs();
+        loadSentInvites();
+        setupPWA();
+        loadCurrentUser();
+        setupLoginGuard();
+        setupEventListeners();
+        setupProfileActionsListeners();
+        initRipple();
+        initStorageEvents();
+
+        updateNotifBadge();
+        updateInviteBadge();
+        setInterval(updateNotifBadge, 30000);
+
+        // ⭐ HIDE LOADING INSTAN — 0ms, tidak tunggu API
+        var lo = document.getElementById('loadingOverlay');
+        if (lo) lo.classList.remove('active');
+
+        // ⭐ RENDER DARI CACHE INSTAN (sinkron 0-50ms)
+        targetUsername = getUsernameFromURL();
+        if (!targetUsername) {
+            showNotFound();
+            return;
+        }
+
+        if (currentUser && currentUser.username === targetUsername) {
+            window.location.href = PROFILE_URL;
+            return;
+        }
+
+        var cachedUsers = [];
+        try { cachedUsers = JSON.parse(localStorage.getItem('salink_users') || '[]'); } catch(e) {}
+        var cachedUser = cachedUsers.find(function(u) { return u.username === targetUsername; });
+
+        if (cachedUser) {
+            profileUser = cachedUser;
+            allUsers = cachedUsers;
+            renderProfile();
+            document.getElementById('profileContent').style.display = 'block';
+            log('✓ Rendered INSTAN dari cache: ' + targetUsername);
+        }
+
+        // ⭐ FETCH API DI BACKGROUND (non-blocking, no await)
+        fetchUsersInBackground();
+        loadPosts();
+        loadFriends().then(function() {
+            if (profileUser) {
+                updateFollowStats();
+                updateFollowButton();
+            }
+        });
+
+        // Kalau cache miss → fetch langsung (bisa 0.5-2s)
+        if (!cachedUser) {
+            log('Cache miss — fetching...');
+            apiGetUsers().then(function(remoteUsers) {
+                if (remoteUsers && remoteUsers.length > 0) {
+                    allUsers = remoteUsers;
+                    try { localStorage.setItem('salink_users', JSON.stringify(remoteUsers)); } catch(e) {}
+                    var u = remoteUsers.find(function(x) { return x.username === targetUsername; });
+                    if (u) {
+                        profileUser = u;
+                        renderProfile();
+                        document.getElementById('profileContent').style.display = 'block';
+                        log('✓ Rendered dari API: ' + targetUsername);
+                    } else {
+                        showNotFound();
+                    }
+                } else {
+                    showNotFound();
+                }
+            }).catch(function() {
+                showNotFound();
+            });
+        }
+
+        if (isPreviewMode) setTimeout(function() { showPreviewOverlay(); }, 1200);
+
+        log('✓ Profile-User v16.0 Ready!');
+        log('  Mode: ' + (isPreviewMode ? 'PREVIEW' : 'FULL'));
+        log('  User: ' + (currentUser ? currentUser.username : 'Guest'));
+        log('  Target: ' + (targetUsername || 'Not found'));
+    }
+
+    // ================================================================
+    // 44. EXPOSE GLOBAL
+    // ================================================================
+    window.handleLike = handleLike;
+    window.sendComment = sendComment;
+    window.deleteComment = deleteComment;
+    window.sharePost = sharePost;
+    window.toggleComments = toggleComments;
+    window.openProfileUser = openProfileUser;
+    window.sendMessage = sendMessage;
+    window.handleFollowClick = handleFollowClick;
+    window.openBiodataModal = openBiodataModal;
+    window.closeBiodataModal = closeBiodataModal;
+    window.openFotoModal = openFotoModal;
+    window.closeFotoModal = closeFotoModal;
+    window.setFotoFilter = setFotoFilter;
+    window.openTemanModal = openTemanModal;
+    window.closeTemanModal = closeTemanModal;
+    window.openFollowModal = openFollowModal;
+    window.closeFollowModal = closeFollowModal;
+    window.switchFollowTab = switchFollowTab;
+    window.openLightboxFromPost = openLightboxFromPost;
+    window.closeLightbox = closeLightbox;
+    window.lightboxPrev = lightboxPrev;
+    window.lightboxNext = lightboxNext;
+    window.openSearchModal = openSearchModal;
+    window.closeSearchModal = closeSearchModal;
+    window.clearSearch = clearSearch;
+    window.switchSearchTab = switchSearchTab;
+    window.setSearchEmergencyFilter = setSearchEmergencyFilter;
+    window.openNotifModal = openNotifModal;
+    window.closeNotifModal = closeNotifModal;
+    window.markNotifRead = markNotifRead;
+    window.openInviteModal = openInviteModal;
+    window.closeInviteModal = closeInviteModal;
+    window.updateInviteBadge = updateInviteBadge;
+    window.openFabModal = openFabModal;
+    window.closeFabModal = closeFabModal;
+    window.openMapModal = openMapModal;
+    window.closeMapModal = closeMapModal;
+    window.toggleTheme = toggleTheme;
+    window.showToast = showToast;
+    window.showPreviewOverlay = showPreviewOverlay;
+    window.hidePreviewOverlay = hidePreviewOverlay;
+    window.activateMapGps = activateMapGps;
+    window.mapSearchService = mapSearchService;
+    window.setReplyTo = setReplyTo;
+    window.cancelReply = cancelReply;
+    window.handleViewer = handleViewer;
+    window.showInstallPrompt = showInstallPrompt;
+    window.showFloatingNotification = showFloatingNotification;
+    window.hideFloatingNotification = hideFloatingNotification;
+
+    // ================================================================
+    // v16.0 — EXPOSE GLOBAL (Profile Actions)
+    // ================================================================
+    window.openProfileActionsModal = openProfileActionsModal;
+    window.openReportUserModal = openReportUserModal;
+    window.closeReportUserModal = closeReportUserModal;
+    window.submitReportUser = submitReportUser;
+    window.openConfirmActionModal = openConfirmActionModal;
+    window.doRemoveFriend = doRemoveFriend;
+    window.doBlockUser = doBlockUser;
+    window.refreshFriendsFromLibrary = refreshFriendsFromLibrary;
+    window.setupProfileActionsListeners = setupProfileActionsListeners;
+
+    // ================================================================
+    // BOOTSTRAP — Trigger init
+    // ================================================================
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
     log('✓ Profile-User v16.0 Script Loaded');
 })();
+        
     </script>
 
     <!-- ============================================================ -->
