@@ -4595,7 +4595,10 @@
         var params = new URLSearchParams(window.location.search);
         return params.get('username');
     }
-
+    function getChatTargetFromURL() {
+        var params = new URLSearchParams(window.location.search);
+        return params.get('chat');
+    }
     // ================================================================
     // 15. API CALL
     // ================================================================
@@ -5299,7 +5302,7 @@
     // ================================================================
     // 23. SEND MESSAGE → Redirect ke pesan-masuk.html
     // ================================================================
-    function sendMessage() {
+        function sendMessage() {
         if (!currentUser) {
             showToast('🔒 Login', 'Silakan masuk untuk mengirim pesan', 'fa-lock');
             setTimeout(function() { window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(window.location.href); }, 800);
@@ -5311,7 +5314,17 @@
             return;
         }
         var target = profileUser.username;
-        window.location.href = PESAN_URL + '?openNewChat=1&to=' + encodeURIComponent(target);
+
+        // ⭐ Simpan pending chat (double-safety untuk pesan-masuk.html)
+        try {
+            localStorage.setItem('salink_pending_chat', JSON.stringify({
+                username: target,
+                timestamp: Date.now()
+            }));
+        } catch(e) {}
+
+        // ⭐ Redirect ke pesan-masuk.html dengan 2 format URL (dual-format)
+        window.location.href = PESAN_URL + '?chat=' + encodeURIComponent(target) + '&openNewChat=1&to=' + encodeURIComponent(target);
     }
 
     // ================================================================
@@ -7280,6 +7293,19 @@
             setInterval(updateNotifBadge, 30000);
         } catch(e) {
             console.error('⚠️ Init basic error:', e);
+        }
+
+                // ⭐ HANDLE ?chat=username → Redirect ke pesan-masuk.html langsung
+        var chatTarget = getChatTargetFromURL();
+        if (chatTarget) {
+            try {
+                localStorage.setItem('salink_pending_chat', JSON.stringify({
+                    username: chatTarget,
+                    timestamp: Date.now()
+                }));
+            } catch(e) {}
+            window.location.href = PESAN_URL + '?chat=' + encodeURIComponent(chatTarget) + '&openNewChat=1&to=' + encodeURIComponent(chatTarget);
+            return;
         }
 
         // ⭐ RENDER DARI CACHE INSTAN (0-50ms)
