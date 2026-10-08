@@ -4111,33 +4111,39 @@
     </div> <!-- /app-shell (tutup) -->
 
         <!-- ============================================================ -->
-    <!-- SCRIPT UTAMA — PROFILE-USER v15.1 (NO PATCH)                  -->
+    <!-- SCRIPT UTAMA — PROFILE-USER v16.1 (FINAL, NO PATCH)           -->
     <!-- ============================================================ -->
     <script>
 /* ====================================================================
- * SALINK PROFILE-USER v15.1 — FINAL (NO PATCH)
+ * SALINK PROFILE-USER v16.1 — FINAL (NO PATCH)
  * ====================================================================
- * Fitur:
- *   - Tema Universal (dark/light) — konsisten Dashboard & induk
- *   - PWA Install
- *   - Header: Menu | Logo | Search | Notif | Theme | Profil | Back
- *   - Sidebar + #sidebarMapBtn (Peta Darurat)
- *   - Modal Peta Darurat
- *   - Modal Search (4 tab + chips SELALU tampil di baris sendiri)
- *   - Modal Notif (filter + tandai semua + mark read)
- *   - Modal Invite (klik nama/avatar → openProfileUser)
- *   - Bottom Nav: Home | Toko | FAB | Invite | Profil (TANPA Notif)
- *   - FAB Modal 2×2 → dashboard.html?emergency=TYPE
- *   - Profil publik read-only (Biodata, Foto, Teman, Follow)
- *   - Stat Postingan: Like, Komentar (nested reply), Share, Viewer
- *   - Klik nama/avatar → openProfileUser() di SEMUA lokasi
- *   - Tombol PESAN → pesan-masuk.html?openNewChat=1&to=USERNAME
- *   - Lightbox Zoom Foto
- *   - Loading cepat (max 500ms)
- *   - GPS Multi-Stage Fallback
+ * PERBAIKAN v16.1:
+ *   ✅ FIX syntax error updateFollowStats() (kode nyangkut dihapus)
+ *   ✅ Loading overlay auto-hide max 300ms + global error handler
+ *   ✅ init() ULTRA FAST: render cache instan, fetch background
+ *   ✅ Integrasi penuh SalinkSocial (friend, block, report)
+ *   ✅ Tombol ⋮ (More Actions) + modal konfirmasi + form laporan
+ *   ✅ Modal Daftar Teman FIX real data dari SalinkSocial
+ *   ✅ Loading TIDAK PERNAH nyangkut, GERCEP <300ms
  * ==================================================================== */
 (function() {
     'use strict';
+
+    // ================================================================
+    // 0. EMERGENCY HIDE LOADING (ANTI-LOADING-LAMA)
+    // ================================================================
+    setTimeout(function() {
+        var lo = document.getElementById('loadingOverlay');
+        if (lo) lo.classList.remove('active');
+    }, 300);
+    window.addEventListener('error', function() {
+        var lo = document.getElementById('loadingOverlay');
+        if (lo) lo.classList.remove('active');
+    });
+    window.addEventListener('unhandledrejection', function() {
+        var lo = document.getElementById('loadingOverlay');
+        if (lo) lo.classList.remove('active');
+    });
 
     // ================================================================
     // 1. KONSTANTA
@@ -4187,6 +4193,7 @@
     var readNotifs = {};
     var sentInvites = {};
     var _salinkSetup = false;
+    var _profileActionsSetup = false;
     var regularSound = null;
 
     // Lightbox state
@@ -4197,6 +4204,9 @@
 
     // Comment reply state
     var activeReplyTo = null;
+
+    // Confirm modal state
+    var _pendingConfirmCallback = null;
 
     // ================================================================
     // 3. HELPERS
@@ -4731,80 +4741,6 @@
         try { localStorage.setItem('salink_friends', JSON.stringify(friends)); } catch(e) {}
     }
 
-    // ⭐ OPTIMASI LOADING: render cepat dari cache dulu, fetch di background
-    async function loadProfileData() {
-        targetUsername = getUsernameFromURL();
-        if (!targetUsername) {
-            showNotFound();
-            return;
-        }
-
-        if (currentUser && currentUser.username === targetUsername) {
-            window.location.href = PROFILE_URL;
-            return;
-        }
-
-        // 1. CACHE HIT — render cepat dari localStorage
-        var users = [];
-        try { users = JSON.parse(localStorage.getItem('salink_users') || '[]'); } catch(e) {}
-        var user = users.find(function(u) { return u.username === targetUsername; });
-
-        if (user) {
-            profileUser = user;
-            allUsers = users;
-            renderProfile();
-            document.getElementById('profileContent').style.display = 'block';
-            // Hide loading cepat
-            var lo = document.getElementById('loadingOverlay');
-            if (lo) setTimeout(function() { lo.classList.remove('active'); }, 200);
-            log('Profile rendered from cache: ' + targetUsername);
-            // Fetch background — tidak blocking UI
-            fetchUsersInBackground();
-            return;
-        }
-
-        // 2. CACHE MISS — fetch dari API
-        log('Cache miss, fetching from API...');
-        try {
-            var remoteUsers = await apiGetUsers();
-            if (remoteUsers && remoteUsers.length > 0) {
-                users = remoteUsers;
-                try { localStorage.setItem('salink_users', JSON.stringify(users)); } catch(e) {}
-                allUsers = users;
-                user = users.find(function(u) { return u.username === targetUsername; });
-            }
-        } catch(e) {
-            console.warn('⚠️ Gagal fetch users:', e);
-        }
-
-        if (!user) {
-            showNotFound();
-            return;
-        }
-
-        profileUser = user;
-        renderProfile();
-        document.getElementById('profileContent').style.display = 'block';
-        var lo2 = document.getElementById('loadingOverlay');
-        if (lo2) lo2.classList.remove('active');
-    }
-
-    function fetchUsersInBackground() {
-        apiGetUsers().then(function(remoteUsers) {
-            if (remoteUsers && remoteUsers.length > 0) {
-                allUsers = remoteUsers;
-                try { localStorage.setItem('salink_users', JSON.stringify(allUsers)); } catch(e) {}
-                // Update profileUser dengan data terbaru (kalau ada perubahan)
-                var updated = allUsers.find(function(u) { return u.username === targetUsername; });
-                if (updated && JSON.stringify(updated) !== JSON.stringify(profileUser)) {
-                    profileUser = updated;
-                    renderProfile();
-                    log('Profile updated from background fetch');
-                }
-            }
-        }).catch(function() {});
-    }
-
     function showNotFound() {
         var lo = document.getElementById('loadingOverlay');
         if (lo) lo.classList.remove('active');
@@ -4821,10 +4757,12 @@
         if (!profileUser) return;
 
         var avatarEl = document.getElementById('profileAvatarLarge');
-        if (profileUser.profilePicture) {
-            avatarEl.innerHTML = '<img src="' + escapeAttr(profileUser.profilePicture) + '" alt="Profile">';
-        } else {
-            avatarEl.innerHTML = profileUser.gender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>';
+        if (avatarEl) {
+            if (profileUser.profilePicture) {
+                avatarEl.innerHTML = '<img src="' + escapeAttr(profileUser.profilePicture) + '" alt="Profile">';
+            } else {
+                avatarEl.innerHTML = profileUser.gender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>';
+            }
         }
 
         var nameEl = document.getElementById('profileName');
@@ -4845,11 +4783,11 @@
         updateFollowButton();
     }
 
-                function updateFollowStats() {
+    // ✅ FIXED: Fungsi bersih tanpa kode nyangkut
+    function updateFollowStats() {
         if (!profileUser) return;
         var targetUser = profileUser.username;
 
-        // ⭐ PAKAI SalinkSocial (single source of truth)
         var followingCount = 0;
         var followersCount = 0;
 
@@ -4857,7 +4795,6 @@
             followingCount = SalinkSocial.getFollowing(targetUser).length;
             followersCount = SalinkSocial.getFollowers(targetUser).length;
         } else {
-            // Fallback ke logic lama
             followingCount = friends.filter(function(f) {
                 var st = String(f.status || '').toLowerCase();
                 return String(f.user1 || '').trim() === targetUser &&
@@ -4894,19 +4831,8 @@
             }
         }
     }
-        if (followingEl) {
-            var prev2 = followingEl.textContent;
-            followingEl.textContent = following.length;
-            if (prev2 !== String(following.length)) {
-                followingEl.classList.remove('bump');
-                void followingEl.offsetWidth;
-                followingEl.classList.add('bump');
-                setTimeout(function() { followingEl.classList.remove('bump'); }, 600);
-            }
-        }
-    }
 
-        function updateFollowButton() {
+    function updateFollowButton() {
         if (!currentUser || !profileUser) return;
         var btn = document.getElementById('inviteBtn');
         var label = document.getElementById('inviteBtnLabel');
@@ -4914,7 +4840,6 @@
         var moreBtn = document.getElementById('profileMoreBtn');
         if (!btn || !label) return;
 
-        // Kalau lihat profil sendiri → sembunyikan tombol
         if (currentUser.username === profileUser.username) {
             btn.style.display = 'none';
             if (moreBtn) moreBtn.style.display = 'none';
@@ -4924,7 +4849,6 @@
         btn.style.display = 'inline-flex';
         if (moreBtn) moreBtn.style.display = 'inline-flex';
 
-        // ⭐ PAKAI SalinkSocial — status: 'none' | 'pending_out' | 'pending_in' | 'accepted' | 'blocked'
         var status = 'none';
         if (typeof SalinkSocial !== 'undefined') {
             status = SalinkSocial.getFriendStatus(currentUser.username, profileUser.username);
@@ -4936,38 +4860,32 @@
             status = isFollowing ? 'accepted' : 'none';
         }
 
-        // Reset state
         btn.classList.remove('following');
         btn.classList.remove('pending');
         btn.disabled = false;
 
         if (status === 'accepted') {
-            // Sudah berteman → tombol hijau "✓ MENGIKUTI"
             btn.classList.add('following');
             label.textContent = 'MENGIKUTI';
             if (icon) icon.className = 'fas fa-user-check';
             btn.title = 'Sudah berteman';
         } else if (status === 'pending_out') {
-            // Kita sudah invite, tunggu diterima → disabled
             btn.classList.add('pending');
             label.textContent = 'MENUNGGU';
             if (icon) icon.className = 'fas fa-hourglass-half';
             btn.disabled = true;
             btn.title = 'Menunggu konfirmasi';
         } else if (status === 'pending_in') {
-            // Orang ini sudah invite kita → tombol "TERIMA"
             label.textContent = 'TERIMA UNDANGAN';
             if (icon) icon.className = 'fas fa-user-plus';
             btn.title = 'Klik untuk menerima undangan';
         } else if (status === 'blocked') {
-            // Kita diblokir oleh target → disable
             btn.classList.add('pending');
             label.textContent = 'DIBLOKIR';
             if (icon) icon.className = 'fas fa-ban';
             btn.disabled = true;
             btn.title = 'Anda diblokir oleh pengguna ini';
         } else {
-            // none → tombol Invite
             label.textContent = 'INVITE';
             if (icon) icon.className = 'fas fa-user-plus';
             btn.title = 'Kirim undangan pertemanan';
@@ -4975,7 +4893,7 @@
     }
 
     // ================================================================
-    // 18. RENDER POSTS (Like + Comment Nested + Share + Viewer)
+    // 18. RENDER POSTS
     // ================================================================
     function renderProfilePosts(userPosts) {
         var container = document.getElementById('profilePosts');
@@ -5081,7 +4999,7 @@
     }
 
     // ================================================================
-    // 19. RENDER COMMENTS TREE (Nested Reply)
+    // 19. RENDER COMMENTS TREE
     // ================================================================
     function renderCommentsTree(postId, comments, parentId) {
         var topLevel = comments.filter(function(c) {
@@ -5226,7 +5144,7 @@
 
         var result = await apiLikePost(postId, currentUser.username, action);
         if (!result) {
-            console.warn('⚠️ Like sync failed — revert');
+            console.warn('⚠️ Like sync failed');
         }
     }
 
@@ -5379,7 +5297,7 @@
     }
 
     // ================================================================
-    // 23. SEND MESSAGE → Redirect ke pesan-masuk.html?openNewChat=1&to=
+    // 23. SEND MESSAGE → Redirect ke pesan-masuk.html
     // ================================================================
     function sendMessage() {
         if (!currentUser) {
@@ -5392,15 +5310,14 @@
             showToast('ℹ️ Info', 'Tidak bisa kirim pesan ke diri sendiri', 'fa-info-circle');
             return;
         }
-        // ⭐ REDIRECT ke pesan-masuk.html dengan parameter openNewChat + to
         var target = profileUser.username;
         window.location.href = PESAN_URL + '?openNewChat=1&to=' + encodeURIComponent(target);
     }
 
     // ================================================================
-    // 24. FOLLOW / INVITE HANDLER
+    // 24. FOLLOW / INVITE HANDLER (v16.0)
     // ================================================================
-        async function handleFollowClick() {
+    async function handleFollowClick() {
         if (!currentUser) {
             showToast('🔒 Login', 'Silakan masuk untuk follow', 'fa-lock');
             setTimeout(function() { window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(window.location.href); }, 800);
@@ -5417,43 +5334,41 @@
         }
 
         var myUsername = currentUser.username;
-        var targetUsername = profileUser.username;
-        var status = SalinkSocial.getFriendStatus(myUsername, targetUsername);
+        var targetUsernameLocal = profileUser.username;
+        var status = SalinkSocial.getFriendStatus(myUsername, targetUsernameLocal);
 
         // === MODE SUDAH BERTEMAN ===
         if (status === 'accepted') {
-            // Tombol jadi "MENGIKUTI" → klik untuk buka modal konfirmasi hapus
             openConfirmActionModal({
                 icon: 'fa-user-minus',
                 iconClass: 'warn',
                 title: 'Hapus Pertemanan?',
-                desc: 'Anda akan berhenti mengikuti <strong>@' + escapeHTML(targetUsername) + '</strong>. Anda bisa mengirim undangan lagi kapan saja.',
+                desc: 'Anda akan berhenti mengikuti <strong>@' + escapeHTML(targetUsernameLocal) + '</strong>. Anda bisa mengirim undangan lagi kapan saja.',
                 btnText: 'Ya, Hapus',
                 btnClass: 'btn-yes-danger',
                 onConfirm: function() {
-                    doRemoveFriend(myUsername, targetUsername);
+                    doRemoveFriend(myUsername, targetUsernameLocal);
                 }
             });
             return;
         }
 
-        // === MODE PENDING_IN (target sudah invite kita) → ACCEPT ===
+        // === MODE PENDING_IN → ACCEPT ===
         if (status === 'pending_in') {
-            var acceptResult = SalinkSocial.acceptInvite(myUsername, targetUsername);
+            var acceptResult = SalinkSocial.acceptInvite(myUsername, targetUsernameLocal);
             if (acceptResult.ok) {
                 playRegularSound();
                 showToast('✅ Diterima', 'Anda sekarang berteman dengan ' + profileUser.fullName, 'fa-user-check');
                 refreshFriendsFromLibrary();
                 updateFollowStats();
                 updateFollowButton();
-                // Sync ke backend
                 try {
                     await apiSaveInvite({
                         id: 'accept-' + Date.now(),
-                        user1: targetUsername,
+                        user1: targetUsernameLocal,
                         user2: myUsername,
                         status: 'accepted',
-                        requestedBy: targetUsername,
+                        requestedBy: targetUsernameLocal,
                         timestamp: new Date().toISOString(),
                         acceptedAt: new Date().toISOString()
                     });
@@ -5464,20 +5379,20 @@
             return;
         }
 
-        // === MODE PENDING_OUT → Disabled, jangan lakukan apapun ===
+        // === MODE PENDING_OUT ===
         if (status === 'pending_out') {
             showToast('⏳ Menunggu', 'Undangan Anda masih menunggu konfirmasi', 'fa-hourglass-half');
             return;
         }
 
-        // === MODE BLOCKED → Info ===
+        // === MODE BLOCKED ===
         if (status === 'blocked') {
             showToast('🚫 Diblokir', 'Anda tidak dapat mengirim undangan ke pengguna ini', 'fa-ban');
             return;
         }
 
         // === MODE NONE → Kirim undangan ===
-        var result = SalinkSocial.sendInvite(myUsername, targetUsername);
+        var result = SalinkSocial.sendInvite(myUsername, targetUsernameLocal);
 
         if (!result.ok) {
             if (result.reason === 'blocked_by_target') {
@@ -5492,7 +5407,6 @@
             return;
         }
 
-        // Kalau auto-accepted (target sudah invite duluan)
         if (result.reason === 'auto_accepted') {
             playRegularSound();
             showToast('🎉 Berteman!', 'Anda sekarang berteman dengan ' + profileUser.fullName, 'fa-user-check');
@@ -5505,7 +5419,6 @@
         updateFollowStats();
         updateFollowButton();
 
-        // Sync ke backend
         try {
             await apiSaveInvite(result.data);
             await apiSaveNotification({
@@ -5645,19 +5558,17 @@
     }
 
     // ================================================================
-    // 27. TEMAN MODAL
+    // 27. TEMAN MODAL (FIX REAL DATA)
     // ================================================================
-        function openTemanModal() {
+    function openTemanModal() {
         if (!profileUser) return;
         var body = document.getElementById('temanModalBody');
         if (!body) return;
 
-        // ⭐ FIX: PAKAI SalinkSocial.getFriends() — REAL DATA dari salink_friends (status accepted)
         var friendList = [];
         if (typeof SalinkSocial !== 'undefined') {
             friendList = SalinkSocial.getFriends(profileUser.username);
         } else {
-            // Fallback ke logic lama
             friendList = friends.filter(function(f) {
                 var u1 = String(f.user1 || '').trim();
                 var u2 = String(f.user2 || '').trim();
@@ -5718,7 +5629,6 @@
         body.innerHTML = headerCount + listHtml;
         openModalById('temanModal');
     }
-    
     function closeTemanModal() { closeModalById('temanModal'); }
 
     // ================================================================
@@ -6091,7 +6001,6 @@
                 : '<div class="notif-item-icon regular"><i class="fas fa-bell"></i></div>';
             var unreadClass = n.read ? '' : 'unread';
             var typeClass = n.type === 'emergency' ? 'emergency' : '';
-            // ⭐ SENDER CLICKABLE
             var senderHtml = n.senderUsername
                 ? '<span class="notif-item-sender" onclick="event.stopPropagation();window.closeNotifModal();window.openProfileUser(\'' + escapeAttr(n.senderUsername) + '\')">' + escapeHTML(n.sender) + '</span>'
                 : escapeHTML(n.sender || '');
@@ -6163,7 +6072,7 @@
     }
 
     // ================================================================
-    // 31. INVITE MODAL — klik nama/avatar → openProfileUser
+    // 31. INVITE MODAL
     // ================================================================
     function loadSentInvites() {
         try { sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}'); }
@@ -6216,7 +6125,6 @@
             var isSent = sentInvites[u.username] === true;
             var location = [u.city, u.province].filter(Boolean).join(', ') || u.country || 'Lokasi tidak diketahui';
             var statusDot = u.isOnline ? '🟢' : '⚪';
-            // ⭐ AVATAR + NAMA clickable
             return '<div class="invite-user-item">' +
                 '<div class="invite-user-avatar" onclick="event.stopPropagation();window.closeInviteModal();window.openProfileUser(\'' + escapeAttr(u.username) + '\')" style="cursor:pointer;">' + avatar + '</div>' +
                 '<div class="invite-user-info" onclick="event.stopPropagation();window.closeInviteModal();window.openProfileUser(\'' + escapeAttr(u.username) + '\')" style="cursor:pointer;">' +
@@ -6288,7 +6196,7 @@
     // ================================================================
     // 32. SEARCH MODAL
     // ================================================================
-        function openSearchModal() {
+    function openSearchModal() {
         if (isPreviewMode) { showPreviewOverlay(); return; }
         openModalById('searchModal');
         var input = document.getElementById('searchInput');
@@ -6307,7 +6215,6 @@
         document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
         var allChip = document.querySelector('.search-filter-chip[data-filter="all"]');
         if (allChip) allChip.classList.add('active');
-        // ⭐ FIX: Sembunyikan chips karena default tab = 'all'
         updateSearchChipsVisibility();
     }
     function closeSearchModal() { closeModalById('searchModal'); }
@@ -6321,24 +6228,21 @@
         var sdv = document.getElementById('searchDefaultView');
         if (sdv) sdv.style.display = 'block';
     }
-        function switchSearchTab(tab, btnEl) {
+    function switchSearchTab(tab, btnEl) {
         searchTab = tab;
         document.querySelectorAll('.search-tab').forEach(function(t) { t.classList.remove('active'); });
         if (btnEl) btnEl.classList.add('active');
-        // ⭐ FIX: Chips hanya tampil kalau tab Emergency aktif
         updateSearchChipsVisibility();
         var input = document.getElementById('searchInput');
         if (input && input.value.trim()) performSearch(input.value.trim());
     }
-        function setSearchEmergencyFilter(filter, btnEl) {
+    function setSearchEmergencyFilter(filter, btnEl) {
         searchEmergencyFilter = filter;
         document.querySelectorAll('.search-filter-chip').forEach(function(c) { c.classList.remove('active'); });
         if (btnEl) btnEl.classList.add('active');
         var input = document.getElementById('searchInput');
         if (input && input.value.trim()) performSearch(input.value.trim());
     }
-
-    // ⭐ FUNGSI BARU — Show/Hide chips berdasarkan tab aktif
     function updateSearchChipsVisibility() {
         var chipsRow = document.getElementById('emergencyFilters');
         if (!chipsRow) return;
@@ -6576,7 +6480,7 @@
 
         if (regionEl) {
             fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id', {
-                headers: { 'User-Agent': 'SALINK-App/15.1' }
+                headers: { 'User-Agent': 'SALINK-App/16.1' }
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -6698,7 +6602,6 @@
             window.location.href = PROFILE_URL;
             return;
         }
-        // Kalau sedang buka profile-user.html, dan username sama → skip reload
         if (targetUsername === username) return;
         window.location.href = 'profile-user.html?username=' + encodeURIComponent(username);
     }
@@ -6743,8 +6646,8 @@
         });
     }
 
-        // ================================================================
-    // 40. EVENT LISTENERS
+    // ================================================================
+    // 40. EVENT LISTENERS (MAIN)
     // ================================================================
     function setupEventListeners() {
         if (_salinkSetup) return;
@@ -6832,7 +6735,7 @@
 
         initFabModal();
 
-        // MAP MODAL CLOSE
+        // MAP MODAL
         var mapModalCloseBtn = document.getElementById('mapModalCloseBtn');
         if (mapModalCloseBtn) mapModalCloseBtn.addEventListener('click', closeMapModal);
         var mapModalCloseFooter = document.getElementById('mapModalCloseFooter');
@@ -6852,7 +6755,7 @@
             });
         });
 
-        // BIODATA MODAL CLOSE
+        // BIODATA MODAL
         var biodataModalCloseBtn = document.getElementById('biodataModalCloseBtn');
         if (biodataModalCloseBtn) biodataModalCloseBtn.addEventListener('click', closeBiodataModal);
         var biodataModalFooterCloseBtn = document.getElementById('biodataModalFooterCloseBtn');
@@ -7029,17 +6932,14 @@
     }
 
     // ================================================================
-    // 41. PROFILE ACTIONS (v16.0) — Hapus / Laporkan / Blokir
+    // 41. PROFILE ACTIONS (v16.0)
     // ================================================================
-
-    // Refresh friends array dari SalinkSocial (biar selalu sinkron)
     function refreshFriendsFromLibrary() {
         if (typeof SalinkSocial !== 'undefined') {
             friends = SalinkSocial.loadFriends();
         }
     }
 
-    // Buka modal aksi profil (dinamis 2 atau 3 pilihan)
     function openProfileActionsModal() {
         if (!currentUser) {
             showToast('🔒 Login', 'Silakan masuk dulu', 'fa-lock');
@@ -7058,7 +6958,6 @@
 
         var isFriend = (status === 'accepted');
 
-        // Update header modal
         var avatarEl = document.getElementById('profileActionsAvatar');
         var nameEl = document.getElementById('profileActionsName');
         var handleEl = document.getElementById('profileActionsHandle');
@@ -7070,14 +6969,12 @@
         if (nameEl) nameEl.textContent = profileUser.fullName || 'User';
         if (handleEl) handleEl.textContent = '@' + (profileUser.username || '-');
 
-        // Build action list
         var listEl = document.getElementById('profileActionsList');
         if (!listEl) return;
 
         var actionsHTML = '';
 
         if (isFriend) {
-            // === Mode berteman: Hapus / Laporkan / Blokir ===
             actionsHTML +=
                 '<button class="action-item danger" data-action="remove-friend" type="button">' +
                     '<div class="action-icon danger"><i class="fas fa-user-minus"></i></div>' +
@@ -7101,7 +6998,6 @@
                     '</div>' +
                 '</button>';
         } else {
-            // === Mode belum berteman: Kirim Undangan / Blokir ===
             actionsHTML +=
                 '<button class="action-item info" data-action="invite" type="button">' +
                     '<div class="action-icon info"><i class="fas fa-user-plus"></i></div>' +
@@ -7121,7 +7017,6 @@
 
         listEl.innerHTML = actionsHTML;
 
-        // Attach listeners ke action item
         listEl.querySelectorAll('[data-action]').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 var action = this.getAttribute('data-action');
@@ -7165,21 +7060,19 @@
         openModalById('profileActionsModal');
     }
 
-    // Eksekusi hapus pertemanan
-    function doRemoveFriend(myUsername, targetUsername) {
+    function doRemoveFriend(myUsername, targetUsernameLocal) {
         if (typeof SalinkSocial === 'undefined') return;
-        var result = SalinkSocial.removeFriend(myUsername, targetUsername);
+        var result = SalinkSocial.removeFriend(myUsername, targetUsernameLocal);
         if (result.ok) {
-            showToast('✅ Terhapus', 'Pertemanan dengan @' + targetUsername + ' dihapus', 'fa-user-minus');
+            showToast('✅ Terhapus', 'Pertemanan dengan @' + targetUsernameLocal + ' dihapus', 'fa-user-minus');
             refreshFriendsFromLibrary();
             updateFollowStats();
             updateFollowButton();
-            // Sync ke backend (opsional)
             try {
                 apiSaveInvite({
                     id: 'remove-' + Date.now(),
                     user1: myUsername,
-                    user2: targetUsername,
+                    user2: targetUsernameLocal,
                     status: 'removed',
                     requestedBy: myUsername,
                     timestamp: new Date().toISOString()
@@ -7190,7 +7083,6 @@
         }
     }
 
-    // Eksekusi blokir
     function doBlockUser(blocker, blocked) {
         if (typeof SalinkSocial === 'undefined') return;
         var result = SalinkSocial.blockUser(blocker, blocked);
@@ -7206,10 +7098,8 @@
         }
     }
 
-    // Modal Report User
     function openReportUserModal() {
         if (!profileUser) return;
-        // Reset form
         var radios = document.querySelectorAll('#reportReasons input[type="radio"]');
         radios.forEach(function(r) {
             r.checked = false;
@@ -7251,9 +7141,6 @@
         }
     }
 
-    // Modal Confirm (generic — dipakai untuk blokir & hapus teman)
-    var _pendingConfirmCallback = null;
-
     function openConfirmActionModal(opts) {
         opts = opts || {};
         var iconEl = document.getElementById('confirmIconLarge');
@@ -7265,7 +7152,6 @@
         var btnNo = document.getElementById('confirmBtnNo');
         if (!iconEl || !titleEl || !descEl || !btnYes || !btnNo) return;
 
-        // Set icon
         iconEl.className = 'confirm-icon-large ' + (opts.iconClass || '');
         iconEl.innerHTML = '<i class="fas ' + (opts.icon || 'fa-question') + '"></i>';
 
@@ -7284,7 +7170,6 @@
 
         _pendingConfirmCallback = opts.onConfirm || null;
 
-        // Reset listener biar tidak dobel
         var newYes = btnYes.cloneNode(true);
         btnYes.parentNode.replaceChild(newYes, btnYes);
         newYes.addEventListener('click', function() {
@@ -7305,11 +7190,10 @@
         openModalById('confirmActionModal');
     }
 
-    // ================================================================
-    // 42. EVENT LISTENERS v16.0 (Profile Actions)
-    // ================================================================
     function setupProfileActionsListeners() {
-        // Tombol ⋮
+        if (_profileActionsSetup) return;
+        _profileActionsSetup = true;
+
         var moreBtn = document.getElementById('profileMoreBtn');
         if (moreBtn) {
             moreBtn.addEventListener('click', function(e) {
@@ -7320,7 +7204,6 @@
             });
         }
 
-        // Close ProfileActionsModal
         var paCloseBtn = document.getElementById('profileActionsModalCloseBtn');
         if (paCloseBtn) paCloseBtn.addEventListener('click', function() { closeModalById('profileActionsModal'); });
         var paCloseFooter = document.getElementById('profileActionsModalFooterCloseBtn');
@@ -7332,7 +7215,6 @@
             });
         }
 
-        // Close ReportUserModal
         var ruCloseBtn = document.getElementById('reportUserModalCloseBtn');
         if (ruCloseBtn) ruCloseBtn.addEventListener('click', function() { closeReportUserModal(); });
         var ruModal = document.getElementById('reportUserModal');
@@ -7342,15 +7224,12 @@
             });
         }
 
-        // Cancel report
         var rcBtn = document.getElementById('reportCancelBtn');
         if (rcBtn) rcBtn.addEventListener('click', function() { closeReportUserModal(); });
 
-        // Submit report
         var rsBtn = document.getElementById('reportSubmitBtn');
         if (rsBtn) rsBtn.addEventListener('click', submitReportUser);
 
-        // Radio reason → enable submit + highlight
         document.querySelectorAll('#reportReasons input[type="radio"]').forEach(function(r) {
             r.addEventListener('change', function() {
                 document.querySelectorAll('#reportReasons .report-reason-item').forEach(function(l) {
@@ -7363,7 +7242,6 @@
             });
         });
 
-        // Close ConfirmActionModal (Batal sudah handle di openConfirmActionModal)
         var caModal = document.getElementById('confirmActionModal');
         if (caModal) {
             caModal.addEventListener('click', function(e) {
@@ -7376,32 +7254,35 @@
     }
 
     // ================================================================
-    // 43. INIT — ULTRA FAST LOADING (GERCEP)
+    // 42. INIT — ULTRA FAST (GERCEP)
     // ================================================================
     function init() {
-        log('Initializing Profile-User v16.0 — ULTRA FAST...');
+        log('Initializing Profile-User v16.1 — ULTRA FAST...');
 
-        // Setup dasar (sinkron, cepat)
-        loadTheme();
-        loadReadNotifs();
-        loadSentInvites();
-        setupPWA();
-        loadCurrentUser();
-        setupLoginGuard();
-        setupEventListeners();
-        setupProfileActionsListeners();
-        initRipple();
-        initStorageEvents();
+        // ⭐ HIDE OVERLAY PALING AWAL — tidak tunggu apapun
+        var lo0 = document.getElementById('loadingOverlay');
+        if (lo0) lo0.classList.remove('active');
 
-        updateNotifBadge();
-        updateInviteBadge();
-        setInterval(updateNotifBadge, 30000);
+        // Setup dasar (semua sinkron, cepat, 0ms)
+        try {
+            loadTheme();
+            loadReadNotifs();
+            loadSentInvites();
+            setupPWA();
+            loadCurrentUser();
+            setupLoginGuard();
+            setupEventListeners();
+            setupProfileActionsListeners();
+            initRipple();
+            initStorageEvents();
+            updateNotifBadge();
+            updateInviteBadge();
+            setInterval(updateNotifBadge, 30000);
+        } catch(e) {
+            console.error('⚠️ Init basic error:', e);
+        }
 
-        // ⭐ HIDE LOADING INSTAN — 0ms, tidak tunggu API
-        var lo = document.getElementById('loadingOverlay');
-        if (lo) lo.classList.remove('active');
-
-        // ⭐ RENDER DARI CACHE INSTAN (sinkron 0-50ms)
+        // ⭐ RENDER DARI CACHE INSTAN (0-50ms)
         targetUsername = getUsernameFromURL();
         if (!targetUsername) {
             showNotFound();
@@ -7413,6 +7294,7 @@
             return;
         }
 
+        // Render dari cache dulu (INSTAN)
         var cachedUsers = [];
         try { cachedUsers = JSON.parse(localStorage.getItem('salink_users') || '[]'); } catch(e) {}
         var cachedUser = cachedUsers.find(function(u) { return u.username === targetUsername; });
@@ -7420,55 +7302,81 @@
         if (cachedUser) {
             profileUser = cachedUser;
             allUsers = cachedUsers;
-            renderProfile();
-            document.getElementById('profileContent').style.display = 'block';
-            log('✓ Rendered INSTAN dari cache: ' + targetUsername);
+            try {
+                renderProfile();
+                document.getElementById('profileContent').style.display = 'block';
+                log('✓ Rendered INSTAN dari cache: ' + targetUsername);
+            } catch(e) {
+                console.error('⚠️ Render cache error:', e);
+            }
         }
 
-        // ⭐ FETCH API DI BACKGROUND (non-blocking, no await)
-        fetchUsersInBackground();
-        loadPosts();
-        loadFriends().then(function() {
-            if (profileUser) {
-                updateFollowStats();
-                updateFollowButton();
-            }
-        });
-
-        // Kalau cache miss → fetch langsung (bisa 0.5-2s)
-        if (!cachedUser) {
-            log('Cache miss — fetching...');
-            apiGetUsers().then(function(remoteUsers) {
-                if (remoteUsers && remoteUsers.length > 0) {
-                    allUsers = remoteUsers;
-                    try { localStorage.setItem('salink_users', JSON.stringify(remoteUsers)); } catch(e) {}
-                    var u = remoteUsers.find(function(x) { return x.username === targetUsername; });
-                    if (u) {
-                        profileUser = u;
-                        renderProfile();
-                        document.getElementById('profileContent').style.display = 'block';
-                        log('✓ Rendered dari API: ' + targetUsername);
+        // ⭐ FETCH BACKGROUND (non-blocking)
+        (async function backgroundFetch() {
+            try {
+                if (!cachedUser) {
+                    log('Cache miss — fetching user...');
+                    var remoteUsers = await apiGetUsers();
+                    if (remoteUsers && remoteUsers.length > 0) {
+                        allUsers = remoteUsers;
+                        try { localStorage.setItem('salink_users', JSON.stringify(remoteUsers)); } catch(e) {}
+                        var u = remoteUsers.find(function(x) { return x.username === targetUsername; });
+                        if (u) {
+                            profileUser = u;
+                            renderProfile();
+                            document.getElementById('profileContent').style.display = 'block';
+                            log('✓ Rendered dari API: ' + targetUsername);
+                        } else {
+                            showNotFound();
+                            return;
+                        }
                     } else {
                         showNotFound();
+                        return;
                     }
                 } else {
-                    showNotFound();
+                    // Cache hit → refresh background
+                    var freshUsers = await apiGetUsers();
+                    if (freshUsers && freshUsers.length > 0) {
+                        allUsers = freshUsers;
+                        try { localStorage.setItem('salink_users', JSON.stringify(freshUsers)); } catch(e) {}
+                        var fresh = freshUsers.find(function(u) { return u.username === targetUsername; });
+                        if (fresh) {
+                            profileUser = fresh;
+                            renderProfile();
+                        }
+                    }
                 }
-            }).catch(function() {
-                showNotFound();
-            });
-        }
+
+                // Load posts & friends paralel
+                await Promise.allSettled([loadPosts(), loadFriends()]);
+
+                if (profileUser) {
+                    updateFollowStats();
+                    updateFollowButton();
+                    renderProfilePosts(posts.filter(function(p) { return p.userId === profileUser.username; }));
+                }
+
+                var lo = document.getElementById('loadingOverlay');
+                if (lo) lo.classList.remove('active');
+
+            } catch(e) {
+                console.error('⚠️ Background fetch error:', e);
+                var lo2 = document.getElementById('loadingOverlay');
+                if (lo2) lo2.classList.remove('active');
+            }
+        })();
 
         if (isPreviewMode) setTimeout(function() { showPreviewOverlay(); }, 1200);
 
-        log('✓ Profile-User v16.0 Ready!');
+        log('✓ Profile-User v16.1 Ready!');
         log('  Mode: ' + (isPreviewMode ? 'PREVIEW' : 'FULL'));
         log('  User: ' + (currentUser ? currentUser.username : 'Guest'));
         log('  Target: ' + (targetUsername || 'Not found'));
     }
 
     // ================================================================
-    // 44. EXPOSE GLOBAL
+    // 43. EXPOSE GLOBAL
     // ================================================================
     window.handleLike = handleLike;
     window.sendComment = sendComment;
@@ -7520,9 +7428,7 @@
     window.showFloatingNotification = showFloatingNotification;
     window.hideFloatingNotification = hideFloatingNotification;
 
-    // ================================================================
-    // v16.0 — EXPOSE GLOBAL (Profile Actions)
-    // ================================================================
+    // v16.0 Profile Actions
     window.openProfileActionsModal = openProfileActionsModal;
     window.openReportUserModal = openReportUserModal;
     window.closeReportUserModal = closeReportUserModal;
@@ -7534,7 +7440,7 @@
     window.setupProfileActionsListeners = setupProfileActionsListeners;
 
     // ================================================================
-    // BOOTSTRAP — Trigger init
+    // 44. BOOTSTRAP
     // ================================================================
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
@@ -7542,9 +7448,8 @@
         init();
     }
 
-    log('✓ Profile-User v16.0 Script Loaded');
+    log('✓ Profile-User v16.1 Script Loaded');
 })();
-        
     </script>
 
     <!-- ============================================================ -->
@@ -7645,3 +7550,5 @@
     </script>
 </body>
 </html>
+
+        
