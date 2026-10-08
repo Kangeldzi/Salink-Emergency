@@ -830,6 +830,46 @@
         }
         .msg-bubble .msg-text { font-size: 0.8rem; line-height: 1.5; display: block; word-break: break-word; }
         .msg-bubble .msg-time { font-size: 0.55rem; opacity: 0.7; margin-top: 4px; display: block; text-align: right; }
+                /* ============ MESSAGE STATUS INDICATOR ============ */
+        .msg-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            margin-left: 5px;
+            font-size: 0.6rem;
+            vertical-align: middle;
+        }
+        .msg-status.sending { color: rgba(255,255,255,0.5); }
+        .msg-status.sent { color: #3fb950; }
+        .msg-status.failed { color: #f85149; }
+        .msg-status.pending { color: #f0d080; }
+        .msg-status i { font-size: 0.55rem; }
+        .msg-status .spinner-tiny {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border: 1.5px solid rgba(255,255,255,0.3);
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        .msg-bubble:not(.mine) .msg-status { color: var(--text-muted); }
+        .msg-bubble.failed {
+            border: 1px solid rgba(248,81,73,0.4) !important;
+            background: rgba(248,81,73,0.08) !important;
+        }
+        .msg-bubble.failed .msg-text { color: var(--text-secondary); }
+        .msg-status-badge {
+            font-size: 0.5rem;
+            padding: 1px 5px;
+            border-radius: 6px;
+            font-weight: 700;
+            margin-left: 4px;
+        }
+        .msg-status-badge.sending { background: rgba(255,255,255,0.1); }
+        .msg-status-badge.sent { background: rgba(63,185,80,0.15); color: #3fb950; }
+        .msg-status-badge.failed { background: rgba(248,81,73,0.15); color: #f85149; }
+        .msg-status-badge.pending { background: rgba(240,208,128,0.15); color: #f0d080; }
         .msg-bubble .msg-media-img { max-width: 220px; max-height: 220px; border-radius: 10px; cursor: zoom-in; margin: 4px 0; display: block; }
         .msg-bubble .msg-media-video { max-width: 220px; max-height: 220px; border-radius: 10px; margin: 4px 0; display: block; }
         .msg-bubble .msg-media-audio { max-width: 220px; margin: 4px 0; display: block; }
@@ -3035,11 +3075,11 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <!-- ============================================================ -->
-    <!-- SCRIPT UTAMA — PESAN-MASUK v15.1 (NO PATCH)                   -->
+    <!-- SCRIPT UTAMA — PESAN-MASUK v15.2 (NO PATCH)                   -->
     <!-- ============================================================ -->
     <script>
 /* ====================================================================
- * SALINK PESAN-MASUK v15.1 — FINAL
+ * SALINK PESAN-MASUK v15.2 — FINAL (NO PATCH)
  * ====================================================================
  * Fitur:
  *   - Tema Universal (dark/light)
@@ -3048,8 +3088,8 @@
  *   - Sidebar + #sidebarMapBtn (Peta Darurat)
  *   - Modal Search (4 tab 1 baris + chips selalu tampil)
  *   - Modal Notif (filter + tandai semua)
- *   - Modal Invite (persis Dashboard)
- *   - Modal Peta Darurat (persis lokasi-bantuan)
+ *   - Modal Invite (pakai SalinkSocial)
+ *   - Modal Peta Darurat
  *   - Bottom Nav: Home | Toko | FAB | Invite | Profil
  *   - FAB Modal 2×2 → dashboard.html?emergency=TYPE
  *   - Chat Room: nama/foto klik → profile-user.html
@@ -3058,12 +3098,10 @@
  *   - Emoji Picker: toggle show/hide + klik emoji auto-hide
  *   - FAB Menu: Chat Baru, Grup Baru, Broadcast, Tambah Kontak
  *   - Mute & Clear chat
- *
- * INTEGRASI dengan salink-social.js (GitHub version):
- *   - Menggunakan SalinkSocial.sendInvite(from, to)
- *   - Menggunakan SalinkSocial.getFriends(username)
- *   - Menggunakan SalinkSocial.areFriends(a, b)
- *   - Menggunakan SalinkSocial.isBlockedBy(target, requester)
+ *   - ⭐ BARU: Video/Voice Call Privacy-Aware
+ *   - ⭐ BARU: Message Status Indicator (sending/sent/failed/pending)
+ *   - ⭐ BARU: Toast notifikasi setiap status pesan
+ *   - ⭐ BARU: Auto-retry saat online
  * ==================================================================== */
 (function() {
     'use strict';
@@ -3416,16 +3454,13 @@
     }
 
     async function loadFriends() {
-        // Baca dari SalinkSocial jika tersedia
         if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.loadFriends === 'function') {
             friendsList = SalinkSocial.loadFriends();
             return;
         }
-        // Fallback: baca langsung dari localStorage
         try {
             friendsList = JSON.parse(localStorage.getItem('salink_friends') || '[]');
         } catch(e) { friendsList = []; }
-        // Coba ambil dari API juga
         try {
             var apiFriends = await apiGetFriends();
             if (apiFriends && apiFriends.length > 0) {
@@ -3489,11 +3524,18 @@
 
             var chat = chatMap.get(partnerUsername);
             var isMine = msg.from === myUsername;
+            // Restore status dari localStorage, default 'sent' untuk pesan lama
+            var savedStatus = 'sent';
+            try {
+                var statusMap = JSON.parse(localStorage.getItem('salink_msg_status') || '{}');
+                if (statusMap[msg.id]) savedStatus = statusMap[msg.id];
+            } catch(e) {}
             chat.messages.push({
                 id: msg.id,
                 text: msg.message,
                 mine: isMine,
-                time: msg.timestamp
+                time: msg.timestamp,
+                status: isMine ? savedStatus : undefined
             });
 
             if (msg.timestamp > chat.lastTime) {
@@ -3506,7 +3548,6 @@
         chatData = Array.from(chatMap.values());
         chatData.sort(function(a, b) { return (b.lastTime || 0) - (a.lastTime || 0); });
 
-        // Merge with local chats (grup, dll)
         var localChats = [];
         try {
             var raw2 = localStorage.getItem('salink_inbox_chats');
@@ -3517,10 +3558,15 @@
         } catch(e) {}
 
         localChats.forEach(function(lc) {
-            if (!chatData.find(function(c) { return c.id === lc.id; })) chatData.push(lc);
+            if (!chatData.find(function(c) { return c.id === lc.id; })) {
+                // Preserve messages from localChats if they have media/audio
+                var existing = chatData.find(function(c) { return c.id === lc.id; });
+                if (!existing && lc.messages && lc.messages.length > 0) {
+                    chatData.push(lc);
+                }
+            }
         });
 
-        // Restore muted state
         try {
             var mutedMap = JSON.parse(localStorage.getItem('salink_muted_chats') || '{}');
             chatData.forEach(function(c) { if (mutedMap[c.id]) c.muted = true; });
@@ -3533,9 +3579,11 @@
         try {
             localStorage.setItem('salink_inbox_chats', JSON.stringify(chatData));
             var allMsgs = [];
+            var statusMap = {};
             chatData.forEach(function(chat) {
                 if (chat.messages) {
                     chat.messages.forEach(function(msg) {
+                        if (msg.mine && msg.status) statusMap[msg.id] = msg.status;
                         if (msg.media || msg.audioUrl) return;
                         allMsgs.push({
                             id: msg.id,
@@ -3552,7 +3600,10 @@
                     });
                 }
             });
-            try { localStorage.setItem('salink_messages', JSON.stringify(allMsgs)); } catch(e) {}
+            try {
+                localStorage.setItem('salink_messages', JSON.stringify(allMsgs));
+                localStorage.setItem('salink_msg_status', JSON.stringify(statusMap));
+            } catch(e) {}
             apiSyncMessages(allMsgs).catch(function() {});
         } catch(e) {}
     }
@@ -3618,11 +3669,9 @@
             '</div>';
         }).join('');
 
-        // Attach listeners
         list.querySelectorAll('.chat-card').forEach(function(card) {
             var chatId = card.dataset.chatId;
 
-            // Click avatar → buka profil user
             var avatarEl = card.querySelector('.avatar');
             if (avatarEl) {
                 avatarEl.addEventListener('click', function(e) {
@@ -3632,7 +3681,6 @@
                 });
             }
 
-            // Long press → context menu Hapus
             card.addEventListener('touchstart', function(e) {
                 longPressTriggered = false;
                 var touch = e.touches[0];
@@ -3665,7 +3713,6 @@
                 if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
             });
 
-            // Normal click → open chat (kalau tidak long-press)
             card.addEventListener('click', function(e) {
                 if (longPressTriggered) { longPressTriggered = false; return; }
                 if (e.target.closest('.avatar')) return;
@@ -3677,7 +3724,7 @@
     }
 
     // ================================================================
-    // 13. OPEN PROFILE USER — Redirect ke profile-user.html
+    // 13. OPEN PROFILE USER
     // ================================================================
     function openProfileUser(username) {
         if (!username) return;
@@ -3704,7 +3751,6 @@
             '<button class="context-menu-item" data-action="mute"><i class="fas fa-bell' + (isMuted ? '' : '-slash') + '"></i> ' + (isMuted ? 'Aktifkan Notif' : 'Mute Notifikasi') + '</button>' +
             '<button class="context-menu-item danger" data-action="delete"><i class="fas fa-trash"></i> Hapus Chat</button>';
 
-        // Position
         var menuW = 200, menuH = 220;
         var vw = window.innerWidth, vh = window.innerHeight;
         var posX = Math.min(x, vw - menuW - 10);
@@ -3714,7 +3760,6 @@
         menu.style.top = posY + 'px';
         menu.classList.add('show');
 
-        // Attach handlers
         menu.querySelectorAll('.context-menu-item').forEach(function(btn) {
             btn.onclick = function() {
                 var action = this.dataset.action;
@@ -3737,10 +3782,9 @@
 
         var menuW = 200, menuH = 180;
         var vw = window.innerWidth, vh = window.innerHeight;
-        // PENTING: Posisikan menu DI BAWAH teks (bukan di atas — terhalang header)
         var posX = Math.min(x, vw - menuW - 10);
-        var posY = y + 10; // 10px di bawah titik sentuh
-        if (posY + menuH > vh - 20) posY = y - menuH - 10; // fallback ke atas jika tidak cukup
+        var posY = y + 10;
+        if (posY + menuH > vh - 20) posY = y - menuH - 10;
         if (posY < 10) posY = 10;
         menu.style.left = posX + 'px';
         menu.style.top = posY + 'px';
@@ -3783,9 +3827,7 @@
         var chat = chatData.find(function(c) { return c.id === chatId; });
         if (!chat) return;
         if (!confirm('Hapus semua obrolan dengan ' + chat.name + '?\n\nTindakan ini tidak bisa dibatalkan.')) return;
-        // Hapus dari chatData
         chatData = chatData.filter(function(c) { return c.id !== chatId; });
-        // Hapus semua messages terkait dari salink_messages
         try {
             var allMsgs = JSON.parse(localStorage.getItem('salink_messages') || '[]');
             allMsgs = allMsgs.filter(function(m) {
@@ -3832,7 +3874,6 @@
         if (inviteBadge && currentUser) {
             var pendingIncoming = 0;
             try {
-                // Pakai SalinkSocial.getPendingFollowers jika tersedia
                 if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.getPendingFollowers === 'function') {
                     pendingIncoming = SalinkSocial.getPendingFollowers(currentUser.username).length;
                 } else {
@@ -3880,6 +3921,7 @@
         }
 
         renderMessages(chat);
+        updateCallButtons(chat);
         var room = document.getElementById('chatRoom');
         if (room) room.classList.add('open');
         document.body.style.overflow = 'hidden';
@@ -3899,6 +3941,32 @@
         currentChatId = null;
     }
 
+    // ================================================================
+    // 17b. UPDATE CALL BUTTONS — Privacy-Aware
+    // ================================================================
+    function updateCallButtons(chat) {
+        var videoBtn = document.getElementById('videoCallBtn');
+        var voiceBtn = document.getElementById('voiceCallBtn');
+        if (!videoBtn || !voiceBtn) return;
+
+        if (chat.isGroup) {
+            videoBtn.style.display = 'none';
+            voiceBtn.style.display = 'none';
+            return;
+        }
+
+        var phone = getContactPhone(chat.username);
+        var hasPhone = !!phone;
+        var allowVideo = isUserAllowed(chat.username, 'videoCall') && hasPhone;
+        var allowVoice = isUserAllowed(chat.username, 'voiceCall') && hasPhone;
+
+        videoBtn.style.display = allowVideo ? 'flex' : 'none';
+        voiceBtn.style.display = allowVoice ? 'flex' : 'none';
+    }
+
+    // ================================================================
+    // 18. RENDER MESSAGES (dengan status indicator)
+    // ================================================================
     function renderMessages(chat) {
         var container = document.getElementById('chatMessages');
         if (!container) return;
@@ -3929,13 +3997,30 @@
             } else {
                 contentHTML = escapeHTML(m.text || '');
             }
-            return '<div class="msg-bubble ' + (m.mine ? 'mine' : '') + '" data-msg-id="' + escapeAttr(m.id) + '">' +
+
+            // Status indicator untuk pesan milik sendiri
+            var statusHTML = '';
+            if (m.mine) {
+                var st = m.status || 'sent';
+                if (st === 'sending') {
+                    statusHTML = '<span class="msg-status sending" title="Mengirim..."><span class="spinner-tiny"></span></span>';
+                } else if (st === 'sent') {
+                    statusHTML = '<span class="msg-status sent" title="Terkirim"><i class="fas fa-check"></i></span>';
+                } else if (st === 'failed') {
+                    statusHTML = '<span class="msg-status failed" title="Gagal terkirim — tap untuk coba lagi"><i class="fas fa-exclamation-circle"></i></span>';
+                } else if (st === 'pending') {
+                    statusHTML = '<span class="msg-status pending" title="Menunggu koneksi"><i class="fas fa-clock"></i></span>';
+                }
+            }
+
+            var bubbleClass = 'msg-bubble ' + (m.mine ? 'mine' : '');
+            if (m.status === 'failed') bubbleClass += ' failed';
+            return '<div class="' + bubbleClass + '" data-msg-id="' + escapeAttr(m.id) + '">' +
                 '<span class="msg-text">' + contentHTML + '</span>' +
-                '<span class="msg-time">' + formatTime(m.time) + '</span>' +
+                '<span class="msg-time">' + formatTime(m.time) + statusHTML + '</span>' +
             '</div>';
         }).join('');
 
-        // Attach lightbox for images
         container.querySelectorAll('[data-lightbox-src]').forEach(function(img) {
             img.addEventListener('click', function(e) {
                 e.stopPropagation();
@@ -3943,9 +4028,20 @@
             });
         });
 
-        // Attach long-press for message bubbles
+        // Attach long-press AND tap-to-retry for failed messages
         container.querySelectorAll('.msg-bubble').forEach(function(bubble) {
             var msgId = bubble.dataset.msgId;
+            var bubbleMsg = (chat.messages || []).find(function(x) { return x.id === msgId; });
+
+            // Tap for retry if failed
+            bubble.addEventListener('click', function(e) {
+                if (longPressTriggered) { longPressTriggered = false; return; }
+                if (bubbleMsg && bubbleMsg.status === 'failed') {
+                    e.stopPropagation();
+                    retryMessage(chat.id, msgId);
+                }
+            });
+
             bubble.addEventListener('touchstart', function(e) {
                 var touch = e.touches[0];
                 longPressTriggered = false;
@@ -3980,6 +4076,9 @@
         });
     }
 
+    // ================================================================
+    // 19. SEND MESSAGE (dengan status indicator)
+    // ================================================================
     async function sendMessage() {
         if (!currentUser) { showToast('🔒 Login', 'Silakan masuk untuk mengirim pesan', 'fa-lock'); return; }
         if (!currentChatId) return;
@@ -3991,7 +4090,6 @@
         var chat = chatData.find(function(c) { return c.id === currentChatId; });
         if (!chat) return;
 
-        // Cek blokir via SalinkSocial
         if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.isBlockedBy === 'function') {
             if (SalinkSocial.isBlockedBy(chat.username, currentUser.username)) {
                 showToast('🚫 Diblokir', 'Anda tidak dapat mengirim pesan ke ' + chat.name, 'fa-ban');
@@ -4003,7 +4101,8 @@
         var msgId = 'msg-' + now + '-' + Math.random().toString(36).substring(2, 8);
 
         if (!chat.messages) chat.messages = [];
-        chat.messages.push({ id: msgId, text: text, mine: true, time: now });
+        var newMsg = { id: msgId, text: text, mine: true, time: now, status: 'sending' };
+        chat.messages.push(newMsg);
         chat.lastMessage = text;
         chat.lastTime = now;
 
@@ -4019,18 +4118,96 @@
             if (msgs) msgs.scrollTop = msgs.scrollHeight;
         }, 50);
 
-        await apiSendMessage({
-            id: msgId,
-            from: currentUser.username,
-            fromName: currentUser.fullName,
-            fromGender: currentUser.gender || 'male',
-            to: chat.username,
-            subject: '',
-            message: text,
-            timestamp: now,
-            read: false,
-            isOwn: true
-        });
+        // Cek offline dulu
+        if (!navigator.onLine) {
+            newMsg.status = 'pending';
+            renderMessages(chat);
+            saveChatData();
+            showToast('⏳ Menunggu Koneksi', 'Pesan akan dikirim saat online', 'fa-clock');
+            return;
+        }
+
+        try {
+            var ok = await apiSendMessage({
+                id: msgId,
+                from: currentUser.username,
+                fromName: currentUser.fullName,
+                fromGender: currentUser.gender || 'male',
+                to: chat.username,
+                subject: '',
+                message: text,
+                timestamp: now,
+                read: false,
+                isOwn: true
+            });
+
+            if (ok) {
+                newMsg.status = 'sent';
+                showToast('✅ Terkirim', 'Pesan berhasil dikirim', 'fa-check-circle');
+            } else {
+                newMsg.status = 'failed';
+                showToast('❌ Gagal', 'Pesan tidak terkirim. Tap pesan untuk coba lagi.', 'fa-exclamation-circle');
+            }
+        } catch(e) {
+            newMsg.status = 'failed';
+            showToast('❌ Gagal', 'Koneksi bermasalah. Tap pesan untuk coba lagi.', 'fa-exclamation-triangle');
+        }
+
+        renderMessages(chat);
+        saveChatData();
+        renderChatList();
+    }
+
+    // ================================================================
+    // 19b. RETRY MESSAGE — Coba kirim ulang pesan yang gagal
+    // ================================================================
+    async function retryMessage(chatId, msgId) {
+        var chat = chatData.find(function(c) { return c.id === chatId; });
+        if (!chat) return;
+        var msg = (chat.messages || []).find(function(m) { return m.id === msgId; });
+        if (!msg) return;
+        if (msg.status !== 'failed' && msg.status !== 'pending') return;
+        if (!currentUser) return;
+
+        msg.status = 'sending';
+        renderMessages(chat);
+        showToast('🔄 Mengirim Ulang', 'Mencoba kirim pesan...', 'fa-sync-alt');
+
+        if (!navigator.onLine) {
+            msg.status = 'pending';
+            renderMessages(chat);
+            showToast('⏳ Menunggu Koneksi', 'Pesan akan dikirim saat online', 'fa-clock');
+            return;
+        }
+
+        try {
+            var ok = await apiSendMessage({
+                id: msg.id,
+                from: currentUser.username,
+                fromName: currentUser.fullName,
+                fromGender: currentUser.gender || 'male',
+                to: chat.username,
+                subject: '',
+                message: msg.text || '',
+                timestamp: msg.time,
+                read: false,
+                isOwn: true
+            });
+
+            if (ok) {
+                msg.status = 'sent';
+                showToast('✅ Terkirim', 'Pesan berhasil dikirim', 'fa-check-circle');
+            } else {
+                msg.status = 'failed';
+                showToast('❌ Gagal', 'Masih belum berhasil. Coba lagi.', 'fa-exclamation-circle');
+            }
+        } catch(e) {
+            msg.status = 'failed';
+            showToast('❌ Gagal', 'Koneksi bermasalah.', 'fa-exclamation-triangle');
+        }
+
+        renderMessages(chat);
+        saveChatData();
     }
 
     function replyMessage(chatId, msgId) {
@@ -4078,7 +4255,100 @@
     }
 
     // ================================================================
-    // 18. VOICE NOTE / ATTACH / CAMERA
+    // 20. CALL HANDLERS — Privacy-Aware
+    // ================================================================
+    function getContactPhone(username) {
+        if (!username) return '';
+        var u = allUsers.find(function(x) { return x.username === username; });
+        if (!u) return '';
+        return u.whatsapp || u.phone || '';
+    }
+
+    function normalizePhoneForWA(phone) {
+        if (!phone) return '';
+        var num = String(phone).replace(/\D/g, '');
+        if (num.indexOf('0') === 0) num = '62' + num.substring(1);
+        return num;
+    }
+
+    function isUserAllowed(username, feature) {
+        if (!username) return false;
+        var u = allUsers.find(function(x) { return x.username === username; });
+        if (!u) return false;
+        var privacy = u.privacy || {};
+        if (feature === 'whatsapp') return privacy.allowWhatsApp !== false;
+        if (feature === 'voiceCall') return privacy.allowVoiceCall !== false;
+        if (feature === 'videoCall') return privacy.allowVideoCall !== false;
+        if (feature === 'phoneCall') return privacy.allowPhoneCall === true;
+        return false;
+    }
+
+    function handleVideoCall() {
+        var chat = chatData.find(function(c) { return c.id === currentChatId; });
+        if (!chat) return;
+        if (chat.isGroup) { showToast('👥 Grup', 'Video call grup belum tersedia', 'fa-users'); return; }
+
+        if (!isUserAllowed(chat.username, 'videoCall')) {
+            showToast('🔒 Privasi', chat.name + ' tidak mengizinkan Video Call', 'fa-lock');
+            return;
+        }
+
+        var phone = getContactPhone(chat.username);
+        if (!phone) {
+            showToast('📱 Tidak Ada Kontak', 'Nomor kontak ' + chat.name + ' belum tersedia', 'fa-phone-slash');
+            return;
+        }
+
+        var waNum = normalizePhoneForWA(phone);
+        if (!waNum) {
+            showToast('⚠️ Error', 'Nomor kontak tidak valid', 'fa-exclamation-triangle');
+            return;
+        }
+
+        showToast('📹 Video Call', 'Menghubungi ' + chat.name + ' via WhatsApp...', 'fa-video');
+        setTimeout(function() {
+            window.open('https://wa.me/' + waNum + '?video=true', '_blank');
+        }, 400);
+    }
+
+    function handleVoiceCall() {
+        var chat = chatData.find(function(c) { return c.id === currentChatId; });
+        if (!chat) return;
+        if (chat.isGroup) { showToast('👥 Grup', 'Voice call grup belum tersedia', 'fa-users'); return; }
+
+        if (!isUserAllowed(chat.username, 'voiceCall')) {
+            showToast('🔒 Privasi', chat.name + ' tidak mengizinkan Voice Call', 'fa-lock');
+            return;
+        }
+
+        var phone = getContactPhone(chat.username);
+        if (!phone) {
+            showToast('📱 Tidak Ada Kontak', 'Nomor kontak ' + chat.name + ' belum tersedia', 'fa-phone-slash');
+            return;
+        }
+
+        var waNum = normalizePhoneForWA(phone);
+        if (!waNum) {
+            showToast('⚠️ Error', 'Nomor kontak tidak valid', 'fa-exclamation-triangle');
+            return;
+        }
+
+        if (isUserAllowed(chat.username, 'phoneCall')) {
+            showToast('📞 Memanggil', 'Menghubungi ' + chat.name + '...', 'fa-phone');
+            setTimeout(function() {
+                window.location.href = 'tel:' + phone;
+            }, 400);
+            return;
+        }
+
+        showToast('📞 Voice Call', 'Menghubungi ' + chat.name + ' via WhatsApp...', 'fa-phone');
+        setTimeout(function() {
+            window.open('https://wa.me/' + waNum, '_blank');
+        }, 400);
+    }
+
+    // ================================================================
+    // 21. VOICE NOTE / ATTACH / CAMERA
     // ================================================================
     function toggleVoiceRecording() {
         var btn = document.getElementById('voiceNoteBtn');
@@ -4109,7 +4379,8 @@
                                 text: '🎙️ Voice Note',
                                 mine: true,
                                 time: now,
-                                audioUrl: url
+                                audioUrl: url,
+                                status: 'sent'
                             });
                             chat.lastMessage = '🎙️ Voice Note';
                             chat.lastTime = now;
@@ -4204,7 +4475,8 @@
             id: 'msg-' + now + '-' + Math.random().toString(36).substring(2, 8),
             text: text,
             mine: true,
-            time: now
+            time: now,
+            status: 'sent'
         }, extra);
         if (type === 'document') msg.isDocument = true;
         if (type === 'location') msg.location = extra.location;
@@ -4253,7 +4525,8 @@
                     mine: true,
                     time: now,
                     media: ev.target.result,
-                    mediaType: isImage ? 'image' : 'video'
+                    mediaType: isImage ? 'image' : 'video',
+                    status: 'sent'
                 });
                 chat.lastMessage = isImage ? '📸 Foto' : '🎥 Video';
                 chat.lastTime = now;
@@ -4268,7 +4541,7 @@
     }
 
     // ================================================================
-    // 19. LIGHTBOX
+    // 22. LIGHTBOX
     // ================================================================
     function openLightbox(src) {
         lightboxImages = [src];
@@ -4288,7 +4561,7 @@
     }
 
     // ================================================================
-    // 20. EMOJI PICKER — TOGGLE SHOW/HIDE
+    // 23. EMOJI PICKER
     // ================================================================
     var EMOJIS = ['😀','😃','😄','😁','😆','😅','😂','🤣','🥲','☺️','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😝','😜','🤪','🤨','🧐','🤓','😎','🥸','🤩','🥳','😏','😒','😞','😔','😟','😕','🙁','☹️','😣','😖','😫','😩','🥺','😢','😭','😤','😠','😡','🤬','🤯','😳','🥵','🥶','😱','😨','😰','😥','😓','🤗','🤔','🤭','🤫','🤥','😶','😐','😑','😬','🙄','😯','😦','😧','😮','😲','🥱','😴','🤤','😪','😵','🤐','🥴','🤢','🤮','🤧','😷','🤒','🤕','🤑','🤠','😈','👿','👹','👺','🤡','💩','👻','💀','☠️','👽','👾','🤖','🎃'];
     var STICKERS = ['🧸','🐻','🐼','🐨','🦊','🐰','🐭','🐹','🐶','🐱','🐺','🦝','🐮','🐷','🐗','🐸','🐵','🙈','🙉','🙊','🐔','🐧','🐦','🦆','🦅','🦉','🦇','🐴','🦄','🐝','🐛','🦋','🐌','🐞','🐜','🦗','🕷️','🦂','🐢','🐍','🦎'];
@@ -4356,7 +4629,7 @@
     }
 
     // ================================================================
-    // 21. NEW CHAT / GROUP / BROADCAST / ADD CONTACT
+    // 24. NEW CHAT / GROUP / BROADCAST / ADD CONTACT
     // ================================================================
     function openNewChatModal() {
         if (!currentUser) { window.location.href = LOGIN_URL; return; }
@@ -4500,7 +4773,8 @@
                 id: 'msg-' + Date.now(),
                 text: '👥 Grup "' + groupName + '" dibuat oleh ' + currentUser.fullName,
                 mine: true,
-                time: Date.now()
+                time: Date.now(),
+                status: 'sent'
             }],
             muted: false
         };
@@ -4584,10 +4858,10 @@
             }
             if (chat) {
                 var msgId = 'msg-' + now + '-' + i + '-' + Math.random().toString(36).substring(2, 6);
-                chat.messages.push({ id: msgId, text: text, mine: true, time: now });
+                chat.messages.push({ id: msgId, text: text, mine: true, time: now, status: 'sending' });
                 chat.lastMessage = text;
                 chat.lastTime = now;
-                await apiSendMessage({
+                var ok = await apiSendMessage({
                     id: msgId,
                     from: currentUser.username,
                     fromName: currentUser.fullName,
@@ -4599,13 +4873,15 @@
                     read: false,
                     isOwn: true
                 });
-                successCount++;
+                var m = chat.messages.find(function(x) { return x.id === msgId; });
+                if (m) m.status = ok ? 'sent' : 'failed';
+                if (ok) successCount++;
             }
         }
         saveChatData();
         renderChatList();
         closeModal();
-        showToast('📢 Broadcast', 'Pesan terkirim ke ' + successCount + ' penerima', 'fa-bullhorn');
+        showToast('📢 Broadcast', 'Pesan terkirim ke ' + successCount + '/' + recipients.length + ' penerima', 'fa-bullhorn');
     }
 
     function openAddContactModal() {
@@ -4614,7 +4890,7 @@
     }
 
     // ================================================================
-    // 22. INVITE MODAL (pakai SalinkSocial)
+    // 25. INVITE MODAL
     // ================================================================
     function loadSentInvites() {
         try {
@@ -4671,7 +4947,6 @@
         listEl.innerHTML = filtered.map(function(u) {
             var initial = (u.fullName || u.username || 'U').charAt(0).toUpperCase();
             var avatar = u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" alt="">' : initial;
-            // Cek status pertemanan pakai SalinkSocial
             var friendStatus = 'none';
             if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.getFriendStatus === 'function' && currentUser) {
                 friendStatus = SalinkSocial.getFriendStatus(currentUser.username, u.username);
@@ -4679,7 +4954,6 @@
             var isSent = sentInvites[u.username] === true;
             var location = [u.city, u.province].filter(Boolean).join(', ') || u.country || 'Lokasi tidak diketahui';
             var statusDot = u.isOnline ? '🟢' : '⚪';
-            // Label tombol
             var btnLabel = '<i class="fas fa-paper-plane"></i> Undang';
             var btnClass = 'item-action-btn';
             var btnDisabled = '';
@@ -4729,9 +5003,6 @@
         }
     }
 
-    // ================================================================
-    // 23. SEND INVITE — pakai SalinkSocial.sendInvite(from, to)
-    // ================================================================
     function sendInvite(username, btnEl) {
         if (!currentUser) { window.location.href = LOGIN_URL; return; }
         if (!username) return;
@@ -4740,13 +5011,11 @@
         var originalHTML = btnEl.innerHTML;
         btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
-        // Cek status: kalau pending_in → terima
         var status = 'none';
         if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.getFriendStatus === 'function') {
             status = SalinkSocial.getFriendStatus(currentUser.username, username);
         }
 
-        // Kalau target sudah invite kita → terima
         if (status === 'pending_in' && typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.acceptInvite === 'function') {
             var result = SalinkSocial.acceptInvite(currentUser.username, username);
             if (result && result.ok) {
@@ -4761,7 +5030,6 @@
             return;
         }
 
-        // Kalau belum → kirim invite via SalinkSocial
         var ok = false;
         var reason = '';
         if (typeof SalinkSocial !== 'undefined' && SalinkSocial && typeof SalinkSocial.sendInvite === 'function') {
@@ -4769,7 +5037,6 @@
             ok = r && r.ok;
             reason = r && r.reason;
         } else {
-            // Fallback: langsung ke localStorage
             try {
                 var friends = JSON.parse(localStorage.getItem('salink_friends') || '[]');
                 friends.push({
@@ -4786,7 +5053,6 @@
             } catch(e) { ok = false; reason = e.message; }
         }
 
-        // Simpan ke sentInvites lokal
         if (ok) {
             sentInvites[username] = true;
             saveSentInvites();
@@ -4805,7 +5071,7 @@
     }
 
     // ================================================================
-    // 24. NOTIF MODAL
+    // 26. NOTIF MODAL
     // ================================================================
     function loadReadNotifs() {
         try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); }
@@ -4983,7 +5249,7 @@
     function closeNotifModal() { closeModalById('notifModal'); }
 
     // ================================================================
-    // 25. SEARCH MODAL
+    // 27. SEARCH MODAL
     // ================================================================
     function openSearchModal() {
         if (!currentUser) { window.location.href = LOGIN_URL; return; }
@@ -5139,7 +5405,7 @@
     }
 
     // ================================================================
-    // 26. FAB MODAL (Emergency 2×2)
+    // 28. FAB MODAL (Emergency 2×2)
     // ================================================================
     function openFabModal() {
         var overlay = document.getElementById('fabModalOverlay');
@@ -5202,7 +5468,7 @@
     }
 
     // ================================================================
-    // 27. MAP MODAL (Peta Darurat)
+    // 29. MAP MODAL
     // ================================================================
     function openMapModal() {
         var modal = document.getElementById('mapModal');
@@ -5270,7 +5536,7 @@
         if (statusIcon) statusIcon.textContent = '✅';
         if (regionEl) {
             fetch('https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lng + '&zoom=18&addressdetails=1&accept-language=id', {
-                headers: { 'User-Agent': 'SALINK-App/15.1' }
+                headers: { 'User-Agent': 'SALINK-App/15.2' }
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -5363,7 +5629,7 @@
     }
 
     // ================================================================
-    // 28. FLOATING NOTIFICATION
+    // 30. FLOATING NOTIFICATION
     // ================================================================
     function showFloatingNotification(type, title, message, subtitle, actionText, actionCallback) {
         var notif = document.getElementById('floatingNotification');
@@ -5424,7 +5690,7 @@
     }
 
     // ================================================================
-    // 29. PWA
+    // 31. PWA
     // ================================================================
     function setupPWA() {
         if ('serviceWorker' in navigator) {
@@ -5449,7 +5715,7 @@
     }
 
     // ================================================================
-    // 30. RIPPLE
+    // 32. RIPPLE
     // ================================================================
     function initRipple() {
         document.addEventListener('click', function(e) {
@@ -5470,7 +5736,7 @@
     }
 
     // ================================================================
-    // 31. HANDLE URL PARAM ?chat=username
+    // 33. HANDLE URL PARAM & PENDING CHAT
     // ================================================================
     function handleUrlChatParam() {
         var params = new URLSearchParams(window.location.search);
@@ -5488,7 +5754,6 @@
             }
         }, 300);
     }
-
     function handlePendingChat() {
         try {
             var raw = localStorage.getItem('salink_pending_chat');
@@ -5514,10 +5779,30 @@
     }
 
     // ================================================================
-    // 32. EVENT LISTENERS
+    // 34. AUTO-RETRY PENDING MESSAGES SAAT ONLINE
+    // ================================================================
+    function setupOnlineRetry() {
+        window.addEventListener('online', function() {
+            log('Online kembali — retry pending messages');
+            chatData.forEach(function(chat) {
+                (chat.messages || []).forEach(function(msg) {
+                    if (msg.mine && msg.status === 'pending') {
+                        retryMessage(chat.id, msg.id);
+                    }
+                });
+            });
+        });
+        window.addEventListener('offline', function() {
+            log('Offline — pesan baru akan pending');
+            showToast('📵 Offline', 'Pesan baru akan dikirim saat online', 'fa-wifi');
+        });
+    }
+
+    // ================================================================
+    // 35. EVENT LISTENERS
     // ================================================================
     function setupEventListeners() {
-        // MENU ☰
+        // MENU
         var menuBtn = document.getElementById('menuBtn');
         if (menuBtn) {
             menuBtn.addEventListener('click', function(e) {
@@ -5531,7 +5816,7 @@
         var sidebarOverlay = document.getElementById('sidebarOverlay');
         if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeSidebar);
 
-        // SIDEBAR MAP BUTTON
+        // SIDEBAR MAP
         var sidebarMapBtn = document.getElementById('sidebarMapBtn');
         if (sidebarMapBtn) {
             sidebarMapBtn.addEventListener('click', function(e) {
@@ -5561,7 +5846,7 @@
             });
         }
 
-        // Header Search → Modal Search
+        // Header Search
         var headerSearchBtn = document.getElementById('headerSearchBtn');
         if (headerSearchBtn) {
             headerSearchBtn.addEventListener('click', function(e) {
@@ -5577,7 +5862,7 @@
                 openNotifModal();
             });
         }
-        // Theme Toggle
+        // Theme
         var themeToggle = document.getElementById('themeToggle');
         if (themeToggle) {
             themeToggle.addEventListener('click', function(e) {
@@ -5585,7 +5870,7 @@
                 toggleTheme();
             });
         }
-        // User Button → Profil
+        // User → Profil
         var userBtn = document.getElementById('userBtn');
         if (userBtn) {
             userBtn.addEventListener('click', function(e) {
@@ -5594,7 +5879,7 @@
             });
         }
 
-        // Local search (search-wrap)
+        // Local search
         var localSearchInput = document.getElementById('localSearchInput');
         if (localSearchInput) {
             localSearchInput.addEventListener('input', function() {
@@ -5616,7 +5901,7 @@
             });
         }
 
-        // Chips filter
+        // Chips
         document.querySelectorAll('.chip').forEach(function(chip) {
             chip.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -5627,7 +5912,7 @@
             });
         });
 
-        // FAB Chat Baru toggle menu
+        // FAB menu
         var fabButton = document.getElementById('fabButton');
         if (fabButton) {
             fabButton.addEventListener('click', function(e) {
@@ -5642,8 +5927,6 @@
                 if (menu) menu.classList.remove('show');
             }
         });
-
-        // FAB Menu items
         var fabNewChat = document.getElementById('fabNewChat');
         if (fabNewChat) fabNewChat.addEventListener('click', function() {
             document.getElementById('fabMenu').classList.remove('show');
@@ -5673,8 +5956,6 @@
                 closeChatRoom();
             });
         }
-
-        // Klik header chat room (nama/foto) → buka profil user
         var chatRoomAvatarWrap = document.getElementById('chatRoomAvatarWrap');
         if (chatRoomAvatarWrap) {
             chatRoomAvatarWrap.addEventListener('click', function() {
@@ -5688,7 +5969,7 @@
             });
         }
 
-        // Emoji Toggle
+        // Emoji
         var emojiToggleBtn = document.getElementById('emojiToggleBtn');
         if (emojiToggleBtn) {
             emojiToggleBtn.addEventListener('click', function(e) {
@@ -5697,7 +5978,7 @@
             });
         }
 
-        // Voice Note
+        // Voice
         var voiceNoteBtn = document.getElementById('voiceNoteBtn');
         if (voiceNoteBtn) {
             voiceNoteBtn.addEventListener('click', function(e) {
@@ -5706,7 +5987,7 @@
             });
         }
 
-        // Send Message
+        // Send
         var sendMsgBtn = document.getElementById('sendMsgBtn');
         if (sendMsgBtn) {
             sendMsgBtn.addEventListener('click', function(e) {
@@ -5729,13 +6010,29 @@
             });
         }
 
-        // Attach & Camera
+        // Attach / Camera
         var attachBtn = document.getElementById('attachBtn');
         if (attachBtn) attachBtn.addEventListener('click', function(e) { e.preventDefault(); openAttachModal(); });
         var cameraBtn = document.getElementById('cameraBtn');
         if (cameraBtn) cameraBtn.addEventListener('click', function(e) { e.preventDefault(); openCameraOptions(); });
 
-        // Chat Room More → Mute, Clear, Profile
+        // Video / Voice Call
+        var videoCallBtn = document.getElementById('videoCallBtn');
+        if (videoCallBtn) {
+            videoCallBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                handleVideoCall();
+            });
+        }
+        var voiceCallBtn = document.getElementById('voiceCallBtn');
+        if (voiceCallBtn) {
+            voiceCallBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                handleVoiceCall();
+            });
+        }
+
+        // Chat More
         var chatRoomMore = document.getElementById('chatRoomMore');
         if (chatRoomMore) {
             chatRoomMore.addEventListener('click', function(e) {
@@ -5754,7 +6051,7 @@
             });
         }
 
-        // Modal generic close
+        // Modal generic
         var modalCloseBtn = document.getElementById('modalCloseBtn');
         if (modalCloseBtn) modalCloseBtn.addEventListener('click', function() { closeModal(); });
         var modalFooterCloseBtn = document.getElementById('modalFooterCloseBtn');
@@ -5766,7 +6063,7 @@
             });
         }
 
-        // Search Modal close
+        // Search Modal
         var searchModalCloseBtn = document.getElementById('searchModalCloseBtn');
         if (searchModalCloseBtn) searchModalCloseBtn.addEventListener('click', closeSearchModal);
         var searchModalFooterCloseBtn = document.getElementById('searchModalFooterCloseBtn');
@@ -5806,7 +6103,7 @@
         var clearSearchModalBtn = document.getElementById('clearSearchModalBtn');
         if (clearSearchModalBtn) clearSearchModalBtn.addEventListener('click', clearSearchModal);
 
-        // Notif Modal close
+        // Notif Modal
         var notifModalCloseBtn = document.getElementById('notifModalCloseBtn');
         if (notifModalCloseBtn) notifModalCloseBtn.addEventListener('click', closeNotifModal);
         var notifModalFooterCloseBtn = document.getElementById('notifModalFooterCloseBtn');
@@ -5820,7 +6117,7 @@
             });
         }
 
-        // Invite Modal close
+        // Invite Modal
         var inviteModalCloseBtn = document.getElementById('inviteModalCloseBtn');
         if (inviteModalCloseBtn) inviteModalCloseBtn.addEventListener('click', closeInviteModal);
         var inviteModalFooterCloseBtn = document.getElementById('inviteModalFooterCloseBtn');
@@ -5833,8 +6130,6 @@
                 if (e.target === inviteModal) closeInviteModal();
             });
         }
-
-        // Bottom Invite Nav
         var bottomInviteNav = document.getElementById('bottomInviteNav');
         if (bottomInviteNav) {
             bottomInviteNav.addEventListener('click', function(e) {
@@ -5843,7 +6138,7 @@
             });
         }
 
-        // Lightbox close
+        // Lightbox
         var lightboxCloseBtn = document.getElementById('lightboxCloseBtn');
         if (lightboxCloseBtn) lightboxCloseBtn.addEventListener('click', function(e) { e.stopPropagation(); closeLightbox(); });
         var lightboxDownloadBtn = document.getElementById('lightboxDownloadBtn');
@@ -5882,7 +6177,7 @@
             });
         }
 
-        // Map Modal close
+        // Map Modal
         var mapModalCloseBtn = document.getElementById('mapModalCloseBtn');
         if (mapModalCloseBtn) mapModalCloseBtn.addEventListener('click', function(e) { e.preventDefault(); closeMapModal(); });
         var mapModalCloseFooter = document.getElementById('mapModalCloseFooter');
@@ -5951,7 +6246,7 @@
     }
 
     // ================================================================
-    // 33. GLOBAL EXPOSE
+    // 36. GLOBAL EXPOSE
     // ================================================================
     window._salinkStartChat = startNewChat;
     window._salinkAttach = handleAttach;
@@ -6004,12 +6299,15 @@
     window.openProfileUser = openProfileUser;
     window.handleUrlChatParam = handleUrlChatParam;
     window.handlePendingChat = handlePendingChat;
+    window.handleVideoCall = handleVideoCall;
+    window.handleVoiceCall = handleVoiceCall;
+    window.retryMessage = retryMessage;
 
     // ================================================================
-    // 34. INIT
+    // 37. INIT
     // ================================================================
     async function init() {
-        log('Initializing Pesan-Masuk v15.1...');
+        log('Initializing Pesan-Masuk v15.2...');
 
         loadTheme();
         loadCurrentUser();
@@ -6018,6 +6316,7 @@
         setupEventListeners();
         initRipple();
         setupPWA();
+        setupOnlineRetry();
 
         await loadAllUsers();
         await loadFriends();
@@ -6027,11 +6326,9 @@
         updateNotifBadge();
         updateInviteBadge();
 
-        // Handle URL param ?chat=username & pending chat
         handleUrlChatParam();
         handlePendingChat();
 
-        // Auto refresh chat
         setInterval(async function() {
             if (!document.hidden && currentUser) {
                 await loadChatData();
@@ -6040,7 +6337,7 @@
             }
         }, 30000);
 
-        log('✓ Pesan-Masuk v15.1 Ready!');
+        log('✓ Pesan-Masuk v15.2 Ready!');
     }
 
     if (document.readyState === 'loading') {
@@ -6103,7 +6400,6 @@
         } catch (err) { console.error('❌ [FCM] error:', err); }
       });
 
-      // CEK SALINK-EMERGENCY
       var checkEmergency = setInterval(function() {
         if (typeof SalinkEmergency !== 'undefined') {
           clearInterval(checkEmergency);
@@ -6115,7 +6411,6 @@
         if (typeof SalinkEmergency === 'undefined') console.warn('⚠️ [SalinkEmergency] Script belum tersedia');
       }, 10000);
 
-      // CEK SALINK-SOCIAL
       var checkSocial = setInterval(function() {
         if (typeof SalinkSocial !== 'undefined') {
           clearInterval(checkSocial);
@@ -6127,7 +6422,6 @@
         if (typeof SalinkSocial === 'undefined') console.warn('⚠️ [SalinkSocial] Script belum tersedia');
       }, 10000);
 
-      // SERVICE WORKER MESSAGE LISTENER
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.addEventListener('message', function(event) {
           var data = event.data || {};
@@ -6147,11 +6441,7 @@
           if (data.type === 'NEW_CHAT_MESSAGE') {
             console.log('💬 [SW] Pesan baru diterima');
             if (typeof window.loadChatData === 'function') {
-              window.loadChatData().then(function() {
-                if (typeof window.openChatRoom === 'function') {
-                  // Silent refresh chat list
-                }
-              });
+              window.loadChatData();
             } else {
               setTimeout(function() { location.reload(); }, 1000);
             }
@@ -6163,7 +6453,6 @@
         console.log('✅ [SW] Message listener terpasang');
       }
 
-      // VISIBILITY CHANGE
       document.addEventListener('visibilitychange', function() {
         if (!document.hidden && typeof SalinkFCM !== 'undefined') {
           if (typeof SalinkFCM.refreshToken === 'function') {
@@ -6198,7 +6487,7 @@
         setTimeout(function() {
           console.log('');
           console.log('╔══════════════════════════════════════════════════╗');
-          console.log('║  SALINK pesan-masuk.html v15.1 — READY          ║');
+          console.log('║  SALINK pesan-masuk.html v15.2 — READY          ║');
           console.log('║  ✅ Tema Universal (dark/light)                  ║');
           console.log('║  ✅ PWA Install                                  ║');
           console.log('║  ✅ Header + Search + Notif + Theme + Profil    ║');
@@ -6209,7 +6498,10 @@
           console.log('║  ✅ Emoji Picker (toggle show/hide)              ║');
           console.log('║  ✅ Grup Baru + Broadcast + Tambah Kontak        ║');
           console.log('║  ✅ Mute & Clear Chat                            ║');
-          console.log('║  ✅ Integrasi dengan salink-social.js v1.0      ║');
+          console.log('║  ✅ Video/Voice Call Privacy-Aware               ║');
+          console.log('║  ✅ Message Status (sending/sent/failed/pending) ║');
+          console.log('║  ✅ Auto-retry saat online                       ║');
+          console.log('║  ✅ Integrasi salink-social.js v1.1              ║');
           console.log('║  ✅ FCM + SalinkEmergency                        ║');
           console.log('╚══════════════════════════════════════════════════╝');
           console.log('');
