@@ -16,6 +16,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@500;600;700;800&display=swap" rel="stylesheet">
 
+    <!-- SALINK Social Library (shared dengan profil.html & pesan-masuk.html) -->
+    <script src="salink-social.js"></script>
+
     <style>
         /* ==================================================================
            SALINK PROFILE-USER v15.1 — FINAL (NO PATCH)
@@ -2789,6 +2792,455 @@
         [data-theme="light"] .preview-overlay-content { background: #ffffff; }
         [data-theme="light"] .post { background: rgba(0,0,0,0.03); }
         [data-theme="light"] .post-text { color: var(--text-primary); }
+          /* ================================================================
+           v16.0 UPDATE — TOMBOL ⚠️ ACTIONS + MODAL FRIEND ACTIONS
+           ================================================================
+           Tambahan untuk:
+           - Tombol ⋮ (titik-3) di samping tombol Invite/Following
+           - Modal Action List (Hapus / Laporkan / Blokir)
+           - Modal Report Form (dengan textarea alasan)
+           - Block confirm badge
+           - Tombol state: Invite (mode belum berteman) / Following (mode sudah berteman)
+           - Badge "🔒 Diblokir" indicator (jika user diblokir)
+           ================================================================ */
+
+        /* ---- Tombol ⋮ (More Actions) ---- */
+        .profile-more-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1.5px solid var(--border-color);
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.25s;
+            font-family: inherit;
+            flex-shrink: 0;
+            padding: 0;
+        }
+        .profile-more-btn:active {
+            transform: scale(0.9);
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(230,0,18,0.1);
+        }
+        .profile-more-btn.warn {
+            border-color: var(--accent-gold);
+            color: var(--accent-gold);
+        }
+        .profile-more-btn.warn:active {
+            background: rgba(240,208,128,0.15);
+        }
+
+        /* ---- Actions wrapper (PESAN + INVITE + ⋮) ---- */
+        .profile-actions {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin: 5px 0 12px;
+            flex-wrap: wrap;
+        }
+
+        /* ---- Modal Action List (3 pilihan: Hapus / Laporkan / Blokir) ---- */
+        .action-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .action-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            color: var(--text-primary);
+            text-align: left;
+            width: 100%;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .action-item:active {
+            transform: scale(0.98);
+            background: var(--bg-card);
+        }
+        .action-item.danger {
+            border-color: rgba(248,81,73,0.3);
+        }
+        .action-item.danger:active {
+            border-color: var(--accent-red);
+            background: rgba(248,81,73,0.1);
+        }
+        .action-item.warn {
+            border-color: rgba(240,208,128,0.3);
+        }
+        .action-item.warn:active {
+            border-color: var(--accent-gold);
+            background: rgba(240,208,128,0.1);
+        }
+        .action-item.info {
+            border-color: rgba(230,0,18,0.3);
+        }
+        .action-item.info:active {
+            border-color: var(--primary);
+            background: rgba(230,0,18,0.1);
+        }
+        .action-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 1.15rem;
+            background: var(--bg-card);
+        }
+        .action-icon.danger {
+            background: rgba(248,81,73,0.15);
+            color: var(--accent-red);
+        }
+        .action-icon.warn {
+            background: rgba(240,208,128,0.15);
+            color: var(--accent-gold);
+        }
+        .action-icon.info {
+            background: rgba(230,0,18,0.15);
+            color: var(--primary);
+        }
+        .action-info {
+            flex: 1;
+            min-width: 0;
+        }
+        .action-title {
+            font-size: 0.82rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+            font-family: 'Poppins', sans-serif;
+        }
+        .action-desc {
+            font-size: 0.62rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        /* ---- Report Form ---- */
+        .report-form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .report-form-label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            font-weight: 700;
+            margin-bottom: 4px;
+            display: block;
+        }
+        .report-reasons {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .report-reason-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            color: var(--text-primary);
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-align: left;
+            width: 100%;
+        }
+        .report-reason-item:active {
+            border-color: var(--primary);
+            background: rgba(230,0,18,0.08);
+        }
+        .report-reason-item.selected {
+            border-color: var(--primary);
+            background: rgba(230,0,18,0.12);
+            color: var(--primary);
+        }
+        .report-reason-item input[type="radio"] {
+            accent-color: var(--primary);
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+        .report-textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border: 1.5px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 0.72rem;
+            font-family: inherit;
+            resize: vertical;
+            outline: none;
+        }
+        .report-textarea:focus {
+            border-color: var(--primary);
+        }
+        .report-textarea::placeholder {
+            color: var(--text-muted);
+        }
+        .report-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 4px;
+        }
+        .report-btn {
+            padding: 11px 12px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.25s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .report-btn:active { transform: scale(0.97); }
+        .report-btn.cancel {
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        .report-btn.submit {
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            border: none;
+            box-shadow: 0 4px 14px rgba(230,0,18,0.35);
+        }
+        .report-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        /* ---- Modal konfirmasi blokir ---- */
+        .confirm-icon-large {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            flex-shrink: 0;
+        }
+        .confirm-icon-large.danger {
+            background: rgba(248,81,73,0.15);
+            color: var(--accent-red);
+            border: 2px solid rgba(248,81,73,0.3);
+        }
+        .confirm-icon-large.warn {
+            background: rgba(240,208,128,0.15);
+            color: var(--accent-gold);
+            border: 2px solid rgba(240,208,128,0.3);
+        }
+        .confirm-title {
+            font-size: 1rem;
+            font-weight: 800;
+            text-align: center;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            font-family: 'Poppins', sans-serif;
+        }
+        .confirm-desc {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.55;
+            margin-bottom: 6px;
+        }
+        .confirm-info-box {
+            background: rgba(240,208,128,0.1);
+            border: 1px solid rgba(240,208,128,0.25);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.68rem;
+            color: var(--accent-gold);
+            line-height: 1.5;
+            margin: 12px 0;
+            text-align: left;
+        }
+        .confirm-info-box i { margin-right: 4px; }
+        .confirm-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 12px;
+        }
+        .confirm-actions button {
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 0.78rem;
+            font-weight: 800;
+            cursor: pointer;
+            font-family: inherit;
+            border: none;
+            transition: all 0.25s;
+        }
+        .confirm-actions button:active { transform: scale(0.97); }
+        .confirm-actions .btn-no {
+            background: var(--bg-input);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        .confirm-actions .btn-yes-danger {
+            background: var(--accent-red);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(248,81,73,0.35);
+        }
+        .confirm-actions .btn-yes-warn {
+            background: var(--accent-gold);
+            color: #0a0e1a;
+            box-shadow: 0 4px 14px rgba(240,208,128,0.35);
+        }
+        .confirm-actions .btn-yes-primary {
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(230,0,18,0.35);
+        }
+
+        /* ---- Badge diblokir di modal friend list ---- */
+        .blocked-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-size: 0.55rem;
+            font-weight: 800;
+            background: rgba(248,81,73,0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(248,81,73,0.3);
+        }
+
+        /* ---- Friend list real-time counter ---- */
+        .friend-list-count {
+            font-size: 0.62rem;
+            color: var(--text-muted);
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-align: center;
+            padding: 6px 12px;
+            background: var(--bg-input);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .friend-list-count strong {
+            color: var(--primary);
+            font-weight: 800;
+        }
+
+        /* ---- Profile action button state: sudah berteman ---- */
+        .profile-invite-btn.following {
+            background: rgba(63,185,80,0.12);
+            color: var(--success);
+            border-color: var(--success);
+            cursor: pointer;
+        }
+        .profile-invite-btn.following:active {
+            background: rgba(63,185,80,0.2);
+        }
+        .profile-invite-btn.pending {
+            background: rgba(240,208,128,0.12);
+            color: var(--accent-gold);
+            border-color: var(--accent-gold);
+            cursor: default;
+        }
+        .profile-invite-btn.pending:active {
+            transform: none;
+        }
+
+        /* ---- Modal Header Tabs (untuk Modal Actions) ---- */
+        .modal-header-compact {
+            text-align: center;
+            padding-bottom: 14px;
+            margin-bottom: 14px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .modal-header-compact .modal-avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            background: var(--accent-blue-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 1.4rem;
+            font-weight: 800;
+            border: 3px solid var(--primary);
+            overflow: hidden;
+        }
+        .modal-header-compact .modal-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .modal-header-compact .modal-username {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            font-family: 'Poppins', sans-serif;
+            margin-bottom: 2px;
+        }
+        .modal-header-compact .modal-userhandle {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+        }
+
+        /* ---- Responsive tweak ---- */
+        @media (max-width: 360px) {
+            .profile-more-btn {
+                width: 34px;
+                height: 34px;
+                font-size: 0.9rem;
+            }
+            .action-item {
+                padding: 12px 14px;
+            }
+            .action-icon {
+                width: 36px;
+                height: 36px;
+                font-size: 1rem;
+            }
+            .confirm-icon-large {
+                width: 60px;
+                height: 60px;
+                font-size: 1.7rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -3012,13 +3464,16 @@
                 </div>
             </div>
 
-            <!-- PROFILE ACTIONS -->
+            <!-- PROFILE ACTIONS — PESAN | INVITE/FOLLOWING | ⋮ (More Actions) -->
             <div class="profile-actions">
                 <button class="profile-pesan-btn" id="pesanBtn" type="button">
                     <i class="fas fa-paper-plane"></i> PESAN
                 </button>
                 <button class="profile-invite-btn" id="inviteBtn" type="button">
-                    <i class="fas fa-user-plus"></i> <span id="inviteBtnLabel">INVITE</span>
+                    <i class="fas fa-user-plus" id="inviteBtnIcon"></i> <span id="inviteBtnLabel">INVITE</span>
+                </button>
+                <button class="profile-more-btn" id="profileMoreBtn" type="button" title="Opsi lainnya" aria-label="Opsi lainnya">
+                    <i class="fas fa-ellipsis-v"></i>
                 </button>
             </div>
 
@@ -3514,6 +3969,139 @@
         <div class="lightbox-info" id="lightboxInfo">
             <div class="lightbox-user" id="lightboxUser">-</div>
             <div class="lightbox-time" id="lightboxTime">-</div>
+        </div>
+    </div>
+    
+    <!-- ============================================================ -->
+    <!-- MODAL PROFILE ACTIONS (Hapus / Laporkan / Blokir)             -->
+    <!-- ============================================================ -->
+    <div class="modal-overlay" id="profileActionsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-user-cog"></i>
+                    <span>Opsi Profil</span>
+                </div>
+                <button class="modal-close" id="profileActionsModalCloseBtn" type="button" aria-label="Tutup">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-header-compact">
+                    <div class="modal-avatar" id="profileActionsAvatar">
+                        <i class="fas fa-user"></i>
+                    </div>
+                    <div class="modal-username" id="profileActionsName">Nama Pengguna</div>
+                    <div class="modal-userhandle" id="profileActionsHandle">@username</div>
+                </div>
+                <div class="action-list" id="profileActionsList">
+                    <!-- Diisi dinamis oleh JS -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-close-modal" id="profileActionsModalFooterCloseBtn" type="button">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MODAL REPORT USER (Form Laporan)                              -->
+    <!-- ============================================================ -->
+    <div class="modal-overlay" id="reportUserModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-flag"></i>
+                    <span>Laporkan Profil</span>
+                </div>
+                <button class="modal-close" id="reportUserModalCloseBtn" type="button" aria-label="Tutup">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="report-form">
+                    <div>
+                        <label class="report-form-label">
+                            <i class="fas fa-list"></i> Pilih alasan laporan:
+                        </label>
+                        <div class="report-reasons" id="reportReasons">
+                            <label class="report-reason-item" data-reason="Konten tidak pantas">
+                                <input type="radio" name="reportReason" value="Konten tidak pantas">
+                                <span>🚫 Konten tidak pantas / vulgar</span>
+                            </label>
+                            <label class="report-reason-item" data-reason="Ujaran kebencian">
+                                <input type="radio" name="reportReason" value="Ujaran kebencian">
+                                <span>😡 Ujaran kebencian / SARA</span>
+                            </label>
+                            <label class="report-reason-item" data-reason="Penipuan">
+                                <input type="radio" name="reportReason" value="Penipuan">
+                                <span>💰 Penipuan / Scam</span>
+                            </label>
+                            <label class="report-reason-item" data-reason="Spam">
+                                <input type="radio" name="reportReason" value="Spam">
+                                <span>📨 Spam / Promosi berlebihan</span>
+                            </label>
+                            <label class="report-reason-item" data-reason="Pelecehan">
+                                <input type="radio" name="reportReason" value="Pelecehan">
+                                <span>😠 Pelecehan / Perundungan</span>
+                            </label>
+                            <label class="report-reason-item" data-reason="Lainnya">
+                                <input type="radio" name="reportReason" value="Lainnya">
+                                <span>📝 Lainnya (isi di bawah)</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="report-form-label">
+                            <i class="fas fa-pen"></i> Detail tambahan (opsional):
+                        </label>
+                        <textarea
+                            class="report-textarea"
+                            id="reportDetailInput"
+                            placeholder="Jelaskan detail laporan Anda..."
+                            maxlength="500"></textarea>
+                    </div>
+                    <div class="confirm-info-box">
+                        <i class="fas fa-info-circle"></i>
+                        Laporan Anda bersifat <strong>rahasia</strong>. Tim SALINK akan meninjau laporan ini dalam 1×24 jam.
+                    </div>
+                    <div class="report-actions">
+                        <button class="report-btn cancel" id="reportCancelBtn" type="button">
+                            <i class="fas fa-times"></i> Batal
+                        </button>
+                        <button class="report-btn submit" id="reportSubmitBtn" type="button" disabled>
+                            <i class="fas fa-paper-plane"></i> Kirim Laporan
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MODAL CONFIRM (Generic: Blokir / Hapus Pertemanan / Unfollow) -->
+    <!-- ============================================================ -->
+    <div class="modal-overlay" id="confirmActionModal">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="confirm-icon-large" id="confirmIconLarge">
+                    <i class="fas fa-question"></i>
+                </div>
+                <div class="confirm-title" id="confirmTitle">Konfirmasi</div>
+                <div class="confirm-desc" id="confirmDesc">Apakah Anda yakin?</div>
+                <div class="confirm-info-box" id="confirmInfoBox" style="display:none;">
+                    <i class="fas fa-info-circle"></i>
+                    <span id="confirmInfoText"></span>
+                </div>
+                <div class="confirm-actions">
+                    <button class="btn-no" id="confirmBtnNo" type="button">
+                        <i class="fas fa-times"></i> Batal
+                    </button>
+                    <button class="btn-yes-primary" id="confirmBtnYes" type="button">
+                        <i class="fas fa-check"></i> Ya, Lanjutkan
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -4257,26 +4845,55 @@
         updateFollowButton();
     }
 
-    function updateFollowStats() {
+        function updateFollowStats() {
         if (!profileUser) return;
         var targetUser = profileUser.username;
 
-        var following = friends.filter(function(f) { return String(f.user1 || '').trim() === targetUser; });
-        var followers = friends.filter(function(f) { return String(f.user2 || '').trim() === targetUser; });
+        // ⭐ PAKAI SalinkSocial (single source of truth)
+        var followingCount = 0;
+        var followersCount = 0;
+
+        if (typeof SalinkSocial !== 'undefined') {
+            followingCount = SalinkSocial.getFollowing(targetUser).length;
+            followersCount = SalinkSocial.getFollowers(targetUser).length;
+        } else {
+            // Fallback ke logic lama
+            followingCount = friends.filter(function(f) {
+                var st = String(f.status || '').toLowerCase();
+                return String(f.user1 || '').trim() === targetUser &&
+                       (st === 'accepted' || st === 'teman' || st === 'friend');
+            }).length;
+            followersCount = friends.filter(function(f) {
+                var st = String(f.status || '').toLowerCase();
+                return String(f.user2 || '').trim() === targetUser &&
+                       (st === 'accepted' || st === 'teman' || st === 'friend');
+            }).length;
+        }
 
         var followersEl = document.getElementById('profileStatFollowers');
         var followingEl = document.getElementById('profileStatFollowing');
 
         if (followersEl) {
             var prev = followersEl.textContent;
-            followersEl.textContent = followers.length;
-            if (prev !== String(followers.length)) {
+            followersEl.textContent = followersCount;
+            if (prev !== String(followersCount)) {
                 followersEl.classList.remove('bump');
                 void followersEl.offsetWidth;
                 followersEl.classList.add('bump');
                 setTimeout(function() { followersEl.classList.remove('bump'); }, 600);
             }
         }
+        if (followingEl) {
+            var prev2 = followingEl.textContent;
+            followingEl.textContent = followingCount;
+            if (prev2 !== String(followingCount)) {
+                followingEl.classList.remove('bump');
+                void followingEl.offsetWidth;
+                followingEl.classList.add('bump');
+                setTimeout(function() { followingEl.classList.remove('bump'); }, 600);
+            }
+        }
+    }
         if (followingEl) {
             var prev2 = followingEl.textContent;
             followingEl.textContent = following.length;
@@ -4289,30 +4906,70 @@
         }
     }
 
-    function updateFollowButton() {
+        function updateFollowButton() {
         if (!currentUser || !profileUser) return;
         var btn = document.getElementById('inviteBtn');
         var label = document.getElementById('inviteBtnLabel');
+        var icon = document.getElementById('inviteBtnIcon');
+        var moreBtn = document.getElementById('profileMoreBtn');
         if (!btn || !label) return;
 
+        // Kalau lihat profil sendiri → sembunyikan tombol
         if (currentUser.username === profileUser.username) {
             btn.style.display = 'none';
+            if (moreBtn) moreBtn.style.display = 'none';
             return;
         }
+
         btn.style.display = 'inline-flex';
+        if (moreBtn) moreBtn.style.display = 'inline-flex';
 
-        var isFollowing = friends.some(function(f) {
-            return String(f.user1 || '').trim() === currentUser.username &&
-                   String(f.user2 || '').trim() === profileUser.username;
-        });
-
-        if (isFollowing) {
-            btn.classList.add('following');
-            label.textContent = '✓ MENGIKUTI';
-            btn.title = 'Klik untuk berhenti mengikuti';
+        // ⭐ PAKAI SalinkSocial — status: 'none' | 'pending_out' | 'pending_in' | 'accepted' | 'blocked'
+        var status = 'none';
+        if (typeof SalinkSocial !== 'undefined') {
+            status = SalinkSocial.getFriendStatus(currentUser.username, profileUser.username);
         } else {
-            btn.classList.remove('following');
+            var isFollowing = friends.some(function(f) {
+                return String(f.user1 || '').trim() === currentUser.username &&
+                       String(f.user2 || '').trim() === profileUser.username;
+            });
+            status = isFollowing ? 'accepted' : 'none';
+        }
+
+        // Reset state
+        btn.classList.remove('following');
+        btn.classList.remove('pending');
+        btn.disabled = false;
+
+        if (status === 'accepted') {
+            // Sudah berteman → tombol hijau "✓ MENGIKUTI"
+            btn.classList.add('following');
+            label.textContent = 'MENGIKUTI';
+            if (icon) icon.className = 'fas fa-user-check';
+            btn.title = 'Sudah berteman';
+        } else if (status === 'pending_out') {
+            // Kita sudah invite, tunggu diterima → disabled
+            btn.classList.add('pending');
+            label.textContent = 'MENUNGGU';
+            if (icon) icon.className = 'fas fa-hourglass-half';
+            btn.disabled = true;
+            btn.title = 'Menunggu konfirmasi';
+        } else if (status === 'pending_in') {
+            // Orang ini sudah invite kita → tombol "TERIMA"
+            label.textContent = 'TERIMA UNDANGAN';
+            if (icon) icon.className = 'fas fa-user-plus';
+            btn.title = 'Klik untuk menerima undangan';
+        } else if (status === 'blocked') {
+            // Kita diblokir oleh target → disable
+            btn.classList.add('pending');
+            label.textContent = 'DIBLOKIR';
+            if (icon) icon.className = 'fas fa-ban';
+            btn.disabled = true;
+            btn.title = 'Anda diblokir oleh pengguna ini';
+        } else {
+            // none → tombol Invite
             label.textContent = 'INVITE';
+            if (icon) icon.className = 'fas fa-user-plus';
             btn.title = 'Kirim undangan pertemanan';
         }
     }
@@ -4743,7 +5400,7 @@
     // ================================================================
     // 24. FOLLOW / INVITE HANDLER
     // ================================================================
-    async function handleFollowClick() {
+        async function handleFollowClick() {
         if (!currentUser) {
             showToast('🔒 Login', 'Silakan masuk untuk follow', 'fa-lock');
             setTimeout(function() { window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(window.location.href); }, 800);
@@ -4754,53 +5411,118 @@
             showToast('⚠️ Info', 'Tidak bisa follow diri sendiri', 'fa-exclamation-triangle');
             return;
         }
+        if (typeof SalinkSocial === 'undefined') {
+            showToast('⚠️ Error', 'Library sosial belum dimuat', 'fa-exclamation-triangle');
+            return;
+        }
 
-        var isFollowing = friends.some(function(f) {
-            return String(f.user1 || '').trim() === currentUser.username &&
-                   String(f.user2 || '').trim() === profileUser.username;
-        });
+        var myUsername = currentUser.username;
+        var targetUsername = profileUser.username;
+        var status = SalinkSocial.getFriendStatus(myUsername, targetUsername);
 
-        if (isFollowing) {
-            if (!confirm('Berhenti mengikuti @' + profileUser.username + '?')) return;
-            friends = friends.filter(function(f) {
-                return !(String(f.user1 || '').trim() === currentUser.username &&
-                         String(f.user2 || '').trim() === profileUser.username);
+        // === MODE SUDAH BERTEMAN ===
+        if (status === 'accepted') {
+            // Tombol jadi "MENGIKUTI" → klik untuk buka modal konfirmasi hapus
+            openConfirmActionModal({
+                icon: 'fa-user-minus',
+                iconClass: 'warn',
+                title: 'Hapus Pertemanan?',
+                desc: 'Anda akan berhenti mengikuti <strong>@' + escapeHTML(targetUsername) + '</strong>. Anda bisa mengirim undangan lagi kapan saja.',
+                btnText: 'Ya, Hapus',
+                btnClass: 'btn-yes-danger',
+                onConfirm: function() {
+                    doRemoveFriend(myUsername, targetUsername);
+                }
             });
-            try { localStorage.setItem('salink_friends', JSON.stringify(friends)); } catch(e) {}
-            updateFollowStats();
-            updateFollowButton();
-            showToast('👋 Berhenti', 'Tidak lagi mengikuti @' + profileUser.username, 'fa-user-minus');
+            return;
+        }
+
+        // === MODE PENDING_IN (target sudah invite kita) → ACCEPT ===
+        if (status === 'pending_in') {
+            var acceptResult = SalinkSocial.acceptInvite(myUsername, targetUsername);
+            if (acceptResult.ok) {
+                playRegularSound();
+                showToast('✅ Diterima', 'Anda sekarang berteman dengan ' + profileUser.fullName, 'fa-user-check');
+                refreshFriendsFromLibrary();
+                updateFollowStats();
+                updateFollowButton();
+                // Sync ke backend
+                try {
+                    await apiSaveInvite({
+                        id: 'accept-' + Date.now(),
+                        user1: targetUsername,
+                        user2: myUsername,
+                        status: 'accepted',
+                        requestedBy: targetUsername,
+                        timestamp: new Date().toISOString(),
+                        acceptedAt: new Date().toISOString()
+                    });
+                } catch(e) {}
+            } else {
+                showToast('⚠️ Gagal', 'Tidak dapat menerima undangan', 'fa-exclamation-triangle');
+            }
+            return;
+        }
+
+        // === MODE PENDING_OUT → Disabled, jangan lakukan apapun ===
+        if (status === 'pending_out') {
+            showToast('⏳ Menunggu', 'Undangan Anda masih menunggu konfirmasi', 'fa-hourglass-half');
+            return;
+        }
+
+        // === MODE BLOCKED → Info ===
+        if (status === 'blocked') {
+            showToast('🚫 Diblokir', 'Anda tidak dapat mengirim undangan ke pengguna ini', 'fa-ban');
+            return;
+        }
+
+        // === MODE NONE → Kirim undangan ===
+        var result = SalinkSocial.sendInvite(myUsername, targetUsername);
+
+        if (!result.ok) {
+            if (result.reason === 'blocked_by_target') {
+                showToast('🚫 Diblokir', '⚠️ Akun Anda di Blokir oleh pemilik akun ini!', 'fa-ban');
+            } else if (result.reason === 'already_sent') {
+                showToast('⏳ Menunggu', 'Undangan sudah pernah dikirim', 'fa-hourglass-half');
+            } else if (result.reason === 'already_friends') {
+                showToast('ℹ️ Info', 'Anda sudah berteman', 'fa-user-check');
+            } else {
+                showToast('⚠️ Gagal', 'Tidak dapat mengirim undangan', 'fa-exclamation-triangle');
+            }
+            return;
+        }
+
+        // Kalau auto-accepted (target sudah invite duluan)
+        if (result.reason === 'auto_accepted') {
+            playRegularSound();
+            showToast('🎉 Berteman!', 'Anda sekarang berteman dengan ' + profileUser.fullName, 'fa-user-check');
         } else {
-            var newInvite = {
-                id: 'invite-' + Date.now(),
-                user1: currentUser.username,
-                user2: profileUser.username,
-                status: 'pending',
-                requestedBy: currentUser.username,
-                timestamp: new Date().toISOString(),
-                acceptedAt: ''
-            };
-            friends.push(newInvite);
-            try { localStorage.setItem('salink_friends', JSON.stringify(friends)); } catch(e) {}
-            updateFollowStats();
-            updateFollowButton();
             playRegularSound();
             showToast('✅ Terkirim', 'Undangan dikirim ke ' + profileUser.fullName, 'fa-user-plus');
+        }
 
-            await apiSaveInvite(newInvite);
+        refreshFriendsFromLibrary();
+        updateFollowStats();
+        updateFollowButton();
+
+        // Sync ke backend
+        try {
+            await apiSaveInvite(result.data);
             await apiSaveNotification({
                 id: 'notif-' + Date.now(),
                 type: 'invite',
                 title: 'Undangan Berteman',
                 message: currentUser.fullName + ' mengirimkan undangan berteman kepada Anda',
                 sender: currentUser.fullName,
-                senderUsername: currentUser.username,
-                link: 'profile-user.html?username=' + currentUser.username,
+                senderUsername: myUsername,
+                link: 'profile-user.html?username=' + myUsername,
                 postId: '',
                 timestamp: new Date().toISOString(),
                 read: 'FALSE',
                 soundKey: ''
             });
+        } catch(e) {
+            console.warn('⚠️ Gagal sync invite ke backend:', e);
         }
     }
 
@@ -4925,49 +5647,78 @@
     // ================================================================
     // 27. TEMAN MODAL
     // ================================================================
-    function openTemanModal() {
+        function openTemanModal() {
         if (!profileUser) return;
         var body = document.getElementById('temanModalBody');
         if (!body) return;
 
-        var userFriends = friends.filter(function(f) {
-            var u1 = String(f.user1 || '').trim();
-            var u2 = String(f.user2 || '').trim();
-            var target = profileUser.username;
-            var st = String(f.status || '').toLowerCase();
-            return (u1 === target || u2 === target) && (st === 'accepted' || st === 'teman' || st === 'friend');
-        });
+        // ⭐ FIX: PAKAI SalinkSocial.getFriends() — REAL DATA dari salink_friends (status accepted)
+        var friendList = [];
+        if (typeof SalinkSocial !== 'undefined') {
+            friendList = SalinkSocial.getFriends(profileUser.username);
+        } else {
+            // Fallback ke logic lama
+            friendList = friends.filter(function(f) {
+                var u1 = String(f.user1 || '').trim();
+                var u2 = String(f.user2 || '').trim();
+                var target = profileUser.username;
+                var st = String(f.status || '').toLowerCase();
+                return (u1 === target || u2 === target) &&
+                       (st === 'accepted' || st === 'teman' || st === 'friend');
+            }).map(function(f) {
+                var u1 = String(f.user1 || '').trim();
+                var u2 = String(f.user2 || '').trim();
+                return { username: u1 === profileUser.username ? u2 : u1, friendData: f };
+            });
+        }
 
         var totalEl = document.getElementById('totalTemanCount');
-        if (totalEl) totalEl.textContent = userFriends.length;
+        if (totalEl) totalEl.textContent = friendList.length;
 
-        if (userFriends.length === 0) {
+        if (friendList.length === 0) {
             body.innerHTML =
                 '<div class="empty-state">' +
                     '<i class="fas fa-users empty-icon"></i>' +
                     '<div class="empty-title">Belum ada teman</div>' +
-                    '<div class="empty-desc">Pengguna ini belum memiliki teman (yang sudah saling invite)</div>' +
+                    '<div class="empty-desc">Pengguna ini belum memiliki teman (yang sudah saling invite & accepted)</div>' +
                 '</div>';
-        } else {
-            body.innerHTML = userFriends.map(function(f) {
-                var otherUsername = String(f.user1 || '').trim() === profileUser.username ? String(f.user2 || '').trim() : String(f.user1 || '').trim();
-                var user = allUsers.find(function(u) { return u.username === otherUsername; }) || { username: otherUsername, fullName: otherUsername, gender: 'male' };
-                var initial = (user.fullName || user.username || 'U').charAt(0).toUpperCase();
-                var avatar = user.profilePicture ? '<img src="' + escapeAttr(user.profilePicture) + '" alt="">' : initial;
-                var onlineDot = user.isOnline ? '<span class="online-dot"></span>' : '';
-                return '<div class="friend-item" onclick="window.openProfileUser(\'' + escapeAttr(user.username) + '\')">' +
-                    '<div class="friend-avatar">' + avatar + onlineDot + '</div>' +
-                    '<div class="friend-info">' +
-                        '<div class="friend-name">' + escapeHTML(user.fullName || user.username) + '</div>' +
-                        '<div class="friend-status">@' + escapeHTML(user.username) + '</div>' +
-                    '</div>' +
-                    '<button type="button" style="background:var(--bg-input);color:var(--primary);border:1px solid var(--primary);padding:5px 12px;border-radius:12px;cursor:pointer;font-size:0.6rem;font-weight:700;font-family:inherit;"><i class="fas fa-eye"></i> Lihat</button>' +
-                '</div>';
-            }).join('');
+            openModalById('temanModal');
+            return;
         }
 
+        var headerCount =
+            '<div class="friend-list-count">' +
+                '<i class="fas fa-user-friends" style="color:var(--primary);"></i>' +
+                'Total <strong>' + friendList.length + '</strong> teman yang sudah saling mengikuti' +
+            '</div>';
+
+        var listHtml = friendList.map(function(item) {
+            var otherUsername = item.username;
+            var user = allUsers.find(function(u) {
+                return String(u.username).toLowerCase() === String(otherUsername).toLowerCase();
+            }) || { username: otherUsername, fullName: otherUsername, gender: 'male', isOnline: false };
+
+            var initial = (user.fullName || user.username || 'U').charAt(0).toUpperCase();
+            var avatar = user.profilePicture
+                ? '<img src="' + escapeAttr(user.profilePicture) + '" alt="">'
+                : initial;
+            var onlineDot = user.isOnline ? '<span class="online-dot"></span>' : '';
+            var loc = [user.city, user.province].filter(Boolean).join(', ') || user.country || 'Lokasi tidak diketahui';
+
+            return '<div class="friend-item" onclick="window.openProfileUser(\'' + escapeAttr(user.username) + '\')">' +
+                '<div class="friend-avatar">' + avatar + onlineDot + '</div>' +
+                '<div class="friend-info">' +
+                    '<div class="friend-name">' + escapeHTML(user.fullName || user.username) + '</div>' +
+                    '<div class="friend-status">@' + escapeHTML(user.username) + ' • 📍 ' + escapeHTML(loc) + '</div>' +
+                '</div>' +
+                '<button type="button" style="background:var(--bg-input);color:var(--primary);border:1px solid var(--primary);padding:6px 12px;border-radius:12px;cursor:pointer;font-size:0.62rem;font-weight:800;font-family:inherit;"><i class="fas fa-eye"></i> Lihat</button>' +
+            '</div>';
+        }).join('');
+
+        body.innerHTML = headerCount + listHtml;
         openModalById('temanModal');
     }
+    
     function closeTemanModal() { closeModalById('temanModal'); }
 
     // ================================================================
@@ -6280,8 +7031,8 @@
     // ================================================================
     // 41. INIT — OPTIMASI LOADING CEPAT
     // ================================================================
-    async function init() {
-        log('Initializing Profile-User v15.1...');
+        async function init() {
+        log('Initializing Profile-User v16.0...');
 
         loadTheme();
         loadReadNotifs();
@@ -6290,6 +7041,7 @@
         loadCurrentUser();
         setupLoginGuard();
         setupEventListeners();
+        setupProfileActionsListeners();
         initRipple();
         initStorageEvents();
 
@@ -6321,7 +7073,7 @@
 
         if (isPreviewMode) setTimeout(function() { showPreviewOverlay(); }, 1200);
 
-        log('✓ Profile-User v15.1 Ready!');
+        log('✓ Profile-User v16.0 Ready!');
         log('  Mode: ' + (isPreviewMode ? 'PREVIEW' : 'FULL'));
         log('  User: ' + (currentUser ? currentUser.username : 'Guest'));
         log('  Target: ' + (profileUser ? profileUser.username : 'Not found'));
@@ -6386,7 +7138,369 @@
     window.showFloatingNotification = showFloatingNotification;
     window.hideFloatingNotification = hideFloatingNotification;
 
-    log('✓ Profile-User v15.1 Script Loaded');
+    // ================================================================
+    // v16.0 — EXPOSE GLOBAL (Profile Actions)
+    // ================================================================
+    window.openProfileActionsModal = openProfileActionsModal;
+    window.openReportUserModal = openReportUserModal;
+    window.closeReportUserModal = closeReportUserModal;
+    window.submitReportUser = submitReportUser;
+    window.openConfirmActionModal = openConfirmActionModal;
+    window.doRemoveFriend = doRemoveFriend;
+    window.doBlockUser = doBlockUser;
+    window.refreshFriendsFromLibrary = refreshFriendsFromLibrary;
+
+    log('✓ Profile-User v16.0 Script Loaded');
+})();
+
+    // ================================================================
+    // 43. PROFILE ACTIONS (v16.0) — Hapus / Laporkan / Blokir
+    // ================================================================
+
+    // Refresh friends array dari SalinkSocial (biar selalu sinkron)
+    function refreshFriendsFromLibrary() {
+        if (typeof SalinkSocial !== 'undefined') {
+            friends = SalinkSocial.loadFriends();
+        }
+    }
+
+    // Buka modal aksi profil (dinamis 2 atau 3 pilihan)
+    function openProfileActionsModal() {
+        if (!currentUser) {
+            showToast('🔒 Login', 'Silakan masuk dulu', 'fa-lock');
+            return;
+        }
+        if (!profileUser) return;
+        if (currentUser.username === profileUser.username) {
+            showToast('ℹ️ Info', 'Tidak ada aksi untuk profil sendiri', 'fa-info-circle');
+            return;
+        }
+
+        var status = 'none';
+        if (typeof SalinkSocial !== 'undefined') {
+            status = SalinkSocial.getFriendStatus(currentUser.username, profileUser.username);
+        }
+
+        var isFriend = (status === 'accepted');
+
+        // Update header modal
+        var avatarEl = document.getElementById('profileActionsAvatar');
+        var nameEl = document.getElementById('profileActionsName');
+        var handleEl = document.getElementById('profileActionsHandle');
+        if (avatarEl) {
+            avatarEl.innerHTML = profileUser.profilePicture
+                ? '<img src="' + escapeAttr(profileUser.profilePicture) + '" alt="">'
+                : (profileUser.gender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>');
+        }
+        if (nameEl) nameEl.textContent = profileUser.fullName || 'User';
+        if (handleEl) handleEl.textContent = '@' + (profileUser.username || '-');
+
+        // Build action list
+        var listEl = document.getElementById('profileActionsList');
+        if (!listEl) return;
+
+        var actionsHTML = '';
+
+        if (isFriend) {
+            // === Mode berteman: Hapus / Laporkan / Blokir ===
+            actionsHTML +=
+                '<button class="action-item danger" data-action="remove-friend" type="button">' +
+                    '<div class="action-icon danger"><i class="fas fa-user-minus"></i></div>' +
+                    '<div class="action-info">' +
+                        '<div class="action-title">Hapus Pertemanan</div>' +
+                        '<div class="action-desc">Hapus dari daftar teman. Anda bisa invite lagi kapan saja.</div>' +
+                    '</div>' +
+                '</button>' +
+                '<button class="action-item warn" data-action="report" type="button">' +
+                    '<div class="action-icon warn"><i class="fas fa-flag"></i></div>' +
+                    '<div class="action-info">' +
+                        '<div class="action-title">Laporkan Profil</div>' +
+                        '<div class="action-desc">Laporkan tindakan kurang baik / tidak sopan.</div>' +
+                    '</div>' +
+                '</button>' +
+                '<button class="action-item danger" data-action="block" type="button">' +
+                    '<div class="action-icon danger"><i class="fas fa-ban"></i></div>' +
+                    '<div class="action-info">' +
+                        '<div class="action-title">Blokir</div>' +
+                        '<div class="action-desc">Anda tidak akan bisa chat dengan pengguna ini.</div>' +
+                    '</div>' +
+                '</button>';
+        } else {
+            // === Mode belum berteman: Kirim Undangan / Blokir ===
+            actionsHTML +=
+                '<button class="action-item info" data-action="invite" type="button">' +
+                    '<div class="action-icon info"><i class="fas fa-user-plus"></i></div>' +
+                    '<div class="action-info">' +
+                        '<div class="action-title">Kirim Undangan</div>' +
+                        '<div class="action-desc">Kirim undangan pertemanan ke pengguna ini.</div>' +
+                    '</div>' +
+                '</button>' +
+                '<button class="action-item danger" data-action="block" type="button">' +
+                    '<div class="action-icon danger"><i class="fas fa-ban"></i></div>' +
+                    '<div class="action-info">' +
+                        '<div class="action-title">Blokir</div>' +
+                        '<div class="action-desc">Anda tidak akan bisa chat dengan pengguna ini.</div>' +
+                    '</div>' +
+                '</button>';
+        }
+
+        listEl.innerHTML = actionsHTML;
+
+        // Attach listeners ke action item
+        listEl.querySelectorAll('[data-action]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var action = this.getAttribute('data-action');
+                closeModalById('profileActionsModal');
+                setTimeout(function() {
+                    if (action === 'remove-friend') {
+                        openConfirmActionModal({
+                            icon: 'fa-user-minus',
+                            iconClass: 'warn',
+                            title: 'Hapus Pertemanan?',
+                            desc: 'Anda akan berhenti berteman dengan <strong>@' + escapeHTML(profileUser.username) + '</strong>.',
+                            infoText: 'Anda bisa mengirim undangan lagi kapan saja.',
+                            btnText: 'Ya, Hapus',
+                            btnClass: 'btn-yes-danger',
+                            onConfirm: function() {
+                                doRemoveFriend(currentUser.username, profileUser.username);
+                            }
+                        });
+                    } else if (action === 'report') {
+                        openReportUserModal();
+                    } else if (action === 'block') {
+                        openConfirmActionModal({
+                            icon: 'fa-ban',
+                            iconClass: 'danger',
+                            title: 'Blokir Pengguna?',
+                            desc: 'Anda akan memblokir <strong>@' + escapeHTML(profileUser.username) + '</strong>.',
+                            infoText: 'Setelah diblokir, Anda tidak bisa chat dengan pengguna ini. Postingan biasa & Emergency tetap tampil.',
+                            btnText: 'Ya, Blokir',
+                            btnClass: 'btn-yes-danger',
+                            onConfirm: function() {
+                                doBlockUser(currentUser.username, profileUser.username);
+                            }
+                        });
+                    } else if (action === 'invite') {
+                        handleFollowClick();
+                    }
+                }, 250);
+            });
+        });
+
+        openModalById('profileActionsModal');
+    }
+
+    // Eksekusi hapus pertemanan
+    function doRemoveFriend(myUsername, targetUsername) {
+        if (typeof SalinkSocial === 'undefined') return;
+        var result = SalinkSocial.removeFriend(myUsername, targetUsername);
+        if (result.ok) {
+            showToast('✅ Terhapus', 'Pertemanan dengan @' + targetUsername + ' dihapus', 'fa-user-minus');
+            refreshFriendsFromLibrary();
+            updateFollowStats();
+            updateFollowButton();
+            // Sync ke backend (opsional)
+            try {
+                apiSaveInvite({
+                    id: 'remove-' + Date.now(),
+                    user1: myUsername,
+                    user2: targetUsername,
+                    status: 'removed',
+                    requestedBy: myUsername,
+                    timestamp: new Date().toISOString()
+                });
+            } catch(e) {}
+        } else {
+            showToast('⚠️ Gagal', 'Tidak dapat menghapus pertemanan', 'fa-exclamation-triangle');
+        }
+    }
+
+    // Eksekusi blokir
+    function doBlockUser(blocker, blocked) {
+        if (typeof SalinkSocial === 'undefined') return;
+        var result = SalinkSocial.blockUser(blocker, blocked);
+        if (result.ok) {
+            showToast('🚫 Diblokir', 'Anda telah memblokir @' + blocked, 'fa-ban');
+            refreshFriendsFromLibrary();
+            updateFollowStats();
+            updateFollowButton();
+        } else if (result.reason === 'already_blocked') {
+            showToast('ℹ️ Info', 'Pengguna sudah diblokir', 'fa-info-circle');
+        } else {
+            showToast('⚠️ Gagal', 'Tidak dapat memblokir pengguna', 'fa-exclamation-triangle');
+        }
+    }
+
+    // Modal Report User
+    function openReportUserModal() {
+        if (!profileUser) return;
+        // Reset form
+        var radios = document.querySelectorAll('#reportReasons input[type="radio"]');
+        radios.forEach(function(r) {
+            r.checked = false;
+            var parent = r.closest('.report-reason-item');
+            if (parent) parent.classList.remove('selected');
+        });
+        var detailEl = document.getElementById('reportDetailInput');
+        if (detailEl) detailEl.value = '';
+        var submitBtn = document.getElementById('reportSubmitBtn');
+        if (submitBtn) submitBtn.disabled = true;
+
+        openModalById('reportUserModal');
+    }
+
+    function closeReportUserModal() {
+        closeModalById('reportUserModal');
+    }
+
+    function submitReportUser() {
+        if (!currentUser || !profileUser) return;
+        var selectedRadio = document.querySelector('#reportReasons input[type="radio"]:checked');
+        if (!selectedRadio) {
+            showToast('⚠️ Pilih alasan', 'Silakan pilih alasan laporan dulu', 'fa-exclamation-triangle');
+            return;
+        }
+        var reason = selectedRadio.value;
+        var detailEl = document.getElementById('reportDetailInput');
+        var detail = detailEl ? detailEl.value.trim() : '';
+        var fullReason = detail ? (reason + ' — ' + detail) : reason;
+
+        if (typeof SalinkSocial === 'undefined') return;
+        var result = SalinkSocial.reportUser(currentUser.username, profileUser.username, fullReason);
+
+        if (result.ok) {
+            closeReportUserModal();
+            showToast('✅ Terkirim', 'Laporan Anda akan ditinjau dalam 1×24 jam', 'fa-flag');
+        } else {
+            showToast('⚠️ Gagal', 'Tidak dapat mengirim laporan', 'fa-exclamation-triangle');
+        }
+    }
+
+    // Modal Confirm (generic — dipakai untuk blokir & hapus teman)
+    var _pendingConfirmCallback = null;
+
+    function openConfirmActionModal(opts) {
+        opts = opts || {};
+        var iconEl = document.getElementById('confirmIconLarge');
+        var titleEl = document.getElementById('confirmTitle');
+        var descEl = document.getElementById('confirmDesc');
+        var infoBox = document.getElementById('confirmInfoBox');
+        var infoText = document.getElementById('confirmInfoText');
+        var btnYes = document.getElementById('confirmBtnYes');
+        var btnNo = document.getElementById('confirmBtnNo');
+        if (!iconEl || !titleEl || !descEl || !btnYes || !btnNo) return;
+
+        // Set icon
+        iconEl.className = 'confirm-icon-large ' + (opts.iconClass || '');
+        iconEl.innerHTML = '<i class="fas ' + (opts.icon || 'fa-question') + '"></i>';
+
+        titleEl.textContent = opts.title || 'Konfirmasi';
+        descEl.innerHTML = opts.desc || 'Apakah Anda yakin?';
+
+        if (opts.infoText) {
+            infoBox.style.display = 'block';
+            if (infoText) infoText.textContent = opts.infoText;
+        } else {
+            infoBox.style.display = 'none';
+        }
+
+        btnYes.className = opts.btnClass || 'btn-yes-primary';
+        btnYes.innerHTML = '<i class="fas fa-check"></i> ' + (opts.btnText || 'Ya, Lanjutkan');
+
+        _pendingConfirmCallback = opts.onConfirm || null;
+
+        // Reset listener biar tidak dobel
+        var newYes = btnYes.cloneNode(true);
+        btnYes.parentNode.replaceChild(newYes, btnYes);
+        newYes.addEventListener('click', function() {
+            closeModalById('confirmActionModal');
+            if (typeof _pendingConfirmCallback === 'function') {
+                setTimeout(function() { _pendingConfirmCallback(); }, 200);
+            }
+            _pendingConfirmCallback = null;
+        });
+
+        var newNo = btnNo.cloneNode(true);
+        btnNo.parentNode.replaceChild(newNo, btnNo);
+        newNo.addEventListener('click', function() {
+            closeModalById('confirmActionModal');
+            _pendingConfirmCallback = null;
+        });
+
+        openModalById('confirmActionModal');
+    }
+
+    // ================================================================
+    // 44. EVENT LISTENERS v16.0 (Profile Actions)
+    // ================================================================
+    function setupProfileActionsListeners() {
+        // Tombol ⋮
+        var moreBtn = document.getElementById('profileMoreBtn');
+        if (moreBtn) {
+            moreBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (isPreviewMode) { showPreviewOverlay(); return; }
+                openProfileActionsModal();
+            });
+        }
+
+        // Close ProfileActionsModal
+        var paCloseBtn = document.getElementById('profileActionsModalCloseBtn');
+        if (paCloseBtn) paCloseBtn.addEventListener('click', function() { closeModalById('profileActionsModal'); });
+        var paCloseFooter = document.getElementById('profileActionsModalFooterCloseBtn');
+        if (paCloseFooter) paCloseFooter.addEventListener('click', function() { closeModalById('profileActionsModal'); });
+        var paModal = document.getElementById('profileActionsModal');
+        if (paModal) {
+            paModal.addEventListener('click', function(e) {
+                if (e.target === paModal) closeModalById('profileActionsModal');
+            });
+        }
+
+        // Close ReportUserModal
+        var ruCloseBtn = document.getElementById('reportUserModalCloseBtn');
+        if (ruCloseBtn) ruCloseBtn.addEventListener('click', function() { closeReportUserModal(); });
+        var ruModal = document.getElementById('reportUserModal');
+        if (ruModal) {
+            ruModal.addEventListener('click', function(e) {
+                if (e.target === ruModal) closeReportUserModal();
+            });
+        }
+
+        // Cancel report
+        var rcBtn = document.getElementById('reportCancelBtn');
+        if (rcBtn) rcBtn.addEventListener('click', function() { closeReportUserModal(); });
+
+        // Submit report
+        var rsBtn = document.getElementById('reportSubmitBtn');
+        if (rsBtn) rsBtn.addEventListener('click', submitReportUser);
+
+        // Radio reason → enable submit + highlight
+        document.querySelectorAll('#reportReasons input[type="radio"]').forEach(function(r) {
+            r.addEventListener('change', function() {
+                document.querySelectorAll('#reportReasons .report-reason-item').forEach(function(l) {
+                    l.classList.remove('selected');
+                });
+                var parent = r.closest('.report-reason-item');
+                if (parent) parent.classList.add('selected');
+                var sb = document.getElementById('reportSubmitBtn');
+                if (sb) sb.disabled = false;
+            });
+        });
+
+        // Close ConfirmActionModal (Batal sudah handle di openConfirmActionModal)
+        var caModal = document.getElementById('confirmActionModal');
+        if (caModal) {
+            caModal.addEventListener('click', function(e) {
+                if (e.target === caModal) {
+                    closeModalById('confirmActionModal');
+                    _pendingConfirmCallback = null;
+                }
+            });
+        }
+    }
+
+    log('✓ Profile-User v16.0 Script Loaded');
 })();
     </script>
 
