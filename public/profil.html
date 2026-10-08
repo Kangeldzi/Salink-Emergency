@@ -4279,18 +4279,12 @@ function validateProfilePost() {
 }
 
 /* ================================================================
- * GPS — Ambil Lokasi Saya
+ * GPS — Ambil Lokasi Saya (Form Postingan)
+ * Menggunakan getMyLocation() — SAMA dengan Modal Peta Darurat & Pengaturan
  * ================================================================ */
-async function ambilLokasiSaya() {
-    const btn = document.getElementById('profileGpsLocationBtn');
-    const btnText = document.getElementById('profileGpsLocationBtnText');
-    const resultBox = document.getElementById('profileGpsLocationResult');
-    const errorBox = document.getElementById('profileGpsError');
-    const addrEl = document.getElementById('profileGpsAddress');
-    const coordsEl = document.getElementById('profileGpsCoords');
-    const mapsLink = document.getElementById('profileGpsMapsLink');
-
+function ambilLokasiSaya() {
     if (!navigator.geolocation) {
+        const errorBox = document.getElementById('profileGpsError');
         if (errorBox) {
             errorBox.textContent = '❌ Browser Anda tidak mendukung GPS.';
             errorBox.classList.add('active');
@@ -4298,81 +4292,65 @@ async function ambilLokasiSaya() {
         return;
     }
 
-    if (btn) btn.classList.add('loading');
-    if (btnText) btnText.innerHTML = '<span class="gps-location-loading"></span> Mengambil lokasi...';
+    const resultBox = document.getElementById('profileGpsLocationResult');
+    const errorBox = document.getElementById('profileGpsError');
     if (resultBox) resultBox.classList.remove('active');
     if (errorBox) errorBox.classList.remove('active');
 
-    try {
-        const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-                enableHighAccuracy: true, timeout: 15000, maximumAge: 0
-            });
-        });
+    // ⭐ Panggil getMyLocation() — SAMA dengan Peta Darurat & Pengaturan
+    getMyLocation({
+        btnId: 'profileGpsLocationBtn',
+        btnTextId: 'profileGpsLocationBtnText',
+        setStatus: null,  // Form posting pakai result box, bukan status card
+        onSuccess: function(lat, lng, address, method) {
+            const addrEl = document.getElementById('profileGpsAddress');
+            const coordsEl = document.getElementById('profileGpsCoords');
+            const mapsLink = document.getElementById('profileGpsMapsLink');
+            const resultBox2 = document.getElementById('profileGpsLocationResult');
+            const errorBox2 = document.getElementById('profileGpsError');
+            const btn = document.getElementById('profileGpsLocationBtn');
+            const btnText = document.getElementById('profileGpsLocationBtnText');
 
-        const lat = position.coords.latitude.toFixed(6);
-        const lng = position.coords.longitude.toFixed(6);
-        const accuracy = Math.round(position.coords.accuracy || 0);
-        const mapsURL = `https://www.google.com/maps?q=${lat},${lng}`;
+            const lat6 = lat.toFixed(6);
+            const lng6 = lng.toFixed(6);
+            const mapsURL = 'https://www.google.com/maps?q=' + lat + ',' + lng;
 
-        if (coordsEl) coordsEl.textContent = `${lat}, ${lng} (±${accuracy}m)`;
-        if (addrEl) addrEl.textContent = '🔄 Mengambil alamat...';
-        if (resultBox) resultBox.classList.add('active');
-        if (mapsLink) mapsLink.href = mapsURL;
+            // Simpan ke currentGpsData (dipakai saat submit posting)
+            currentGpsData = {
+                lat: lat,
+                lng: lng,
+                accuracy: 0,
+                address: address || (lat6 + ', ' + lng6),
+                mapsURL: mapsURL
+            };
 
-        currentGpsData = {
-            lat: parseFloat(lat), lng: parseFloat(lng), accuracy,
-            address: `${lat}, ${lng}`, mapsURL
-        };
+            if (coordsEl) coordsEl.textContent = lat6 + ', ' + lng6;
+            if (addrEl) addrEl.textContent = address ? ('📍 ' + address) : ('📍 Koordinat: ' + lat6 + ', ' + lng6);
+            if (resultBox2) resultBox2.classList.add('active');
+            if (errorBox2) errorBox2.classList.remove('active');
+            if (mapsLink) mapsLink.href = mapsURL;
 
-        try {
-            const nominatimUrl = `${NOMINATIM_URL}?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=id`;
-            const response = await fetch(nominatimUrl, {
-                method: 'GET',
-                headers: { 'User-Agent': 'SALINK-Emergency-App/7.0' }
-            });
-            if (response.ok) {
-                const data = await response.json();
-                if (data && data.display_name) {
-                    if (addrEl) addrEl.textContent = '📍 ' + data.display_name;
-                    currentGpsData.address = data.display_name;
-                } else {
-                    if (addrEl) addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
-                }
-            } else {
-                if (addrEl) addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
+            if (btn) btn.disabled = false;
+            if (btnText) btnText.textContent = '✅ Lokasi Ditemukan — Tap untuk Ambil Ulang';
+            if (btn) btn.style.background = 'linear-gradient(135deg, #3fb950, #2ea44f)';
+
+            showToast('📍 Lokasi Ditemukan', 'Akurasi GPS berhasil didapatkan', 'fa-location-arrow', 'success');
+
+            validateProfilePost();
+        },
+        onError: function(msg) {
+            const errorBox3 = document.getElementById('profileGpsError');
+            const btn = document.getElementById('profileGpsLocationBtn');
+            const btnText = document.getElementById('profileGpsLocationBtnText');
+
+            if (errorBox3) {
+                errorBox3.textContent = '❌ ' + (msg || 'Gagal mengambil lokasi.');
+                errorBox3.classList.add('active');
             }
-        } catch(e) {
-            if (addrEl) addrEl.textContent = `📍 Koordinat: ${lat}, ${lng}`;
+            if (btn) { btn.disabled = false; btn.style.background = ''; }
+            if (btnText) btnText.textContent = '📍 Ambil Lokasi Saya';
         }
-
-        if (btn) btn.classList.remove('loading');
-        if (btnText) btnText.textContent = '✅ Lokasi Ditemukan — Tap untuk Ambil Ulang';
-        if (btn) btn.style.background = 'linear-gradient(135deg, #3fb950, #2ea44f)';
-
-        showToast('📍 Lokasi Ditemukan', `Akurasi ±${accuracy}m`, 'fa-location-arrow', 'success');
-        validateProfilePost();
-
-    } catch(error) {
-        if (btn) {
-            btn.classList.remove('loading');
-            btn.style.background = '';
-        }
-        if (btnText) btnText.textContent = '📍 Ambil Lokasi Saya';
-
-        let errMsg = 'Gagal mengambil lokasi. ';
-        switch(error.code) {
-            case 1: errMsg += 'Izin lokasi ditolak.'; break;
-            case 2: errMsg += 'Lokasi tidak tersedia.'; break;
-            case 3: errMsg += 'Timeout. Coba lagi.'; break;
-            default: errMsg += error.message || 'Coba lagi.';
-        }
-        if (errorBox) {
-            errorBox.textContent = '❌ ' + errMsg;
-            errorBox.classList.add('active');
-        }
-        showToast('⚠️ Gagal', errMsg, 'fa-exclamation-triangle', 'error');
-    }
+    });
 }
 
 /* ================================================================
