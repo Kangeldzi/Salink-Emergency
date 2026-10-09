@@ -6656,7 +6656,61 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     // Init FAB
-    initFabModal();
+    function initFabModal() {
+    const scanFab = document.getElementById('scanFab');
+    const fabModalOverlay = document.getElementById('fabModalOverlay');
+    const fabModalClose = document.getElementById('fabModalClose');
+    const fabEmergencyCards = document.querySelectorAll('.fab-emergency-card');
+
+    if (scanFab) {
+        scanFab.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            openFabModal();
+        });
+    }
+    if (fabModalClose) fabModalClose.addEventListener('click', closeFabModal);
+    if (fabModalOverlay) {
+        fabModalOverlay.addEventListener('click', function(e) {
+            if (e.target === fabModalOverlay) closeFabModal();
+        });
+    }
+
+    // ⭐ FAB Emergency Card → Redirect ke DASHBOARD dengan ?emergency=TYPE
+    // (Konsisten dengan dashboard.html, pesan-masuk.html, lokasi-bantuan.html)
+    fabEmergencyCards.forEach(card => {
+        card.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const type = card.dataset.fabType;
+            if (!type) return;
+
+            closeFabModal();
+
+            // Kalau belum login → redirect ke login
+            if (!currentUser) {
+                showToast('🔒 Login', 'Silakan login dulu', 'fa-lock', 'error');
+                setTimeout(() => {
+                    window.location.href = LOGIN_URL + '?redirect=' + encodeURIComponent(DASHBOARD_URL + '?emergency=' + type);
+                }, 800);
+                return;
+            }
+
+            // ⭐ Redirect ke DASHBOARD — di sana ada form posting + alarm system
+            setTimeout(() => {
+                window.location.href = DASHBOARD_URL + '?emergency=' + encodeURIComponent(type);
+            }, 250);
+
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        });
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && fabModalOverlay && fabModalOverlay.classList.contains('active')) {
+            closeFabModal();
+        }
+    });
+}
 
     // Setup PWA
     setupPWA();
