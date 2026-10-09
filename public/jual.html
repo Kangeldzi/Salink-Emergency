@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="id" data-theme="dark">
 <head>
     <meta charset="UTF-8">
@@ -17,12 +18,12 @@
 
     <style>
         /* ==================================================================
-           SALINK JUAL v3.0.0 — DASHBOARD SELLER (FINAL)
+           SALINK JUAL v3.1.0 — DASHBOARD SELLER (FINAL + NOTIF/INVITE)
            ==================================================================
-           Tema : Biru profesional (khusus ruang kerja toko online)
-           Note : Berbeda dari dashboard.html (tema emergency merah) — by design
-           Integrasi: dashboard.html, profil.html, profile-user.html, toko.html,
-                      order-tracking.html (e-commerce)
+           Tambahan v3.1.0:
+           - Modal Notifikasi Seller (pesanan, pembayaran, chat, dll)
+           - Modal Invite (WA, Copy Link, Undang User)
+           - Badge notif dinamis di bottom nav
            ================================================================== */
 
         :root {
@@ -220,7 +221,7 @@
         .toast .toast-message { font-size: 0.7rem; color: var(--text-secondary); }
         .toast .toast-close { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; }
 
-        /* MODAL */
+        /* MODAL GENERIC */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(15px); z-index: 2000; display: none; align-items: center; justify-content: center; padding: 20px; }
         .modal-overlay.active { display: flex; animation: fadeIn 0.3s ease; }
         .modal-content { background: var(--modal-bg); border-radius: 20px; max-width: 500px; width: 100%; max-height: 85vh; overflow-y: auto; padding: 20px 18px; border: 1px solid var(--border-color); box-shadow: 0 30px 60px var(--shadow-color); animation: modalIn 0.4s cubic-bezier(0.175,0.885,0.32,1.275); }
@@ -240,9 +241,367 @@
             .admin-card { padding: 12px; }
         }
         .main-content { padding-bottom: calc(var(--footer-height) + 16px) !important; }
+
+        /* ================================================================
+           NOTIFIKASI SELLER — v3.1.0
+           ================================================================ */
+        .notif-filter-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 12px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            padding-bottom: 4px;
+        }
+        .notif-filter-tabs::-webkit-scrollbar { display: none; }
+        .notif-tab {
+            flex: 0 0 auto;
+            padding: 6px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            color: var(--text-muted);
+            font-size: 0.65rem;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .notif-tab:hover { border-color: var(--accent-blue); color: var(--text-primary); }
+        .notif-tab.active {
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            border-color: var(--accent-blue);
+            box-shadow: 0 4px 12px rgba(88,166,255,0.3);
+        }
+
+        .notif-stats-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background: var(--bg-input);
+            border-radius: 10px;
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+        }
+        .notif-stats-row .mark-all-btn {
+            padding: 4px 10px;
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.6rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .notif-list {
+            max-height: 55vh;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+        .seller-notif-item {
+            display: flex;
+            gap: 10px;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.25s;
+            position: relative;
+            border-left: 3px solid var(--accent-blue);
+        }
+        .seller-notif-item:hover {
+            border-color: var(--accent-blue);
+            transform: translateX(3px);
+            background: var(--bg-card);
+        }
+        .seller-notif-item.unread { background: rgba(88,166,255,0.08); }
+        .seller-notif-item.unread::after {
+            content: '';
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            animation: notifPulse 1.5s infinite;
+        }
+        .seller-notif-item.order { border-left-color: var(--accent-gold); }
+        .seller-notif-item.payment { border-left-color: var(--accent-green); }
+        .seller-notif-item.shipping { border-left-color: var(--accent-blue); }
+        .seller-notif-item.review { border-left-color: #ffc107; }
+        .seller-notif-item.chat { border-left-color: var(--accent-purple); }
+        .seller-notif-item.wishlist { border-left-color: #ff3b6b; }
+        .seller-notif-item.system { border-left-color: var(--text-muted); }
+
+        .seller-notif-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+        }
+        .seller-notif-item.order .seller-notif-icon { background: rgba(240,208,128,0.15); border-color: rgba(240,208,128,0.3); }
+        .seller-notif-item.payment .seller-notif-icon { background: rgba(37,211,102,0.15); border-color: rgba(37,211,102,0.3); }
+        .seller-notif-item.shipping .seller-notif-icon { background: rgba(88,166,255,0.15); border-color: rgba(88,166,255,0.3); }
+        .seller-notif-item.review .seller-notif-icon { background: rgba(255,193,7,0.15); border-color: rgba(255,193,7,0.3); }
+        .seller-notif-item.chat .seller-notif-icon { background: rgba(199,146,234,0.15); border-color: rgba(199,146,234,0.3); }
+        .seller-notif-item.wishlist .seller-notif-icon { background: rgba(255,59,107,0.15); border-color: rgba(255,59,107,0.3); }
+
+        .seller-notif-content { flex: 1; min-width: 0; }
+        .seller-notif-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .seller-notif-message {
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            line-height: 1.45;
+            margin-bottom: 6px;
+            word-break: break-word;
+        }
+        .seller-notif-meta {
+            font-size: 0.58rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .seller-notif-meta .price-tag {
+            color: var(--accent-green);
+            font-weight: 700;
+        }
+        .seller-notif-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 6px;
+            padding: 4px 10px;
+            border-radius: 8px;
+            background: rgba(88,166,255,0.15);
+            color: var(--accent-blue);
+            font-size: 0.6rem;
+            font-weight: 700;
+            border: 1px solid rgba(88,166,255,0.3);
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .seller-notif-action:hover {
+            background: var(--accent-blue);
+            color: #fff;
+        }
+
+        /* ================================================================
+           INVITE SELLER — v3.1.0
+           ================================================================ */
+        .invite-hero {
+            text-align: center;
+            padding: 14px 10px 18px;
+            border-bottom: 1px dashed var(--border-color);
+            margin-bottom: 16px;
+        }
+        .invite-hero-icon {
+            font-size: 2.5rem;
+            margin-bottom: 8px;
+            animation: notifPulse 2s infinite;
+        }
+        .invite-hero-title {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            font-family: 'Poppins', sans-serif;
+            margin-bottom: 4px;
+        }
+        .invite-hero-desc {
+            font-size: 0.68rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            max-width: 320px;
+            margin: 0 auto;
+        }
+
+        .invite-channel-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .invite-channel-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.25s;
+            font-family: inherit;
+            text-align: left;
+            width: 100%;
+        }
+        .invite-channel-card:hover {
+            border-color: var(--accent-blue);
+            transform: translateY(-2px);
+            background: var(--bg-card);
+        }
+        .invite-channel-card:active { transform: scale(0.98); }
+        .invite-channel-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+        .invite-channel-icon.wa { background: rgba(37,211,102,0.15); color: var(--accent-green); }
+        .invite-channel-icon.copy { background: rgba(88,166,255,0.15); color: var(--accent-blue); }
+        .invite-channel-icon.user { background: rgba(199,146,234,0.15); color: var(--accent-purple); }
+        .invite-channel-info { flex: 1; min-width: 0; }
+        .invite-channel-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 3px;
+        }
+        .invite-channel-desc {
+            font-size: 0.62rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+        .invite-channel-arrow {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+
+        /* Invite user list */
+        .invite-user-search {
+            width: 100%;
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 0.75rem;
+            font-family: inherit;
+            margin-bottom: 12px;
+        }
+        .invite-user-search:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+        .invite-user-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 8px;
+            transition: all 0.2s;
+        }
+        .invite-user-item:hover { border-color: var(--accent-blue); }
+        .invite-user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--accent-blue-gradient);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: 700;
+            font-size: 1rem;
+            overflow: hidden;
+            flex-shrink: 0;
+            border: 2px solid var(--accent-blue);
+        }
+        .invite-user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .invite-user-info { flex: 1; min-width: 0; }
+        .invite-user-name {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .invite-user-sub {
+            font-size: 0.6rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .invite-user-btn {
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: none;
+            background: var(--accent-blue-gradient);
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            cursor: pointer;
+            flex-shrink: 0;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .invite-user-btn:active { transform: scale(0.95); }
+        .invite-user-btn.sent {
+            background: rgba(63,185,80,0.15);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+        .invite-user-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .invite-preview-box {
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 12px;
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+        .invite-preview-box .preview-label {
+            font-size: 0.58rem;
+            color: var(--text-muted);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .invite-preview-box .preview-text {
+            color: var(--text-primary);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
     </style>
 </head>
-
 <body>
 
     <!-- HEADER -->
@@ -253,6 +612,10 @@
         </a>
         <div class="header-center">
             <button class="menu-btn" id="menuBtn" title="Menu" type="button"><i class="fas fa-bars"></i></button>
+            <button class="menu-btn" id="headerNotifBtn" title="Notifikasi" type="button" style="position:relative;">
+                <i class="fas fa-bell"></i>
+                <span id="headerNotifBadge" style="position:absolute;top:-4px;right:-4px;background:var(--accent-red);color:#fff;font-size:0.5rem;font-weight:800;border-radius:10px;min-width:16px;height:16px;display:none;align-items:center;justify-content:center;padding:0 4px;border:2px solid var(--bg-primary);">0</span>
+            </button>
         </div>
         <div class="header-right">
             <a href="profil.html" class="user-btn" id="userBtn" title="Profil Saya"><i class="fas fa-user"></i></a>
@@ -262,7 +625,7 @@
             <a href="toko.html" class="back-btn" title="Ke Toko"><i class="fas fa-store"></i></a>
         </div>
     </header>
-
+    
     <!-- SIDEBAR -->
     <div class="sidebar-overlay-bg" id="sidebarOverlay"></div>
     <div class="sidebar" id="sidebar">
@@ -630,6 +993,7 @@
     </main>
 
     <!-- BOTTOM NAV -->
+        <!-- BOTTOM NAV -->
     <nav class="bottom-nav">
         <a href="dashboard.html" class="nav-item-bottom" data-workspace="home"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></a>
         <a href="toko.html" class="nav-item-bottom" data-workspace="toko"><span class="nav-icon">🛒</span><span class="nav-label">Toko</span></a>
@@ -652,10 +1016,120 @@
         </div>
     </div>
 
+    <!-- ============================================================ -->
+    <!-- MODAL NOTIFIKASI SELLER v3.1.0                                -->
+    <!-- ============================================================ -->
+    <div class="modal-overlay" id="sellerNotifModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-bell"></i>
+                    <span>🔔 Notifikasi Penjual</span>
+                    <span class="badge-count" id="sellerNotifBadgeCount">0</span>
+                </div>
+                <button class="modal-close" onclick="closeSellerNotifModal()" type="button"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="notif-filter-tabs">
+                    <button class="notif-tab active" data-filter="all" type="button">📋 Semua</button>
+                    <button class="notif-tab" data-filter="order" type="button">🛒 Pesanan</button>
+                    <button class="notif-tab" data-filter="payment" type="button">💳 Pembayaran</button>
+                    <button class="notif-tab" data-filter="shipping" type="button">📦 Pengiriman</button>
+                    <button class="notif-tab" data-filter="chat" type="button">💬 Chat</button>
+                    <button class="notif-tab" data-filter="review" type="button">⭐ Ulasan</button>
+                </div>
+
+                <div class="notif-stats-row">
+                    <span><i class="fas fa-info-circle" style="color:var(--accent-blue);"></i> <span id="sellerNotifStats">0 notifikasi</span></span>
+                    <button class="mark-all-btn" onclick="markAllSellerNotifRead()" type="button">
+                        <i class="fas fa-check-double"></i> Tandai Semua
+                    </button>
+                </div>
+
+                <div class="notif-list" id="sellerNotifList">
+                    <!-- Dinamis dari JS -->
+                    <div class="empty-state">
+                        <i class="fas fa-bell-slash"></i>
+                        <p>Belum ada notifikasi</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-close-modal" onclick="closeSellerNotifModal()" type="button">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- MODAL INVITE SELLER v3.1.0                                    -->
+    <!-- ============================================================ -->
+    <div class="modal-overlay" id="sellerInviteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-user-plus"></i>
+                    <span>📨 Undang Pembeli</span>
+                </div>
+                <button class="modal-close" onclick="closeSellerInviteModal()" type="button"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="sellerInviteMainView">
+                    <div class="invite-hero">
+                        <div class="invite-hero-icon">🛍️</div>
+                        <div class="invite-hero-title">Bagikan Toko Anda!</div>
+                        <div class="invite-hero-desc">Undang calon pembeli untuk belanja di toko Anda. Semakin banyak yang tahu, semakin banyak penjualan!</div>
+                    </div>
+
+                    <div class="invite-channel-list">
+                        <button class="invite-channel-card" onclick="shareStoreViaWA()" type="button">
+                            <div class="invite-channel-icon wa"><i class="fab fa-whatsapp"></i></div>
+                            <div class="invite-channel-info">
+                                <div class="invite-channel-title">WhatsApp</div>
+                                <div class="invite-channel-desc">Bagikan link toko via WhatsApp</div>
+                            </div>
+                            <i class="fas fa-chevron-right invite-channel-arrow"></i>
+                        </button>
+
+                        <button class="invite-channel-card" onclick="copyStoreLink()" type="button">
+                            <div class="invite-channel-icon copy"><i class="fas fa-link"></i></div>
+                            <div class="invite-channel-info">
+                                <div class="invite-channel-title">Copy Link Toko</div>
+                                <div class="invite-channel-desc">Salin link ke clipboard</div>
+                            </div>
+                            <i class="fas fa-chevron-right invite-channel-arrow"></i>
+                        </button>
+
+                        <button class="invite-channel-card" onclick="openInviteUserList()" type="button">
+                            <div class="invite-channel-icon user"><i class="fas fa-users"></i></div>
+                            <div class="invite-channel-info">
+                                <div class="invite-channel-title">Undang Pengguna SALINK</div>
+                                <div class="invite-channel-desc">Kirim undangan belanja ke pengguna lain</div>
+                            </div>
+                            <i class="fas fa-chevron-right invite-channel-arrow"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="sellerInviteUserView" style="display:none;">
+                    <button class="btn-secondary" onclick="backToInviteMain()" style="margin-bottom:12px;" type="button">
+                        <i class="fas fa-arrow-left"></i> Kembali
+                    </button>
+                    <input type="text" class="invite-user-search" id="inviteUserSearchInput" placeholder="🔍 Cari nama atau username...">
+                    <div id="inviteUserListContainer" style="max-height:50vh;overflow-y:auto;">
+                        <!-- Dinamis dari JS -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-close-modal" onclick="closeSellerInviteModal()" type="button">Tutup</button>
+            </div>
+        </div>
+    </div>
+
     <!-- TOAST -->
     <div class="toast-container" id="toastContainer"></div>
 
-      <!-- ============================================================ -->
+    <!-- ============================================================ -->
     <!-- SCRIPT UTAMA — JUAL v3.0.0 (FINAL, NO PATCH)                  -->
     <!-- ============================================================ -->
     <script>
@@ -691,6 +1165,16 @@ let allUsers = [];
 let editingProductId = null;
 let uploadedFiles = [];
 let toastTimeout = null;
+
+// ⭐ v3.1.0 — State Notif Seller
+let sellerNotifications = [];
+let sellerNotifFilter = 'all';
+let readSellerNotifs = {};
+let sellerNotifPollTimer = null;
+const SELLER_NOTIF_POLL_INTERVAL = 30000;
+
+// ⭐ v3.1.0 — State Invite
+let sentSellerInvites = {};
 
 const MAX_FILES = 20;
 const MAX_FILE_SIZE = 200 * 1024; // 200 KB
@@ -1819,7 +2303,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Map input listener
     document.getElementById('mapLink')?.addEventListener('change', updateMapFromInput);
 
-    // Storage sync
+        // Storage sync
     window.addEventListener('storage', (e) => {
         if (e.key === 'salink_user') {
             try {
@@ -1827,15 +2311,32 @@ document.addEventListener('DOMContentLoaded', async () => {
                 if (updated) { currentUser = updated; updateUserUI(); }
             } catch(err) {}
         }
-        if (e.key === 'salink_sync_trigger') {
+        if (e.key === 'salink_sync_trigger' && e.newValue) {
             try {
                 const data = JSON.parse(e.newValue);
                 if (data && (data.type === 'new_product' || data.type === 'delete_product')) {
                     loadMyProducts();
                 }
+                // ⭐ v3.1.0 — Notif baru datang → reload
+                if (data && (data.type === 'new_transaction' || data.type === 'new_message')) {
+                    loadSellerNotifications();
+                }
             } catch(err) {}
         }
     });
+
+    // ⭐ v3.1.0 — BroadcastChannel for realtime notif
+    try {
+        const notifBC = new BroadcastChannel('salink_sync');
+        notifBC.onmessage = (e) => {
+            const data = e.data || {};
+            if (data.type === 'new_transaction' || data.type === 'new_message') {
+                console.log('📡 [jual.html] Notif baru:', data.type);
+                if (currentUser) loadSellerNotifications();
+            }
+        };
+    } catch(e) {}
+    
        // ⭐ BroadcastChannel sync — real-time antar tab
     try {
         const syncBC = new BroadcastChannel('salink_sync');
@@ -1881,7 +2382,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     } catch(e) {}
 
-    console.log('✅ Jual v3.0.0 Ready!');
+        // ⭐ v3.1.0 — Init notif & invite seller
+    initSellerNotifInvite();
+
+    console.log('✅ Jual v3.1.0 Ready!');
     console.log('📦 My Products:', myProducts.length);
     console.log('👤 User:', currentUser?.fullName || 'Guest');
 });
@@ -1907,7 +2411,669 @@ window.updateMapFromInput = updateMapFromInput;
 window.closeModal = closeModal;
 window.showToast = showToast;
 
-console.log('✅ SALINK jual.html v3.0.0 Loaded — Full Synchronized');
+// ⭐ v3.1.0 — Notif Seller
+window.openSellerNotifModal = openSellerNotifModal;
+window.closeSellerNotifModal = closeSellerNotifModal;
+window.markAllSellerNotifRead = markAllSellerNotifRead;
+window.handleSellerNotifAction = handleSellerNotifAction;
+window.loadSellerNotifications = loadSellerNotifications;
+
+// ⭐ v3.1.0 — Invite Seller
+window.openSellerInviteModal = openSellerInviteModal;
+window.closeSellerInviteModal = closeSellerInviteModal;
+window.shareStoreViaWA = shareStoreViaWA;
+window.copyStoreLink = copyStoreLink;
+window.openInviteUserList = openInviteUserList;
+window.backToInviteMain = backToInviteMain;
+window.sendSellerInvite = sendSellerInvite;
+
+/* ================================================================
+ * NOTIFIKASI SELLER v3.1.0
+ * ================================================================
+ * Derive notif dari:
+ *  - transactions (pesanan, pembayaran, pengiriman, ulasan)
+ *  - messages (chat pembeli)
+ *  - products (wishlist, viewer insight)
+ * ================================================================ */
+
+function loadReadSellerNotifs() {
+    try {
+        readSellerNotifs = JSON.parse(localStorage.getItem('salink_read_seller_notifs') || '{}');
+    } catch(e) { readSellerNotifs = {}; }
+}
+function saveReadSellerNotifs() {
+    try {
+        localStorage.setItem('salink_read_seller_notifs', JSON.stringify(readSellerNotifs));
+    } catch(e) {}
+}
+
+async function loadSellerNotifications() {
+    if (!currentUser || !currentUser.username) return;
+    const myUsername = String(currentUser.username).toLowerCase();
+
+    try {
+        // Ambil data paralel
+        const results = await Promise.allSettled([
+            apiCall('get_transactions'),
+            apiCall('get_messages'),
+            apiCall('get_products')
+        ]);
+
+        const transactions = (results[0].status === 'fulfilled' && results[0].value.status === 'success')
+            ? (results[0].value.data || []) : [];
+        const messages = (results[1].status === 'fulfilled' && results[1].value.status === 'success')
+            ? (results[1].value.data || []) : [];
+        const allProducts = (results[2].status === 'fulfilled' && results[2].value.status === 'success')
+            ? (results[2].value.data || []) : [];
+
+        const notifs = [];
+
+        // 1. Dari transaksi (sebagai seller)
+        transactions.forEach(t => {
+            const tSellerId = String(t.sellerId || '').trim().toLowerCase();
+            if (tSellerId !== myUsername) return;
+
+            const tBuyerName = t.buyerName || 'Pembeli';
+            const tProductName = t.productName || 'Produk';
+            const tQty = t.quantity || 1;
+            const tTotal = Number(t.totalPrice) || 0;
+            const tStatus = String(t.status || 'pending').toLowerCase();
+            const ts = t.createdAt ? new Date(t.createdAt).getTime() : Date.now();
+
+            // Pesanan Baru (pending)
+            if (tStatus === 'pending') {
+                notifs.push({
+                    id: 'order-' + t.id,
+                    type: 'order',
+                    icon: '🛒',
+                    title: 'Pesanan Baru',
+                    message: tBuyerName + ' memesan ' + tProductName + ' (Qty ' + tQty + ')',
+                    price: tTotal,
+                    timestamp: ts,
+                    action: 'Lihat Detail',
+                    link: 'order-tracking.html?id=' + encodeURIComponent(t.id)
+                });
+            }
+
+            // Pembayaran Diterima (paid)
+            if (tStatus === 'paid') {
+                notifs.push({
+                    id: 'payment-' + t.id,
+                    type: 'payment',
+                    icon: '💳',
+                    title: 'Pembayaran Diterima',
+                    message: 'Pesanan #' + (t.id || '').substring(0, 8) + ' dari ' + tBuyerName,
+                    price: tTotal,
+                    timestamp: ts,
+                    action: 'Konfirmasi & Kirim',
+                    link: 'order-tracking.html?id=' + encodeURIComponent(t.id)
+                });
+            }
+
+            // Pengiriman (shipped)
+            if (tStatus === 'shipped') {
+                notifs.push({
+                    id: 'shipping-' + t.id,
+                    type: 'shipping',
+                    icon: '📦',
+                    title: 'Pesanan Dikirim',
+                    message: 'Pesanan ' + tProductName + ' ke ' + tBuyerName + ' sudah dikirim',
+                    timestamp: ts,
+                    action: 'Lacak Pesanan',
+                    link: 'order-tracking.html?id=' + encodeURIComponent(t.id)
+                });
+            }
+
+            // Ulasan (rating)
+            if (t.rating && Number(t.rating) > 0) {
+                notifs.push({
+                    id: 'review-' + t.id,
+                    type: 'review',
+                    icon: '⭐',
+                    title: 'Ulasan Baru (' + t.rating + ' Bintang)',
+                    message: tBuyerName + ' memberi rating ' + t.rating + ' untuk ' + tProductName,
+                    timestamp: ts,
+                    action: 'Lihat Ulasan',
+                    link: 'order-tracking.html?id=' + encodeURIComponent(t.id)
+                });
+            }
+        });
+
+        // 2. Dari messages (chat dari pembeli)
+        messages.forEach(m => {
+            const toUser = String(m.to || m.toUsername || '').trim().toLowerCase();
+            const fromUser = String(m.from || m.fromUsername || '').trim().toLowerCase();
+            if (toUser !== myUsername) return;
+            if (fromUser === myUsername) return;
+
+            const fromName = m.fromName || m.sender || 'Pembeli';
+            const msgText = m.message || m.text || '';
+            const ts = m.timestamp ? new Date(m.timestamp).getTime() : Date.now();
+
+            notifs.push({
+                id: 'chat-' + (m.id || ts),
+                type: 'chat',
+                icon: '💬',
+                title: 'Chat dari ' + fromName,
+                message: msgText.substring(0, 100),
+                timestamp: ts,
+                action: 'Balas Chat',
+                link: 'pesan-masuk.html?chat=' + encodeURIComponent(fromUser)
+            });
+        });
+
+        // 3. Dari products (wishlist & viewer insight)
+        allProducts.forEach(p => {
+            const pSellerId = String(p.sellerId || '').trim().toLowerCase();
+            if (pSellerId !== myUsername) return;
+
+            // Wishlist
+            let wishlistedBy = [];
+            try {
+                if (typeof p.wishlistedBy === 'string') wishlistedBy = JSON.parse(p.wishlistedBy);
+                else if (Array.isArray(p.wishlistedBy)) wishlistedBy = p.wishlistedBy;
+            } catch(e) {}
+
+            if (wishlistedBy.length > 0) {
+                notifs.push({
+                    id: 'wishlist-' + p.id,
+                    type: 'wishlist',
+                    icon: '❤️',
+                    title: 'Produk Disukai',
+                    message: 'Produk "' + (p.name || 'Produk') + '" ditambahkan ke wishlist',
+                    timestamp: Date.now() - 3600000, // 1 jam lalu
+                    action: 'Lihat Produk',
+                    link: 'toko.html?product=' + encodeURIComponent(p.id)
+                });
+            }
+
+            // Viewer insight (jika > 50 view)
+            const viewerCount = parseInt(p.viewerCount || 0, 10) || 0;
+            if (viewerCount >= 50) {
+                notifs.push({
+                    id: 'insight-' + p.id,
+                    type: 'system',
+                    icon: '📈',
+                    title: 'Insight Produk',
+                    message: 'Produk "' + (p.name || 'Produk') + '" dilihat ' + viewerCount + ' kali!',
+                    timestamp: Date.now() - 7200000,
+                    action: 'Lihat Produk',
+                    link: 'toko.html?product=' + encodeURIComponent(p.id)
+                });
+            }
+        });
+
+        // Sort & simpan
+        notifs.sort((a, b) => b.timestamp - a.timestamp);
+        sellerNotifications = notifs;
+        try {
+            localStorage.setItem('salink_seller_notifications', JSON.stringify(notifs));
+        } catch(e) {}
+
+        updateSellerNotifBadge();
+
+    } catch(e) {
+        console.error('❌ [loadSellerNotifications] Error:', e);
+        try {
+            sellerNotifications = JSON.parse(localStorage.getItem('salink_seller_notifications') || '[]');
+        } catch(err) { sellerNotifications = []; }
+    }
+}
+
+function getFilteredSellerNotifs() {
+    if (sellerNotifFilter === 'all') return sellerNotifications;
+    if (sellerNotifFilter === 'order') return sellerNotifications.filter(n => n.type === 'order');
+    if (sellerNotifFilter === 'payment') return sellerNotifications.filter(n => n.type === 'payment');
+    if (sellerNotifFilter === 'shipping') return sellerNotifications.filter(n => n.type === 'shipping');
+    if (sellerNotifFilter === 'chat') return sellerNotifications.filter(n => n.type === 'chat');
+    if (sellerNotifFilter === 'review') return sellerNotifications.filter(n => n.type === 'review');
+    return sellerNotifications;
+}
+
+function updateSellerNotifBadge() {
+    const unreadCount = sellerNotifications.filter(n => !readSellerNotifs[n.id]).length;
+
+    // Update badge di header
+    const headerBadge = document.getElementById('headerNotifBadge');
+    if (headerBadge) {
+        if (unreadCount > 0) {
+            headerBadge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+            headerBadge.style.display = 'flex';
+        } else {
+            headerBadge.style.display = 'none';
+        }
+    }
+
+    // Update badge di bottom nav
+    const bottomBadge = document.getElementById('notifBadge');
+    if (bottomBadge) {
+        if (unreadCount > 0) {
+            bottomBadge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+            bottomBadge.classList.add('show');
+        } else {
+            bottomBadge.classList.remove('show');
+        }
+    }
+
+    // Update badge count di modal title
+    const modalBadge = document.getElementById('sellerNotifBadgeCount');
+    if (modalBadge) modalBadge.textContent = unreadCount;
+}
+
+function renderSellerNotifList() {
+    const listEl = document.getElementById('sellerNotifList');
+    const statsEl = document.getElementById('sellerNotifStats');
+    if (!listEl) return;
+
+    const filtered = getFilteredSellerNotifs();
+    const unreadCount = sellerNotifications.filter(n => !readSellerNotifs[n.id]).length;
+
+    if (statsEl) {
+        statsEl.textContent = sellerNotifications.length + ' total • ' + unreadCount + ' belum dibaca';
+    }
+
+    if (filtered.length === 0) {
+        listEl.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-bell-slash"></i>
+                <p>Tidak ada notifikasi</p>
+                <p style="font-size:0.6rem;margin-top:4px;color:var(--text-muted);">Notifikasi pesanan, chat, dan ulasan akan muncul di sini</p>
+            </div>
+        `;
+        return;
+    }
+
+    listEl.innerHTML = filtered.map(n => {
+        const isRead = readSellerNotifs[n.id] === true;
+        const unreadClass = isRead ? '' : 'unread';
+        const typeClass = n.type || 'system';
+        const timeAgo = getTimeAgo(n.timestamp);
+        const priceHtml = n.price ? `<span class="price-tag">${formatRupiah(n.price)}</span>` : '';
+
+        return `
+            <div class="seller-notif-item ${typeClass} ${unreadClass}" data-notif-id="${escapeAttr(n.id)}">
+                <div class="seller-notif-icon">${n.icon || '🔔'}</div>
+                <div class="seller-notif-content">
+                    <div class="seller-notif-title">${escapeHTML(n.title)}</div>
+                    <div class="seller-notif-message">${escapeHTML(n.message)}</div>
+                    <div class="seller-notif-meta">
+                        <i class="fas fa-clock"></i> ${timeAgo}
+                        ${priceHtml}
+                    </div>
+                    ${n.action ? `<button class="seller-notif-action" onclick="event.stopPropagation();handleSellerNotifAction('${escapeAttr(n.id)}')" type="button">
+                        <i class="fas fa-arrow-right"></i> ${escapeHTML(n.action)}
+                    </button>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Attach click handler untuk mark as read
+    listEl.querySelectorAll('.seller-notif-item').forEach(el => {
+        el.addEventListener('click', function() {
+            const id = this.getAttribute('data-notif-id');
+            markSellerNotifRead(id);
+        });
+    });
+}
+
+function markSellerNotifRead(id) {
+    if (!id) return;
+    if (readSellerNotifs[id]) return;
+    readSellerNotifs[id] = true;
+    saveReadSellerNotifs();
+    updateSellerNotifBadge();
+
+    const el = document.querySelector(`.seller-notif-item[data-notif-id="${id}"]`);
+    if (el) el.classList.remove('unread');
+}
+
+function markAllSellerNotifRead() {
+    sellerNotifications.forEach(n => {
+        readSellerNotifs[n.id] = true;
+    });
+    saveReadSellerNotifs();
+    updateSellerNotifBadge();
+    renderSellerNotifList();
+    showToast('✅ Berhasil', 'Semua notifikasi ditandai dibaca', 'fa-check-double');
+}
+
+function handleSellerNotifAction(notifId) {
+    const n = sellerNotifications.find(x => x.id === notifId);
+    if (!n) return;
+    markSellerNotifRead(notifId);
+    if (n.link) {
+        closeSellerNotifModal();
+        setTimeout(() => {
+            window.location.href = n.link;
+        }, 300);
+    }
+}
+
+function openSellerNotifModal() {
+    if (!currentUser) {
+        showToast('🔒 Login', 'Silakan login dulu', 'fa-lock');
+        return;
+    }
+    openModal('sellerNotifModal');
+    sellerNotifFilter = 'all';
+
+    // Reset active tab
+    document.querySelectorAll('#sellerNotifModal .notif-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.filter === 'all');
+    });
+
+    // Attach tab listeners
+    document.querySelectorAll('#sellerNotifModal .notif-tab').forEach(tab => {
+        tab.onclick = function() {
+            document.querySelectorAll('#sellerNotifModal .notif-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            sellerNotifFilter = this.dataset.filter || 'all';
+            renderSellerNotifList();
+        };
+    });
+
+    // Show existing data dulu
+    renderSellerNotifList();
+    updateSellerNotifBadge();
+
+    // Reload fresh dari server
+    loadSellerNotifications().then(() => {
+        renderSellerNotifList();
+    });
+}
+
+function closeSellerNotifModal() {
+    closeModal('sellerNotifModal');
+}
+
+/* ================================================================
+ * INVITE SELLER v3.1.0
+ * ================================================================ */
+
+function loadSentSellerInvites() {
+    try {
+        sentSellerInvites = JSON.parse(localStorage.getItem('salink_sent_seller_invites') || '{}');
+    } catch(e) { sentSellerInvites = {}; }
+}
+function saveSentSellerInvites() {
+    try {
+        localStorage.setItem('salink_sent_seller_invites', JSON.stringify(sentSellerInvites));
+    } catch(e) {}
+}
+
+function openSellerInviteModal() {
+    if (!currentUser) {
+        showToast('🔒 Login', 'Silakan login dulu', 'fa-lock');
+        return;
+    }
+    loadSentSellerInvites();
+    openModal('sellerInviteModal');
+    backToInviteMain();
+}
+
+function closeSellerInviteModal() {
+    closeModal('sellerInviteModal');
+}
+
+function backToInviteMain() {
+    const mainView = document.getElementById('sellerInviteMainView');
+    const userView = document.getElementById('sellerInviteUserView');
+    if (mainView) mainView.style.display = 'block';
+    if (userView) userView.style.display = 'none';
+}
+
+function buildStoreLink() {
+    const username = currentUser?.username || '';
+    return window.location.origin + '/toko.html?seller=' + encodeURIComponent(username);
+}
+
+function shareStoreViaWA() {
+    const storeName = currentUser?.storeName || currentUser?.fullName || 'Toko Saya';
+    const link = buildStoreLink();
+    const message = 
+`🛍️ *${storeName}*
+
+Halo! Saya buka toko online di SALINK MarketPlace. Yuk mampir dan belanja di toko saya!
+
+🔗 ${link}
+
+Terima kasih! 🙏`;
+
+    const waUrl = 'https://wa.me/?text=' + encodeURIComponent(message);
+    window.open(waUrl, '_blank');
+    showToast('📤 Membuka WhatsApp', 'Bagikan link toko ke kontak Anda', 'fa-whatsapp');
+}
+
+function copyStoreLink() {
+    const link = buildStoreLink();
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(link).then(() => {
+            showToast('📋 Berhasil', 'Link toko disalin ke clipboard', 'fa-copy');
+        }).catch(() => {
+            fallbackCopyLink(link);
+        });
+    } else {
+        fallbackCopyLink(link);
+    }
+}
+
+function fallbackCopyLink(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+        document.execCommand('copy');
+        showToast('📋 Berhasil', 'Link toko disalin', 'fa-copy');
+    } catch(e) {
+        showToast('⚠️ Gagal', 'Tidak dapat menyalin link', 'fa-exclamation-triangle');
+    }
+    document.body.removeChild(ta);
+}
+
+function openInviteUserList() {
+    const mainView = document.getElementById('sellerInviteMainView');
+    const userView = document.getElementById('sellerInviteUserView');
+    if (mainView) mainView.style.display = 'none';
+    if (userView) userView.style.display = 'block';
+
+    const searchInput = document.getElementById('inviteUserSearchInput');
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.oninput = () => renderInviteUserList(searchInput.value.trim());
+    }
+
+    renderInviteUserList('');
+}
+
+function renderInviteUserList(query) {
+    const container = document.getElementById('inviteUserListContainer');
+    if (!container) return;
+
+    if (!allUsers || allUsers.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-users-slash"></i>
+                <p>Belum ada pengguna lain</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Filter: bukan diri sendiri
+    let users = allUsers.filter(u => u.username !== currentUser?.username);
+
+    // Filter pencarian
+    if (query) {
+        const q = query.toLowerCase();
+        users = users.filter(u =>
+            (u.fullName || '').toLowerCase().includes(q) ||
+            (u.username || '').toLowerCase().includes(q)
+        );
+    }
+
+    if (users.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-search"></i>
+                <p>Tidak ada pengguna cocok</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = users.slice(0, 50).map(u => {
+        const initial = (u.fullName || u.username || 'U').charAt(0).toUpperCase();
+        const avatar = u.profilePicture
+            ? `<img src="${escapeAttr(u.profilePicture)}" alt="">`
+            : initial;
+        const isSent = sentSellerInvites[u.username] === true;
+        const location = [u.city, u.province].filter(Boolean).join(', ') || u.country || 'Lokasi tidak diketahui';
+
+        return `
+            <div class="invite-user-item">
+                <div class="invite-user-avatar">${avatar}</div>
+                <div class="invite-user-info">
+                    <div class="invite-user-name">${escapeHTML(u.fullName || u.username)}</div>
+                    <div class="invite-user-sub">@${escapeHTML(u.username)} • 📍 ${escapeHTML(location)}</div>
+                </div>
+                <button class="invite-user-btn ${isSent ? 'sent' : ''}"
+                        data-username="${escapeAttr(u.username)}"
+                        ${isSent ? 'disabled' : ''}
+                        type="button">
+                    ${isSent ? '<i class="fas fa-check"></i> Terkirim' : '<i class="fas fa-paper-plane"></i> Undang'}
+                </button>
+            </div>
+        `;
+    }).join('');
+
+    // Attach event listener
+    container.querySelectorAll('[data-username]').forEach(btn => {
+        btn.onclick = function() {
+            const username = this.getAttribute('data-username');
+            sendSellerInvite(username, this);
+        };
+    });
+}
+
+async function sendSellerInvite(username, btnEl) {
+    if (!currentUser || !username) return;
+
+    btnEl.disabled = true;
+    const origHTML = btnEl.innerHTML;
+    btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    try {
+        // Simpan di sentInvites lokal
+        sentSellerInvites[username] = true;
+        saveSentSellerInvites();
+
+        // Kirim notifikasi via backend (sheet notifications)
+        const storeName = currentUser.storeName || currentUser.fullName || 'Toko Saya';
+        const link = buildStoreLink();
+        const notifPayload = {
+            id: 'seller-invite-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8),
+            type: 'seller_invite',
+            title: '🛍️ Undangan Belanja',
+            message: storeName + ' mengundang Anda untuk belanja di toko mereka!',
+            sender: currentUser.fullName,
+            senderUsername: currentUser.username,
+            link: link,
+            postId: '',
+            timestamp: new Date().toISOString(),
+            read: 'FALSE',
+            soundKey: ''
+        };
+
+        try {
+            await apiCall('save_notification', notifPayload);
+        } catch(e) {
+            console.warn('⚠️ [sendSellerInvite] Backend error:', e);
+        }
+
+        // Update UI
+        btnEl.classList.add('sent');
+        btnEl.innerHTML = '<i class="fas fa-check"></i> Terkirim';
+
+        showToast('📨 Terkirim', 'Undangan belanja dikirim ke @' + username, 'fa-paper-plane');
+
+    } catch(e) {
+        console.error('❌ [sendSellerInvite] Error:', e);
+        btnEl.disabled = false;
+        btnEl.innerHTML = origHTML;
+        showToast('⚠️ Gagal', 'Tidak dapat mengirim undangan', 'fa-exclamation-triangle');
+    }
+}
+
+/* ================================================================
+ * INIT NOTIF & INVITE LISTENERS
+ * ================================================================ */
+function initSellerNotifInvite() {
+    loadReadSellerNotifs();
+    loadSentSellerInvites();
+
+    // Header notif button
+    const headerNotifBtn = document.getElementById('headerNotifBtn');
+    if (headerNotifBtn) {
+        headerNotifBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            openSellerNotifModal();
+        });
+    }
+
+    // Bottom nav — notif
+    const bottomNotifNav = document.getElementById('bottomNotifNav');
+    if (bottomNotifNav) {
+        bottomNotifNav.addEventListener('click', function(e) {
+            e.preventDefault();
+            openSellerNotifModal();
+        });
+    }
+
+    // Bottom nav — invite
+    const bottomInviteNav = document.getElementById('bottomInviteNav');
+    if (bottomInviteNav) {
+        bottomInviteNav.addEventListener('click', function(e) {
+            e.preventDefault();
+            openSellerInviteModal();
+        });
+    }
+
+    // Modal overlay click to close
+    const sellerNotifModal = document.getElementById('sellerNotifModal');
+    if (sellerNotifModal) {
+        sellerNotifModal.addEventListener('click', function(e) {
+            if (e.target === this) closeSellerNotifModal();
+        });
+    }
+    const sellerInviteModal = document.getElementById('sellerInviteModal');
+    if (sellerInviteModal) {
+        sellerInviteModal.addEventListener('click', function(e) {
+            if (e.target === this) closeSellerInviteModal();
+        });
+    }
+
+    // Load notif pertama kali
+    setTimeout(() => {
+        if (currentUser) loadSellerNotifications();
+    }, 1500);
+
+    // Auto-refresh notif tiap 30 detik
+    if (sellerNotifPollTimer) clearInterval(sellerNotifPollTimer);
+    sellerNotifPollTimer = setInterval(() => {
+        if (!document.hidden && currentUser) {
+            loadSellerNotifications();
+        }
+    }, SELLER_NOTIF_POLL_INTERVAL);
+
+    console.log('✅ [SellerNotifInvite] Initialized');
+}
+
+        
+console.log('✅ SALINK jual.html v3.1.0 Loaded — Full Synchronized + Notif/Invite');
     </script>
 
     <!-- ============================================================ -->
