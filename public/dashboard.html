@@ -6466,8 +6466,20 @@ function initRipple() {
 }
 function initStorageEvents() {
     window.addEventListener('storage', function(e) {
-        if (e.key === 'salink_sync_trigger') {
-            try { const data = JSON.parse(e.newValue); if (data && data.type) handleSyncMessage(data); } catch(err) {}
+                if (e.key === 'salink_sync_trigger' && e.newValue) {
+            try {
+                const data = JSON.parse(e.newValue);
+                if (data && data.type) {
+                    // ⭐ Handle produk khusus
+                    if (data.type === 'new_product' || data.type === 'delete_product') {
+                        console.log('📡 [dashboard.html] sync trigger:', data.type);
+                        if (typeof loadMiniProducts === 'function') loadMiniProducts();
+                    } else {
+                        // Handle emergency & post (existing)
+                        handleSyncMessage(data);
+                    }
+                }
+            } catch(err) {}
         }
         if (e.key === 'salink_user') { loadUser(); updateUserUI(); }
         if (e.key === 'salink_theme') loadTheme();
@@ -6935,6 +6947,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadMiniOrders();
     }, 1500);
 
+        // ⭐ BroadcastChannel sync — real-time dari jual.html & toko.html
+    try {
+        const syncBC = new BroadcastChannel('salink_sync');
+        syncBC.onmessage = (e) => {
+            const data = e.data || {};
+            if (data.type === 'new_product' || data.type === 'delete_product') {
+                console.log('📡 [dashboard.html] Broadcast diterima:', data.type);
+                // Reload mini marketplace
+                if (typeof loadMiniProducts === 'function') loadMiniProducts();
+            }
+            if (data.type === 'new_post' || data.type === 'new_emergency' || data.type === 'delete_post') {
+                // Sudah di-handle oleh handleSyncMessage via storage event
+                console.log('📡 [dashboard.html] Post sync:', data.type);
+            }
+        };
+    } catch(e) {
+        console.warn('⚠️ BroadcastChannel tidak tersedia');
+    }
+    
     // --- Init Charts (sebelum loadData supaya canvas siap) ---
     initAllCharts();
 
