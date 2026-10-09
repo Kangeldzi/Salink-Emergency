@@ -7158,12 +7158,40 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadStats3x2();
     }, 800);
 
+        // ⭐ v8.0 — BroadcastChannel sync (real-time dari jual.html & toko.html)
+    try {
+        const syncBC = new BroadcastChannel('salink_sync');
+        syncBC.onmessage = (e) => {
+            const data = e.data || {};
+            if (data.type === 'new_product' || data.type === 'delete_product') {
+                console.log('📡 [profil.html] Broadcast diterima:', data.type);
+                if (typeof loadMiniProducts === 'function') loadMiniProducts();
+            }
+            if (data.type === 'profile_update') {
+                // User update profil — refresh
+                loadUser();
+                renderProfile();
+            }
+        };
+    } catch(e) {
+        console.warn('⚠️ BroadcastChannel tidak tersedia');
+    }
+    
     // Cross-tab sync
     window.addEventListener('storage', function(e) {
-        if (e.key === 'salink_sync_trigger') {
+        if (e.key === 'salink_sync_trigger' && e.newValue) {
             try {
                 const data = JSON.parse(e.newValue);
-                if (data && data.type) handleSyncMessage(data);
+                if (data && data.type) {
+                    // ⭐ Handle produk khusus
+                    if (data.type === 'new_product' || data.type === 'delete_product') {
+                        console.log('📡 [profil.html] sync trigger:', data.type);
+                        if (typeof loadMiniProducts === 'function') loadMiniProducts();
+                    } else {
+                        // Handle emergency & post (existing)
+                        handleSyncMessage(data);
+                    }
+                }
             } catch(err) {}
         }
         if (e.key === 'salink_posts' || e.key === 'salink_emergencies') {
