@@ -1233,7 +1233,16 @@ function toggleWishlist(productId) {
     saveWishlist();
     updateWishlistCount();
     applyFiltersAndRender();
-}
+    
+    // ⭐ v3.1.0 — Sync wishlist ke backend (untuk notif seller)
+    if (typeof apiCall === 'function') {
+        apiCall('toggle_wishlist', {
+            productId: productId,
+            username: currentUser?.username || 'guest'
+        }).catch(() => {});
+    }
+}  
+        
 function updateWishlistCount() {
     const countEl = document.getElementById('wishlistCount');
     if (countEl) {
@@ -1284,6 +1293,23 @@ function openProductModal(productId) {
     selectedQty = 1;
     selectedOptions = { size: '', color: '', type: '', weight: '', shipping: '' };
     currentModalSlide = 0;
+
+    function openProductModal(productId) {
+    const p = products.find(x => x.id === productId);
+    if (!p) {
+        showToast('⚠️ Error', 'Produk tidak ditemukan', 'fa-exclamation-triangle');
+        return;
+    }
+
+    selectedProduct = p;
+    selectedQty = 1;
+    selectedOptions = { size: '', color: '', type: '', weight: '', shipping: '' };
+    currentModalSlide = 0;
+
+    // ⭐ v3.1.0 — Increment viewer count di backend (untuk notif seller)
+    if (typeof apiCall === 'function' && currentUser) {
+        apiCall('increment_viewer', { productId: productId }).catch(() => {});
+    }
 
     // Build images array
     let images = [];
@@ -1491,6 +1517,15 @@ function openProductModal(productId) {
     const modalBody = document.getElementById('productModalBody');
     if (modalBody) modalBody.innerHTML = bodyHtml;
 
+        // ⭐ v3.1.0 — Sinkron viewer count ke backend
+    apiCall('increment_viewer', { productId: productId })
+        .then(r => {
+            if (r && r.status === 'success' && r.viewerCount) {
+                p.viewerCount = r.viewerCount;
+            }
+        })
+        .catch(e => console.warn('⚠️ [viewer] Sync gagal:', e));
+        
     openModal('productModal');
     updateTotal();
 }
