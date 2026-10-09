@@ -1671,12 +1671,65 @@ function cancelEdit() {
 async function deleteProduct(productId) {
     const p = myProducts.find(x => x.id === productId);
     if (!p) return;
-    if (!confirm('Hapus produk "' + p.name + '"?')) return;
+    if (!confirm('Hapus produk "' + p.name + '"?\n\nTindakan ini tidak bisa dibatalkan.')) return;
 
+    showToast('🗑️ Menghapus...', 'Menghubungi server...', 'fa-spinner');
+
+    // ⭐ 1. Hapus dari backend (WAJIB)
+    let backendOk = false;
+    try {
+        const r = await apiCall('delete_product', {
+            id: productId,
+            sellerId: currentUser?.username || ''
+        });
+        backendOk = r.status === 'success';
+        console.log('✅ [deleteProduct] Backend response:', r.status);
+    } catch(e) {
+        console.error('❌ [deleteProduct] Backend error:', e);
+    }
+
+    // ⭐ 2. Hapus dari local state
     myProducts = myProducts.filter(x => x.id !== productId);
-    localStorage.setItem('salink_my_products', JSON.stringify(myProducts));
+    try { localStorage.setItem('salink_my_products', JSON.stringify(myProducts)); } catch(e) {}
+
+    // ⭐ 3. Update global cache (salink_products)
+    try {
+        const global = JSON.parse(localStorage.getItem('salink_products') || '[]');
+        const filtered = global.filter(x => x.id !== productId);
+        localStorage.setItem('salink_products', JSON.stringify(filtered));
+    } catch(e) {}
+
+    // ⭐ 4. Broadcast sync (localStorage trigger)
+    try {
+        localStorage.setItem('salink_sync_trigger', JSON.stringify({
+            type: 'delete_product',
+            data: { productId: productId },
+            timestamp: Date.now()
+        }));
+        setTimeout(() => {
+            try { localStorage.removeItem('salink_sync_trigger'); } catch(e) {}
+        }, 200);
+    } catch(e) {}
+
+    // ⭐ 5. Broadcast sync (BroadcastChannel)
+    try {
+        const bc = new BroadcastChannel('salink_sync');
+        bc.postMessage({
+            type: 'delete_product',
+            data: { productId: productId },
+            timestamp: Date.now()
+        });
+        setTimeout(() => bc.close(), 500);
+    } catch(e) {}
+
+    // ⭐ 6. Render ulang
     renderMyProducts();
-    showToast('🗑️ Dihapus', 'Produk berhasil dihapus', 'fa-trash');
+
+    if (backendOk) {
+        showToast('🗑️ Dihapus', 'Produk berhasil dihapus dari server', 'fa-trash');
+    } else {
+        showToast('⚠️ Tersimpan Lokal', 'Produk dihapus lokal, tapi gagal sync ke server. Coba reload.', 'fa-exclamation-triangle');
+    }
 }
 
 /* ================================================================
@@ -1783,7 +1836,19 @@ document.addEventListener('DOMContentLoaded', async () => {
             } catch(err) {}
         }
     });
-
+       // ⭐ BroadcastChannel sync — real-time antar tab
+    try {
+        const syncBC = new BroadcastChannel('salink_sync');
+        syncBC.onmessage = (e) => {
+            const data = e.data || {};
+            if (data.type === 'new_product' || data.type === 'delete_product') {
+                console.log('📡 [jual.html] Broadcast diterima:', data.type);
+                loadMyProducts();
+            }
+        };
+    } catch(e) {
+        console.warn('⚠️ BroadcastChannel tidak tersedia');
+    }
     // Bottom nav
     document.getElementById('bottomNotifNav')?.addEventListener('click', (e) => {
         e.preventDefault();
