@@ -2457,9 +2457,53 @@ async function apiLogin(identifier, password) {
         // 🔑 FORGOT PASSWORD
         // ================================================================
         document.getElementById('forgotPassword').addEventListener('click', function(e) {
-            e.preventDefault();
-            showMessage('🔄 Fitur reset password segera hadir!<br><small>Hubungi admin SALINK.</small>', 'info', true);
-        });
+  e.preventDefault();
+  prosesLupaKataSandi();
+});
+        
+async function prosesLupaKataSandi() {
+  if (!salinkSupabase) {
+    alert('Koneksi Supabase belum siap. Silakan muat ulang halaman.');
+    return;
+  }
+
+  const email = window.prompt(
+    'Masukkan alamat email yang terdaftar di akun SALINK:'
+  );
+
+  if (email === null) return;
+
+  const emailBersih = email.trim();
+
+  if (!emailBersih || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailBersih)) {
+    alert('Masukkan alamat email yang valid.');
+    return;
+  }
+
+  try {
+    const { error } =
+      await salinkSupabase.auth.resetPasswordForEmail(emailBersih, {
+        redirectTo:
+          'https://salink-emergency.vercel.app/reset-password.html'
+      });
+
+    if (error) throw error;
+
+    alert(
+      'Jika email tersebut terdaftar dan dapat menerima pemulihan, ' +
+      'ikuti tautan yang dikirim ke kotak masuk email kamu. ' +
+      'Periksa juga folder Spam.'
+    );
+  } catch (error) {
+    console.error('SALINK password recovery error:', error);
+
+    alert(
+      'Permintaan pemulihan belum berhasil dikirim. ' +
+      'Periksa koneksi, konfigurasi Supabase, dan URL pemulihan.'
+    );
+  }
+}
+
 
         // ================================================================
         // 🗑️ CLEAR DATA
