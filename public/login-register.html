@@ -36,102 +36,7 @@
 
     console.log('✅ SALINK Supabase Client — Login/Register siap');
 </script>
-    <script>
-(async function testSalinkLoginSupabase() {
-
-    alert('🧪 TES SUPABASE LOGIN/REGISTER DIMULAI');
-
-    try {
-
-        if (typeof window.supabase === 'undefined') {
-            alert(
-                '🔴 SUPABASE LIBRARY TIDAK TERSEDIA'
-            );
-            return;
-        }
-
-        if (typeof salinkSupabase === 'undefined') {
-            alert(
-                '🔴 CLIENT SUPABASE SALINK TIDAK TERSEDIA'
-            );
-            return;
-        }
-
-        alert(
-            '🟢 SUPABASE CLIENT LOGIN/REGISTER TERSEDIA\n\n' +
-            'Sekarang menguji Auth...'
-        );
-
-        const timeout = new Promise(function (_, reject) {
-
-            setTimeout(function () {
-
-                reject(
-                    new Error(
-                        'Supabase tidak memberikan respons dalam 10 detik.'
-                    )
-                );
-
-            }, 10000);
-
-        });
-
-        const authTest =
-            salinkSupabase.auth.getSession();
-
-        const result =
-            await Promise.race([
-                authTest,
-                timeout
-            ]);
-
-        if (result.error) {
-
-            alert(
-                '🔴 SUPABASE AUTH ERROR\n\n' +
-                result.error.message
-            );
-
-            console.error(
-                'SALINK Login Supabase Error:',
-                result.error
-            );
-
-            return;
-        }
-
-        alert(
-            '🟢 SUPABASE LOGIN/REGISTER TERHUBUNG!\n\n' +
-            'Auth Endpoint berhasil diakses.\n\n' +
-            'Status Session: ' +
-            (
-                result.data && result.data.session
-                    ? 'Sudah Login'
-                    : 'Belum Login'
-            )
-        );
-
-        console.log(
-            '✅ SALINK LOGIN SUPABASE OK',
-            result.data
-        );
-
-    } catch (error) {
-
-        alert(
-            '🔴 ERROR SUPABASE LOGIN/REGISTER\n\n' +
-            (error.message || String(error))
-        );
-
-        console.error(
-            'SALINK Login Supabase Exception:',
-            error
-        );
-
-    }
-
-})();
-</script>
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <script>
@@ -442,76 +347,99 @@
         // ================================================================
         // 📡 API LOGIN
         // ================================================================
-        function apiLogin(identifier, password) {
-            return new Promise(function(resolve) {
-                var id = (identifier || '').trim();
-                var pwd = (password || '').trim();
-                
-                console.log('🔐 Login attempt:', id);
-                
-                var payload = JSON.stringify({
-                    action: 'login',
-                    data: { identifier: id, password: pwd },
-                    timestamp: Date.now()
-                });
-                
-                universalFetch(API_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: payload
-                }).then(function(response) {
-                    return response.json();
-                }).then(function(result) {
-                    console.log('📥 Backend response:', result);
-                    
-                    if (result && result.status === 'success' && result.data) {
-                        Storage.addUser(result.data);
-                        resolve({ sukses: true, pesan: result.message || 'Login berhasil!', pengguna: result.data, source: 'server' });
-                    } else if (result && result.status === 'error') {
-                        // Cek local dulu (mungkin user offline register)
-                        var localUser = Storage.findUser(id, pwd);
-                        if (localUser) {
-                            resolve({ sukses: true, pesan: 'Login berhasil (mode lokal)!', pengguna: localUser, source: 'local' });
-                        } else {
-                            resolve({ sukses: false, pesan: result.message || 'Username/email atau password salah!' });
-                        }
-                    } else {
-                        // Response aneh, cek local
-                        var localUser2 = Storage.findUser(id, pwd);
-                        if (localUser2) {
-                            resolve({ sukses: true, pesan: 'Login berhasil!', pengguna: localUser2, source: 'local' });
-                        } else {
-                            resolve({ sukses: false, pesan: 'Username/email atau password salah!' });
-                        }
-                    }
-                }).catch(function(error) {
-                    console.warn('⚠️ Backend gagal, coba local storage:', error.message);
-                    
-                    // FALLBACK ke local
-                    var localUser = Storage.findUser(id, pwd);
-                    if (localUser) {
-                        resolve({ sukses: true, pesan: 'Login berhasil (mode offline)!', pengguna: localUser, source: 'local' });
-                    } else {
-                        var users = Storage.getUsers();
-                        var idLower = id.toLowerCase();
-                        var exists = false;
-                        for (var i = 0; i < users.length; i++) {
-                            if ((users[i].username || '').toLowerCase() === idLower || 
-                                (users[i].email || '').toLowerCase() === idLower) {
-                                exists = true;
-                                break;
-                            }
-                        }
-                        
-                        if (exists) {
-                            resolve({ sukses: false, pesan: 'Password salah! Periksa kembali password Anda.' });
-                        } else {
-                            resolve({ sukses: false, pesan: 'Akun tidak ditemukan. Silakan daftar terlebih dahulu.' });
-                        }
-                    }
-                });
+        
+/* =========================================================
+   SALINK AUTH — LOGIN MELALUI SUPABASE
+   Versi migrasi tahap pertama
+   ========================================================= */
+
+async function apiLogin(identifier, password) {
+    const id = (identifier || '').trim();
+    const pwd = password || '';
+
+    if (!id || !pwd) {
+        return {
+            sukses: false,
+            pesan: 'Email dan password wajib diisi.'
+        };
+    }
+
+    // Tahap pertama: gunakan email akun Supabase Auth.
+    // Login dengan username membutuhkan pemetaan username → email
+    // yang aman dari sumber data profil.
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(id);
+
+    if (!isEmail) {
+        return {
+            sukses: false,
+            pesan: 'Untuk pengujian awal, gunakan email akun Supabase Anda.'
+        };
+    }
+
+    if (!navigator.onLine) {
+        return {
+            sukses: false,
+            pesan: 'Koneksi internet diperlukan untuk login Supabase.'
+        };
+    }
+
+    try {
+        const { data, error } =
+            await salinkSupabase.auth.signInWithPassword({
+                email: id.toLowerCase(),
+                password: pwd
             });
+
+        if (error) {
+            console.warn('[SALINK Auth] Login ditolak:', error.message);
+
+            // Pesan tidak membedakan apakah email terdaftar atau tidak.
+            return {
+                sukses: false,
+                pesan: 'Login gagal. Periksa email dan password, lalu coba lagi.'
+            };
         }
+
+        if (!data || !data.user || !data.session) {
+            return {
+                sukses: false,
+                pesan: 'Login belum menghasilkan session. Silakan coba lagi.'
+            };
+        }
+
+        const authUser = data.user;
+        const metadata = authUser.user_metadata || {};
+
+        // Jangan menyimpan password atau access token ke objek profil.
+        const pengguna = {
+            id: authUser.id,
+            email: authUser.email || id.toLowerCase(),
+            username: metadata.username ||
+                (authUser.email || id).split('@')[0],
+            fullName: metadata.full_name ||
+                metadata.fullName ||
+                (authUser.email || id).split('@')[0]
+        };
+
+        console.log('[SALINK Auth] Login Supabase berhasil.');
+
+        return {
+            sukses: true,
+            pesan: 'Login Supabase berhasil!',
+            pengguna: pengguna,
+            source: 'supabase'
+        };
+
+    } catch (error) {
+        console.error('[SALINK Auth] Kesalahan login:', error);
+
+        return {
+            sukses: false,
+            pesan: 'Terjadi kesalahan koneksi. Periksa internet dan coba lagi.'
+        };
+    }
+}
+
 
         // ================================================================
         // 📝 API REGISTER - SOLUSI: JANGAN BLOKIR, SELALU SUKSES
@@ -2414,7 +2342,7 @@
             var email = document.getElementById('signupEmail').value.trim();
             var phone = document.getElementById('signupPhone').value.trim();
             var username = document.getElementById('signupUsername').value.trim();
-            var password = document.getElementById('signupPassword').value.trim();
+            var password = document.getElementById('signinPassword').value;
             var confirmPassword = document.getElementById('signupConfirmPassword').value.trim();
             var bio = document.getElementById('signupBio').value.trim() || ('Halo! Saya ' + fullName);
             var profilePicture = document.getElementById('profilePreview').dataset.image || '';
