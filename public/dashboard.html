@@ -2425,6 +2425,184 @@ function adaptPost(p) {
         district: p.district || '', village: p.village || '', address: p.address || ''
     };
 }
+
+/* ================================================================
+ * PATCH D3-A — ADAPTER SUPABASE → JS & JS → SUPABASE
+ * Konversi antara format Supabase (snake_case) dan dashboard (camelCase).
+ * ================================================================ */
+
+/* Supabase → Dashboard JS
+ * Input: row dari Supabase (dengan JOIN profiles & counts)
+ * Output: objek yang kompatibel dengan renderPosts() dll.
+ */
+function adaptPostFromSupabase(row) {
+    if (!row) return null;
+
+    // Joined profile data (dari Supabase JOIN)
+    const profile = row.profiles || {};
+
+    // Media (kalau ada JOIN ke media)
+    const mediaArr = Array.isArray(row.media) ? row.media : (row.media ? [row.media] : []);
+    const firstMedia = mediaArr.length > 0 ? mediaArr[0] : null;
+
+    // Likes & comments count (kalau ada aggregate)
+    const likesCount = typeof row.likes_count === 'number' 
+        ? row.likes_count 
+        : (Array.isArray(row.likes) ? row.likes.length : 0);
+    const commentsCount = typeof row.comments_count === 'number'
+        ? row.comments_count
+        : (Array.isArray(row.comments) ? row.comments.length : 0);
+
+    // Timestamp: Supabase pakai created_at, dashboard pakai timestamp
+    const tsRaw = row.created_at || row.timestamp || new Date().toISOString();
+    const ts = typeof tsRaw === 'number' ? tsRaw : new Date(tsRaw).getTime();
+
+    // Media URL dari tabel media
+    let mediaType = '';
+    let mediaData = '';
+    let mediaId = '';
+    let gdriveId = '';
+    let gdriveImageUrl = '';
+    let gdriveVideoEmbed = '';
+
+    if (firstMedia) {
+        mediaType = firstMedia.media_type || '';
+        mediaId = firstMedia.id || '';
+        // Bangun URL dari object_key (asumsi Supabase Storage public)
+        if (firstMedia.object_key) {
+            const bucket = firstMedia.bucket || 'salink-media';
+            const url = 'https://dtmzrcsqpprtkcgsdijg.supabase.co/storage/v1/object/public/' + bucket + '/' + firstMedia.object_key;
+            if (mediaType === 'image') {
+                gdriveImageUrl = url;
+            } else if (mediaType === 'video') {
+                gdriveVideoEmbed = url;
+            }
+        }
+        // Fallback: pakai mediaData lama kalau ada
+        mediaData = firstMedia.media_data || '';
+    }
+
+    // Likes & comments array untuk backward compat dengan renderPosts lama
+    // (renderPosts lama baca post.likes & post.comments sebagai JSON string)
+    const likesArray = Array.isArray(row.likes) 
+        ? row.likes.map(l => l.user_id || l) 
+        : [];
+    const commentsArray = Array.isArray(row.comments)
+        ? row.comments.map(c => ({
+            id: c.id,
+            userId: c.user_id,
+            userFullName: c.profile?.full_name || c.user_full_name || '',
+            userGender: c.profile?.gender || 'male',
+            userProfilePic: c.profile?.profile_picture || '',
+            text: c.content || c.text || '',
+            timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
+            parentId: c.parent_id || null
+        }))
+        : [];
+
+    return {
+        id: row.id,
+        userId: profile.username || row.user_username || row.user_id,
+        userAuthId: row.user_id,                          // UUID Supabase (untuk operasi delete/like)
+        userFullName: profile.full_name || row.user_full_name || 'Pengguna SALINK',
+        userGender: normalizeGenderProfile(profile.gender || row.user_gender || 'Laki-laki'),
+        userProfilePic: profile.profile_picture || row.user_profile_pic || '',
+
+        text: row.text || '',
+        mediaType: mediaType,
+        mediaData: mediaData,
+        mediaId: mediaId,
+        mediaThumbnail: '',
+        gdriveId: gdriveId,
+        gdriveImageUrl: gdriveImageUrl,
+        gdriveVideoEmbed: gdriveVideoEmbed,
+        gdriveThumbnail: '',
+
+        timestamp: ts,
+        likes: JSON.stringify(likesArray),
+        comments: JSON.stringify(commentsArray),
+        viewerCount: parseInt(row.viewer_count || 0, 10) || 0,
+
+        isSpecial: row.is_special === true || row.is_special === 'TRUE' || row.is_special === 'true',
+        specialType: row.special_type || '',
+        specialLocation: row.special_location || '',
+        specialAddress: row.special_address || '',
+
+        latitude: row.latitude || '',
+        longitude: row.longitude || '',
+        mapsURL: row.maps_url || '',
+
+        postType: row.post_type || 'biasa',
+        status: row.status || 'published',
+
+        country: row.country || '',
+        province: row.province || '',
+        city: row.city || '',
+        district: row.district || '',
+        village: row.village || '',
+        address: row.address || '',
+
+        // Metadata tambahan untuk debugging
+        _source: 'supabase',
+        _raw: row
+    };
+}
+
+/* Dashboard JS → Supabase
+ * Input: objek post dari form/dashboard
+ * Output: payload untuk INSERT/UPDATE di Supabase
+ * Catatan: user_id di-set dari currentAuthUser.id (bukan username)
+ */
+function adaptPostToSupabase(post, authUserId) {
+    if (!post) return null;
+
+    // Timestamp: konversi ke ISO
+    const ts = post.timestamp 
+        ? (typeof post.timestamp === 'number' 
+            ? new Date(post.timestamp).toISOString() 
+            : post.timestamp)
+        : new Date().toISOString();
+
+    const payload = {
+        user_id: authUserId || post.userAuthId || null,
+        text: post.text || '',
+        post_type: post.postType || 'biasa',
+        is_special: post.isSpecial === true || post.isSpecial === 'TRUE' || post.isSpecial === 'true',
+        special_type: post.specialType || null,
+        special_location: post.specialLocation || null,
+        special_address: post.specialAddress || null,
+        country: post.country || null,
+        province: post.province || null,
+        city: post.city || null,
+        district: post.district || null,
+        village: post.village || null,
+        address: post.address || null,
+        latitude: post.latitude ? parseFloat(post.latitude) : null,
+        longitude: post.longitude ? parseFloat(post.longitude) : null,
+        maps_url: post.mapsURL || null,
+        // status HARUS 'published' supaya muncul di feed (sesuai policy)
+        status: 'published',
+        viewer_count: parseInt(post.viewerCount || 0, 10) || 0,
+        created_at: ts,
+        updated_at: new Date().toISOString()
+    };
+
+    // Buang null values untuk kolom yang tidak perlu
+    Object.keys(payload).forEach(key => {
+        if (payload[key] === null && key !== 'special_type' && key !== 'latitude' && key !== 'longitude') {
+            delete payload[key];
+        }
+    });
+
+    return payload;
+}
+
+/* Cek apakah sebuah ID adalah UUID Supabase (untuk bedakan dari ID lama GAS) */
+function isSupabaseUUID(id) {
+    if (!id || typeof id !== 'string') return false;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+
 function adaptUser(u) {
     const lastActive = u.lastActive ? new Date(u.lastActive).getTime() : 0;
     return Object.assign({}, u, { isOnline: lastActive > (Date.now() - 5 * 60 * 1000) });
@@ -3014,10 +3192,86 @@ async function apiCall(action, data) {
     }
 }
 
+/* ================================================================
+ * PATCH D3-B — apiGetPosts() dari Supabase
+ * - Baca posts dari tabel `posts` (Supabase)
+ * - JOIN ke `profiles` untuk user data
+ * - JOIN ke `media` untuk gambar/video
+ * - Aggregate `likes` & `comments` (count + array)
+ * - Fallback ke GAS kalau Supabase gagal
+ * ================================================================ */
 async function apiGetPosts() {
-    const r = await apiCall('get_posts');
-    return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptPost) : [];
+    // 1) Coba Supabase dulu
+    try {
+        if (window.SALINK_SB_READY && window.salinkSupabase) {
+            const client = window.salinkSupabase;
+
+            // Query: posts + join profiles + media + likes + comments
+            // CATATAN: Supabase PostgREST syntax untuk join & aggregate
+            const { data, error } = await client
+                .from('posts')
+                .select(`
+                    *,
+                    profiles!posts_user_id_fkey (
+                        username,
+                        full_name,
+                        profile_picture,
+                        gender
+                    ),
+                    media!media_post_id_fkey (
+                        id,
+                        media_type,
+                        bucket,
+                        object_key,
+                        mime_type,
+                        status
+                    ),
+                    likes (
+                        user_id
+                    ),
+                    comments (
+                        id,
+                        user_id,
+                        content,
+                        created_at,
+                        parent_id,
+                        profiles!comments_user_id_fkey (
+                            full_name,
+                            gender,
+                            profile_picture
+                        )
+                    )
+                `)
+                .order('created_at', { ascending: false })
+                .limit(100);
+
+            if (error) {
+                console.warn('[SALINK] Supabase getPosts error:', error.message);
+                throw error;
+            }
+
+            if (Array.isArray(data)) {
+                console.log('✅ [SALINK] Posts dari Supabase:', data.length);
+                return data.map(adaptPostFromSupabase).filter(p => p !== null);
+            }
+        }
+    } catch (err) {
+        console.warn('[SALINK] Supabase getPosts gagal, fallback ke GAS:', err.message);
+    }
+
+    // 2) Fallback: GAS (untuk backward compat)
+    try {
+        console.log('📡 [SALINK] Fallback: Posts dari GAS');
+        const r = await apiCall('get_posts');
+        return r.status === 'success' && Array.isArray(r.data) 
+            ? r.data.map(adaptPost) 
+            : [];
+    } catch (err) {
+        console.error('[SALINK] GAS getPosts error:', err.message);
+        return [];
+    }
 }
+            
 async function apiGetEmergencies() {
     const r = await apiCall('get_emergencies');
     return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptEmergency) : [];
