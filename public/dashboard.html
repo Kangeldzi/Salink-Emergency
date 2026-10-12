@@ -3289,28 +3289,156 @@ async function apiGetUsers() {
     return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptUser) : [];
 }
 
+/* ================================================================
+ * PATCH D3-C — apiSavePost() ke Supabase + dual-write GAS
+ *
+ * Alur:
+ * 1) Kalau ada media & file asli → upload ke Supabase Storage
+ *    (belum di-patch, sementara tetap ke GDrive)
+ * 2) INSERT post ke Supabase (primary)
+ * 3) INSERT media ke Supabase (kalau ada gdriveId/mediaData)
+ * 4) Dual-write ke GAS (backup)
+ *
+ * Return: true kalau minimal Supabase berhasil
+ * ================================================================ */
 async function apiSavePost(postData) {
-    const payload = {
-        id: postData.id, userId: postData.userId, userFullName: postData.userFullName,
-        userGender: postData.userGender || 'male', userProfilePic: postData.userProfilePic || '',
-        text: postData.text || '', mediaType: postData.mediaType || '', mediaData: postData.mediaData || '',
-        gdriveId: postData.gdriveId || '', gdriveImageUrl: postData.gdriveImageUrl || '',
-        gdriveVideoEmbed: postData.gdriveVideoEmbed || '', gdriveThumbnail: postData.gdriveThumbnail || '',
-        timestamp: new Date(postData.timestamp).toISOString(),
-        likes: JSON.stringify(postData.likes || []),
-        comments: JSON.stringify(postData.comments || []),
-        isSpecial: postData.isSpecial ? 'TRUE' : 'FALSE',
-        specialType: postData.specialType || '',
-        specialLocation: postData.specialLocation || '', specialAddress: postData.specialAddress || '',
-        postType: postData.postType || 'biasa',
-        country: postData.country || '', province: postData.province || '',
-        city: postData.city || '', district: postData.district || '',
-        village: postData.village || '', address: postData.address || '',
-        latitude: postData.latitude || '', longitude: postData.longitude || '',
-        mapsURL: postData.mapsURL || ''
-    };
-    const r = await apiCall('save_post', payload);
-    return r.status === 'success';
+    if (!postData) return false;
+
+    let supabaseOk = false;
+    let gasOk = false;
+    let supabasePostId = null;
+
+    // ============================================================
+    // 1) SIMPAN KE SUPABASE (PRIMARY)
+    // ============================================================
+    try {
+        if (window.SALINK_SB_READY && window.salinkSupabase && currentAuthUser?.id) {
+            const client = window.salinkSupabase;
+
+            // Bangun payload Supabase
+            const sbPayload = adaptPostToSupabase(postData, currentAuthUser.id);
+
+            // Override: user_id HARUS currentAuthUser.id
+            sbPayload.user_id = currentAuthUser.id;
+
+            // Kalau postData.id sudah UUID (update), pakai. Kalau bukan, biarkan auto-generate.
+            if (postData.id && isSupabaseUUID(postData.id)) {
+                sbPayload.id = postData.id;
+            }
+
+            console.log('📤 [SALINK] Save post ke Supabase:', sbPayload);
+
+            // INSERT atau UPSERT
+            const { data: postResult, error: postError } = await client
+                .from('posts')
+                .upsert(sbPayload, { onConflict: 'id' })
+                .select()
+                .single();
+
+            if (postError) {
+                console.warn('[SALINK] Supabase save post error:', postError.message);
+                throw postError;
+            }
+
+            if (!postResult || !postResult.id) {
+                throw new Error('Supabase tidak mengembalikan ID post');
+            }
+
+            supabasePostId = postResult.id;
+            supabaseOk = true;
+            console.log('✅ [SALINK] Post tersimpan di Supabase:', supabasePostId);
+
+            // ============================================================
+            // 2) SIMPAN MEDIA KE SUPABASE (kalau ada)
+            // ============================================================
+            // Catatan: Sementara masih pakai GDrive URL.
+            // Storage upload ke Supabase akan di-patch di D3-E.
+            try {
+                const hasMedia = postData.mediaType && (postData.gdriveId || postData.mediaData);
+                if (hasMedia) {
+                    const mediaPayload = {
+                        owner_id: currentAuthUser.id,
+                        post_id: supabasePostId,
+                        provider: 'gdrive',                          // sementara
+                        bucket: null,                                 // sementara
+                        object_key: postData.gdriveId || null,        // sementara pakai gdriveId
+                        media_type: postData.mediaType,               // 'image' / 'video'
+                        mime_type: postData.mediaType === 'image'
+                            ? 'image/jpeg'
+                            : 'video/mp4',
+                        original_name: null,
+                        status: 'active'
+                    };
+
+                    const { error: mediaError } = await client
+                        .from('media')
+                        .insert(mediaPayload);
+
+                    if (mediaError) {
+                        console.warn('[SALINK] Supabase save media warning:', mediaError.message);
+                        // Tidak fatal — post sudah tersimpan
+                    } else {
+                        console.log('✅ [SALINK] Media tersimpan di Supabase');
+                    }
+                }
+            } catch (mediaErr) {
+                console.warn('[SALINK] Media save error (non-fatal):', mediaErr.message);
+            }
+
+        } else {
+            console.warn('[SALINK] Supabase tidak siap atau user belum login');
+        }
+    } catch (sbErr) {
+        console.warn('[SALINK] Supabase save post GAGAL:', sbErr.message);
+        supabaseOk = false;
+    }
+
+    // ============================================================
+    // 3) DUAL-WRITE KE GAS (BACKUP)
+    // ============================================================
+    try {
+        const gasPayload = {
+            id: postData.id, userId: postData.userId, userFullName: postData.userFullName,
+            userGender: postData.userGender || 'male', userProfilePic: postData.userProfilePic || '',
+            text: postData.text || '', mediaType: postData.mediaType || '', mediaData: postData.mediaData || '',
+            gdriveId: postData.gdriveId || '', gdriveImageUrl: postData.gdriveImageUrl || '',
+            gdriveVideoEmbed: postData.gdriveVideoEmbed || '', gdriveThumbnail: postData.gdriveThumbnail || '',
+            timestamp: new Date(postData.timestamp).toISOString(),
+            likes: JSON.stringify(postData.likes || []),
+            comments: JSON.stringify(postData.comments || []),
+            isSpecial: postData.isSpecial ? 'TRUE' : 'FALSE',
+            specialType: postData.specialType || '',
+            specialLocation: postData.specialLocation || '', specialAddress: postData.specialAddress || '',
+            postType: postData.postType || 'biasa',
+            country: postData.country || '', province: postData.province || '',
+            city: postData.city || '', district: postData.district || '',
+            village: postData.village || '', address: postData.address || '',
+            latitude: postData.latitude || '', longitude: postData.longitude || '',
+            mapsURL: postData.mapsURL || ''
+        };
+
+        const r = await apiCall('save_post', gasPayload);
+        gasOk = (r.status === 'success');
+        console.log('📤 [SALINK] GAS backup:', gasOk ? 'OK' : 'FAILED');
+    } catch (gasErr) {
+        console.warn('[SALINK] GAS backup error:', gasErr.message);
+        gasOk = false;
+    }
+
+    // ============================================================
+    // 4) KEPUTUSAN
+    // ============================================================
+    // Sukses kalau minimal Supabase berhasil
+    const overallOk = supabaseOk || gasOk;
+
+    console.log('📊 [SALINK] Save post result:', {
+        supabase: supabaseOk,
+        gas: gasOk,
+        overall: overallOk,
+        supabasePostId: supabasePostId
+    });
+
+    return overallOk;
 }
 
 async function apiSaveEmergency(emergencyData) {
