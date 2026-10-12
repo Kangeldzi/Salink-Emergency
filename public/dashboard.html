@@ -19,11 +19,44 @@
     <script src="https://accounts.google.com/gsi/client" async defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <script>
-    const SALINK_SUPABASE_URL = 'https://dtmzrcsqpprtkcgsdijg.supabase.co/rest/v1/';
-    const SALINK_SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_l3CvU_zCWEgyoa-LTiG2-w_aXqjXQGd';
-    const salinkSupabase = window.supabase.createClient(SALINK_SUPABASE_URL, SALINK_SUPABASE_PUBLISHABLE_KEY);
-    console.log('✅ SALINK Supabase Client siap');
+        <script>
+    /* =========================================================
+       PATCH D1 — SUPABASE CLIENT INIT (FIXED)
+       - URL tanpa /rest/v1/ (createClient butuh base URL)
+       - Flag SALINK_SB_READY untuk cek siap/tidak
+       - Konsisten dengan login-register.html & profil.html
+    ========================================================= */
+    (function () {
+        'use strict';
+
+        const SUPABASE_URL = 'https://dtmzrcsqpprtkcgsdijg.supabase.co';
+        const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_l3CvU_zCWEgyoa-LTiG2-w_aXqjXQGd';
+
+        window.SALINK_SB_READY = false;
+
+        if (!window.supabase || !window.supabase.createClient) {
+            console.error('[SALINK Dashboard] Supabase JS belum dimuat. Periksa CDN Supabase.');
+            return;
+        }
+
+        // Hindari membuat client kedua jika sudah tersedia.
+        if (!window.salinkSupabase) {
+            window.salinkSupabase = window.supabase.createClient(
+                SUPABASE_URL,
+                SUPABASE_PUBLISHABLE_KEY,
+                {
+                    auth: {
+                        persistSession: true,
+                        autoRefreshToken: true,
+                        detectSessionInUrl: false
+                    }
+                }
+            );
+        }
+
+        window.SALINK_SB_READY = true;
+        console.log('✅ SALINK Supabase Client siap (dashboard v8.1)');
+    })();
     </script>
 
     <style>
