@@ -1692,7 +1692,7 @@
             <div id="postsList"></div>
         </div>
 
-       <!-- ============================================================ -->
+<!-- ============================================================ -->
 <!-- MINI MARKETPLACE — 6 Produk + 3 Pesanan Terakhir              -->
 <!-- ============================================================ -->
 <div class="mini-marketplace" id="miniMarketplace">
@@ -2068,6 +2068,7 @@ const POST_TYPE_MAP = {
 // 2. STATE GLOBAL
 // ====================================================================
 let currentUser = null;
+let currentAuthUser = null;   // PATCH D2-A — auth object Supabase
 let isPreviewMode = true;
 let currentTheme = 'dark';
 
@@ -5229,21 +5230,174 @@ function setupChartNavigation() {
 
 console.log('✅ [TAHAP 4] Like, Comment, CreatePost, TriggerLocalEmergency, Notif, Invite, Charts loaded');
 
+
 // ====================================================================
 // 40. USER & PREVIEW MODE
+// PATCH D2-B — loadUser() dari Supabase Auth + profiles
 // ====================================================================
-function loadUser() {
-    const s = localStorage.getItem('salink_user');
-    if (s) {
-        try {
-            currentUser = JSON.parse(s);
-            if (currentUser && currentUser.username && currentUser.fullName) {
-                isPreviewMode = false;
-                return;
-            }
-        } catch(e) {}
+
+/* Helper: Normalisasi gender dari Supabase ("Laki-laki"/"Perempuan") */
+function normalizeGenderDashboard(raw) {
+    if (!raw) return 'male';
+    const g = String(raw).toLowerCase().trim();
+    if (g === 'perempuan' || g === 'female' || g === 'f' || g === 'wanita') {
+        return 'female';
     }
+    return 'male';
+}
+
+/* Helper: Mirror user ke LocalStorage untuk kompatibilitas tab lain */
+function mirrorUserToLocalStorage(user) {
+    if (!user) return;
+    try {
+        const mirror = {
+            id: user.id,
+            authUid: user.authUid,
+            username: user.username,
+            fullName: user.fullName,
+            email: user.email,
+            gender: user.gender,
+            genderRaw: user.genderRaw,
+            phone: user.phone,
+            country: user.country,
+            province: user.province,
+            city: user.city,
+            district: user.district,
+            village: user.village,
+            address: user.address,
+            bio: user.bio,
+            mapLink: user.mapLink,
+            mapsURL: user.mapLink,
+            status: user.status,
+            joinedAt: user.joinedAt,
+            joinedDate: user.joinedDate,
+            lastActiveAt: user.lastActiveAt,
+            createdAt: user.createdAt,
+            updatedAt: user.updatedAt
+            // profilePicture dibuang (biar ringan, sama seperti login-register)
+        };
+        localStorage.setItem('salink_user', JSON.stringify(mirror));
+        localStorage.setItem('salink_logged_in', 'true');
+    } catch (e) {}
+}
+
+/* PATCH D2-B — loadUser() async dari Supabase */
+async function loadUser() {
+    try {
+        const client = window.salinkSupabase;
+
+        if (!client) {
+            console.warn('[SALINK Dashboard] Supabase client belum siap, fallback ke LocalStorage');
+            return loadUserFromLocalStorage();
+        }
+
+        // 1) Cek session Supabase Auth
+        const { data: sessionData, error: sessionError } =
+            await client.auth.getSession();
+
+        if (sessionError) {
+            console.warn('[SALINK Dashboard] getSession error:', sessionError.message);
+            return loadUserFromLocalStorage();
+        }
+
+        const authUser = sessionData?.session?.user;
+
+        // 2) Session tidak ada → cek LocalStorage (fallback)
+        if (!authUser) {
+            return loadUserFromLocalStorage();
+        }
+
+        // 3) Ambil profile dari tabel profiles
+        const { data: profile, error: profileError } = await client
+            .from('profiles')
+            .select('*')
+            .eq('id', authUser.id)
+            .maybeSingle();
+
+        if (profileError) {
+            console.warn('[SALINK Dashboard] Profile fetch error:', profileError.message);
+            return loadUserFromLocalStorage();
+        }
+
+        // 4) Profile tidak ada → fallback ke LocalStorage
+        if (!profile) {
+            console.warn('[SALINK Dashboard] Profile tidak ditemukan untuk UID:', authUser.id);
+            return loadUserFromLocalStorage();
+        }
+
+        // 5) Set state global
+        currentAuthUser = authUser;
+
+        const genderRaw = profile.gender || '';
+        const genderNorm = normalizeGenderDashboard(genderRaw);
+        const joinedAtRaw = profile.joined_at || authUser.created_at || '';
+
+        currentUser = {
+            id: authUser.id,
+            authUid: authUser.id,
+            username: profile.username || '',
+            fullName: profile.full_name || '',
+            email: authUser.email || profile.email || '',
+            gender: genderNorm,
+            genderRaw: genderRaw,
+            phone: profile.phone || '',
+            country: profile.country || '',
+            province: profile.province || '',
+            city: profile.city || '',
+            district: profile.district || '',
+            village: profile.village || '',
+            address: profile.address || '',
+            bio: profile.bio || '',
+            mapLink: profile.map_link || '',
+            mapsURL: profile.map_link || '',
+            profilePicture: profile.profile_picture || '',
+            status: profile.status || '',
+            joinedAt: joinedAtRaw,
+            joinedDate: joinedAtRaw,
+            timestamp: joinedAtRaw,
+            lastActiveAt: profile.last_active_at || '',
+            createdAt: profile.created_at || '',
+            updatedAt: profile.updated_at || ''
+        };
+
+        isPreviewMode = false;
+
+        // 6) Mirror ke LocalStorage untuk tab lain
+        mirrorUserToLocalStorage(currentUser);
+
+        console.log('✅ [SALINK Dashboard] Profil dimuat dari Supabase:',
+            currentUser.username || currentUser.email);
+
+        return true;
+
+    } catch (err) {
+        console.error('[SALINK Dashboard] loadUser error:', err);
+        return loadUserFromLocalStorage();
+    }
+}
+
+/* Fallback: baca dari LocalStorage (legacy path) */
+function loadUserFromLocalStorage() {
+    try {
+        const s = localStorage.getItem('salink_user');
+        if (s) {
+            const u = JSON.parse(s);
+            if (u && u.username && u.fullName) {
+                currentUser = u;
+                isPreviewMode = false;
+                // Normalisasi gender kalau belum
+                if (!currentUser.gender || (currentUser.gender !== 'male' && currentUser.gender !== 'female')) {
+                    currentUser.gender = normalizeGenderDashboard(currentUser.gender || currentUser.genderRaw);
+                }
+                console.log('[SALINK Dashboard] User dari LocalStorage (fallback):', currentUser.username);
+                return true;
+            }
+        }
+    } catch (e) {}
+    currentUser = null;
+    currentAuthUser = null;
     isPreviewMode = true;
+    return false;
 }
 
 function updateUserUI() {
@@ -6521,7 +6675,13 @@ function initStorageEvents() {
                 }
             } catch(err) {}
         }
-        if (e.key === 'salink_user') { loadUser(); updateUserUI(); }
+        // PATCH D2-C — loadUser() sekarang async
+        if (e.key === 'salink_user') {
+            loadUser().then(() => {
+            updateUserUI();
+            applyPreviewMode();
+           });
+        }
         if (e.key === 'salink_theme') loadTheme();
         if (e.key === 'salink_posts' || e.key === 'salink_emergencies') {
             posts = loadPostsFromStorage();
@@ -6870,7 +7030,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadTheme();
     loadReadNotifs();
     loadDismissed();
-    loadUser();
+
+    // PATCH D2-D — tunggu loadUser selesai (async)
+    await loadUser();
+
     applyPreviewMode();
     setTimeout(() => { handlePendingEmergencyFromURL(); }, 800);
     updateUserUI();
