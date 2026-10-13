@@ -3567,17 +3567,70 @@ function broadcastSync(type, data) {
         setTimeout(() => localStorage.removeItem('salink_sync_trigger'), 100);
     } catch(e) {}
 }
+
+/* ================================================================
+ * PATCH D3-D2 — loadPostsFromStorage() dari Supabase + fallback LS
+ *
+ * Alur:
+ * 1) Coba ambil dari Supabase (via apiGetPosts)
+ * 2) Fallback ke LocalStorage kalau Supabase gagal / kosong
+ * 3) Filter: post yang sudah di-mark deleted tidak ikut
+ *
+ * Catatan: Fungsi ini SINKRON (bukan async), jadi tidak bisa langsung
+ * panggil apiGetPosts (yang async). Sebagai solusi:
+ * - Fungsi ini baca dari cache `posts` global dulu
+ * - Kalau kosong, baca dari LocalStorage
+ * - Refresh dari Supabase dilakukan di tempat lain (loadData)
+ * ================================================================ */
 function loadPostsFromStorage() {
+    // 1) Kalau array `posts` global ada & valid, pakai itu (paling fresh)
+    if (Array.isArray(posts) && posts.length > 0) {
+        return posts.filter(p => p && p.id && !isDeleted(p.id));
+    }
+
+    // 2) Fallback: baca dari LocalStorage
     try {
         const raw = localStorage.getItem('salink_posts');
         if (raw) {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed)) {
-                return parsed.map(adaptPost).filter(p => p && p.id && !isDeleted(p.id));
+                return parsed
+                    .map(adaptPost)
+                    .filter(p => p && p.id && !isDeleted(p.id));
             }
         }
-    } catch(e) {}
+    } catch(e) {
+        console.warn('[SALINK] loadPostsFromStorage LS error:', e.message);
+    }
+
+    // 3) Kalau semua kosong, return array kosong
     return [];
+}
+
+/* ================================================================
+ * PATCH D3-D2b — Async version: baca dari Supabase
+ * Dipakai saat init atau refresh, supaya data selalu fresh
+ * ================================================================ */
+async function loadPostsFromSupabase() {
+    try {
+        if (!window.SALINK_SB_READY || !window.salinkSupabase) {
+            console.warn('[SALINK] Supabase tidak ready, skip');
+            return null;
+        }
+
+        // Panggil apiGetPosts (yang sudah handle Supabase + fallback GAS)
+        const sbPosts = await apiGetPosts();
+
+        if (Array.isArray(sbPosts) && sbPosts.length > 0) {
+            console.log('✅ [SALINK] loadPostsFromSupabase:', sbPosts.length, 'posts');
+            return sbPosts.filter(p => p && p.id && !isDeleted(p.id));
+        }
+
+        return null; // return null artinya "tidak ada data baru"
+    } catch (err) {
+        console.warn('[SALINK] loadPostsFromSupabase error:', err.message);
+        return null;
+    }
 }
 
 // ====================================================================
