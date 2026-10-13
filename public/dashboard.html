@@ -2405,6 +2405,33 @@ function adaptEmergency(em) {
         district: em.district || '', village: em.village || ''
     };
 }
+
+/* ================================================================
+ * PATCH D3-B-FIX — Helper: Normalisasi Gender & Denormalisasi
+ * Dibutuhkan oleh adaptPostFromSupabase() & adaptPostToSupabase()
+ * ================================================================ */
+function normalizeGenderProfile(raw) {
+    if (!raw) return 'male';
+    const g = String(raw).toLowerCase().trim();
+    if (g === 'perempuan' || g === 'female' || g === 'f' || g === 'wanita') {
+        return 'female';
+    }
+    return 'male';
+}
+
+function denormalizeGenderProfile(norm) {
+    const g = String(norm || '').toLowerCase().trim();
+    if (g === 'female' || g === 'perempuan' || g === 'f' || g === 'wanita') {
+        return 'Perempuan';
+    }
+    return 'Laki-laki';
+}
+
+function isSupabaseUUID(id) {
+    if (!id || typeof id !== 'string') return false;
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+}
+            
 function adaptPost(p) {
     const ts = p.timestamp ? new Date(p.timestamp).getTime() : Date.now();
     return {
