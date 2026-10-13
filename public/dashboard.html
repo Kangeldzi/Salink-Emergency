@@ -3740,6 +3740,22 @@ function closeDeleteConfirm() {
 // ====================================================================
 // 22. DELETE PERMANENT (FIX BUG 2)
 // ====================================================================
+
+/* ================================================================
+ * PATCH D3-D1 — deletePostPermanent() dengan Supabase hard delete
+ *
+ * Alur:
+ * 1) Cek login
+ * 2) Konfirmasi (2x)
+ * 3) Mark as deleted (cegah render ulang)
+ * 4) Delete GDrive media (kalau ada)
+ * 5) Delete Supabase (kalau ID UUID)
+ *    → CASCADE otomatis hapus likes, comments, media
+ * 6) Delete GAS (dual-delete untuk backup)
+ * 7) Delete LocalStorage
+ * 8) Broadcast sync
+ * 9) Render ulang
+ * ================================================================ */
 async function deletePostPermanent(postId, options) {
     options = options || {};
     const silent = options.silent || false;
@@ -3752,10 +3768,12 @@ async function deletePostPermanent(postId, options) {
 
     const post = posts.find(p => p.id === postId);
     const isEmergency = post && post.isSpecial && post.specialType;
+    const isUUID = isSupabaseUUID(postId);
 
+    // 1) KONFIRMASI (2 lapis)
     if (!skipConfirm) {
         const label = post ? (post.text ? post.text.substring(0, 50) : 'Postingan media') : 'Postingan';
-        if (!confirm('🗑️ HAPUS PERMANEN?\n\n"' + label + '"\n\nAkan dihapus dari:\n✅ Tampilan aplikasi\n✅ Penyimpanan lokal\n✅ Database server\n✅ Google Drive (media)\n\nTindakan ini TIDAK BISA DIBATALKAN!')) {
+        if (!confirm('🗑️ HAPUS PERMANEN?\n\n"' + label + '"\n\nAkan dihapus dari:\n✅ Tampilan aplikasi\n✅ Supabase Database\n✅ Penyimpanan lokal\n✅ Google Drive (media)\n✅ GAS (backup)\n\nTindakan ini TIDAK BISA DIBATALKAN!')) {
             return false;
         }
         if (!confirm('🛑 KONFIRMASI KEDUA\n\nYakin ingin menghapus? Data tidak dapat dikembalikan.')) {
@@ -3764,52 +3782,52 @@ async function deletePostPermanent(postId, options) {
     }
 
     showSyncIndicator();
-    console.log('🗑️ [deletePostPermanent] Deleting:', postId, '| Emergency:', isEmergency);
+    console.log('🗑️ [deletePostPermanent] Deleting:', postId, '| UUID:', isUUID, '| Emergency:', isEmergency);
 
     try {
+        // 2) MARK AS DELETED (cegah render ulang sementara)
         markAsDeleted(postId);
         console.log('✅ [deletePostPermanent] Marked as deleted');
 
+        // 3) DELETE GDRIVE MEDIA (kalau ada)
         if (post && post.gdriveId) {
             try {
                 await deleteFromGDrive(post.gdriveId);
-            } catch(e) {}
+                console.log('✅ [deletePostPermanent] GDrive deleted');
+            } catch (e) {
+                console.warn('⚠️ [deletePostPermanent] GDrive error (non-fatal):', e.message);
+            }
         }
 
-        let allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
-        allPosts = allPosts.filter(p => p && p.id !== postId);
-        safeSavePosts(allPosts);
-
-        let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-        ems = ems.filter(e => e && e.id !== postId);
-        localStorage.setItem('salink_emergencies', JSON.stringify(ems));
-
-        let notifs = JSON.parse(localStorage.getItem('salink_notifications') || '[]');
-        notifs = notifs.filter(n => n && n.id !== postId && n.postId !== postId);
-        localStorage.setItem('salink_notifications', JSON.stringify(notifs));
-
-        if (window._salinkLikesMap && window._salinkLikesMap[postId]) {
-            delete window._salinkLikesMap[postId];
-            saveLikesMap();
-        }
-        if (window._salinkCommentsMap && window._salinkCommentsMap[postId]) {
-            delete window._salinkCommentsMap[postId];
-            saveCommentsMap();
-        }
-
-        if (post && post.mediaId) {
+        // 4) DELETE DARI SUPABASE (kalau UUID)
+        let supabaseOk = false;
+        if (isUUID && window.SALINK_SB_READY && window.salinkSupabase) {
             try {
-                const mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}');
-                if (mediaStore[post.mediaId]) {
-                    delete mediaStore[post.mediaId];
-                    localStorage.setItem('salink_post_media', JSON.stringify(mediaStore));
+                const client = window.salinkSupabase;
+
+                console.log('📤 [deletePostPermanent] Delete dari Supabase:', postId);
+
+                // CASCADE otomatis hapus likes, comments, media
+                const { error: sbError } = await client
+                    .from('posts')
+                    .delete()
+                    .eq('id', postId);
+
+                if (sbError) {
+                    console.warn('⚠️ [deletePostPermanent] Supabase error:', sbError.message);
+                } else {
+                    supabaseOk = true;
+                    console.log('✅ [deletePostPermanent] Supabase deleted');
                 }
-            } catch(e) {}
+            } catch (sbErr) {
+                console.warn('⚠️ [deletePostPermanent] Supabase catch:', sbErr.message);
+            }
+        } else {
+            console.log('ℹ️ [deletePostPermanent] Skip Supabase (bukan UUID atau tidak ready)');
         }
 
-        if (readNotifs[postId]) { delete readNotifs[postId]; saveReadNotifs(); }
-        if (dismissedEmergencies[postId]) { delete dismissedEmergencies[postId]; saveDismissed(); }
-
+        // 5) DELETE DARI GAS (dual-delete)
+        let gasOk = false;
         try {
             const deleteType = isEmergency ? 'emergency' : 'post';
             const response = await fetch(API_URL, {
@@ -3827,12 +3845,68 @@ async function deletePostPermanent(postId, options) {
             });
             const result = await response.json();
             if (result && result.status === 'success') {
-                console.log('✅ [deletePostPermanent] Backend delete OK');
+                gasOk = true;
+                console.log('✅ [deletePostPermanent] GAS deleted');
             }
-        } catch(e) {}
+        } catch (gasErr) {
+            console.warn('⚠️ [deletePostPermanent] GAS error:', gasErr.message);
+        }
 
+        // 6) DELETE DARI LOCALSTORAGE (semua key terkait)
+        try {
+            // Posts
+            let allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
+            allPosts = allPosts.filter(p => p && p.id !== postId);
+            safeSavePosts(allPosts);
+
+            // Emergencies
+            let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
+            ems = ems.filter(e => e && e.id !== postId);
+            localStorage.setItem('salink_emergencies', JSON.stringify(ems));
+
+            // Notifications
+            let notifs = JSON.parse(localStorage.getItem('salink_notifications') || '[]');
+            notifs = notifs.filter(n => n && n.id !== postId && n.postId !== postId);
+            localStorage.setItem('salink_notifications', JSON.stringify(notifs));
+
+            // Likes map (untuk post lama)
+            if (window._salinkLikesMap && window._salinkLikesMap[postId]) {
+                delete window._salinkLikesMap[postId];
+                saveLikesMap();
+            }
+            // Comments map (untuk post lama)
+            if (window._salinkCommentsMap && window._salinkCommentsMap[postId]) {
+                delete window._salinkCommentsMap[postId];
+                saveCommentsMap();
+            }
+
+            // Media store
+            if (post && post.mediaId) {
+                const mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}');
+                if (mediaStore[post.mediaId]) {
+                    delete mediaStore[post.mediaId];
+                    localStorage.setItem('salink_post_media', JSON.stringify(mediaStore));
+                }
+            }
+
+            // Read notifs
+            if (readNotifs[postId]) {
+                delete readNotifs[postId];
+                saveReadNotifs();
+            }
+            // Dismissed
+            if (dismissedEmergencies[postId]) {
+                delete dismissedEmergencies[postId];
+                saveDismissed();
+            }
+        } catch (lsErr) {
+            console.warn('⚠️ [deletePostPermanent] LS error:', lsErr.message);
+        }
+
+        // 7) BROADCAST SYNC
         broadcastSync(isEmergency ? 'delete_emergency' : 'delete_post', { id: postId });
 
+        // 8) RENDER ULANG
         posts = loadPostsFromStorage();
         renderPosts();
         renderPostsStats();
@@ -3845,42 +3919,27 @@ async function deletePostPermanent(postId, options) {
         closeModal('notifModal');
         closeDeleteConfirm();
 
-        if (!silent) showToast('✅ Terhapus', 'Postingan dihapus permanen', 'fa-check-circle');
+        // 9) FEEDBACK
+        if (!silent) {
+            const parts = [];
+            if (supabaseOk) parts.push('Supabase');
+            if (gasOk) parts.push('GAS');
+            const src = parts.length > 0 ? ' (' + parts.join(' + ') + ')' : '';
+            showToast('✅ Terhapus', 'Postingan dihapus permanen' + src, 'fa-check-circle');
+        }
         playRegularSound();
 
         hideSyncIndicator();
         return true;
-    } catch(e) {
+
+    } catch (e) {
         console.error('❌ [deletePostPermanent] Error:', e);
         hideSyncIndicator();
         if (!silent) showToast('⚠️ Gagal', 'Error: ' + e.message, 'fa-exclamation-triangle');
         return false;
     }
 }
-
-window.deletePostPermanent = deletePostPermanent;
-
-function handleDeleteFromMenu(postId) {
-    document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
-    deletePostPermanent(postId);
-}
-window.handleDeleteFromMenu = handleDeleteFromMenu;
-
-function handleDeleteFromStatsCard(postId) {
-    deletePostPermanent(postId);
-}
-window.handleDeleteFromStatsCard = handleDeleteFromStatsCard;
-
-function handleDeleteFromHologram(emergencyId) {
-    deletePostPermanent(emergencyId);
-}
-window.handleDeleteFromHologram = handleDeleteFromHologram;
-
-function handleDeleteFromNotif(notifId) {
-    deletePostPermanent(notifId);
-}
-window.handleDeleteFromNotif = handleDeleteFromNotif;
-
+            
 // ====================================================================
 // 23. CALCULATE STATS (Helper)
 // ====================================================================
