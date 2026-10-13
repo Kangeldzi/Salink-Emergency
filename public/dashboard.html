@@ -4646,42 +4646,144 @@ console.log('✅ [TAHAP 3] Hologram + Render Posts + Posts Stats loaded');
  // ====================================================================
 // 30. TOGGLE LIKE (PERSISTENT)
 // ====================================================================
-function toggleLike(postId) {
+/* ================================================================
+ * PATCH D5-A — toggleLike() ke Supabase (tabel `likes`)
+ *
+ * Alur:
+ * 1) Cek login
+ * 2) Cek apakah user sudah like post ini di Supabase
+ *    ├─ Kalau sudah → DELETE dari `likes`
+ *    └─ Kalau belum → INSERT ke `likes`
+ * 3) Update UI + array global `posts`
+ * 4) Dual-write ke GAS (backup)
+ * 5) Broadcast sync
+ *
+ * Catatan:
+ * - Post ID HARUS UUID Supabase (kalau bukan, skip Supabase)
+ * - `user_id` WAJIB di-set = currentAuthUser.id (RLS policy)
+ * ================================================================ */
+async function toggleLike(postId) {
     if (!currentUser) { redirectToLogin(); return; }
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
 
+    const post = posts.find(p => p.id === postId);
+    if (!post) {
+        console.warn('[Like] Post tidak ditemukan:', postId);
+        return;
+    }
+
+    // Cek apakah postId UUID Supabase
+    const isUUID = isSupabaseUUID(postId);
+
+    // Ambil likes array dari global state / LS
     let likes = getPostLikes(postId) || [];
     if (!Array.isArray(likes)) likes = [];
     if (likes.length === 0) {
-        try { likes = typeof post.likes === 'string' ? JSON.parse(post.likes) : (post.likes || []); } catch(e) { likes = []; }
+        try {
+            likes = typeof post.likes === 'string' ? JSON.parse(post.likes) : (post.likes || []);
+        } catch (e) { likes = []; }
     }
 
+    // Cek status like user (dari array lokal)
     const idx = likes.indexOf(currentUser.username);
     const isUnlike = idx > -1;
-    if (isUnlike) likes.splice(idx, 1);
-    else likes.push(currentUser.username);
+
+    // ============================================================
+    // 1) SUPABASE (PRIMARY)
+    // ============================================================
+    let supabaseOk = false;
+    if (isUUID && window.SALINK_SB_READY && window.salinkSupabase && currentAuthUser?.id) {
+        try {
+            const client = window.salinkSupabase;
+
+            if (isUnlike) {
+                // DELETE dari likes
+                console.log('📤 [Like] Delete dari Supabase:', postId);
+                const { error: delError } = await client
+                    .from('likes')
+                    .delete()
+                    .eq('user_id', currentAuthUser.id)
+                    .eq('post_id', postId);
+
+                if (delError) {
+                    console.warn('⚠️ [Like] Supabase delete error:', delError.message);
+                } else {
+                    supabaseOk = true;
+                    console.log('✅ [Like] Supabase delete OK');
+                }
+            } else {
+                // INSERT ke likes
+                console.log('📤 [Like] Insert ke Supabase:', postId);
+                const { error: insError } = await client
+                    .from('likes')
+                    .insert({
+                        user_id: currentAuthUser.id,
+                        post_id: postId
+                    });
+
+                if (insError) {
+                    // Handle duplicate (kalau sudah ada di DB tapi tidak di LS)
+                    if (insError.code === '23505') {
+                        console.log('ℹ️ [Like] Sudah ada di Supabase (duplicate)');
+                        supabaseOk = true;
+                    } else {
+                        console.warn('⚠️ [Like] Supabase insert error:', insError.message);
+                    }
+                } else {
+                    supabaseOk = true;
+                    console.log('✅ [Like] Supabase insert OK');
+                }
+            }
+        } catch (sbErr) {
+            console.warn('⚠️ [Like] Supabase catch:', sbErr.message);
+        }
+    } else {
+        console.log('ℹ️ [Like] Skip Supabase (bukan UUID atau tidak ready)');
+    }
+
+    // ============================================================
+    // 2) UPDATE UI + GLOBAL STATE
+    // ============================================================
+    if (isUnlike) {
+        likes.splice(idx, 1);
+    } else {
+        likes.push(currentUser.username);
+    }
 
     setPostLikes(postId, likes);
     post.likes = JSON.stringify(likes);
 
-    // Sync ke backend
-    const action = isUnlike ? 'unlike_post' : 'like_post';
-    apiCall(action, {
-        postId: postId,
-        userId: currentUser.username,
-        userName: currentUser.fullName
-    }).then(r => {
-        console.log('✅ [Like] Backend sync OK:', r.status);
-    }).catch(e => {
-        console.warn('⚠️ [Like] Backend error:', e.message);
-    });
-
+    // Simpan ke LS
     safeSavePosts(posts);
+
+    // ============================================================
+    // 3) DUAL-WRITE KE GAS (BACKUP)
+    // ============================================================
+    const action = isUnlike ? 'unlike_post' : 'like_post';
+    try {
+        const r = await apiCall(action, {
+            postId: postId,
+            userId: currentUser.username,
+            userName: currentUser.fullName
+        });
+        console.log('📤 [Like] GAS backup:', r.status);
+    } catch (e) {
+        console.warn('⚠️ [Like] GAS error:', e.message);
+    }
+
+    // ============================================================
+    // 4) RENDER + SYNC
+    // ============================================================
     renderPosts();
     broadcastSync('stats_update', { postId: postId });
     playRegularSound();
+
+    console.log('📊 [Like] Result:', {
+        action: isUnlike ? 'unlike' : 'like',
+        supabaseOk: supabaseOk,
+        totalLikes: likes.length
+    });
 }
+
 
 // ====================================================================
 // 31. ADD COMMENT (FCM TRIGGER)
