@@ -3220,12 +3220,16 @@ async function apiCall(action, data) {
 }
 
 /* ================================================================
- * PATCH D3-B — apiGetPosts() dari Supabase
- * - Baca posts dari tabel `posts` (Supabase)
- * - JOIN ke `profiles` untuk user data
- * - JOIN ke `media` untuk gambar/video
- * - Aggregate `likes` & `comments` (count + array)
- * - Fallback ke GAS kalau Supabase gagal
+ * PATCH D3-FIX-2 — apiGetPosts() dengan multi-query
+ *
+ * Alih-alih 1 query besar dengan 4 nested JOIN (yang sering gagal),
+ * kita pisah jadi 4 query paralel, lalu merge di JavaScript.
+ *
+ * Query:
+ * 1) Posts + profiles (user pembuat post)
+ * 2) Comments + profiles (user yang komentar)
+ * 3) Media (untuk post)
+ * 4) Likes (untuk post)
  * ================================================================ */
 async function apiGetPosts() {
     // 1) Coba Supabase dulu
@@ -3233,9 +3237,10 @@ async function apiGetPosts() {
         if (window.SALINK_SB_READY && window.salinkSupabase) {
             const client = window.salinkSupabase;
 
-            // Query: posts + join profiles + media + likes + comments
-            // CATATAN: Supabase PostgREST syntax untuk join & aggregate
-            const { data, error } = await client
+            // ============================================
+            // QUERY 1: Posts + profiles pembuat post
+            // ============================================
+            const postsPromise = client
                 .from('posts')
                 .select(`
                     *,
@@ -3244,54 +3249,140 @@ async function apiGetPosts() {
                         full_name,
                         profile_picture,
                         gender
-                    ),
-                    media!media_post_id_fkey (
-                        id,
-                        media_type,
-                        bucket,
-                        object_key,
-                        mime_type,
-                        status
-                    ),
-                    likes (
-                        user_id
-                    ),
-                    comments (
-                        id,
-                        user_id,
-                        content,
-                        created_at,
-                        parent_id,
-                        profiles!comments_user_id_fkey (
-                            full_name,
-                            gender,
-                            profile_picture
-                        )
                     )
                 `)
                 .order('created_at', { ascending: false })
                 .limit(100);
 
-            if (error) {
-                console.warn('[SALINK] Supabase getPosts error:', error.message);
-                throw error;
+            // ============================================
+            // QUERY 2: Semua comments + profiles komentator
+            // ============================================
+            const commentsPromise = client
+                .from('comments')
+                .select(`
+                    *,
+                    profiles!comments_user_id_fkey (
+                        username,
+                        full_name,
+                        profile_picture,
+                        gender
+                    )
+                `)
+                .order('created_at', { ascending: true })
+                .limit(1000);
+
+            // ============================================
+            // QUERY 3: Semua media untuk posts
+            // ============================================
+            const mediaPromise = client
+                .from('media')
+                .select('id, post_id, media_type, bucket, object_key, mime_type, status')
+                .not('post_id', 'is', null)
+                .limit(1000);
+
+            // ============================================
+            // QUERY 4: Semua likes untuk posts
+            // ============================================
+            const likesPromise = client
+                .from('likes')
+                .select('id, user_id, post_id')
+                .limit(2000);
+
+            // Jalankan paralel
+            const [postsRes, commentsRes, mediaRes, likesRes] = await Promise.all([
+                postsPromise,
+                commentsPromise,
+                mediaPromise,
+                likesPromise
+            ]);
+
+            // Cek error utama
+            if (postsRes.error) throw postsRes.error;
+            if (commentsRes.error) console.warn('[apiGetPosts] Comments error:', commentsRes.error.message);
+            if (mediaRes.error) console.warn('[apiGetPosts] Media error:', mediaRes.error.message);
+            if (likesRes.error) console.warn('[apiGetPosts] Likes error:', likesRes.error.message);
+
+            const rawPosts = Array.isArray(postsRes.data) ? postsRes.data : [];
+            const rawComments = Array.isArray(commentsRes.data) ? commentsRes.data : [];
+            const rawMedia = Array.isArray(mediaRes.data) ? mediaRes.data : [];
+            const rawLikes = Array.isArray(likesRes.data) ? likesRes.data : [];
+
+            console.log('[apiGetPosts] Raw:', {
+                posts: rawPosts.length,
+                comments: rawComments.length,
+                media: rawMedia.length,
+                likes: rawLikes.length
+            });
+
+            if (rawPosts.length === 0) {
+                // Supabase kosong → biarkan fallback GAS
+                throw new Error('Supabase posts kosong');
             }
 
-            if (Array.isArray(data)) {
-                console.log('✅ [SALINK] Posts dari Supabase:', data.length);
-                return data.map(adaptPostFromSupabase).filter(p => p !== null);
-            }
+            // ============================================
+            // MERGE: Kelompokkan comments, media, likes per post
+            // ============================================
+            const commentsByPost = {};
+            rawComments.forEach(c => {
+                if (!c.post_id) return;
+                if (!commentsByPost[c.post_id]) commentsByPost[c.post_id] = [];
+                const profile = c.profiles || {};
+                commentsByPost[c.post_id].push({
+                    id: c.id,
+                    user_id: c.user_id,
+                    userId: profile.username || c.user_id,
+                    userFullName: profile.full_name || '',
+                    userGender: normalizeGenderProfile(profile.gender || 'Laki-laki'),
+                    userProfilePic: profile.profile_picture || '',
+                    content: c.content || '',
+                    text: c.content || '',      // alias untuk kompat
+                    parent_id: c.parent_id || null,
+                    parentId: c.parent_id || null,
+                    created_at: c.created_at,
+                    timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
+                    updated_at: c.updated_at,
+                    deleted_at: c.deleted_at
+                });
+            });
+
+            const mediaByPost = {};
+            rawMedia.forEach(m => {
+                if (!m.post_id) return;
+                mediaByPost[m.post_id] = m;
+            });
+
+            const likesByPost = {};
+            rawLikes.forEach(l => {
+                if (!l.post_id) return;
+                if (!likesByPost[l.post_id]) likesByPost[l.post_id] = [];
+                likesByPost[l.post_id].push(l.user_id);
+            });
+
+            // ============================================
+            // ADAPT: Buat objek post final
+            // ============================================
+            const adapted = rawPosts.map(row => {
+                // Sisipkan comments, media, likes ke row dulu
+                row.comments = commentsByPost[row.id] || [];
+                row.media = mediaByPost[row.id] ? [mediaByPost[row.id]] : [];
+                row.likes = likesByPost[row.id] || [];
+
+                return adaptPostFromSupabase(row);
+            }).filter(p => p !== null);
+
+            console.log('✅ [SALINK] Posts dari Supabase (multi-query):', adapted.length);
+            return adapted;
         }
     } catch (err) {
         console.warn('[SALINK] Supabase getPosts gagal, fallback ke GAS:', err.message);
     }
 
-    // 2) Fallback: GAS (untuk backward compat)
+    // 2) Fallback: GAS
     try {
         console.log('📡 [SALINK] Fallback: Posts dari GAS');
         const r = await apiCall('get_posts');
-        return r.status === 'success' && Array.isArray(r.data) 
-            ? r.data.map(adaptPost) 
+        return r.status === 'success' && Array.isArray(r.data)
+            ? r.data.map(adaptPost)
             : [];
     } catch (err) {
         console.error('[SALINK] GAS getPosts error:', err.message);
