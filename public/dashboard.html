@@ -2515,16 +2515,39 @@ function adaptPostFromSupabase(row) {
         ? row.likes.map(l => l.user_id || l) 
         : [];
     
-    /* PATCH D3-FIX-4 — Perbaiki adapter comments (c.profiles, bukan c.profile) */
+       // PATCH D3-Fix-10 — Jangan overwrite kalau sudah ada di c.userFullName
     const commentsArray = Array.isArray(row.comments)
         ? row.comments.map(c => {
-            // Ambil profile (bisa dari JOIN atau flat)
-            const profile = c.profiles || c.profile || {};
+            // Kalau c.userFullName sudah terisi (dari commentProfileMap), jangan overwrite
+            const hasFullName = c.userFullName && c.userFullName.trim() !== '';
+            const hasProfilePic = c.userProfilePic && c.userProfilePic.trim() !== '';
             
+            if (hasFullName && hasProfilePic) {
+                // Sudah lengkap, return apa adanya
+                return {
+                    id: c.id,
+                    user_id: c.user_id,
+                    userId: c.userId || c.user_id,
+                    userFullName: c.userFullName,
+                    userGender: c.userGender || 'male',
+                    userProfilePic: c.userProfilePic,
+                    content: c.content || '',
+                    text: c.content || c.text || '',
+                    parent_id: c.parent_id || c.parentId || null,
+                    parentId: c.parent_id || c.parentId || null,
+                    created_at: c.created_at,
+                    timestamp: c.timestamp || (c.created_at ? new Date(c.created_at).getTime() : Date.now()),
+                    updated_at: c.updated_at,
+                    deleted_at: c.deleted_at
+                };
+            }
+            
+            // Fallback: pakai c.profiles (untuk backward compat)
+            const profile = c.profiles || c.profile || {};
             return {
                 id: c.id,
                 user_id: c.user_id,
-                userId: profile.username || c.user_id,           // ← username kalau ada
+                userId: profile.username || c.user_id,
                 userFullName: profile.full_name || c.user_full_name || '',
                 userGender: normalizeGenderProfile(profile.gender || c.user_gender || 'Laki-laki'),
                 userProfilePic: profile.profile_picture || c.user_profile_pic || '',
@@ -2538,7 +2561,7 @@ function adaptPostFromSupabase(row) {
                 deleted_at: c.deleted_at
             };
         })
-        : [];
+        : []; 
 
     return {
         id: row.id,
