@@ -3375,14 +3375,69 @@ async function apiGetPosts() {
             // ============================================
             // ADAPT
             // ============================================
+                        // ============================================
+            // PATCH FIX-2 — Refresh profile comments SECARA TERPISAH
+            // (hindari JOIN profiles di commentsPromise yang kadang gagal)
+            // ============================================
+            let profileMap = {};
+            try {
+                // Kumpulkan SEMUA user_id dari rawComments
+                const commentUserIds = new Set();
+                rawComments.forEach(c => {
+                    if (c.user_id) commentUserIds.add(c.user_id);
+                });
+
+                if (commentUserIds.size > 0) {
+                    console.log('[apiGetPosts FIX-2] Query profiles untuk', commentUserIds.size, 'user IDs');
+
+                    const { data: profilesData, error: profilesError } = await client
+                        .from('profiles')
+                        .select('id, username, full_name, profile_picture, gender')
+                        .in('id', Array.from(commentUserIds));
+
+                    if (profilesError) {
+                        console.warn('[apiGetPosts FIX-2] Error:', profilesError.message);
+                    } else if (profilesData && profilesData.length > 0) {
+                        profilesData.forEach(p => { profileMap[p.id] = p; });
+                        console.log('[apiGetPosts FIX-2] Dapat', profilesData.length, 'profiles');
+                    }
+                }
+            } catch (e) {
+                console.warn('[apiGetPosts FIX-2] Catch:', e.message);
+            }
+
+            // ============================================
+            // ADAPT — dengan profile comments yang sudah lengkap
+            // ============================================
             const adapted = rawPosts.map(row => {
-                row.comments = commentsByPost[row.id] || [];
+                // Susun comments dengan profile lengkap dari profileMap
+                const postComments = (commentsByPost[row.id] || []).map(c => {
+                    const profile = profileMap[c.user_id] || {};
+                    return {
+                        id: c.id,
+                        user_id: c.user_id,
+                        userId: profile.username || c.user_id,
+                        userFullName: profile.full_name || '',
+                        userGender: normalizeGenderProfile(profile.gender || 'Laki-laki'),
+                        userProfilePic: profile.profile_picture || '',
+                        content: c.content || '',
+                        text: c.content || '',
+                        parent_id: c.parent_id || null,
+                        parentId: c.parent_id || null,
+                        created_at: c.created_at,
+                        timestamp: c.timestamp,
+                        updated_at: c.updated_at,
+                        deleted_at: c.deleted_at
+                    };
+                });
+
+                row.comments = postComments;
                 row.media = mediaByPost[row.id] ? [mediaByPost[row.id]] : [];
                 row.likes = likesByPost[row.id] || [];
                 return adaptPostFromSupabase(row);
             }).filter(p => p !== null);
 
-            console.log('✅ [SALINK] Posts dari Supabase (FIX-1):', adapted.length);
+            console.log('✅ [SALINK] Posts dari Supabase (FIX-2):', adapted.length);
             return adapted;
         }
     } catch (err) {
