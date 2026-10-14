@@ -3387,34 +3387,35 @@ async function apiGetPosts() {
 // PATCH D3-Fix-2b — FALLBACK: Refresh profile comments yang kosong
 // Kalau ada comment dengan userFullName kosong, query profiles terpisah
 // ============================================================
+
+// PATCH D3-Fix-6 — SELALU refresh profile comments dari query terpisah
 try {
-    const emptyProfileUserIds = new Set();
-    
+    // Kumpulkan SEMUA user_id dari rawComments (bukan cek profile)
+    const allCommentUserIds = new Set();
     rawComments.forEach(c => {
-        const profile = c.profiles || {};
-        if (!profile.full_name && c.user_id) {
-            emptyProfileUserIds.add(c.user_id);
-        }
+        if (c.user_id) allCommentUserIds.add(c.user_id);
     });
 
-    if (emptyProfileUserIds.size > 0) {
-        console.log('[apiGetPosts] Refresh profile untuk', emptyProfileUserIds.size, 'user IDs');
+    if (allCommentUserIds.size > 0) {
+        console.log('[apiGetPosts D3-Fix-6] Query profiles untuk', allCommentUserIds.size, 'user IDs');
         
         const { data: profilesData, error: profilesError } = await client
             .from('profiles')
             .select('id, username, full_name, profile_picture, gender')
-            .in('id', Array.from(emptyProfileUserIds));
+            .in('id', Array.from(allCommentUserIds));
 
         if (profilesError) {
-            console.warn('[apiGetPosts] Refresh profiles error:', profilesError.message);
+            console.warn('[apiGetPosts D3-Fix-6] Error:', profilesError.message);
         } else if (profilesData && profilesData.length > 0) {
-            console.log('[apiGetPosts] Dapat', profilesData.length, 'profiles. Update comments...');
-
-            // Bangun map untuk lookup cepat
+            console.log('[apiGetPosts D3-Fix-6] Dapat', profilesData.length, 'profiles');
+            
+            // Build map
             const profileMap = {};
             profilesData.forEach(p => { profileMap[p.id] = p; });
-
-            // Update adapted posts — refresh comments
+            
+            console.log('[apiGetPosts D3-Fix-6] profileMap keys:', Object.keys(profileMap));
+            
+            // Update comments di SETIAP post
             adapted.forEach(post => {
                 if (!post || !post.comments) return;
                 
@@ -3424,11 +3425,18 @@ try {
                         ? JSON.parse(post.comments)
                         : post.comments;
                 } catch (e) { return; }
-
+                
+                console.log('[apiGetPosts D3-Fix-6] Post', post.id, 'comments count:', comments.length);
+                
                 let updated = false;
                 comments.forEach(c => {
-                    if (!c.userFullName && profileMap[c.userId]) {
-                        const profile = profileMap[c.userId];
+                    // Coba cari profile pakai c.userId ATAU c.user_id
+                    const lookupId = c.userId || c.user_id;
+                    const profile = profileMap[lookupId];
+                    
+                    console.log('[apiGetPosts D3-Fix-6] Lookup', lookupId, '→', profile ? 'FOUND' : 'MISSING');
+                    
+                    if (profile) {
                         c.userFullName = profile.full_name || '';
                         c.userId = profile.username || c.userId;
                         c.userGender = normalizeGenderProfile(profile.gender || 'Laki-laki');
@@ -3436,45 +3444,20 @@ try {
                         updated = true;
                     }
                 });
-
+                
                 if (updated) {
-    post.comments = JSON.stringify(comments);
-    // PATCH D3-Fix-2c — Update LS agar renderPosts pakai data lengkap
-    try {
-        if (typeof setPostComments === 'function') {
-            setPostComments(post.id, comments);
-        }
-    } catch (e) {}
-}
+                    post.comments = JSON.stringify(comments);
+                    console.log('[apiGetPosts D3-Fix-6] Updated post', post.id);
+                }
             });
-
-            console.log('[apiGetPosts] Comments profile updated');
+            
+            console.log('[apiGetPosts D3-Fix-6] Done updating comments');
         }
     }
 } catch (e) {
-    console.warn('[apiGetPosts] Fallback profile error:', e.message);
-}
-
-console.log('✅ [SALINK] Posts dari Supabase (multi-query):', adapted.length);
-return adapted;
-        }
-    } catch (err) {
-        console.warn('[SALINK] Supabase getPosts gagal, fallback ke GAS:', err.message);
-    }
-
-    // 2) Fallback: GAS
-    try {
-        console.log('📡 [SALINK] Fallback: Posts dari GAS');
-        const r = await apiCall('get_posts');
-        return r.status === 'success' && Array.isArray(r.data)
-            ? r.data.map(adaptPost)
-            : [];
-    } catch (err) {
-        console.error('[SALINK] GAS getPosts error:', err.message);
-        return [];
-    }
-}
-            
+    console.warn('[apiGetPosts D3-Fix-6] Catch:', e.message);
+}          
+                
 async function apiGetEmergencies() {
     const r = await apiCall('get_emergencies');
     return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptEmergency) : [];
