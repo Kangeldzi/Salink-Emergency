@@ -3407,12 +3407,22 @@ async function apiGetPosts() {
             }
 
             // ============================================
-            // ADAPT — dengan profile comments yang sudah lengkap
+            // PATCH FIX-3 — ADAPT dengan debug detail
             // ============================================
+            console.log('[FIX-3] commentsByPost:', JSON.stringify(Object.keys(commentsByPost)));
+            console.log('[FIX-3] profileMap keys:', JSON.stringify(Object.keys(profileMap)));
+
             const adapted = rawPosts.map(row => {
-                // Susun comments dengan profile lengkap dari profileMap
-                const postComments = (commentsByPost[row.id] || []).map(c => {
+                console.log('[FIX-3] Processing post:', row.id);
+                console.log('[FIX-3] commentsByPost[row.id]:', commentsByPost[row.id] ? commentsByPost[row.id].length + ' items' : 'UNDEFINED');
+
+                const rawPostComments = commentsByPost[row.id] || [];
+                console.log('[FIX-3] rawPostComments:', rawPostComments.length);
+
+                const postComments = rawPostComments.map(c => {
                     const profile = profileMap[c.user_id] || {};
+                    console.log('[FIX-3] Comment', c.id, '| c.user_id:', c.user_id, '| profile:', profile.full_name || 'MISSING');
+
                     return {
                         id: c.id,
                         user_id: c.user_id,
@@ -3428,6 +3438,32 @@ async function apiGetPosts() {
                         timestamp: c.timestamp,
                         updated_at: c.updated_at,
                         deleted_at: c.deleted_at
+                    };
+                });
+
+                console.log('[FIX-3] postComments final:', postComments.length, '| first fullName:', postComments[0]?.userFullName);
+
+                row.comments = postComments;
+                row.media = mediaByPost[row.id] ? [mediaByPost[row.id]] : [];
+                row.likes = likesByPost[row.id] || [];
+                return adaptPostFromSupabase(row);
+            }).filter(p => p !== null);
+
+            console.log('✅ [SALINK] Posts dari Supabase (FIX-3):', adapted.length);
+            return adapted;
+                    };
+                });
+
+                console.log('[FIX-3] postComments final:', postComments.length, '| first fullName:', postComments[0]?.userFullName);
+
+                row.comments = postComments;
+                row.media = mediaByPost[row.id] ? [mediaByPost[row.id]] : [];
+                row.likes = likesByPost[row.id] || [];
+                return adaptPostFromSupabase(row);
+            }).filter(p => p !== null);
+
+            console.log('✅ [SALINK] Posts dari Supabase (FIX-3):', adapted.length);
+            return adapted;
                     };
                 });
 
