@@ -3353,15 +3353,26 @@ try {
             // ============================================
 
             // Comments by post
-            // PATCH D3-Fix-8: Pakai commentProfileMap (bukan c.profiles)
-        // PATCH D3-Fix-8: Pakai commentProfileMap (BUKAN c.profiles)
-            const commentsByPost = {};
-                 rawComments.forEach(c => {
-            if (!c.post_id) return;
-            if (!commentsByPost[c.post_id]) commentsByPost[c.post_id] = [];
-            const profile = commentProfileMap[c.user_id] || {};  // ← GANTI KE INI
-              commentsByPost[c.post_id].push({
-    
+// ============================================
+// BUILD commentsByPost — PATCH D3-Fix-9 (dengan LOG DETAIL)
+// ============================================
+const commentsByPost = {};
+console.log('[commentsByPost DEBUG] commentProfileMap keys:',
+    Object.keys(commentProfileMap));
+console.log('[commentsByPost DEBUG] Total rawComments:', rawComments.length);
+
+rawComments.forEach(c => {
+    if (!c.post_id) return;
+    if (!commentsByPost[c.post_id]) commentsByPost[c.post_id] = [];
+
+    // PATCH D3-Fix-9 — lookup dari commentProfileMap
+    const profile = commentProfileMap[c.user_id] || {};
+
+    console.log('[commentsByPost DEBUG] c.user_id:', c.user_id,
+        '| profile found:', !!profile.full_name,
+        '| full_name:', profile.full_name);
+
+    commentsByPost[c.post_id].push({
         id: c.id,
         user_id: c.user_id,
         userId: profile.username || c.user_id,
@@ -3378,6 +3389,9 @@ try {
         deleted_at: c.deleted_at
     });
 });
+
+console.log('[commentsByPost DEBUG] Total posts with comments:',
+    Object.keys(commentsByPost).length); 
 
             // Media by post
             const mediaByPost = {};
@@ -3397,7 +3411,7 @@ try {
             // ============================================
             // ADAPT
             // ============================================
-                        // ============================================
+            // ============================================
             // PATCH FIX-2 — Refresh profile comments SECARA TERPISAH
             // (hindari JOIN profiles di commentsPromise yang kadang gagal)
             // ============================================
