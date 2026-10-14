@@ -4788,24 +4788,99 @@ async function toggleLike(postId) {
 // ====================================================================
 // 31. ADD COMMENT (FCM TRIGGER)
 // ====================================================================
-function addComment(postId, text) {
+/* ================================================================
+ * PATCH D5-B — addComment() ke Supabase (tabel `comments`)
+ *
+ * Alur:
+ * 1) Cek login
+ * 2) Cek post ada
+ * 3) INSERT ke `comments` di Supabase:
+ *    - user_id = currentAuthUser.id (WAJIB untuk RLS)
+ *    - post_id = UUID post
+ *    - content = teks komentar
+ *    - parent_id = null (komentar utama)
+ * 4) Update UI + array global `posts`
+ * 5) Dual-write ke GAS (backup)
+ * 6) Broadcast sync
+ *
+ * Catatan:
+ * - Post ID HARUS UUID Supabase (kalau bukan, skip Supabase)
+ * - `user_id` WAJIB di-set = currentAuthUser.id
+ * ================================================================ */
+async function addComment(postId, text) {
     if (!currentUser) { redirectToLogin(); return; }
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
 
+    const trimmedText = (text || '').trim();
+    if (!trimmedText) {
+        showToast('⚠️', 'Komentar tidak boleh kosong', 'fa-exclamation-triangle');
+        return;
+    }
+
+    const post = posts.find(p => p.id === postId);
+    if (!post) {
+        console.warn('[Comment] Post tidak ditemukan:', postId);
+        return;
+    }
+
+    // Cek apakah postId UUID Supabase
+    const isUUID = isSupabaseUUID(postId);
+
+    // ============================================================
+    // 1) INSERT KE SUPABASE (PRIMARY)
+    // ============================================================
+    let supabaseOk = false;
+    let supabaseCommentId = null;
+
+    if (isUUID && window.SALINK_SB_READY && window.salinkSupabase && currentAuthUser?.id) {
+        try {
+            const client = window.salinkSupabase;
+
+            console.log('📤 [Comment] Insert ke Supabase:', postId);
+
+            const { data: commentResult, error: commentError } = await client
+                .from('comments')
+                .insert({
+                    user_id: currentAuthUser.id,      // WAJIB untuk RLS
+                    post_id: postId,
+                    content: trimmedText,             // Kolom isi komentar
+                    parent_id: null                   // Komentar utama (bukan reply)
+                })
+                .select()
+                .single();
+
+            if (commentError) {
+                console.warn('⚠️ [Comment] Supabase insert error:', commentError.message);
+            } else if (commentResult && commentResult.id) {
+                supabaseOk = true;
+                supabaseCommentId = commentResult.id;
+                console.log('✅ [Comment] Supabase insert OK:', supabaseCommentId);
+            }
+        } catch (sbErr) {
+            console.warn('⚠️ [Comment] Supabase catch:', sbErr.message);
+        }
+    } else {
+        console.log('ℹ️ [Comment] Skip Supabase (bukan UUID atau tidak ready)');
+    }
+
+    // ============================================================
+    // 2) UPDATE UI + GLOBAL STATE
+    // ============================================================
     let comments = getPostComments(postId) || [];
     if (!Array.isArray(comments)) comments = [];
     if (comments.length === 0) {
-        try { comments = typeof post.comments === 'string' ? JSON.parse(post.comments) : (post.comments || []); } catch(e) { comments = []; }
+        try {
+            comments = typeof post.comments === 'string' ? JSON.parse(post.comments) : (post.comments || []);
+        } catch (e) { comments = []; }
     }
 
     const newComment = {
-        id: 'c-' + Date.now(),
+        id: supabaseCommentId || ('c-' + Date.now()),  // Pakai UUID kalau ada
         userId: currentUser.username,
+        userAuthId: currentAuthUser?.id || null,        // UUID Supabase
         userFullName: currentUser.fullName,
         userGender: currentUser.gender,
         userProfilePic: currentUser.profilePicture,
-        text: text.trim(),
+        text: trimmedText,
         timestamp: Date.now()
     };
     comments.push(newComment);
@@ -4813,22 +4888,36 @@ function addComment(postId, text) {
     setPostComments(postId, comments);
     post.comments = JSON.stringify(comments);
 
-    // Sync via action comment_post → trigger FCM ke pemilik post
-    apiCall('comment_post', {
-        postId: postId,
-        commenterId: currentUser.username,
-        commenterName: currentUser.fullName,
-        text: text.trim()
-    }).then(r => {
-        console.log('✅ [Comment] FCM trigger OK:', r.status);
-    }).catch(e => {
-        console.warn('⚠️ [Comment] Backend error:', e.message);
-    });
-
+    // Simpan ke LS
     safeSavePosts(posts);
+
+    // ============================================================
+    // 3) DUAL-WRITE KE GAS (BACKUP)
+    // ============================================================
+    try {
+        const r = await apiCall('comment_post', {
+            postId: postId,
+            commenterId: currentUser.username,
+            commenterName: currentUser.fullName,
+            text: trimmedText
+        });
+        console.log('📤 [Comment] GAS backup:', r.status);
+    } catch (e) {
+        console.warn('⚠️ [Comment] GAS error:', e.message);
+    }
+
+    // ============================================================
+    // 4) RENDER + SYNC
+    // ============================================================
     renderPosts();
     broadcastSync('new_post', { id: postId });
     playRegularSound();
+
+    console.log('📊 [Comment] Result:', {
+        supabaseOk: supabaseOk,
+        totalComments: comments.length,
+        supabaseCommentId: supabaseCommentId
+    });
 }
 
 function deleteComment(postId, commentId) {
@@ -6188,19 +6277,55 @@ async function loadData() {
         ]);
 
         // Posts
-        let apiPosts = (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) ? results[0].value : [];
-        const postMap = new Map();
-        posts.forEach(p => { if (p && p.id && !isDeleted(p.id)) postMap.set(p.id, p); });
-        apiPosts.forEach(p => {
-            if (p && p.id && !isDeleted(p.id)) {
-                if (!postMap.has(p.id)) postMap.set(p.id, p);
-            }
-        });
-        posts = Array.from(postMap.values())
-            .filter(p => p && p.id && p.userId && p.userFullName)
-            .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-        safeSavePosts(posts);
+        // PATCH D3-FIX-1 — Filter & sort posts dengan validasi timestamp
+let apiPosts = (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) ? results[0].value : [];
 
+// Kalau Supabase punya data → HANYA pakai Supabase (jangan campur dengan GAS)
+const supabasePosts = apiPosts.filter(p => p && p._source === 'supabase');
+const useSupabaseOnly = supabasePosts.length > 0;
+
+console.log('[loadData] Supabase posts:', supabasePosts.length, '| Use only Supabase:', useSupabaseOnly);
+
+const postMap = new Map();
+
+if (useSupabaseOnly) {
+    // Pakai Supabase sebagai satu-satunya sumber
+    supabasePosts.forEach(p => {
+        if (p && p.id && !isDeleted(p.id)) postMap.set(p.id, p);
+    });
+} else {
+    // Fallback: gabung LS + GAS
+    posts.forEach(p => { 
+        if (p && p.id && !isDeleted(p.id)) postMap.set(p.id, p); 
+    });
+    apiPosts.forEach(p => {
+        if (p && p.id && !isDeleted(p.id)) {
+            if (!postMap.has(p.id)) postMap.set(p.id, p);
+        }
+    });
+}
+
+posts = Array.from(postMap.values())
+    .filter(p => {
+        if (!p || !p.id) return false;
+        if (isDeleted(p.id)) return false;
+        if (!p.userId || !p.userFullName) return false;
+        
+        // PATCH D3-FIX-1 — Filter post dengan timestamp valid
+        const ts = typeof p.timestamp === 'number' ? p.timestamp : new Date(p.timestamp).getTime();
+        if (isNaN(ts) || ts <= 0) {
+            console.warn('[loadData] Post timestamp invalid, skip:', p.id, '| ts:', p.timestamp);
+            return false;
+        }
+        p.timestamp = ts; // normalize
+        
+        return true;
+    })
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+safeSavePosts(posts);
+console.log('[loadData] Final posts:', posts.length, '| From Supabase:', posts.filter(p => p._source === 'supabase').length);
+     
         // Emergencies
         let apiEms = (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) ? results[1].value : [];
         apiEms = apiEms.map(em => {
