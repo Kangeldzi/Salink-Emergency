@@ -2511,20 +2511,33 @@ function adaptPostFromSupabase(row) {
 
     // Likes & comments array untuk backward compat dengan renderPosts lama
     // (renderPosts lama baca post.likes & post.comments sebagai JSON string)
-    const likesArray = Array.isArray(row.likes) 
+        const likesArray = Array.isArray(row.likes) 
         ? row.likes.map(l => l.user_id || l) 
         : [];
+    
+    /* PATCH D3-FIX-4 — Perbaiki adapter comments (c.profiles, bukan c.profile) */
     const commentsArray = Array.isArray(row.comments)
-        ? row.comments.map(c => ({
-            id: c.id,
-            userId: c.user_id,
-            userFullName: c.profile?.full_name || c.user_full_name || '',
-            userGender: c.profile?.gender || 'male',
-            userProfilePic: c.profile?.profile_picture || '',
-            text: c.content || c.text || '',
-            timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
-            parentId: c.parent_id || null
-        }))
+        ? row.comments.map(c => {
+            // Ambil profile (bisa dari JOIN atau flat)
+            const profile = c.profiles || c.profile || {};
+            
+            return {
+                id: c.id,
+                user_id: c.user_id,
+                userId: profile.username || c.user_id,           // ← username kalau ada
+                userFullName: profile.full_name || c.user_full_name || '',
+                userGender: normalizeGenderProfile(profile.gender || c.user_gender || 'Laki-laki'),
+                userProfilePic: profile.profile_picture || c.user_profile_pic || '',
+                content: c.content || '',
+                text: c.content || c.text || '',
+                parent_id: c.parent_id || null,
+                parentId: c.parent_id || null,
+                created_at: c.created_at,
+                timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
+                updated_at: c.updated_at,
+                deleted_at: c.deleted_at
+            };
+        })
         : [];
 
     return {
@@ -3953,6 +3966,41 @@ function closeDeleteConfirm() {
     if (modal) modal.classList.remove('active');
 }
 
+
+/* ================================================================
+ * PATCH D3-FIX-5 — confirmDeleteNow()
+ * Fungsi ini hilang di file — perlu ditambahkan
+ * Dipanggil dari tombol "Ya, Hapus" di modal konfirmasi delete
+ * ================================================================ */
+async function confirmDeleteNow() {
+    if (!pendingDelete) {
+        console.warn('[confirmDeleteNow] Tidak ada pendingDelete');
+        closeDeleteConfirm();
+        return;
+    }
+
+    const { type, id, description } = pendingDelete;
+
+    // Tutup modal konfirmasi dulu
+    const modal = document.getElementById('deleteConfirmModal');
+    if (modal) modal.classList.remove('active');
+
+    // Hapus item
+    try {
+        if (type === 'post' || type === 'emergency') {
+            await deletePostPermanent(id, { skipConfirm: true });
+        } else {
+            console.warn('[confirmDeleteNow] Type tidak dikenal:', type);
+        }
+    } catch (e) {
+        console.error('[confirmDeleteNow] Error:', e);
+        showToast('⚠️ Gagal', 'Tidak dapat menghapus: ' + e.message, 'fa-exclamation-triangle');
+    }
+
+    // Reset
+    pendingDelete = null;
+}
+            
 // ====================================================================
 // 22. DELETE PERMANENT (FIX BUG 2)
 // ====================================================================
