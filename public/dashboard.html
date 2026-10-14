@@ -3362,16 +3362,82 @@ async function apiGetPosts() {
             // ADAPT: Buat objek post final
             // ============================================
             const adapted = rawPosts.map(row => {
-                // Sisipkan comments, media, likes ke row dulu
-                row.comments = commentsByPost[row.id] || [];
-                row.media = mediaByPost[row.id] ? [mediaByPost[row.id]] : [];
-                row.likes = likesByPost[row.id] || [];
+    // Sisipkan comments, media, likes ke row dulu
+    row.comments = commentsByPost[row.id] || [];
+    row.media = mediaByPost[row.id] ? [mediaByPost[row.id]] : [];
+    row.likes = likesByPost[row.id] || [];
 
-                return adaptPostFromSupabase(row);
-            }).filter(p => p !== null);
+    return adaptPostFromSupabase(row);
+}).filter(p => p !== null);
 
-            console.log('✅ [SALINK] Posts dari Supabase (multi-query):', adapted.length);
-            return adapted;
+// ============================================================
+// PATCH D3-Fix-2b — FALLBACK: Refresh profile comments yang kosong
+// Kalau ada comment dengan userFullName kosong, query profiles terpisah
+// ============================================================
+try {
+    const emptyProfileUserIds = new Set();
+    
+    rawComments.forEach(c => {
+        const profile = c.profiles || {};
+        if (!profile.full_name && c.user_id) {
+            emptyProfileUserIds.add(c.user_id);
+        }
+    });
+
+    if (emptyProfileUserIds.size > 0) {
+        console.log('[apiGetPosts] Refresh profile untuk', emptyProfileUserIds.size, 'user IDs');
+        
+        const { data: profilesData, error: profilesError } = await client
+            .from('profiles')
+            .select('id, username, full_name, profile_picture, gender')
+            .in('id', Array.from(emptyProfileUserIds));
+
+        if (profilesError) {
+            console.warn('[apiGetPosts] Refresh profiles error:', profilesError.message);
+        } else if (profilesData && profilesData.length > 0) {
+            console.log('[apiGetPosts] Dapat', profilesData.length, 'profiles. Update comments...');
+
+            // Bangun map untuk lookup cepat
+            const profileMap = {};
+            profilesData.forEach(p => { profileMap[p.id] = p; });
+
+            // Update adapted posts — refresh comments
+            adapted.forEach(post => {
+                if (!post || !post.comments) return;
+                
+                let comments = [];
+                try {
+                    comments = typeof post.comments === 'string'
+                        ? JSON.parse(post.comments)
+                        : post.comments;
+                } catch (e) { return; }
+
+                let updated = false;
+                comments.forEach(c => {
+                    if (!c.userFullName && profileMap[c.userId]) {
+                        const profile = profileMap[c.userId];
+                        c.userFullName = profile.full_name || '';
+                        c.userId = profile.username || c.userId;
+                        c.userGender = normalizeGenderProfile(profile.gender || 'Laki-laki');
+                        c.userProfilePic = profile.profile_picture || '';
+                        updated = true;
+                    }
+                });
+
+                if (updated) {
+                    post.comments = JSON.stringify(comments);
+                }
+            });
+
+            console.log('[apiGetPosts] Comments profile updated');
+        }
+    }
+} catch (e) {
+    console.warn('[apiGetPosts] Fallback profile error:', e.message);
+}
+
+console.log('✅ [SALINK] Posts dari Supabase (multi-query):', adapted.length);
+return adapted;
         }
     } catch (err) {
         console.warn('[SALINK] Supabase getPosts gagal, fallback ke GAS:', err.message);
