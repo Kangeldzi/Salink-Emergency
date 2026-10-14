@@ -3281,19 +3281,11 @@ async function apiGetPosts() {
                 .limit(2000);
 
             // ============================================
-            // QUERY 4: Comments + profiles komentator
+            // QUERY 4: Comments SAJA (TANPA JOIN — fix bug PostgREST)
             // ============================================
             const commentsPromise = client
                 .from('comments')
-                .select(`
-                    *,
-                    profiles!comments_user_id_fkey (
-                        username,
-                        full_name,
-                        profile_picture,
-                        gender
-                    )
-                `)
+                .select('*')                                    // ← TANPA JOIN
                 .order('created_at', { ascending: true })
                 .limit(1000);
 
@@ -3315,7 +3307,36 @@ async function apiGetPosts() {
             const rawMedia = Array.isArray(mediaRes.data) ? mediaRes.data : [];
             const rawLikes = Array.isArray(likesRes.data) ? likesRes.data : [];
             const rawComments = Array.isArray(commentsRes.data) ? commentsRes.data : [];
-
+        
+// ============================================
+// PATCH D3-Fix-8: Query profiles TERPISAH untuk comments
+// (Fix bug PostgREST JOIN yang kadang membuang komentar)
+// ============================================
+let commentProfileMap = {};
+try {
+    // Kumpulkan unique user_id dari comments
+    const commentUserIds = [...new Set(rawComments.map(c => c.user_id).filter(Boolean))];
+    
+    if (commentUserIds.length > 0) {
+        console.log('[apiGetPosts D3-Fix-8] Query', commentUserIds.length, 'user profiles untuk comments');
+        
+        const { data: commentProfiles, error: commentProfilesError } = await client
+            .from('profiles')
+            .select('id, username, full_name, profile_picture, gender')
+            .in('id', commentUserIds);
+        
+        if (commentProfilesError) {
+            console.warn('[apiGetPosts D3-Fix-8] Error:', commentProfilesError.message);
+        } else if (commentProfiles && commentProfiles.length > 0) {
+            commentProfiles.forEach(p => { 
+                commentProfileMap[p.id] = p; 
+            });
+            console.log('[apiGetPosts D3-Fix-8] Dapat', commentProfiles.length, 'profiles');
+        }
+    }
+} catch (e) {
+    console.warn('[apiGetPosts D3-Fix-8] Catch:', e.message);
+}
             console.log('[apiGetPosts] Raw:', {
                 posts: rawPosts.length,
                 comments: rawComments.length,
@@ -3332,30 +3353,32 @@ async function apiGetPosts() {
             // ============================================
 
             // Comments by post
-            const commentsByPost = {};
-            rawComments.forEach(c => {
-                if (!c.post_id) return;
-                if (!commentsByPost[c.post_id]) commentsByPost[c.post_id] = [];
-
-                const profile = c.profiles || {};
-
-                commentsByPost[c.post_id].push({
-                    id: c.id,
-                    user_id: c.user_id,
-                    userId: profile.username || c.user_id,
-                    userFullName: profile.full_name || '',
-                    userGender: normalizeGenderProfile(profile.gender || 'Laki-laki'),
-                    userProfilePic: profile.profile_picture || '',
-                    content: c.content || '',
-                    text: c.content || '',
-                    parent_id: c.parent_id || null,
-                    parentId: c.parent_id || null,
-                    created_at: c.created_at,
-                    timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
-                    updated_at: c.updated_at,
-                    deleted_at: c.deleted_at
-                });
-            });
+            // PATCH D3-Fix-8: Pakai commentProfileMap (bukan c.profiles)
+const commentsByPost = {};
+rawComments.forEach(c => {
+    if (!c.post_id) return;
+    if (!commentsByPost[c.post_id]) commentsByPost[c.post_id] = [];
+    
+    // Lookup profile dari map terpisah
+    const profile = commentProfileMap[c.user_id] || {};
+    
+    commentsByPost[c.post_id].push({
+        id: c.id,
+        user_id: c.user_id,
+        userId: profile.username || c.user_id,
+        userFullName: profile.full_name || '',
+        userGender: normalizeGenderProfile(profile.gender || 'Laki-laki'),
+        userProfilePic: profile.profile_picture || '',
+        content: c.content || '',
+        text: c.content || '',
+        parent_id: c.parent_id || null,
+        parentId: c.parent_id || null,
+        created_at: c.created_at,
+        timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
+        updated_at: c.updated_at,
+        deleted_at: c.deleted_at
+    });
+});
 
             // Media by post
             const mediaByPost = {};
