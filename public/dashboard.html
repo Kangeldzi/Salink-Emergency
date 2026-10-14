@@ -3233,22 +3233,17 @@ async function apiCall(action, data) {
 }
 
 /* ================================================================
- * PATCH D3-FIX-2 — apiGetPosts() dengan multi-query
- *
- * Alih-alih 1 query besar dengan 4 nested JOIN (yang sering gagal),
- * kita pisah jadi 4 query paralel, lalu merge di JavaScript.
- *
- * Query:
- * 1) Posts + profiles (user pembuat post)
- * 2) Comments + profiles (user yang komentar)
- * 3) Media (untuk post)
- * 4) Likes (untuk post)
+ * PATCH D3-FIX-7 — apiGetPosts() Simple & Reliable
+ * - 3 query paralel (posts, likes, media)
+ * - Comments di-query TERPISAH dengan JOIN profiles
  * ================================================================ */
 async function apiGetPosts() {
     // 1) Coba Supabase dulu
     try {
         if (window.SALINK_SB_READY && window.salinkSupabase) {
             const client = window.salinkSupabase;
+
+            console.log('[apiGetPosts] Mulai query Supabase...');
 
             // ============================================
             // QUERY 1: Posts + profiles pembuat post
@@ -3268,7 +3263,24 @@ async function apiGetPosts() {
                 .limit(100);
 
             // ============================================
-            // QUERY 2: Semua comments + profiles komentator
+            // QUERY 2: Media untuk posts
+            // ============================================
+            const mediaPromise = client
+                .from('media')
+                .select('id, post_id, media_type, bucket, object_key, mime_type, status')
+                .not('post_id', 'is', null)
+                .limit(1000);
+
+            // ============================================
+            // QUERY 3: Likes untuk posts
+            // ============================================
+            const likesPromise = client
+                .from('likes')
+                .select('id, user_id, post_id')
+                .limit(2000);
+
+            // ============================================
+            // QUERY 4: Comments + profiles komentator (TERPISAH)
             // ============================================
             const commentsPromise = client
                 .from('comments')
@@ -3284,41 +3296,24 @@ async function apiGetPosts() {
                 .order('created_at', { ascending: true })
                 .limit(1000);
 
-            // ============================================
-            // QUERY 3: Semua media untuk posts
-            // ============================================
-            const mediaPromise = client
-                .from('media')
-                .select('id, post_id, media_type, bucket, object_key, mime_type, status')
-                .not('post_id', 'is', null)
-                .limit(1000);
-
-            // ============================================
-            // QUERY 4: Semua likes untuk posts
-            // ============================================
-            const likesPromise = client
-                .from('likes')
-                .select('id, user_id, post_id')
-                .limit(2000);
-
-            // Jalankan paralel
-            const [postsRes, commentsRes, mediaRes, likesRes] = await Promise.all([
+            // Jalankan SEMUA paralel
+            const [postsRes, mediaRes, likesRes, commentsRes] = await Promise.all([
                 postsPromise,
-                commentsPromise,
                 mediaPromise,
-                likesPromise
+                likesPromise,
+                commentsPromise
             ]);
 
-            // Cek error utama
+            // Cek error
             if (postsRes.error) throw postsRes.error;
-            if (commentsRes.error) console.warn('[apiGetPosts] Comments error:', commentsRes.error.message);
             if (mediaRes.error) console.warn('[apiGetPosts] Media error:', mediaRes.error.message);
             if (likesRes.error) console.warn('[apiGetPosts] Likes error:', likesRes.error.message);
+            if (commentsRes.error) console.warn('[apiGetPosts] Comments error:', commentsRes.error.message);
 
             const rawPosts = Array.isArray(postsRes.data) ? postsRes.data : [];
-            const rawComments = Array.isArray(commentsRes.data) ? commentsRes.data : [];
             const rawMedia = Array.isArray(mediaRes.data) ? mediaRes.data : [];
             const rawLikes = Array.isArray(likesRes.data) ? likesRes.data : [];
+            const rawComments = Array.isArray(commentsRes.data) ? commentsRes.data : [];
 
             console.log('[apiGetPosts] Raw:', {
                 posts: rawPosts.length,
@@ -3327,11 +3322,100 @@ async function apiGetPosts() {
                 likes: rawLikes.length
             });
 
+            // Debug: cek apakah comments punya profiles field
+            if (rawComments.length > 0) {
+                console.log('[apiGetPosts] Sample comment.profiles:', 
+                    rawComments[0].profiles ? 'ADA' : 'TIDAK ADA',
+                    rawComments[0].profiles);
+            }
+
             if (rawPosts.length === 0) {
-                // Supabase kosong → biarkan fallback GAS
                 throw new Error('Supabase posts kosong');
             }
 
+            // ============================================
+            // BANGUN MAPS
+            // ============================================
+            
+            // Comments by post
+            const commentsByPost = {};
+            rawComments.forEach(c => {
+                if (!c.post_id) return;
+                if (!commentsByPost[c.post_id]) commentsByPost[c.post_id] = [];
+                
+                // Ambil profile - support berbagai format
+                const profile = c.profiles || {};
+                
+                commentsByPost[c.post_id].push({
+                    id: c.id,
+                    user_id: c.user_id,
+                    userId: profile.username || c.user_id,
+                    userFullName: profile.full_name || '',
+                    userGender: normalizeGenderProfile(profile.gender || 'Laki-laki'),
+                    userProfilePic: profile.profile_picture || '',
+                    content: c.content || '',
+                    text: c.content || '',
+                    parent_id: c.parent_id || null,
+                    parentId: c.parent_id || null,
+                    created_at: c.created_at,
+                    timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
+                    updated_at: c.updated_at,
+                    deleted_at: c.deleted_at
+                });
+            });
+
+            // Media by post
+            const mediaByPost = {};
+            rawMedia.forEach(m => {
+                if (!m.post_id) return;
+                mediaByPost[m.post_id] = m;
+            });
+
+            // Likes by post
+            const likesByPost = {};
+            rawLikes.forEach(l => {
+                if (!l.post_id) return;
+                if (!likesByPost[l.post_id]) likesByPost[l.post_id] = [];
+                likesByPost[l.post_id].push(l.user_id);
+            });
+
+            // ============================================
+            // ADAPT
+            // ============================================
+            const adapted = rawPosts.map(row => {
+                row.comments = commentsByPost[row.id] || [];
+                row.media = mediaByPost[row.id] ? [mediaByPost[row.id]] : [];
+                row.likes = likesByPost[row.id] || [];
+                return adaptPostFromSupabase(row);
+            }).filter(p => p !== null);
+
+            // Log sample adapted comment
+            if (adapted.length > 0 && adapted[0].comments) {
+                try {
+                    const sampleComments = JSON.parse(adapted[0].comments);
+                    console.log('[apiGetPosts] Sample adapted comment:', sampleComments[0]);
+                } catch(e) {}
+            }
+
+            console.log('✅ [SALINK] Posts dari Supabase (D3-Fix-7):', adapted.length);
+            return adapted;
+        }
+    } catch (err) {
+        console.warn('[SALINK] Supabase getPosts gagal, fallback ke GAS:', err.message);
+    }
+
+    // 2) Fallback: GAS
+    try {
+        console.log('📡 [SALINK] Fallback: Posts dari GAS');
+        const r = await apiCall('get_posts');
+        return r.status === 'success' && Array.isArray(r.data)
+            ? r.data.map(adaptPost)
+            : [];
+    } catch (err) {
+        console.error('[SALINK] GAS getPosts error:', err.message);
+        return [];
+    }
+}
             // ============================================
             // MERGE: Kelompokkan comments, media, likes per post
             // ============================================
@@ -3371,10 +3455,10 @@ async function apiGetPosts() {
                 likesByPost[l.post_id].push(l.user_id);
             });
 
-            // ============================================
-            // ADAPT: Buat objek post final
-            // ============================================
-            const adapted = rawPosts.map(row => {
+// ============================================
+// ADAPT: Buat objek post final
+// ============================================
+    const adapted = rawPosts.map(row => {
     // Sisipkan comments, media, likes ke row dulu
     row.comments = commentsByPost[row.id] || [];
     row.media = mediaByPost[row.id] ? [mediaByPost[row.id]] : [];
