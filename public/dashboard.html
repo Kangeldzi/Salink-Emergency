@@ -4490,28 +4490,44 @@ function renderPosts() {
     sorted.forEach(post => {
         if (!post.userId || !post.userFullName || post.userFullName.trim() === '') return;
 
-        let likes = [], comments = [];
-        const cachedLikes = getPostLikes(post.id);
-        const cachedComments = getPostComments(post.id);
+        /* PATCH D3-FIX-3 — Prioritaskan Supabase, fallback ke LS */
+let likes = [], comments = [];
 
-        if (cachedLikes && Array.isArray(cachedLikes) && cachedLikes.length > 0) {
-            likes = cachedLikes;
-        } else {
-            try {
-                if (typeof post.likes === 'string') likes = JSON.parse(post.likes) || [];
-                else if (Array.isArray(post.likes)) likes = post.likes;
-            } catch(e) { likes = []; }
-            if (likes.length > 0) setPostLikes(post.id, likes);
-        }
-        if (cachedComments && Array.isArray(cachedComments) && cachedComments.length > 0) {
-            comments = cachedComments;
-        } else {
-            try {
-                if (typeof post.comments === 'string') comments = JSON.parse(post.comments) || [];
-                else if (Array.isArray(post.comments)) comments = post.comments;
-            } catch(e) { comments = []; }
-            if (comments.length > 0) setPostComments(post.id, comments);
-        }
+// === LIKES ===
+// 1) Coba dari post (Supabase) dulu
+try {
+    if (typeof post.likes === 'string') likes = JSON.parse(post.likes) || [];
+    else if (Array.isArray(post.likes)) likes = post.likes;
+} catch(e) { likes = []; }
+
+// 2) Kalau kosong, coba dari LS
+if (likes.length === 0) {
+    const cachedLikes = getPostLikes(post.id);
+    if (cachedLikes && Array.isArray(cachedLikes) && cachedLikes.length > 0) {
+        likes = cachedLikes;
+    }
+}
+
+// 3) Sync balik ke LS
+if (likes.length > 0) setPostLikes(post.id, likes);
+
+// === COMMENTS ===
+// 1) Coba dari post (Supabase) dulu — ini paling fresh
+try {
+    if (typeof post.comments === 'string') comments = JSON.parse(post.comments) || [];
+    else if (Array.isArray(post.comments)) comments = post.comments;
+} catch(e) { comments = []; }
+
+// 2) Kalau kosong, coba dari LS
+if (comments.length === 0) {
+    const cachedComments = getPostComments(post.id);
+    if (cachedComments && Array.isArray(cachedComments) && cachedComments.length > 0) {
+        comments = cachedComments;
+    }
+}
+
+// 3) Sync balik ke LS (dengan data fresh dari Supabase)
+if (comments.length > 0) setPostComments(post.id, comments);
 
         const isLiked = currentUser && likes.indexOf(currentUser.username) !== -1;
         const isOwner = currentUser && post.userId === currentUser.username;
