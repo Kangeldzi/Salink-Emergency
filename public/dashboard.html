@@ -1493,8 +1493,10 @@
             animation: commentBump 0.4s ease;
         }
 
-        .comment-item .comment-action-btn .action-counter.empty {
+        /* PATCH 6A — Hapus .empty hide, semua counter tampil */
+        /* .comment-item .comment-action-btn .action-counter.empty {
             display: none;
+        } */
         }
 
         .comment-item .comment-action-btn.delete-btn {
@@ -5203,18 +5205,21 @@ function buildCommentItemHTML(c, postId, isReply) {
     
     let actionsHTML = '';
     
-    if (!isDeleted) {
-        // Like button (hidden kalau milik sendiri)
+        if (!isDeleted) {
+        // PATCH 6A — Hybrid: semua komentar tampil counter
+        // - Komentar orang lain → klikable (like/unlike)
+        // - Komentar sendiri → read-only (tampil counter, tidak klikable)
         if (!isOwn) {
+            // Milik orang lain → klikable
             actionsHTML += '<button class="comment-action-btn' + (isLiked ? ' liked' : '') + '" data-action="like-comment" data-comment-id="' + escapeAttr(c.id) + '" data-post-id="' + escapeAttr(postId) + '" type="button">' +
                 '<i class="' + (isLiked ? 'fas' : 'far') + ' fa-heart"></i>' +
-                '<span class="action-counter like-counter' + likeCounterClass + '">' + likeCount + '</span>' +
+                '<span class="action-counter like-counter">' + likeCount + '</span>' +
             '</button>';
-        } else if (likeCount > 0) {
-            // Kalau milik sendiri tapi ada like, tampilkan count saja (read-only)
-            actionsHTML += '<span class="comment-action-btn" style="cursor:default;">' +
-                '<i class="fas fa-heart" style="color:var(--accent-red);"></i>' +
-                '<span class="action-counter">' + likeCount + '</span>' +
+        } else {
+            // Milik sendiri → read-only (tampil counter tanpa klik)
+            actionsHTML += '<span class="comment-action-btn" style="cursor:default;" title="Anda tidak bisa like komentar sendiri">' +
+                '<i class="fas fa-heart" style="color:' + (likeCount > 0 ? 'var(--accent-red)' : '#9aa0ab') + ';"></i>' +
+                '<span class="action-counter like-counter">' + likeCount + '</span>' +
             '</span>';
         }
         
@@ -5634,11 +5639,15 @@ async function handleEditComment(commentId, postId) {
 }
 
 /* ================================================================
- * PATCH 5D — handleDeleteComment()
- * Soft delete komentar (tampil "Komentar dihapus oleh user")
+ * PATCH 6C — handleDeleteComment() dengan FIX PERSIST
+ * Urutan: Update Supabase DULU, baru UI
  * ================================================================ */
 async function handleDeleteComment(commentId, postId) {
     if (!currentUser) { redirectToLogin(); return; }
+    if (!currentAuthUser?.id) {
+        showToast('⚠️', 'Session tidak valid', 'fa-exclamation-triangle');
+        return;
+    }
     
     const post = posts.find(p => p.id === postId);
     if (!post) return;
@@ -5648,20 +5657,22 @@ async function handleDeleteComment(commentId, postId) {
     
     const comment = comments.find(c => c.id === commentId);
     if (!comment) {
-        console.warn('[Delete] Comment tidak ditemukan:', commentId);
+        console.warn('[Delete 6C] Comment tidak ditemukan:', commentId);
         return;
     }
 
     // Cek apakah user adalah pemilik
     const isOwn = (comment.userId === currentUser.username) || 
-                  (comment.userAuthId === currentAuthUser?.id);
+                  (comment.userAuthId === currentAuthUser.id);
     if (!isOwn) {
         showToast('⚠️', 'Anda hanya bisa hapus komentar sendiri', 'fa-exclamation-triangle');
         return;
     }
 
     // Cek apakah punya balasan
-    const hasReplies = comments.some(c => (c.parent_id || c.parentId) === commentId);
+    const hasReplies = comments.some(c => 
+        (c.parent_id || c.parentId) === commentId && !c.deleted_at
+    );
     
     // Konfirmasi
     const confirmMsg = hasReplies
@@ -5670,8 +5681,47 @@ async function handleDeleteComment(commentId, postId) {
     
     if (!confirm('🗑️ ' + confirmMsg)) return;
 
-    // Optimistic update
+    const isUUID = isSupabaseUUID(commentId);
+    console.log('[Delete 6C] Start:', { commentId, isUUID, isOwn, hasReplies });
+
+    // ============================================================
+    // 1) UPDATE SUPABASE DULU (PRIMARY)
+    // ============================================================
+    let supabaseOk = false;
     const now = new Date().toISOString();
+    
+    if (isUUID && window.SALINK_SB_READY && window.salinkSupabase) {
+        try {
+            const client = window.salinkSupabase;
+            const { data: updated, error } = await client
+                .from('comments')
+                .update({
+                    deleted_at: now,
+                    content: '[deleted]'
+                })
+                .eq('id', commentId)
+                .select();
+
+            if (error) {
+                console.error('[Delete 6C] Supabase error:', error.message);
+                showToast('❌ Gagal', 'Tidak bisa hapus di server: ' + error.message, 'fa-times-circle');
+                return;
+            } else {
+                supabaseOk = true;
+                console.log('[Delete 6C] Supabase OK, rows updated:', updated?.length || 0);
+            }
+        } catch (e) {
+            console.error('[Delete 6C] Catch:', e.message);
+            showToast('❌ Gagal', 'Error: ' + e.message, 'fa-times-circle');
+            return;
+        }
+    } else {
+        console.warn('[Delete 6C] Skip Supabase (bukan UUID atau tidak ready)');
+    }
+
+    // ============================================================
+    // 2) UPDATE LOCAL STATE (setelah Supabase OK)
+    // ============================================================
     comment.deleted_at = now;
     comment.text = '';
     comment.content = '';
@@ -5679,35 +5729,15 @@ async function handleDeleteComment(commentId, postId) {
     setPostComments(postId, comments);
     safeSavePosts(posts);
 
-    // Sync ke Supabase
-    const isUUID = isSupabaseUUID(commentId);
-    let supabaseOk = false;
-    
-    if (isUUID && window.SALINK_SB_READY && window.salinkSupabase) {
-        try {
-            const client = window.salinkSupabase;
-            const { error } = await client
-                .from('comments')
-                .update({
-                    deleted_at: now,
-                    content: ''
-                })
-                .eq('id', commentId);
-
-            if (error) console.warn('[Delete] Supabase error:', error.message);
-            else supabaseOk = true;
-        } catch (e) {
-            console.warn('[Delete] Catch:', e.message);
-        }
-    }
-
-    // Re-render
+    // ============================================================
+    // 3) RE-RENDER
+    // ============================================================
     renderPosts();
     broadcastSync('new_post', { id: postId });
     playRegularSound();
 
     showToast('✅ Terhapus', 'Komentar dihapus', 'fa-check-circle');
-    console.log('[Delete Comment]', { commentId, supabaseOk });
+    console.log('[Delete 6C] DONE:', { commentId, supabaseOk });
 }
 
 function showAllReplies(commentId, postId) {
@@ -6110,6 +6140,87 @@ async function addComment(postId, text, parentId = null) {
     renderPosts();
     broadcastSync('new_post', { id: postId });
     playRegularSound();
+
+        // ============================================================
+    // PATCH 6D — Kirim NOTIFIKASI ke pemilik post / parent comment
+    // ============================================================
+    try {
+        const notifTargetUserId = parentComment 
+            ? parentComment.userAuthId
+            : post.userAuthId;
+        
+        const notifTargetUsername = parentComment
+            ? parentComment.userId
+            : post.userId;
+        
+        // Jangan kirim notif ke diri sendiri
+        const isSelfAction = currentAuthUser?.id === notifTargetUserId;
+        
+        if (notifTargetUserId && !isSelfAction) {
+            const isEmergency = post.isSpecial && post.specialType;
+            const notifType = isEmergency 
+                ? 'emergency_' + post.specialType
+                : (parentComment ? 'social_reply' : 'social_comment');
+            
+            const notifTitle = isEmergency
+                ? EMERGENCY_ICONS[post.specialType] + ' ' + EMERGENCY_LABELS[post.specialType]
+                : (parentComment ? '💬 Balasan Komentar' : '💬 Komentar Baru');
+            
+            const notifMessage = currentUser.fullName + ' ' + 
+                (parentComment ? 'membalas komentar Anda' : 'mengomentari postingan Anda') +
+                ': "' + trimmedText.substring(0, 80) + '"';
+            
+            const notifPayload = {
+                id: 'notif-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+                user_id: notifTargetUserId,
+                sender_id: currentAuthUser.id,
+                type: notifType,
+                title: notifTitle,
+                message: notifMessage,
+                link: 'detail-emergency.html?id=' + postId,
+                post_id: postId,
+                emergency_id: isEmergency ? postId : null,
+                sound_key: isEmergency ? post.specialType : 'social_comment',
+                read: false,
+                created_at: new Date().toISOString()
+            };
+            
+            console.log('📤 [Notif 6D] Kirim ke', notifTargetUsername, '| type:', notifType);
+            
+            // Insert ke Supabase
+            if (window.SALINK_SB_READY && window.salinkSupabase) {
+                const { error: notifError } = await window.salinkSupabase
+                    .from('notifications')
+                    .insert(notifPayload);
+                
+                if (notifError) {
+                    console.warn('⚠️ [Notif 6D] Supabase error:', notifError.message);
+                } else {
+                    console.log('✅ [Notif 6D] Tersimpan di Supabase');
+                }
+            }
+            
+            // Trigger FCM (via GAS)
+            try {
+                await apiCall('send_notification', {
+                    userId: notifTargetUserId,
+                    username: notifTargetUsername,
+                    type: notifType,
+                    title: notifTitle,
+                    message: notifMessage,
+                    link: notifPayload.link,
+                    soundKey: notifPayload.sound_key
+                });
+                console.log('📤 [Notif 6D] FCM trigger terkirim');
+            } catch (fcmErr) {
+                console.warn('⚠️ [Notif 6D] FCM error:', fcmErr.message);
+            }
+        } else {
+            console.log('ℹ️ [Notif 6D] Skip (self action atau tidak ada target)');
+        }
+    } catch (notifCatch) {
+        console.warn('⚠️ [Notif 6D] Catch:', notifCatch.message);
+    }
 
     console.log('📊 [Comment] Result:', {
         supabaseOk: supabaseOk,
@@ -7445,15 +7556,21 @@ async function loadData() {
         ]);
 
         // Posts
-        // PATCH D3-FIX-1 — Filter & sort posts dengan validasi timestamp
+
+// PATCH D3-FIX-1 + PATCH 6B — Filter & sort posts
 let apiPosts = (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) ? results[0].value : [];
 
-// Kalau Supabase punya data → HANYA pakai Supabase (jangan campur dengan GAS)
+// PATCH 6B — HANYA pakai post dari Supabase (exclude sampah GAS)
 const supabasePosts = apiPosts.filter(p => p && p._source === 'supabase');
 const useSupabaseOnly = supabasePosts.length > 0;
 
-console.log('[loadData] Supabase posts:', supabasePosts.length, '| Use only Supabase:', useSupabaseOnly);
+console.log('[loadData 6B] Supabase posts:', supabasePosts.length, '| Use only Supabase:', useSupabaseOnly);
 
+// PATCH 6B — Kalau Supabase ada, JANGAN baca LS/GAS
+if (useSupabaseOnly) {
+    console.log('[loadData 6B] Supabase = source of truth, ignore LS/GAS');
+}
+        
 const postMap = new Map();
 
 if (useSupabaseOnly) {
