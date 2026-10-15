@@ -5043,28 +5043,18 @@ async function toggleLike(postId) {
 // 31. ADD COMMENT (FCM TRIGGER)
 // ====================================================================
 /* ================================================================
- * PATCH D5-B — addComment() ke Supabase (tabel `comments`)
+ * PATCH 2 — addComment() dengan dukungan parent_id (reply)
  *
  * Alur:
- * 1) Cek login
- * 2) Cek post ada
- * 3) INSERT ke `comments` di Supabase:
- *    - user_id = currentAuthUser.id (WAJIB untuk RLS)
- *    - post_id = UUID post
- *    - content = teks komentar
- *    - parent_id = null (komentar utama)
- * 4) Update UI + array global `posts`
- * 5) Dual-write ke GAS (backup)
- * 6) Broadcast sync
- *
- * Catatan:
- * - Post ID HARUS UUID Supabase (kalau bukan, skip Supabase)
- * - `user_id` WAJIB di-set = currentAuthUser.id
+ * 1) Kalau parentId ada → reply, auto-prepend @username
+ * 2) INSERT ke `comments` dengan parent_id
+ * 3) Update UI + global state
+ * 4) Dual-write ke GAS
  * ================================================================ */
-async function addComment(postId, text) {
+async function addComment(postId, text, parentId = null) {
     if (!currentUser) { redirectToLogin(); return; }
 
-    const trimmedText = (text || '').trim();
+    let trimmedText = (text || '').trim();
     if (!trimmedText) {
         showToast('⚠️', 'Komentar tidak boleh kosong', 'fa-exclamation-triangle');
         return;
@@ -5080,24 +5070,54 @@ async function addComment(postId, text) {
     const isUUID = isSupabaseUUID(postId);
 
     // ============================================================
+    // PREPARE — Kalau reply, siapkan parent info
+    // ============================================================
+    let parentComment = null;
+    let parentUsername = null;
+    let parentCommentId = null;
+
+    if (parentId) {
+        // Cari parent di comments post
+        const postComments = JSON.parse(post.comments || '[]');
+        parentComment = postComments.find(c => c.id === parentId);
+        
+        if (parentComment) {
+            // Cari username parent (userId di comment = username atau UUID)
+            parentUsername = parentComment.userId || '';
+            parentCommentId = parentComment.id;
+            
+            // Auto-prepend @username kalau belum ada di text
+            if (parentUsername && !trimmedText.startsWith('@' + parentUsername)) {
+                trimmedText = '@' + parentUsername + ' ' + trimmedText;
+            }
+        } else {
+            console.warn('[Comment] Parent comment tidak ditemukan:', parentId);
+            // Lanjut sebagai komentar biasa
+            parentId = null;
+        }
+    }
+
+    // ============================================================
     // 1) INSERT KE SUPABASE (PRIMARY)
     // ============================================================
     let supabaseOk = false;
     let supabaseCommentId = null;
+    let supabaseCommentData = null;
 
     if (isUUID && window.SALINK_SB_READY && window.salinkSupabase && currentAuthUser?.id) {
         try {
             const client = window.salinkSupabase;
 
-            console.log('📤 [Comment] Insert ke Supabase:', postId);
+            console.log('📤 [Comment] Insert ke Supabase:', postId, 
+                parentId ? '(reply to ' + parentId + ')' : '(top-level)');
 
             const { data: commentResult, error: commentError } = await client
                 .from('comments')
                 .insert({
-                    user_id: currentAuthUser.id,      // WAJIB untuk RLS
+                    user_id: currentAuthUser.id,
                     post_id: postId,
-                    content: trimmedText,             // Kolom isi komentar
-                    parent_id: null                   // Komentar utama (bukan reply)
+                    content: trimmedText,
+                    parent_id: parentId || null
                 })
                 .select()
                 .single();
@@ -5107,6 +5127,7 @@ async function addComment(postId, text) {
             } else if (commentResult && commentResult.id) {
                 supabaseOk = true;
                 supabaseCommentId = commentResult.id;
+                supabaseCommentData = commentResult;
                 console.log('✅ [Comment] Supabase insert OK:', supabaseCommentId);
             }
         } catch (sbErr) {
@@ -5119,30 +5140,38 @@ async function addComment(postId, text) {
     // ============================================================
     // 2) UPDATE UI + GLOBAL STATE
     // ============================================================
-    let comments = getPostComments(postId) || [];
+    let comments = [];
+    try {
+        comments = typeof post.comments === 'string' ? JSON.parse(post.comments) : (post.comments || []);
+    } catch (e) { comments = []; }
     if (!Array.isArray(comments)) comments = [];
-    if (comments.length === 0) {
-        try {
-            comments = typeof post.comments === 'string' ? JSON.parse(post.comments) : (post.comments || []);
-        } catch (e) { comments = []; }
-    }
 
     const newComment = {
-        id: supabaseCommentId || ('c-' + Date.now()),  // Pakai UUID kalau ada
+        id: supabaseCommentId || ('c-' + Date.now()),
+        user_id: currentAuthUser?.id || null,
         userId: currentUser.username,
-        userAuthId: currentAuthUser?.id || null,        // UUID Supabase
+        userAuthId: currentAuthUser?.id || null,
         userFullName: currentUser.fullName,
         userGender: currentUser.gender,
-        userProfilePic: currentUser.profilePicture,
+        userProfilePic: currentUser.profilePicture || '',
+        content: trimmedText,
         text: trimmedText,
-        timestamp: Date.now()
+        parent_id: parentId || null,
+        parentId: parentId || null,
+        parentUsername: parentUsername || null,       // ← info parent
+        created_at: supabaseCommentData?.created_at || new Date().toISOString(),
+        timestamp: Date.now(),
+        updated_at: null,
+        deleted_at: null,
+        likes_count: 0,                                 // ← initial
+        is_liked: false                                 // ← initial
     };
-    comments.push(newComment);
 
-    setPostComments(postId, comments);
+    comments.push(newComment);
     post.comments = JSON.stringify(comments);
 
-    // Simpan ke LS
+    // Sync ke LS
+    setPostComments(postId, comments);
     safeSavePosts(posts);
 
     // ============================================================
@@ -5153,7 +5182,8 @@ async function addComment(postId, text) {
             postId: postId,
             commenterId: currentUser.username,
             commenterName: currentUser.fullName,
-            text: trimmedText
+            text: trimmedText,
+            parentId: parentId || ''
         });
         console.log('📤 [Comment] GAS backup:', r.status);
     } catch (e) {
@@ -5169,43 +5199,13 @@ async function addComment(postId, text) {
 
     console.log('📊 [Comment] Result:', {
         supabaseOk: supabaseOk,
+        isReply: !!parentId,
+        parentId: parentId,
         totalComments: comments.length,
         supabaseCommentId: supabaseCommentId
     });
-}
 
-function deleteComment(postId, commentId) {
-    if (!confirm('Hapus komentar?')) return;
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-
-    let comments = getPostComments(postId) || [];
-    if (comments.length === 0) {
-        try { comments = typeof post.comments === 'string' ? JSON.parse(post.comments) : (post.comments || []); } catch(e) { comments = []; }
-    }
-    comments = comments.filter(c => c.id !== commentId);
-
-    setPostComments(postId, comments);
-    post.comments = JSON.stringify(comments);
-
-    apiCall('save_post', {
-        id: postId,
-        comments: JSON.stringify(comments)
-    }).catch(e => console.warn('⚠️ [Comment] Delete sync error:', e.message));
-
-    safeSavePosts(posts);
-    renderPosts();
-    broadcastSync('new_post', { id: postId });
-    playRegularSound();
-}
-
-function sharePost(postId) {
-    const p = posts.find(x => x.id === postId);
-    if (!p) return;
-    const text = p.text || 'Postingan SALINK';
-    const url = window.location.href;
-    if (navigator.share) navigator.share({ title: 'SALINK', text: text, url: url }).catch(() => {});
-    else navigator.clipboard.writeText(text + '\n' + url).then(() => showToast('📋', 'Link disalin', 'fa-copy'));
+    return newComment;
 }
 
 // ====================================================================
