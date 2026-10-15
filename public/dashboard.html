@@ -5639,8 +5639,8 @@ async function handleEditComment(commentId, postId) {
 }
 
 /* ================================================================
- * PATCH 6C — handleDeleteComment() dengan FIX PERSIST
- * Urutan: Update Supabase DULU, baru UI
+ * PATCH 6C-REVISI — handleDeleteComment() dengan HARD DELETE
+ * Sesuai kesepakatan awal: hapus permanen dari Supabase
  * ================================================================ */
 async function handleDeleteComment(commentId, postId) {
     if (!currentUser) { redirectToLogin(); return; }
@@ -5657,7 +5657,7 @@ async function handleDeleteComment(commentId, postId) {
     
     const comment = comments.find(c => c.id === commentId);
     if (!comment) {
-        console.warn('[Delete 6C] Comment tidak ditemukan:', commentId);
+        console.warn('[Delete 6C-R] Comment tidak ditemukan:', commentId);
         return;
     }
 
@@ -5670,63 +5670,70 @@ async function handleDeleteComment(commentId, postId) {
     }
 
     // Cek apakah punya balasan
-    const hasReplies = comments.some(c => 
+    const replyCount = comments.filter(c => 
         (c.parent_id || c.parentId) === commentId && !c.deleted_at
-    );
+    ).length;
+    const hasReplies = replyCount > 0;
     
     // Konfirmasi
     const confirmMsg = hasReplies
-        ? 'Komentar ini punya balasan. Akan ditampilkan sebagai "Komentar dihapus oleh user".\n\nLanjutkan?'
-        : 'Hapus komentar ini?\n\nTindakan ini tidak bisa dibatalkan.';
+        ? 'Komentar ini punya ' + replyCount + ' balasan.\n\n' +
+          '⚠️ PERHATIAN: Balasan juga akan ikut terhapus (CASCADE).\n\n' +
+          'Lanjutkan?'
+        : 'Hapus komentar ini?\n\nTindakan ini TIDAK BISA DIBATALKAN.';
     
     if (!confirm('🗑️ ' + confirmMsg)) return;
 
     const isUUID = isSupabaseUUID(commentId);
-    console.log('[Delete 6C] Start:', { commentId, isUUID, isOwn, hasReplies });
+    console.log('[Delete 6C-R] Start (HARD DELETE):', { commentId, isUUID, isOwn, replyCount });
 
     // ============================================================
-    // 1) UPDATE SUPABASE DULU (PRIMARY)
+    // 1) HAPUS DARI SUPABASE (HARD DELETE)
     // ============================================================
     let supabaseOk = false;
-    const now = new Date().toISOString();
     
     if (isUUID && window.SALINK_SB_READY && window.salinkSupabase) {
         try {
             const client = window.salinkSupabase;
-            const { data: updated, error } = await client
+            const { data: deleted, error } = await client
                 .from('comments')
-                .update({
-                    deleted_at: now,
-                    content: '[deleted]'
-                })
+                .delete()
                 .eq('id', commentId)
                 .select();
 
             if (error) {
-                console.error('[Delete 6C] Supabase error:', error.message);
+                console.error('[Delete 6C-R] Supabase error:', error.message);
                 showToast('❌ Gagal', 'Tidak bisa hapus di server: ' + error.message, 'fa-times-circle');
                 return;
             } else {
                 supabaseOk = true;
-                console.log('[Delete 6C] Supabase OK, rows updated:', updated?.length || 0);
+                console.log('[Delete 6C-R] Supabase OK, rows deleted:', deleted?.length || 0);
             }
         } catch (e) {
-            console.error('[Delete 6C] Catch:', e.message);
+            console.error('[Delete 6C-R] Catch:', e.message);
             showToast('❌ Gagal', 'Error: ' + e.message, 'fa-times-circle');
             return;
         }
     } else {
-        console.warn('[Delete 6C] Skip Supabase (bukan UUID atau tidak ready)');
+        console.warn('[Delete 6C-R] Skip Supabase (bukan UUID atau tidak ready)');
     }
 
     // ============================================================
-    // 2) UPDATE LOCAL STATE (setelah Supabase OK)
+    // 2) HAPUS DARI LOCAL STATE
     // ============================================================
-    comment.deleted_at = now;
-    comment.text = '';
-    comment.content = '';
-    post.comments = JSON.stringify(comments);
-    setPostComments(postId, comments);
+    // Hapus comment + balasannya (kalau ada)
+    const commentIdsToRemove = [commentId];
+    if (hasReplies) {
+        comments.forEach(c => {
+            if ((c.parent_id || c.parentId) === commentId) {
+                commentIdsToRemove.push(c.id);
+            }
+        });
+    }
+    
+    const filteredComments = comments.filter(c => !commentIdsToRemove.includes(c.id));
+    post.comments = JSON.stringify(filteredComments);
+    setPostComments(postId, filteredComments);
     safeSavePosts(posts);
 
     // ============================================================
@@ -5736,8 +5743,11 @@ async function handleDeleteComment(commentId, postId) {
     broadcastSync('new_post', { id: postId });
     playRegularSound();
 
-    showToast('✅ Terhapus', 'Komentar dihapus', 'fa-check-circle');
-    console.log('[Delete 6C] DONE:', { commentId, supabaseOk });
+    const successMsg = hasReplies
+        ? 'Komentar + ' + replyCount + ' balasan dihapus'
+        : 'Komentar dihapus';
+    showToast('✅ Terhapus', successMsg, 'fa-check-circle');
+    console.log('[Delete 6C-R] DONE:', { commentId, supabaseOk, removed: commentIdsToRemove.length });
 }
 
 function showAllReplies(commentId, postId) {
