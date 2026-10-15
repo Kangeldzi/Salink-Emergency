@@ -3584,10 +3584,11 @@ async function apiGetPosts() {
 
             // ============================================
             // QUERY 4: Comments SAJA (TANPA JOIN — fix bug PostgREST)
+            // PATCH 4A — Fix: select('*') + limit drop row parent_id
             // ============================================
             const commentsPromise = client
                 .from('comments')
-                .select('*')                                    // ← TANPA JOIN
+                .select('id, post_id, user_id, parent_id, content, created_at, updated_at, deleted_at')
                 .order('created_at', { ascending: true })
                 .limit(1000);
 
@@ -5165,6 +5166,8 @@ function buildCommentItemHTML(c, postId, isReply) {
         ? ' <span class="comment-edited-badge">(diedit)</span>' 
         : '';
     
+    // PATCH 4B — Waktu lengkap + tooltip
+    const timeFull = formatDate(c.timestamp || Date.now());
     const timeAgo = getTimeAgo(c.timestamp || Date.now());
     
     // Text — kalau ada @mention, bungkus dengan span
@@ -5229,7 +5232,7 @@ function buildCommentItemHTML(c, postId, isReply) {
     return '<div class="comment-item" data-comment-id="' + escapeAttr(c.id) + '">' +
         '<div class="comment-avatar" onclick="' + (isDeleted ? '' : 'handleProfileClick(\'' + escapeAttr(c.userId) + '\')') + '">' + avatarHTML + '</div>' +
         '<div class="comment-body">' +
-            '<div class="comment-head">' + nameHTML + '<span class="comment-time">' + timeAgo + '</span>' + editedBadge + '</div>' +
+            '<div class="comment-head">' + nameHTML + '<span class="comment-time" title="' + escapeAttr(timeFull) + '">' + timeAgo + ' • ' + timeFull + '</span>' + editedBadge + '</div>' +
             textHTML +
             (actionsHTML ? '<div class="comment-actions">' + actionsHTML + '</div>' : '') +
             replyBoxHTML +
