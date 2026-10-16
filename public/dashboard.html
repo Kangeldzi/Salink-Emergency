@@ -7444,27 +7444,62 @@ async function loadUser() {
     }
 }
 
-/* Fallback: baca dari LocalStorage (legacy path) */
+/* Fallback: baca dari LocalStorage — DIPERKETAT dengan expiry check */
 function loadUserFromLocalStorage() {
     try {
+        const loggedInFlag = localStorage.getItem('salink_logged_in');
         const s = localStorage.getItem('salink_user');
-        if (s) {
-            const u = JSON.parse(s);
-            if (u && u.username && u.fullName) {
-                currentUser = u;
-                isPreviewMode = false;
-                // Normalisasi gender kalau belum
-                if (!currentUser.gender || (currentUser.gender !== 'male' && currentUser.gender !== 'female')) {
-                    currentUser.gender = normalizeGenderDashboard(currentUser.gender || currentUser.genderRaw);
-                }
-                console.log('[SALINK Dashboard] User dari LocalStorage (fallback):', currentUser.username);
-                return true;
+
+        // SYARAT 1: Harus ada flag login EKSPLISIT
+        if (loggedInFlag !== 'true' || !s) {
+            throw new Error('No valid login flag');
+        }
+
+        const u = JSON.parse(s);
+        if (!u || !u.username || !u.fullName) {
+            throw new Error('Invalid user data');
+        }
+
+        // SYARAT 2: Cek umur session (max 7 hari)
+        // Pakai lastActiveAt atau updatedAt sebagai patokan
+        const lastActivity = u.lastActiveAt || u.updatedAt || u.createdAt;
+        if (lastActivity) {
+            const lastTs = new Date(lastActivity).getTime();
+            const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+            if (isNaN(lastTs) || lastTs < sevenDaysAgo) {
+                console.log('[SALINK] Session LS kadaluarsa (>7 hari)');
+                throw new Error('Session expired');
             }
         }
-    } catch (e) {}
+
+        // Lolos semua syarat → pakai LS
+        currentUser = u;
+        isPreviewMode = false;
+
+        if (!currentUser.gender || (currentUser.gender !== 'male' && currentUser.gender !== 'female')) {
+            currentUser.gender = normalizeGenderDashboard(currentUser.gender || currentUser.genderRaw);
+        }
+
+        console.log('[SALINK Dashboard] User dari LocalStorage (fallback valid):', currentUser.username);
+        return true;
+
+    } catch (e) {
+        // Ada masalah apapun → PREVIEW MODE + bersihkan sisa
+        console.log('[SALINK Dashboard] LS fallback ditolak:', e.message);
+    }
+
+    // Default: preview mode
     currentUser = null;
     currentAuthUser = null;
     isPreviewMode = true;
+
+    // Bersihkan sisa biar tidak menghantui load berikutnya
+    try {
+        localStorage.removeItem('salink_user');
+        localStorage.removeItem('salink_logged_in');
+    } catch(e) {}
+
+    console.log('[SALINK Dashboard] Tidak ada sesi valid → Mode Preview');
     return false;
 }
 
