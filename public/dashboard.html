@@ -4881,25 +4881,59 @@ function renderPosts() {
         if (likes.length > 0) setPostLikes(post.id, likes);
 
         // === COMMENTS ===
-        // 1) SELALU dari post (Supabase) — JANGAN pakai LS kalau Supabase ada data
-        try {
-            if (typeof post.comments === 'string') comments = JSON.parse(post.comments) || [];
-            else if (Array.isArray(post.comments)) comments = post.comments;
-        } catch(e) { comments = []; }
+// 1) SELALU dari post (Supabase) — JANGAN pakai LS kalau Supabase ada data
+try {
+    if (typeof post.comments === 'string') comments = JSON.parse(post.comments) || [];
+    else if (Array.isArray(post.comments)) comments = post.comments;
+} catch(e) { comments = []; }
 
-        // 2) Kalau Supabase KOSONG, baru pakai LS
-        if (comments.length === 0) {
-            const cachedComments = getPostComments(post.id);
-            if (cachedComments && Array.isArray(cachedComments) && cachedComments.length > 0) {
-                comments = cachedComments;
-            }
-        }
+// 2) Kalau Supabase KOSONG, baru pakai LS
+if (comments.length === 0) {
+    const cachedComments = getPostComments(post.id);
+    if (cachedComments && Array.isArray(cachedComments) && cachedComments.length > 0) {
+        comments = cachedComments;
+    }
+}
 
-        // 3) Force sync LS dengan data dari Supabase
-        //    (biar LS tidak stale dengan data lama)
-        if (comments.length > 0) {
-            setPostComments(post.id, comments);
+// ============================================================
+// PATCH 7E-MINIMAL — Race Condition Guard
+// Kalau LS punya komentar yang BELUM ada di Supabase (commit lag),
+// preserve komentar lokal yang masih fresh (< 2 menit).
+// ============================================================
+try {
+    const cachedComments = getPostComments(post.id);
+    if (Array.isArray(cachedComments) && cachedComments.length > comments.length) {
+        // Bangun Set ID dari Supabase
+        const supabaseIds = new Set(comments.map(c => c && c.id).filter(Boolean));
+        
+        // Cari komentar lokal yang:
+        // - ID-nya valid (bukan "c-...")
+        // - BELUM ada di Supabase
+        // - Umurnya < 2 menit (indikasi baru dikirim, commit lag)
+        const twoMinAgo = Date.now() - (2 * 60 * 1000);
+        const freshLocal = cachedComments.filter(c => {
+            if (!c || !c.id) return false;
+            if (supabaseIds.has(c.id)) return false;
+            if (c.id.startsWith('c-')) return false;
+            const ts = c.timestamp || (c.created_at ? new Date(c.created_at).getTime() : 0);
+            return ts > twoMinAgo;
+        });
+
+        if (freshLocal.length > 0) {
+            console.warn('[7E-MINIMAL] Preserve ' + freshLocal.length + ' komentar lokal fresh untuk post ' + post.id);
+            // Gabung: Supabase dulu, baru lokal (biar tetap tampil)
+            comments = [...comments, ...freshLocal];
         }
+    }
+} catch(e) {
+    console.warn('[7E-MINIMAL] Error:', e.message);
+}
+
+// 3) Force sync LS dengan data dari Supabase (sudah include komentar lokal)
+//    (biar LS tidak stale dengan data lama)
+if (comments.length > 0) {
+    setPostComments(post.id, comments);
+}
 
         const isLiked = currentUser && likes.indexOf(currentUser.username) !== -1;
         const isOwner = currentUser && post.userId === currentUser.username;
