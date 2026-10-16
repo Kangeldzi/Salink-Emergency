@@ -4165,84 +4165,40 @@ if ('serviceWorker' in navigator) {
 // ====================================================================
 // 20. MEDIA HELPERS (safeSavePosts, getMediaUrl, handleImageError)
 // ====================================================================
-/* ================================================================
- * PATCH 6E — safeSavePosts() AGRESSIVE CLEANUP
- * - Strip SEMUA mediaData (base64 besar)
- * - Cek size sebelum simpan
- * - Kalau gagal, hapus salink_posts dulu baru simpan
- * ================================================================ */
 function safeSavePosts(postsArray) {
     try {
-        // FILTER: Hanya post yang penting
-        const cleanPosts = postsArray
-            .filter(p => p && p.id)
-            .map(p => {
+        const fullPosts = postsArray.filter(p => p && p.id);
+        const fullJson = JSON.stringify(fullPosts);
+        if (fullJson.length < 4 * 1024 * 1024) {
+            localStorage.setItem('salink_posts', fullJson);
+            console.log('✅ [safeSavePosts] Saved full:', fullPosts.length, 'posts,', (fullJson.length / 1024).toFixed(1), 'KB');
+            return true;
+        }
+        const lightPosts = fullPosts.map(p => {
+            const copy = Object.assign({}, p);
+            if (copy.mediaData && copy.mediaData.length > 50000) {
+                copy.mediaData = copy.mediaData.substring(0, 50000);
+            }
+            return copy;
+        });
+        localStorage.setItem('salink_posts', JSON.stringify(lightPosts));
+        console.log('✅ [safeSavePosts] Saved light:', lightPosts.length, 'posts');
+        return true;
+    } catch (e) {
+        console.error('❌ [safeSavePosts] Error:', e.message);
+        try {
+            const noMediaPosts = postsArray.filter(p => p && p.id).map(p => {
                 const copy = Object.assign({}, p);
-                
-                // STRIP: mediaData (base64 image/video) — JANGAN SIMPAN
-                if (copy.mediaData) delete copy.mediaData;
-                
-                // STRIP: Field berat lain
-                if (copy._raw) delete copy._raw;
-                if (copy.gdriveThumbnail && copy.gdriveThumbnail.length > 5000) {
-                    delete copy.gdriveThumbnail;
-                }
-                if (copy.userProfilePic && copy.userProfilePic.length > 10000) {
-                    // Avatar base64 — simpan versi kecil atau kosongkan
-                    delete copy.userProfilePic;
-                }
-                
-                // STRIP: Comments content kalau panjang
-                if (copy.comments && copy.comments.length > 50000) {
-                    try {
-                        const cms = JSON.parse(copy.comments);
-                        cms.forEach(c => {
-                            if (c.userProfilePic && c.userProfilePic.length > 10000) {
-                                delete c.userProfilePic;
-                            }
-                        });
-                        copy.comments = JSON.stringify(cms);
-                    } catch(e) {}
-                }
-                
+                delete copy.mediaData;
                 return copy;
             });
-        
-        // Coba simpan
-        const json = JSON.stringify(cleanPosts);
-        const sizeKB = (json.length / 1024).toFixed(1);
-        
-        console.log('[safeSavePosts 6E] Size:', sizeKB, 'KB for', cleanPosts.length, 'posts');
-        
-        // Kalau < 1 MB, simpan
-        if (json.length < 1024 * 1024) {
-            try {
-                localStorage.setItem('salink_posts', json);
-                return true;
-            } catch (e) {
-                console.warn('[safeSavePosts 6E] SetItem gagal:', e.message);
-            }
-        }
-        
-        // Kalau >= 1 MB atau gagal, HAPUS dulu semua
-        console.warn('[safeSavePosts 6E] Size terlalu besar atau gagal, cleanup...');
-        try {
-            localStorage.removeItem('salink_posts');
-            localStorage.removeItem('salink_post_media');
-            // Coba simpan versi light (5 post terakhir saja)
-            const lightPosts = cleanPosts.slice(0, 5);
-            localStorage.setItem('salink_posts', JSON.stringify(lightPosts));
-            console.log('[safeSavePosts 6E] Saved light version:', lightPosts.length, 'posts');
+            localStorage.setItem('salink_posts', JSON.stringify(noMediaPosts));
             return true;
         } catch (e2) {
-            console.error('[safeSavePosts 6E] Masih gagal:', e2.message);
             return false;
         }
-    } catch (e) {
-        console.error('[safeSavePosts 6E] Error:', e.message);
-        return false;
     }
-  }
+}
 
 function getMediaFromStore(mediaId, fallbackData) {
     if (!mediaId) return fallbackData || '';
@@ -4925,19 +4881,19 @@ function renderPosts() {
         if (likes.length > 0) setPostLikes(post.id, likes);
 
         // === COMMENTS ===
-// PATCH 7A — Supabase = source of truth. JANGAN fallback ke LS.
-// 1) Coba dari post (Supabase) dulu
-try {
-    if (typeof post.comments === 'string') comments = JSON.parse(post.comments) || [];
-    else if (Array.isArray(post.comments)) comments = post.comments;
-} catch(e) { comments = []; }
+        // 1) SELALU dari post (Supabase) — JANGAN pakai LS kalau Supabase ada data
+        try {
+            if (typeof post.comments === 'string') comments = JSON.parse(post.comments) || [];
+            else if (Array.isArray(post.comments)) comments = post.comments;
+        } catch(e) { comments = []; }
 
-// 2) PATCH 7A — HAPUS fallback LS. Kalau post.comments kosong, ya kosong.
-// Tidak ada fallback ke getPostComments().
-
-// 3) Sync balik ke LS (dengan data fresh dari Supabase)
-// PATCH 7A — Selalu sync, bahkan kalau kosong
-setPostComments(post.id, comments);
+        // 2) Kalau Supabase KOSONG, baru pakai LS
+        if (comments.length === 0) {
+            const cachedComments = getPostComments(post.id);
+            if (cachedComments && Array.isArray(cachedComments) && cachedComments.length > 0) {
+                comments = cachedComments;
+            }
+        }
 
         // 3) Force sync LS dengan data dari Supabase
         //    (biar LS tidak stale dengan data lama)
@@ -5749,17 +5705,11 @@ async function handleDeleteComment(commentId, postId) {
                 console.error('[Delete 6C-R] Supabase error:', error.message);
                 showToast('❌ Gagal', 'Tidak bisa hapus di server: ' + error.message, 'fa-times-circle');
                 return;
-                        } else {
+            } else {
                 supabaseOk = true;
                 console.log('[Delete 6C-R] Supabase OK, rows deleted:', deleted?.length || 0);
-                
-                // PATCH 7B — Force overwrite LS setelah delete
-                try {
-                    localStorage.removeItem('salink_comments_map');
-                    localStorage.removeItem('salink_posts');
-                    console.log('[Delete 7B] LS cleared (force refresh)');
-                } catch (e) {}
             }
+        } catch (e) {
             console.error('[Delete 6C-R] Catch:', e.message);
             showToast('❌ Gagal', 'Error: ' + e.message, 'fa-times-circle');
             return;
@@ -6174,26 +6124,9 @@ async function addComment(postId, text, parentId = null) {
     comments.push(newComment);
     post.comments = JSON.stringify(comments);
 
-        // PATCH 7C — Sync ke LS (force overwrite)
-    post.comments = JSON.stringify(comments);
+    // Sync ke LS
     setPostComments(postId, comments);
     safeSavePosts(posts);
-
-    // PATCH 7C — Force refresh data dari Supabase setelah add
-    // (biar LS benar-benar sinkron)
-    setTimeout(async () => {
-        try {
-            const { data } = await window.salinkSupabase
-                .from('comments')
-                .select('id, content, parent_id, created_at')
-                .eq('post_id', postId)
-                .order('created_at', { ascending: true });
-            
-            console.log('[Comment 7C] Refresh dari Supabase:', data?.length, 'comments');
-        } catch (e) {
-            console.warn('[Comment 7C] Refresh error:', e.message);
-        }
-    }, 500);
 
     // ============================================================
     // 3) DUAL-WRITE KE GAS (BACKUP)
