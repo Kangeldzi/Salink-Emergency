@@ -7711,19 +7711,57 @@ posts = Array.from(postMap.values())
     .filter(p => {
         if (!p || !p.id) return false;
         if (isDeleted(p.id)) return false;
-        if (!p.userId || !p.userFullName) return false;
         
-        // PATCH D3-FIX-1 — Filter post dengan timestamp valid
-        const ts = typeof p.timestamp === 'number' ? p.timestamp : new Date(p.timestamp).getTime();
-        if (isNaN(ts) || ts <= 0) {
-            console.warn('[loadData] Post timestamp invalid, skip:', p.id, '| ts:', p.timestamp);
+        // PATCH 8A — Tolak post sampah (tanpa nama atau tanpa teks & media)
+        if (!p.userId || !p.userFullName || p.userFullName.trim() === '') {
+            console.warn('[loadData 8A] Post tanpa user valid dibuang:', p.id);
             return false;
         }
-        p.timestamp = ts; // normalize
+        if (!p.text && !p.mediaType && !p.gdriveId && !p.mediaData) {
+            console.warn('[loadData 8A] Post kosong tanpa teks/media dibuang:', p.id);
+            return false;
+        }
+        
+        const ts = typeof p.timestamp === 'number' ? p.timestamp : new Date(p.timestamp).getTime();
+        if (isNaN(ts) || ts <= 0) return false;
+        p.timestamp = ts;
         
         return true;
     })
     .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+// ============================================================
+// PATCH 8C — Deteksi Emergency Baru dari Supabase (Pemicu Alarm)
+// ============================================================
+if (useSupabaseOnly && supabasePosts.length > 0) {
+    // Ambil post emergency terbaru
+    const latestEmergency = supabasePosts.find(p => p.isSpecial && p.specialType);
+    
+    if (latestEmergency) {
+        const lastEmergencyId = localStorage.getItem('salink_last_emergency_id');
+        
+        // Jika ada emergency baru (ID berbeda dari sebelumnya)
+        if (latestEmergency.id !== lastEmergencyId) {
+            console.log('🚨 [8C] Emergency Baru dari Supabase:', latestEmergency.specialType);
+            
+            // 1. Simpan ID agar tidak berbunyi berulang saat reload
+            localStorage.setItem('salink_last_emergency_id', latestEmergency.id);
+            
+            // 2. Panggil fungsi Alarm (Suara, Getar, Zoom, Floating)
+            if (typeof triggerLocalEmergencyVisual === 'function') {
+                triggerLocalEmergencyVisual(
+                    latestEmergency.id, 
+                    latestEmergency.specialType, 
+                    latestEmergency.userFullName, 
+                    latestEmergency.specialLocation, 
+                    latestEmergency.text
+                );
+            } else if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency.handleGridButtonTap) {
+                SalinkEmergency.handleGridButtonTap(latestEmergency.specialType);
+            }
+        }
+    }
+}
 
 safeSavePosts(posts);
 console.log('[loadData] Final posts:', posts.length, '| From Supabase:', posts.filter(p => p._source === 'supabase').length);
@@ -7781,7 +7819,18 @@ console.log('[loadData] Final posts:', posts.length, '| From Supabase:', posts.f
         });
         notifications = Array.from(notifMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         try { localStorage.setItem('salink_notifications', JSON.stringify(notifications)); } catch(e) {}
+        
+        // PATCH 8B — Pemicu Suara Notifikasi Reguler (Supabase)
+        const unreadNotifs = notifications.filter(n => !n.read);
+        const lastUnreadCount = parseInt(localStorage.getItem('salink_last_unread_count') || '0');
+        const currentUnreadCount = unreadNotifs.length;
 
+              if (currentUnreadCount > lastUnreadCount) {
+                   console.log('🔊 [8B] Notifikasi baru masuk, membunyikan suara...');
+                   playRegularSound();
+        }
+        localStorage.setItem('salink_last_unread_count', currentUnreadCount.toString());
+        
         // Statistics
         if (results[3].status === 'fulfilled' && results[3].value) statistics = results[3].value;
 
