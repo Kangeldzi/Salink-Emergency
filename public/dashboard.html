@@ -1625,6 +1625,31 @@
         [data-theme="dark"] .comment-item .comment-action-btn:hover {
             background: rgba(255,255,255,0.06);
         }
+
+        /* ================================================================
+   PATCH 7F-NESTED — CSS untuk Indentasi Berantai
+   ================================================================ */
+.comment-item[data-depth="1"] .comment-replies { margin-left: 36px; }
+.comment-item[data-depth="2"] .comment-replies { margin-left: 36px; }
+.comment-item[data-depth="3"] .comment-replies { margin-left: 28px; }
+.comment-item[data-depth="4"] .comment-replies { margin-left: 24px; }
+.comment-item[data-depth="5"] .comment-replies { margin-left: 20px; }
+
+.comment-show-replies-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    margin: 4px 0 0 42px;
+    background: transparent;
+    border: none;
+    color: #6b7688;
+    font-size: 0.62rem;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+}
+.comment-show-replies-btn:hover { color: var(--primary); }
         
 </style>
 </head>
@@ -5134,69 +5159,61 @@ function renderFullPostCard(p, isExpired) {
 // ====================================================================
 // 28. ATTACH POST LISTENERS
 // ====================================================================
+
 /* ================================================================
- * PATCH 3A — renderCommentsNested()
- * Render komentar dengan balasan (nested 1 level)
- *
- * Cara kerja:
- * 1) Pisahkan komentar jadi 2 grup: top-level (parent_id = null) 
- *    dan replies (parent_id != null)
- * 2) Untuk setiap top-level, render + cari replies-nya
- * 3) Tampilkan 2 balasan dulu + tombol "Lihat X balasan"
+ * PATCH 7F-NESTED — Render komentar berantai (nested unlimited)
  * ================================================================ */
 function renderCommentsNested(comments, postId) {
     if (!Array.isArray(comments)) comments = [];
-    
-    // Separator: top-level vs replies
+
+    const commentMap = {};
+    comments.forEach(c => {
+        if (c && c.id) commentMap[c.id] = c;
+    });
+
     const topLevel = comments.filter(c => !c.parent_id && !c.parentId);
-    const replies = comments.filter(c => c.parent_id || c.parentId);
-    
-    // Sort: top-level by timestamp ascending (terlama dulu)
-    topLevel.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-    
-    // Group replies by parent_id
+
     const repliesByParent = {};
-    replies.forEach(r => {
-        const pid = r.parent_id || r.parentId;
+    comments.forEach(c => {
+        const pid = c.parent_id || c.parentId;
         if (!pid) return;
         if (!repliesByParent[pid]) repliesByParent[pid] = [];
-        repliesByParent[pid].push(r);
+        repliesByParent[pid].push(c);
     });
-    
-    // Sort replies per parent (terlama dulu)
+
+    topLevel.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
     Object.keys(repliesByParent).forEach(pid => {
         repliesByParent[pid].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
     });
-    
-    // Kalau tidak ada komentar
-    if (topLevel.length === 0 && replies.length === 0) {
+
+    if (topLevel.length === 0) {
         return '<div style="text-align:center;padding:16px;color:#9aa0ab;font-size:0.7rem;">Belum ada komentar</div>';
     }
-    
+
     let html = '<div class="comments-thread">';
-    
     topLevel.forEach(parent => {
-        const parentReplies = repliesByParent[parent.id] || [];
-        html += buildCommentItemHTML(parent, postId, false);
-        
-        // Balasan
-        if (parentReplies.length > 0) {
-            html += renderRepliesBlock(parent, parentReplies, postId);
-        }
+        html += renderCommentTree(parent, repliesByParent, postId, 0);
     });
-    
-    // Handle orphan replies (parent tidak ada — fallback tampil di atas)
-    // (kasus langka: parent dihapus, tapi reply masih ada)
-    topLevel.forEach(parent => {
-        // skip, sudah di-handle di atas
-    });
-    
     html += '</div>';
     return html;
 }
 
+/* Render satu comment + semua descendant-nya (rekursif) */
+function renderCommentTree(comment, repliesByParent, postId, depth) {
+    if (!comment) return '';
+    let html = '';
+    const isReply = depth > 0;
+    html += buildCommentItemHTML(comment, postId, isReply, depth);
+    const children = repliesByParent[comment.id] || [];
+    if (children.length > 0) {
+        html += renderRepliesBlock(comment, children, repliesByParent, postId, depth);
+    }
+    return html;
+}
+
 /* Render satu komentar item */
-function buildCommentItemHTML(c, postId, isReply) {
+function buildCommentItemHTML(c, postId, isReply, depth) {
+    depth = depth || 0;
     const isOwn = currentUser && (c.userId === currentUser.username || c.userAuthId === currentAuthUser?.id);
     const isDeleted = !!c.deleted_at;
     
@@ -5283,7 +5300,7 @@ function buildCommentItemHTML(c, postId, isReply) {
         '<button class="reply-send-btn" data-parent-id="' + escapeAttr(c.id) + '" data-post-id="' + escapeAttr(postId) + '" type="button"><i class="fas fa-paper-plane"></i></button>' +
     '</div>';
     
-    return '<div class="comment-item" data-comment-id="' + escapeAttr(c.id) + '">' +
+    return '<div class="comment-item" data-comment-id="' + escapeAttr(c.id) + '" data-depth="' + depth + '">' +
         '<div class="comment-avatar" onclick="' + (isDeleted ? '' : 'handleProfileClick(\'' + escapeAttr(c.userId) + '\')') + '">' + avatarHTML + '</div>' +
         '<div class="comment-body">' +
             '<div class="comment-head">' + nameHTML + '<span class="comment-time" title="' + escapeAttr(timeFull) + '">' + timeAgo + ' • ' + timeFull + '</span>' + editedBadge + '</div>' +
@@ -5295,35 +5312,38 @@ function buildCommentItemHTML(c, postId, isReply) {
 }
 
 /* Render blok balasan */
-function renderRepliesBlock(parent, parentReplies, postId) {
+/* ================================================================
+ * PATCH 7F-NESTED — Render blok balasan dengan tombol expand
+ * ================================================================ */
+function renderRepliesBlock(parent, replies, repliesByParent, postId, parentDepth) {
     const MAX_VISIBLE = 2;
-    const total = parentReplies.length;
+    const total = replies.length;
     const showAll = total <= MAX_VISIBLE;
     const visibleCount = showAll ? total : MAX_VISIBLE;
     const hiddenCount = total - visibleCount;
-    
-    let html = '<div class="comment-replies" id="replies-' + escapeAttr(parent.id) + '" data-total="' + total + '" data-visible="' + visibleCount + '">';
-    
+
+    const containerId = 'replies-' + escapeAttr(parent.id);
+    const depth = parentDepth + 1;
+
+    let html = '<div class="comment-replies" id="' + containerId + '" data-total="' + total + '" data-visible="' + visibleCount + '">';
+
     for (let i = 0; i < visibleCount; i++) {
-        html += buildCommentItemHTML(parentReplies[i], postId, true);
+        html += renderCommentTree(replies[i], repliesByParent, postId, depth);
     }
-    
     html += '</div>';
-    
-    // Tombol "Lihat X balasan" — muncul kalau ada yang hidden
-    if (!showAll) {
+
+    if (!showAll && hiddenCount > 0) {
         html += '<button class="comment-show-replies-btn" data-action="show-replies" data-comment-id="' + escapeAttr(parent.id) + '" data-post-id="' + escapeAttr(postId) + '" type="button">' +
             '<i class="fas fa-chevron-down"></i> Lihat ' + hiddenCount + ' balasan lainnya' +
         '</button>';
-    } else if (total > 0) {
-        // Tombol "Sembunyikan" — kalau semua sudah tampil dan > MAX_VISIBLE
-        if (total > MAX_VISIBLE) {
-            html += '<button class="comment-show-replies-btn" data-action="hide-replies" data-comment-id="' + escapeAttr(parent.id) + '" data-post-id="' + escapeAttr(postId) + '" type="button">' +
-                '<i class="fas fa-chevron-up"></i> Sembunyikan balasan' +
-            '</button>';
-        }
     }
-    
+
+    if (showAll && total > MAX_VISIBLE) {
+        html += '<button class="comment-show-replies-btn" data-action="hide-replies" data-comment-id="' + escapeAttr(parent.id) + '" data-post-id="' + escapeAttr(postId) + '" type="button">' +
+            '<i class="fas fa-chevron-up"></i> Sembunyikan balasan' +
+        '</button>';
+    }
+
     return html;
 }
             
@@ -5784,69 +5804,122 @@ async function handleDeleteComment(commentId, postId) {
     console.log('[Delete 6C-R] DONE:', { commentId, supabaseOk, removed: commentIdsToRemove.length });
 }
 
+/* PATCH 7F-NESTED — Tampilkan semua balasan (re-render) */
 function showAllReplies(commentId, postId) {
     const post = posts.find(p => p.id === postId);
     if (!post) return;
-    let comments = [];
-    try { comments = JSON.parse(post.comments || '[]'); } catch(e) {}
-    
-    const repliesContainer = document.getElementById('replies-' + commentId);
-    if (!repliesContainer) return;
-    
-    const parentReplies = comments
-        .filter(c => (c.parent_id || c.parentId) === commentId)
-        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-    
-    // Render semua balasan
-    let html = '';
-    parentReplies.forEach(r => {
-        html += buildCommentItemHTML(r, postId, true);
+
+    const comments = JSON.parse(post.comments || '[]');
+    const container = document.getElementById('replies-' + commentId);
+    if (!container) return;
+
+    const parent = comments.find(c => c.id === commentId);
+    if (!parent) return;
+
+    const repliesByParent = {};
+    comments.forEach(c => {
+        const pid = c.parent_id || c.parentId;
+        if (!pid) return;
+        if (!repliesByParent[pid]) repliesByParent[pid] = [];
+        repliesByParent[pid].push(c);
     });
-    repliesContainer.innerHTML = html;
-    repliesContainer.dataset.visible = parentReplies.length;
-    
-    // Ganti tombol dengan "Sembunyikan"
+    Object.keys(repliesByParent).forEach(pid => {
+        repliesByParent[pid].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    });
+
+    const children = repliesByParent[commentId] || [];
+    if (children.length === 0) return;
+
+    let parentDepth = 0;
+    let cur = parent;
+    let guard = 0;
+    while (cur && guard < 30) {
+        const pid = cur.parent_id || cur.parentId;
+        if (!pid) break;
+        parentDepth++;
+        cur = comments.find(c => c.id === pid);
+        guard++;
+    }
+
+    let html = '';
+    const depth = parentDepth + 1;
+    for (let i = 0; i < children.length; i++) {
+        html += renderCommentTree(children[i], repliesByParent, postId, depth);
+    }
+    container.innerHTML = html;
+    container.dataset.visible = children.length;
+
     const btn = document.querySelector('.comment-show-replies-btn[data-action="show-replies"][data-comment-id="' + commentId + '"]');
-    if (btn) {
+    if (btn && children.length > 2) {
         btn.outerHTML = '<button class="comment-show-replies-btn" data-action="hide-replies" data-comment-id="' + commentId + '" data-post-id="' + postId + '" type="button">' +
             '<i class="fas fa-chevron-up"></i> Sembunyikan balasan' +
         '</button>';
+    } else if (btn) {
+        btn.remove();
     }
-    
-    // Re-attach listeners untuk tombol baru
+
     attachPostListeners();
 }
 
+/* PATCH 7F-NESTED — Sembunyikan balasan (kembali ke MAX_VISIBLE) */
 function hideReplies(commentId, postId) {
     const post = posts.find(p => p.id === postId);
     if (!post) return;
-    let comments = [];
-    try { comments = JSON.parse(post.comments || '[]'); } catch(e) {}
-    
-    const repliesContainer = document.getElementById('replies-' + commentId);
-    if (!repliesContainer) return;
-    
-    const parentReplies = comments
-        .filter(c => (c.parent_id || c.parentId) === commentId)
-        .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-    
-    const MAX_VISIBLE = 2;
-    let html = '';
-    for (let i = 0; i < Math.min(MAX_VISIBLE, parentReplies.length); i++) {
-        html += buildCommentItemHTML(parentReplies[i], postId, true);
+
+    const comments = JSON.parse(post.comments || '[]');
+    const parent = comments.find(c => c.id === commentId);
+    if (!parent) return;
+
+    const repliesByParent = {};
+    comments.forEach(c => {
+        const pid = c.parent_id || c.parentId;
+        if (!pid) return;
+        if (!repliesByParent[pid]) repliesByParent[pid] = [];
+        repliesByParent[pid].push(c);
+    });
+    Object.keys(repliesByParent).forEach(pid => {
+        repliesByParent[pid].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    });
+
+    const children = repliesByParent[commentId] || [];
+    if (children.length === 0) return;
+
+    let parentDepth = 0;
+    let cur = parent;
+    let guard = 0;
+    while (cur && guard < 30) {
+        const pid = cur.parent_id || cur.parentId;
+        if (!pid) break;
+        parentDepth++;
+        cur = comments.find(c => c.id === pid);
+        guard++;
     }
-    repliesContainer.innerHTML = html;
-    repliesContainer.dataset.visible = Math.min(MAX_VISIBLE, parentReplies.length);
-    
-    // Ganti tombol dengan "Lihat X balasan"
-    const hiddenCount = parentReplies.length - MAX_VISIBLE;
+
+    const MAX_VISIBLE = 2;
+    const visibleCount = Math.min(MAX_VISIBLE, children.length);
+    const hiddenCount = children.length - visibleCount;
+
+    let html = '';
+    const depth = parentDepth + 1;
+    for (let i = 0; i < visibleCount; i++) {
+        html += renderCommentTree(children[i], repliesByParent, postId, depth);
+    }
+
+    const container = document.getElementById('replies-' + commentId);
+    if (container) {
+        container.innerHTML = html;
+        container.dataset.visible = visibleCount;
+    }
+
     const btn = document.querySelector('.comment-show-replies-btn[data-action="hide-replies"][data-comment-id="' + commentId + '"]');
     if (btn && hiddenCount > 0) {
         btn.outerHTML = '<button class="comment-show-replies-btn" data-action="show-replies" data-comment-id="' + commentId + '" data-post-id="' + postId + '" type="button">' +
             '<i class="fas fa-chevron-down"></i> Lihat ' + hiddenCount + ' balasan lainnya' +
         '</button>';
+    } else if (btn) {
+        btn.remove();
     }
-    
+
     attachPostListeners();
 }
     
