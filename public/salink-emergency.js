@@ -1650,14 +1650,45 @@ if (detailBtn) {
         log('Emergency polling started (' + (CONFIG.POLL_INTERVAL / 1000) + 's)');
     }
 
-    async function checkEmergencyNow() {
+        async function checkEmergencyNow() {
         try {
-            const notifs = await apiGetNotifications();
-            if (notifs && notifs.length > 0) {
-                const newEmergency = detectNewEmergencyNotifications(notifs);
-                if (newEmergency) {
-                    log('New emergency detected:', newEmergency.type, newEmergency.id);
-                    triggerEmergencyFromNotification(newEmergency);
+            // PATCH 9: Ambil data langsung dari Supabase (bukan GAS lagi)
+            if (window.salinkSupabase) {
+                const { data, error } = await window.salinkSupabase
+                    .from('notifications')
+                    .select('*')
+                    .in('type', ['fire', 'medical', 'crime', 'disaster'])
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+                
+                if (!error && data && data.length > 0) {
+                    const notifs = data.map(n => ({
+                        id: n.id,
+                        type: n.type,
+                        title: n.title,
+                        message: n.message,
+                        sender: n.sender,
+                        senderUsername: n.sender_username,
+                        timestamp: new Date(n.created_at).getTime(),
+                        read: n.read,
+                        soundKey: n.sound_key
+                    }));
+                    
+                    const newEmergency = detectNewEmergencyNotifications(notifs);
+                    if (newEmergency) {
+                        log('New emergency detected from Supabase:', newEmergency.type);
+                        triggerEmergencyFromNotification(newEmergency);
+                    }
+                }
+            } else {
+                // Fallback ke GAS jika Supabase client tidak ada
+                const notifs = await apiGetNotifications();
+                if (notifs && notifs.length > 0) {
+                    const newEmergency = detectNewEmergencyNotifications(notifs);
+                    if (newEmergency) {
+                        log('New emergency detected:', newEmergency.type, newEmergency.id);
+                        triggerEmergencyFromNotification(newEmergency);
+                    }
                 }
             }
         } catch(e) {
