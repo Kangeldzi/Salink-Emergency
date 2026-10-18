@@ -3618,14 +3618,14 @@ async function apiGetPosts() {
                 .limit(5000);
 
             // ============================================
-            // QUERY 4: Comments SAJA (TANPA JOIN — fix bug PostgREST)
-            // PATCH 4A — Fix: select('*') + limit drop row parent_id
+            // QUERY 4: Comments — PATCH 8 (Bypass Limit Bug PostgREST)
+            // Ganti .limit() jadi .range() & buang kolom updated_at/deleted_at
             // ============================================
             const commentsPromise = client
                 .from('comments')
-                .select('id, post_id, user_id, parent_id, content, created_at, updated_at, deleted_at')
+                .select('id, post_id, user_id, parent_id, content, created_at')
                 .order('created_at', { ascending: true })
-                .limit(1000);
+                .range(0, 999); // ← Gunakan range, bukan limit!
 
             // Jalankan SEMUA paralel
             const [postsRes, mediaRes, likesRes, commentsRes, commentLikesRes] = await Promise.all([
@@ -3692,7 +3692,7 @@ try {
             // BANGUN MAPS
             // ============================================
 
-            // Comments by post
+// Comments by post
 // ============================================
 // BUILD commentsByPost — PATCH D3-Fix-9 (dengan LOG DETAIL)
 // ============================================
@@ -3711,7 +3711,7 @@ rawComments.forEach(c => {
         '| profile found:', !!profile.full_name,
         '| full_name:', profile.full_name);
 
-    commentsByPost[c.post_id].push({
+        commentsByPost[c.post_id].push({
         id: c.id,
         user_id: c.user_id,
         userId: profile.username || c.user_id,
@@ -3724,12 +3724,11 @@ rawComments.forEach(c => {
         parentId: c.parent_id || null,
         created_at: c.created_at,
         timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
-        updated_at: c.updated_at,
-        deleted_at: c.deleted_at,
-// PATCH 5E — likes count & is_liked
+        updated_at: null, // PATCH 8: default null (dibuang dari query)
+        deleted_at: null, // PATCH 8: default null (dibuang dari query)
         likes_count: rawCommentLikes.filter(cl => cl.comment_id === c.id).length,
         is_liked: rawCommentLikes.some(cl => 
-        cl.comment_id === c.id && cl.user_id === currentAuthUser?.id
+            cl.comment_id === c.id && cl.user_id === currentAuthUser?.id
         )
     });
 });
