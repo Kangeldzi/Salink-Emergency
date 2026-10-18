@@ -328,10 +328,8 @@
 
     function playEmergencyLoop(type) {
         try {
-            unlockAudio();
+            unlockAudio(); // PATCH 9: Wajib unlock tepat sebelum play
             const url = CONFIG.AUDIO[type];
-            if (!url) return null;
-
             stopEmergencyLoop();
 
             const cached = state.audioCache[type];
@@ -923,8 +921,19 @@
             log('Button tidak ditemukan untuk type:', type, '(mungkin di halaman tanpa grid)');
         }
 
-        // Play audio loop
+                // Play audio loop
+        // PATCH 9: Paksa unlock audio & putar suara dengan interaksi user
+        unlockAudio(); 
         playEmergencyLoop(type);
+        
+        // Fallback: Jika HP memblokir loop, mainkan satu kali secara manual
+        setTimeout(() => {
+            if (state.emergencyAudioLoop && state.emergencyAudioLoop.paused) {
+                const fallbackAudio = new Audio(CONFIG.AUDIO[type]);
+                fallbackAudio.volume = 1.0;
+                fallbackAudio.play().catch(e => console.warn('Autoplay diblokir browser:', e));
+            }
+        }, 100);
 
         // Start vibrate loop
         startVibrateLoop(() => {
