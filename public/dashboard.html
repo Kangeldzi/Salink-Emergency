@@ -6445,86 +6445,78 @@ function triggerLocalEmergencyVisual(emergencyId, type, sender, location, text) 
 // 33. CREATE POST
 // ====================================================================
 async function createPost(text, mediaFile, isSpecial, specialData) {
-    if (window._salinkPostingInProgress) {
-        showToast('⏳ Tunggu', 'Postingan sedang diproses...', 'fa-spinner');
-        return;
-    }
+    if (window._salinkPostingInProgress) return;
     if (isPreviewMode) { showPreviewOverlay(); return; }
     if (!currentUser) { redirectToLogin(); return; }
 
-    window._salinkPostingInProgress = true;
+    window._salinkPostingInProgress = true; // KUNCI AUTO-REFRESH
+    
     const submitBtn = document.getElementById('postSubmit');
-    if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...';
-    }
-
-    const POSTING_TIMEOUT = 60000;
-    const timeoutId = setTimeout(() => {
-        window._salinkPostingInProgress = false;
-        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Posting'; }
-        showToast('⚠️ Timeout', 'Upload terlalu lama. Coba lagi.', 'fa-exclamation-triangle');
-    }, POSTING_TIMEOUT);
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Posting...'; }
 
     try {
-        const hasText = text && text.trim() !== '';
-        const hasMedia = mediaFile && mediaFile.size > 0;
-
-        if (isSpecial) {
-            if (!hasText) {
-                showToast('⚠️ Pesan kosong', 'Postingan khusus wajib isi pesan notifikasi', 'fa-exclamation-triangle');
-                return;
-            }
-        } else {
-            if (!hasText && !hasMedia) {
-                showToast('⚠️ Postingan kosong', 'Isi teks atau upload foto/video', 'fa-exclamation-triangle');
-                return;
-            }
-        }
-
-        const uniqueId = 'content-' + Date.now() + '-' + Math.random().toString(36).substring(2, 10);
-        const postId = uniqueId;
-        const emergencyId = uniqueId;
-        const notifId = uniqueId;
-
+        const uniqueId = 'content-' + Date.now();
+        const postId = isSupabaseUUID(uniqueId) ? uniqueId : null; // Biarkan Supabase generate UUID
+        
         let mediaType = '';
         let gdriveData = null;
-        let mediaDataLocal = '';
-        let mediaIdLocal = '';
 
-        // Upload media (jika ada)
-        if (hasMedia) {
+        // Upload ke GDrive
+        if (mediaFile && mediaFile.size > 0) {
             const isImage = mediaFile.type.indexOf('image/') === 0;
-            const isVideo = mediaFile.type.indexOf('video/') === 0;
-            mediaType = isImage ? 'image' : (isVideo ? 'video' : '');
-            showToast('📤 Upload...', 'Mengirim media ke Google Drive...', 'fa-cloud-upload-alt');
-
+            mediaType = isImage ? 'image' : 'video';
             try {
                 gdriveData = await uploadToGDrive(mediaFile);
-                showToast('✅ Upload Berhasil', 'Media tersimpan di Google Drive', 'fa-check-circle');
-            } catch (err) {
-                showToast('⚠️ GDrive Gagal', 'Media disimpan lokal.', 'fa-exclamation-triangle');
-                mediaDataLocal = await new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => resolve(e.target.result);
-                    reader.readAsDataURL(mediaFile);
-                });
-                mediaIdLocal = 'media-' + uniqueId;
-                try {
-                    let mediaStore = JSON.parse(localStorage.getItem('salink_post_media') || '{}');
-                    mediaStore[mediaIdLocal] = {
-                        type: mediaType, data: mediaDataLocal,
-                        timestamp: Date.now(), size: mediaDataLocal.length
-                    };
-                    localStorage.setItem('salink_post_media', JSON.stringify(mediaStore));
-                } catch(e) {}
+            } catch(e) {
+                showToast('⚠️ GDrive Gagal', 'Media disimpan lokal', 'fa-exclamation-triangle');
             }
         }
 
-        // Bangun objek post
-        const post = {
-            id: postId,
+        // Susun payload untuk Supabase
+        const sbPayload = {
+            user_id: currentAuthUser.id,
+            text: text || '',
+            post_type: isSpecial ? 'khusus' : 'biasa',
+            is_special: isSpecial || false,
+            special_type: isSpecial && specialData ? specialData.type : null,
+            special_location: isSpecial && specialData ? specialData.location : null,
+            latitude: isSpecial && specialData ? specialData.latitude : null,
+            longitude: isSpecial && specialData ? specialData.longitude : null,
+            maps_url: isSpecial && specialData ? specialData.mapsURL : null,
+            status: 'published',
+            created_at: new Date().toISOString()
+        };
+
+        // SIMPAN KE SUPABASE
+        let savedPostId = null;
+        if (window.SALINK_SB_READY && window.salinkSupabase) {
+            const { data: postResult, error: postError } = await window.salinkSupabase
+                .from('posts')
+                .insert(sbPayload)
+                .select()
+                .single();
+
+            if (postError) throw new Error('Supabase Error: ' + postError.message);
+            savedPostId = postResult.id;
+
+            // Simpan Media ke Supabase jika ada
+            if (gdriveData) {
+                await window.salinkSupabase.from('media').insert({
+                    post_id: savedPostId,
+                    owner_id: currentAuthUser.id,
+                    provider: 'gdrive',
+                    object_key: gdriveData.id,
+                    media_type: mediaType,
+                    status: 'active'
+                });
+            }
+        }
+
+        // BUAT OBJEK LOKAL AGAR LANGSUNG TAMPIL DI UI
+        const postLokal = {
+            id: savedPostId || uniqueId,
             userId: currentUser.username,
+            userAuthId: currentAuthUser.id,
             userFullName: currentUser.fullName,
             userGender: currentUser.gender || 'male',
             userProfilePic: currentUser.profilePicture || '',
@@ -6533,158 +6525,62 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
             gdriveId: gdriveData ? gdriveData.id : '',
             gdriveImageUrl: gdriveData ? gdriveData.imageUrl : '',
             gdriveVideoEmbed: gdriveData ? gdriveData.videoEmbed : '',
-            gdriveThumbnail: gdriveData ? gdriveData.thumbnail : '',
-            mediaId: mediaIdLocal,
-            mediaData: '',
             timestamp: Date.now(),
-            likes: '[]',
-            comments: '[]',
-            viewerCount: 0,
+            likes: '[]', comments: '[]', viewerCount: 0,
             isSpecial: isSpecial || false,
             specialType: isSpecial && specialData ? specialData.type : '',
             specialLocation: isSpecial && specialData ? specialData.location : '',
-            specialAddress: isSpecial && specialData ? specialData.address : '',
-            latitude: isSpecial && specialData ? specialData.latitude : '',
-            longitude: isSpecial && specialData ? specialData.longitude : '',
-            mapsURL: isSpecial && specialData ? specialData.mapsURL : '',
-            postType: isSpecial ? 'khusus' : 'biasa',
-            country: currentUser.country || '',
-            province: currentUser.province || '',
-            city: currentUser.city || '',
-            district: currentUser.district || '',
-            village: currentUser.village || '',
-            address: currentUser.address || ''
+            country: currentUser.country || 'Indonesia'
         };
 
-        // Simpan ke array lokal
-        posts.unshift(post);
+        posts.unshift(postLokal);
         safeSavePosts(posts);
-
-        // Render ulang feed & stats
         renderPosts();
         renderPostsStats();
 
-        // Simpan ke backend
-        apiSavePost(post).then(ok => {
-            if (ok) console.log('✅ [CreatePost] Saved to backend:', postId);
-            else console.warn('⚠️ [CreatePost] Backend save failed, keeping local');
-        });
-
-        // ⭐ KALAU EMERGENCY
+        // Simpan Notifikasi jika ini Emergency
         if (isSpecial && specialData) {
-            const emPayload = {
-                id: emergencyId,
+            const notifPayload = {
+                user_id: currentAuthUser.id, // Dikirim ke diri sendiri / broadcast
+                sender_id: currentAuthUser.id,
+                sender: currentUser.fullName,
+                sender_username: currentUser.username,
                 type: specialData.type,
                 title: EMERGENCY_LABELS[specialData.type],
-                sender: currentUser.fullName,
-                senderUsername: currentUser.username,
-                senderPhone: currentUser.phone || '',
-                location: specialData.location,
-                address: specialData.address,
-                latitude: specialData.latitude,
-                longitude: specialData.longitude,
-                mapsURL: specialData.mapsURL,
-                description: text,
-                status: 'active',
-                province: currentUser.province || '',
-                city: currentUser.city || '',
-                district: currentUser.district || '',
-                village: currentUser.village || '',
-                country: currentUser.country || 'Indonesia'
+                message: text.substring(0, 100),
+                link: 'detail-emergency.html?id=' + (savedPostId || uniqueId),
+                post_id: savedPostId || uniqueId,
+                read: false,
+                created_at: new Date().toISOString()
             };
-
-            // Simpan emergency ke backend
-            apiSaveEmergency(emPayload);
-
-            // Simpan notif ke backend
-            const notifPayload = {
-                id: notifId,
-                type: specialData.type,
-                title: EMERGENCY_LABELS[specialData.type] + ' — ' + (text.substring(0, 50)),
-                message: text.substring(0, 200),
-                sender: currentUser.fullName,
-                senderUsername: currentUser.username,
-                link: DETAIL_URL + '?id=' + encodeURIComponent(emergencyId),
-                postId: postId,
-                timestamp: new Date().toISOString(),
-                read: 'FALSE',
-                soundKey: specialData.type
-            };
-            apiCall('save_notification', notifPayload);
-
-            // ⭐ PENTING: Trigger emergency visual (masuk ke hologram)
-            triggerLocalEmergencyVisual(emergencyId, specialData.type, currentUser.fullName, specialData.location, text);
-
-            // Broadcast ke tab lain
-            const emergencyPayload = {
-                id: emergencyId,
-                type: specialData.type,
-                sender: currentUser.fullName,
-                senderUsername: currentUser.username,
-                location: specialData.location,
-                address: specialData.address,
-                text: text,
-                timestamp: Date.now(),
-                expiresAt: Date.now() + EMERGENCY_DURATION,
-                coords: specialData.coords,
-                mapsURL: specialData.mapsURL,
-                country: currentUser.country || 'Indonesia'
-            };
-            try {
-                if (window._salinkAlarmChannel) {
-                    window._salinkAlarmChannel.postMessage({
-                        type: 'new_emergency',
-                        emergency: emergencyPayload
-                    });
-                }
-                localStorage.setItem('salink_emergencies_new', JSON.stringify({
-                    emergency: emergencyPayload
-                }));
-                setTimeout(() => localStorage.removeItem('salink_emergencies_new'), 500);
-            } catch(e) {}
+            await window.salinkSupabase.from('notifications').insert(notifPayload);
+            
+            // Trigger visual lokal (alarm, hologram, dll)
+            triggerLocalEmergencyVisual(postLokal.id, specialData.type, currentUser.fullName, specialData.location, text);
         } else {
-            // Postingan biasa
             playRegularSound();
             showToast('📝', 'Postingan baru berhasil', 'fa-check-circle');
         }
 
-        broadcastSync('new_post', { id: postId });
-
-        // Reset form
-        const pi = document.getElementById('postInput');
-        if (pi) pi.value = '';
-        const pst = document.getElementById('postSpecialText');
-        if (pst) pst.value = '';
-        const mu = document.getElementById('mediaUpload');
-        if (mu) mu.value = '';
-        const mp = document.getElementById('mediaPreview');
-        if (mp) mp.style.display = 'none';
-        const sel = document.getElementById('postTypeSelect');
-        if (sel) sel.value = 'biasa';
+        // Reset Form
+        document.getElementById('postInput').value = '';
+        if(document.getElementById('postSpecialText')) document.getElementById('postSpecialText').value = '';
+        document.getElementById('mediaUpload').value = '';
+        document.getElementById('mediaPreview').style.display = 'none';
+        document.getElementById('postTypeSelect').value = 'biasa';
         currentPostType = 'biasa';
-        const psf = document.getElementById('postSpecialFields');
-        if (psf) psf.classList.remove('active');
-        const pbf = document.getElementById('postBiasaForm');
-        if (pbf) pbf.style.display = 'block';
+        document.getElementById('postSpecialFields').classList.remove('active');
+        document.getElementById('postBiasaForm').style.display = 'block';
         currentGpsData = null;
-        const gpsResult = document.getElementById('gpsLocationResult');
-        if (gpsResult) gpsResult.classList.remove('active');
-        const gpsBtn = document.getElementById('gpsLocationBtn');
-        if (gpsBtn) {
-            gpsBtn.style.background = '';
-            const txt = document.getElementById('gpsLocationBtnText');
-            if (txt) txt.textContent = '📍 Ambil Lokasi Saya';
-        }
+        document.getElementById('gpsLocationResult').classList.remove('active');
+        document.getElementById('gpsLocationBtnText').textContent = '📍 Ambil Lokasi Saya';
+
     } catch (err) {
         console.error('❌ [CreatePost] Error:', err);
         showToast('❌ Gagal', err.message || 'Gagal posting', 'fa-exclamation-triangle');
     } finally {
-        clearTimeout(timeoutId);
-        window._salinkPostingInProgress = false;
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Posting';
-        }
+        window._salinkPostingInProgress = false; // BUKA KUNCI AUTO-REFRESH
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Posting'; }
     }
 }
 
@@ -7623,48 +7519,80 @@ function setupLoginGuard() {
 // 41. LOAD DATA — API + Local Merge
 // ====================================================================
 async function loadData() {
+    // PATCH 12A: Kunci Auto-refresh jika sedang posting/hapus
+    if (window._salinkPostingInProgress || window._salinkDeleteInProgress) {
+        console.log('[loadData] Ditunda karena ada proses simpan/hapus.');
+        return;
+    }
+
     let localPosts = [];
-    try { localPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]'); } catch(e) { localPosts = []; }
-    let localEms = [];
-    try { localEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]'); } catch(e) { localEms = []; }
-    let localNotifs = [];
-    try { localNotifs = JSON.parse(localStorage.getItem('salink_notifications') || '[]'); } catch(e) { localNotifs = []; }
-    let localUsers = [];
-    try { localUsers = JSON.parse(localStorage.getItem('salink_users') || '[]'); } catch(e) { localUsers = []; }
-
-    loadDeletedIds();
-
+    try { localPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]'); } catch(e) {}
+    
+    // 1. SELALU TAMPILKAN LOCAL STORAGE DULU (Agar layar tidak kosong)
     posts = localPosts
         .filter(p => p && p.id && p.userId && p.userFullName && !isDeleted(p.id))
         .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-    const now = Date.now();
-    const validLocalEms = localEms.filter(e => {
-        if (!e || !e.id) return false;
-        if (isDeleted(e.id)) return false;
-        let ts = typeof e.timestamp === 'number' ? e.timestamp : new Date(e.timestamp).getTime();
-        if (isNaN(ts)) ts = now;
-        const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
-        return exp > now;
-    });
-
-    notifications = localNotifs
-        .filter(n => n && n.id && !isDeleted(n.id))
-        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-    allUsers = localUsers;
-
-    // Render awal dari local
     renderPosts();
     renderPostsStats();
-    renderHologram();
-    updateEmergencyBadges();
-    updateNotifBadge();
-    updateInviteBadge();
-    updateStatsCards();
 
-    if (chartInstances.pie || chartInstances.bar) updateAllCharts();
+    // 2. AMBIL DATA DARI SUPABASE
+    try {
+        const apiPosts = await apiGetPosts();
+        const supabasePosts = apiPosts.filter(p => p && p._source === 'supabase');
 
+        if (supabasePosts.length > 0) {
+            const postMap = new Map();
+            // Masukkan data Supabase
+            supabasePosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
+            // Masukkan data lokal yang baru dibuat (belum masuk Supabase)
+            posts.forEach(p => { 
+                if (p && p.id && !postMap.has(p.id)) {
+                    const ts = p.timestamp || Date.now();
+                    // Hanya ambil post lokal yang umurnya di bawah 2 menit (mencegah data sampah lama)
+                    if (Date.now() - ts < 120000) postMap.set(p.id, p);
+                }
+            });
+
+            posts = Array.from(postMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            safeSavePosts(posts);
+            console.log('✅ [loadData 12A] Sinkronisasi Sukses:', posts.length, 'posts');
+        } else {
+            console.log('⚠️ [loadData 12A] Supabase kosong, mempertahankan data lokal.');
+        }
+
+        // Update data lain
+        const apiEms = await apiGetEmergencies();
+        if (apiEms && apiEms.length > 0) {
+            localStorage.setItem('salink_emergencies', JSON.stringify(apiEms));
+        }
+
+        const apiNotifs = await apiGetNotifications();
+        if (apiNotifs && apiNotifs.length > 0) {
+            notifications = apiNotifs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            localStorage.setItem('salink_notifications', JSON.stringify(notifications));
+        }
+
+        const apiUsers = await apiGetUsers();
+        if (apiUsers && apiUsers.length > 0) {
+            allUsers = apiUsers;
+            localStorage.setItem('salink_users', JSON.stringify(allUsers));
+        }
+
+        // Render ulang semuanya
+        renderPosts();
+        renderPostsStats();
+        renderHologram();
+        updateEmergencyBadges();
+        updateNotifBadge();
+        updateStatsCards();
+        updateAllCharts();
+
+    } catch (err) {
+        console.warn('⚠️ [loadData 12A] API error, menggunakan data lokal:', err.message);
+    }
+}
+            
     // Fetch dari API
     try {
         const results = await Promise.allSettled([
