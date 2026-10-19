@@ -3618,14 +3618,14 @@ async function apiGetPosts() {
                 .limit(5000);
 
             // ============================================
-            // QUERY 4: Comments — PATCH 8 (Bypass Limit Bug PostgREST)
-            // Ganti .limit() jadi .range() & buang kolom updated_at/deleted_at
+            // QUERY 4: Comments — PATCH 11A (Anti-Bug Limit & Soft Delete)
             // ============================================
             const commentsPromise = client
                 .from('comments')
-                .select('id, post_id, user_id, parent_id, content, created_at')
+                .select('id, post_id, user_id, parent_id, content, created_at, deleted_at') // Tambah deleted_at
+                .is('deleted_at', null) // HANYA ambil yang BELUM dihapus
                 .order('created_at', { ascending: true })
-                .range(0, 999); // ← Gunakan range, bukan limit!
+                .range(0, 999);
 
             // Jalankan SEMUA paralel
             const [postsRes, mediaRes, likesRes, commentsRes, commentLikesRes] = await Promise.all([
@@ -3724,8 +3724,8 @@ rawComments.forEach(c => {
         parentId: c.parent_id || null,
         created_at: c.created_at,
         timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
-        updated_at: null, // PATCH 8: default null (dibuang dari query)
-        deleted_at: null, // PATCH 8: default null (dibuang dari query)
+        updated_at: null, // PATCH 8: default null
+        deleted_at: c.deleted_at || null, // PATCH 11A: Ambil nilai aslinya
         likes_count: rawCommentLikes.filter(cl => cl.comment_id === c.id).length,
         is_liked: rawCommentLikes.some(cl => 
             cl.comment_id === c.id && cl.user_id === currentAuthUser?.id
@@ -5700,6 +5700,9 @@ async function handleDeleteComment(commentId, postId) {
     if (!currentAuthUser?.id) {
         showToast('⚠️', 'Session tidak valid', 'fa-exclamation-triangle');
         return;
+    // PATCH 11B: Kunci sinkronisasi otomatis selama proses hapus
+    window._salinkDeleteInProgress = true;
+    setTimeout(() => { window._salinkDeleteInProgress = false; }, 5000); // Buka kunci setelah 5 detik
     }
     
     const post = posts.find(p => p.id === postId);
@@ -5748,9 +5751,10 @@ async function handleDeleteComment(commentId, postId) {
     if (isUUID && window.SALINK_SB_READY && window.salinkSupabase) {
         try {
             const client = window.salinkSupabase;
+            // PATCH 11C: Soft Delete (Isi deleted_at, jangan hapus permanen)
             const { data: deleted, error } = await client
                 .from('comments')
-                .delete()
+                .update({ deleted_at: new Date().toISOString() })
                 .eq('id', commentId)
                 .select();
 
@@ -7670,9 +7674,7 @@ async function loadData() {
             apiGetStatistics(),
             apiGetUsers()
         ]);
-
-        // Posts
-
+        
 // PATCH D3-FIX-1 + PATCH 6B — Filter & sort posts
 let apiPosts = (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) ? results[0].value : [];
 
@@ -7689,13 +7691,28 @@ if (useSupabaseOnly) {
         
 const postMap = new Map();
 
+// PATCH 11D: Jaring Pengaman (Anti Postingan Kosong)
 if (useSupabaseOnly) {
-    // Pakai Supabase sebagai satu-satunya sumber
-    supabasePosts.forEach(p => {
-        if (p && p.id && !isDeleted(p.id)) postMap.set(p.id, p);
-    });
+    if (supabasePosts.length > 0) {
+        supabasePosts.forEach(p => {
+            if (p && p.id && !isDeleted(p.id)) postMap.set(p.id, p);
+        });
+    } else {
+        // Jika Supabase kosong/error, LOAD DARI LOCAL STORAGE!
+        console.warn('[PATCH 11D] Supabase kosong, menggunakan data cache LS.');
+        posts.forEach(p => { 
+            if (p && p.id && !isDeleted(p.id)) postMap.set(p.id, p); 
+        });
+    }
 } else {
-    // Fallback: gabung LS + GAS
+
+// PATCH 11E: Jangan loadData jika sedang ada proses hapus/sinkronisasi
+    if (window._salinkDeleteInProgress) {
+        console.log('[loadData] Ditunda karena ada proses hapus.');
+        return;
+    }
+    
+// Fallback: gabung LS + GAS
     posts.forEach(p => { 
         if (p && p.id && !isDeleted(p.id)) postMap.set(p.id, p); 
     });
@@ -7711,7 +7728,7 @@ posts = Array.from(postMap.values())
         if (!p || !p.id) return false;
         if (isDeleted(p.id)) return false;
         
-        // PATCH 8A — Tolak post sampah (tanpa nama atau tanpa teks & media)
+// PATCH 8A — Tolak post sampah (tanpa nama atau tanpa teks & media)
         if (!p.userId || !p.userFullName || p.userFullName.trim() === '') {
             console.warn('[loadData 8A] Post tanpa user valid dibuang:', p.id);
             return false;
