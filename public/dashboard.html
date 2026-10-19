@@ -7538,18 +7538,29 @@ async function loadData() {
 
     // 2. AMBIL DATA DARI SUPABASE
     try {
-        const apiPosts = await apiGetPosts();
+        const results = await Promise.allSettled([
+            apiGetPosts(),
+            apiGetEmergencies(),
+            apiGetNotifications(),
+            apiGetStatistics(),
+            apiGetUsers()
+        ]);
+
+        // ==============================
+        // 2A. PROSES POSTS
+        // ==============================
+        let apiPosts = (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) ? results[0].value : [];
         const supabasePosts = apiPosts.filter(p => p && p._source === 'supabase');
 
         if (supabasePosts.length > 0) {
             const postMap = new Map();
             // Masukkan data Supabase
-            supabasePosts.forEach(p => { if (p && p.id) postMap.set(p.id, p); });
-            // Masukkan data lokal yang baru dibuat (belum masuk Supabase)
+            supabasePosts.forEach(p => { if (p && p.id && !isDeleted(p.id)) postMap.set(p.id, p); });
+            
+            // Masukkan data lokal yang baru dibuat (umur < 2 menit)
             posts.forEach(p => { 
                 if (p && p.id && !postMap.has(p.id)) {
                     const ts = p.timestamp || Date.now();
-                    // Hanya ambil post lokal yang umurnya di bawah 2 menit (mencegah data sampah lama)
                     if (Date.now() - ts < 120000) postMap.set(p.id, p);
                 }
             });
@@ -7561,234 +7572,88 @@ async function loadData() {
             console.log('⚠️ [loadData 12A] Supabase kosong, mempertahankan data lokal.');
         }
 
-        // Update data lain
-        const apiEms = await apiGetEmergencies();
-        if (apiEms && apiEms.length > 0) {
-            localStorage.setItem('salink_emergencies', JSON.stringify(apiEms));
+        // ==============================
+        // 2B. PROSES EMERGENCIES
+        // ==============================
+        let apiEms = (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) ? results[1].value : [];
+        if (apiEms.length > 0) {
+            const now = Date.now();
+            const validEms = apiEms.map(em => {
+                let ts = typeof em.timestamp === 'number' ? em.timestamp : new Date(em.timestamp).getTime();
+                if (isNaN(ts)) ts = now;
+                return Object.assign({}, em, { timestamp: ts });
+            }).filter(e => {
+                const exp = e.expiresAt || (e.timestamp + EMERGENCY_DURATION);
+                return exp > now && !isDeleted(e.id);
+            });
+            
+            if (validEms.length > 0) {
+                localStorage.setItem('salink_emergencies', JSON.stringify(validEms));
+            }
         }
 
-        const apiNotifs = await apiGetNotifications();
-        if (apiNotifs && apiNotifs.length > 0) {
-            notifications = apiNotifs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        // ==============================
+        // 2C. PROSES NOTIFICATIONS
+        // ==============================
+        let apiNotifs = (results[2].status === 'fulfilled' && Array.isArray(results[2].value)) ? results[2].value : [];
+        if (apiNotifs.length > 0) {
+            notifications = apiNotifs
+                .filter(n => n && n.id && !isDeleted(n.id))
+                .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
             localStorage.setItem('salink_notifications', JSON.stringify(notifications));
+
+            // PATCH 8B — Pemicu Suara Notifikasi Reguler
+            const unreadNotifs = notifications.filter(n => !n.read);
+            const lastUnreadCount = parseInt(localStorage.getItem('salink_last_unread_count') || '0');
+            if (unreadNotifs.length > lastUnreadCount) {
+                console.log('🔊 [8B] Notifikasi baru masuk, membunyikan suara...');
+                playRegularSound();
+            }
+            localStorage.setItem('salink_last_unread_count', unreadNotifs.length.toString());
         }
 
-        const apiUsers = await apiGetUsers();
-        if (apiUsers && apiUsers.length > 0) {
+        // ==============================
+        // 2D. PROSES STATISTICS & USERS
+        // ==============================
+        if (results[3].status === 'fulfilled' && results[3].value) {
+            statistics = results[3].value;
+        }
+
+        let apiUsers = (results[4].status === 'fulfilled' && Array.isArray(results[4].value)) ? results[4].value : [];
+        if (apiUsers.length > 0) {
             allUsers = apiUsers;
             localStorage.setItem('salink_users', JSON.stringify(allUsers));
         }
 
-        // Render ulang semuanya
-        renderPosts();
-        renderPostsStats();
-        renderHologram();
-        updateEmergencyBadges();
-        updateNotifBadge();
-        updateStatsCards();
-        updateAllCharts();
-
-    } catch (err) {
-        console.warn('⚠️ [loadData 12A] API error, menggunakan data lokal:', err.message);
-    }
-}
-            
-    // Fetch dari API
-    try {
-        const results = await Promise.allSettled([
-            apiGetPosts(),
-            apiGetEmergencies(),
-            apiGetNotifications(),
-            apiGetStatistics(),
-            apiGetUsers()
-        ]);
-        
-// PATCH D3-FIX-1 + PATCH 6B — Filter & sort posts
-let apiPosts = (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) ? results[0].value : [];
-
-// PATCH 6B — HANYA pakai post dari Supabase (exclude sampah GAS)
-const supabasePosts = apiPosts.filter(p => p && p._source === 'supabase');
-const useSupabaseOnly = supabasePosts.length > 0;
-
-console.log('[loadData 6B] Supabase posts:', supabasePosts.length, '| Use only Supabase:', useSupabaseOnly);
-
-// PATCH 6B — Kalau Supabase ada, JANGAN baca LS/GAS
-if (useSupabaseOnly) {
-    console.log('[loadData 6B] Supabase = source of truth, ignore LS/GAS');
-}
-        
-const postMap = new Map();
-
-// PATCH 11D: Jaring Pengaman (Anti Postingan Kosong)
-if (useSupabaseOnly) {
-    if (supabasePosts.length > 0) {
-        supabasePosts.forEach(p => {
-            if (p && p.id && !isDeleted(p.id)) postMap.set(p.id, p);
-        });
-    } else {
-        // Jika Supabase kosong/error, LOAD DARI LOCAL STORAGE!
-        console.warn('[PATCH 11D] Supabase kosong, menggunakan data cache LS.');
-        posts.forEach(p => { 
-            if (p && p.id && !isDeleted(p.id)) postMap.set(p.id, p); 
-        });
-    }
-} else {
-
-// PATCH 11E: Jangan loadData jika sedang ada proses hapus/sinkronisasi
-    if (window._salinkDeleteInProgress) {
-        console.log('[loadData] Ditunda karena ada proses hapus.');
-        return;
-    }
-    
-// Fallback: gabung LS + GAS
-    posts.forEach(p => { 
-        if (p && p.id && !isDeleted(p.id)) postMap.set(p.id, p); 
-    });
-    apiPosts.forEach(p => {
-        if (p && p.id && !isDeleted(p.id)) {
-            if (!postMap.has(p.id)) postMap.set(p.id, p);
-        }
-    });
-}
-
-posts = Array.from(postMap.values())
-    .filter(p => {
-        if (!p || !p.id) return false;
-        if (isDeleted(p.id)) return false;
-        
-// PATCH 8A — Tolak post sampah (tanpa nama atau tanpa teks & media)
-        if (!p.userId || !p.userFullName || p.userFullName.trim() === '') {
-            console.warn('[loadData 8A] Post tanpa user valid dibuang:', p.id);
-            return false;
-        }
-        if (!p.text && !p.mediaType && !p.gdriveId && !p.mediaData) {
-            console.warn('[loadData 8A] Post kosong tanpa teks/media dibuang:', p.id);
-            return false;
-        }
-        
-        const ts = typeof p.timestamp === 'number' ? p.timestamp : new Date(p.timestamp).getTime();
-        if (isNaN(ts) || ts <= 0) return false;
-        p.timestamp = ts;
-        
-        return true;
-    })
-    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-// ============================================================
-// PATCH 8C — Deteksi Emergency Baru dari Supabase (Pemicu Alarm)
-// ============================================================
-if (useSupabaseOnly && supabasePosts.length > 0) {
-    // Ambil post emergency terbaru
-    const latestEmergency = supabasePosts.find(p => p.isSpecial && p.specialType);
-    
-    if (latestEmergency) {
-        const lastEmergencyId = localStorage.getItem('salink_last_emergency_id');
-        
-        // Jika ada emergency baru (ID berbeda dari sebelumnya)
-        if (latestEmergency.id !== lastEmergencyId) {
-            console.log('🚨 [8C] Emergency Baru dari Supabase:', latestEmergency.specialType);
-            
-            // 1. Simpan ID agar tidak berbunyi berulang saat reload
-            localStorage.setItem('salink_last_emergency_id', latestEmergency.id);
-            
-            // 2. Panggil fungsi Alarm (Suara, Getar, Zoom, Floating)
-            if (typeof triggerLocalEmergencyVisual === 'function') {
-                triggerLocalEmergencyVisual(
-                    latestEmergency.id, 
-                    latestEmergency.specialType, 
-                    latestEmergency.userFullName, 
-                    latestEmergency.specialLocation, 
-                    latestEmergency.text
-                );
-            } else if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency.handleGridButtonTap) {
-                SalinkEmergency.handleGridButtonTap(latestEmergency.specialType);
+        // ==============================
+        // 2E. PATCH 8C — Deteksi Emergency Baru (Alarm)
+        // ==============================
+        if (supabasePosts.length > 0) {
+            const latestEmergency = supabasePosts.find(p => p.isSpecial && p.specialType);
+            if (latestEmergency) {
+                const lastEmergencyId = localStorage.getItem('salink_last_emergency_id');
+                if (latestEmergency.id !== lastEmergencyId) {
+                    console.log('🚨 [8C] Emergency Baru dari Supabase:', latestEmergency.specialType);
+                    localStorage.setItem('salink_last_emergency_id', latestEmergency.id);
+                    
+                    if (typeof triggerLocalEmergencyVisual === 'function') {
+                        triggerLocalEmergencyVisual(
+                            latestEmergency.id, 
+                            latestEmergency.specialType, 
+                            latestEmergency.userFullName, 
+                            latestEmergency.specialLocation, 
+                            latestEmergency.text
+                        );
+                    } else if (typeof SalinkEmergency !== 'undefined' && SalinkEmergency.handleGridButtonTap) {
+                        SalinkEmergency.handleGridButtonTap(latestEmergency.specialType);
+                    }
+                }
             }
         }
-    }
-}
 
-safeSavePosts(posts);
-console.log('[loadData] Final posts:', posts.length, '| From Supabase:', posts.filter(p => p._source === 'supabase').length);
-     
-        // Emergencies
-        let apiEms = (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) ? results[1].value : [];
-        apiEms = apiEms.map(em => {
-            let ts = em.timestamp;
-            if (typeof ts === 'string') {
-                const parsed = new Date(ts.replace(' ', 'T'));
-                ts = isNaN(parsed.getTime()) ? Date.now() : parsed.getTime();
-            } else if (typeof ts === 'number') {
-                ts = ts;
-            } else {
-                ts = Date.now();
-            }
-            return Object.assign({}, em, {
-                timestamp: ts,
-                country: em.country || 'Indonesia',
-                mapsURL: em.mapsURL || em.mapsurl || '',
-                coords: (em.latitude && em.longitude) ? (em.latitude + ', ' + em.longitude) : ''
-            });
-        });
-        const emMap = new Map();
-        validLocalEms.forEach(e => { if (e && e.id && !isDeleted(e.id)) emMap.set(e.id, e); });
-        apiEms.forEach(e => {
-            if (e && e.id && !isDeleted(e.id)) {
-                if (!emMap.has(e.id)) emMap.set(e.id, e);
-            }
-        });
-        const mergedEms = Array.from(emMap.values()).filter(e => {
-            if (!e || !e.id) return false;
-            let ts = typeof e.timestamp === 'number' ? e.timestamp : new Date(e.timestamp).getTime();
-            if (isNaN(ts)) ts = now;
-            const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
-            return exp > now;
-        });
-        try {
-            const currentLocal = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-            const merged = [...mergedEms];
-            currentLocal.forEach(e => {
-                if (e && e.id && !merged.find(m => m.id === e.id) && !isDeleted(e.id)) merged.push(e);
-            });
-            localStorage.setItem('salink_emergencies', JSON.stringify(merged));
-        } catch(e) {}
-
-        // Notifications
-        let apiNotifs = (results[2].status === 'fulfilled' && Array.isArray(results[2].value)) ? results[2].value : [];
-        const notifMap = new Map();
-        notifications.forEach(n => { if (n && n.id && !isDeleted(n.id)) notifMap.set(n.id, n); });
-        apiNotifs.forEach(n => {
-            if (n && n.id && !isDeleted(n.id)) {
-                if (!notifMap.has(n.id)) notifMap.set(n.id, n);
-            }
-        });
-        notifications = Array.from(notifMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-        try { localStorage.setItem('salink_notifications', JSON.stringify(notifications)); } catch(e) {}
-        
-        // PATCH 8B — Pemicu Suara Notifikasi Reguler (Supabase)
-        const unreadNotifs = notifications.filter(n => !n.read);
-        const lastUnreadCount = parseInt(localStorage.getItem('salink_last_unread_count') || '0');
-        const currentUnreadCount = unreadNotifs.length;
-
-              if (currentUnreadCount > lastUnreadCount) {
-                   console.log('🔊 [8B] Notifikasi baru masuk, membunyikan suara...');
-                   playRegularSound();
-        }
-        localStorage.setItem('salink_last_unread_count', currentUnreadCount.toString());
-        
-        // Statistics
-        if (results[3].status === 'fulfilled' && results[3].value) statistics = results[3].value;
-
-        // Users
-        let apiUsers = (results[4].status === 'fulfilled' && Array.isArray(results[4].value)) ? results[4].value : [];
-        const userMap = new Map();
-        allUsers.forEach(u => { if (u && u.username) userMap.set(u.username, u); });
-        apiUsers.forEach(u => { if (u && u.username) userMap.set(u.username, u); });
-        allUsers = Array.from(userMap.values());
-        try {
-            if (allUsers.length > 0) localStorage.setItem('salink_users', JSON.stringify(allUsers));
-        } catch(e) {}
-
-        // Render ulang
+        // ==============================
+        // 3. RENDER ULANG SEMUA UI
+        // ==============================
         renderPosts();
         renderPostsStats();
         renderHologram();
@@ -7797,8 +7662,9 @@ console.log('[loadData] Final posts:', posts.length, '| From Supabase:', posts.f
         updateInviteBadge();
         updateStatsCards();
         updateAllCharts();
+
     } catch (err) {
-        console.warn('⚠️ [loadData] API error:', err.message);
+        console.warn('⚠️ [loadData 12A] API error, menggunakan data lokal:', err.message);
     }
 }
 
