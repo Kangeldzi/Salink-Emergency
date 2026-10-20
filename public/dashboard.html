@@ -6465,13 +6465,20 @@ async function createPost(text, mediaFile, isSpecial, specialData) {
         if (mediaFile && mediaFile.size > 0) {
             const isImage = mediaFile.type.indexOf('image/') === 0;
             mediaType = isImage ? 'image' : 'video';
-            try {
+        try {
                 gdriveData = await uploadToGDrive(mediaFile);
-            } catch(e) {
-                showToast('⚠️ GDrive Gagal', 'Media disimpan lokal', 'fa-exclamation-triangle');
-            }
-        }
-
+            } catch(err) {
+                console.warn('GDrive gagal, lanjutkan simpan sebagai base64 lokal');
+                // Konversi file ke base64 (hanya untuk gambar < 1MB)
+                if (mediaFile && mediaFile.size < 1024 * 1024) {
+                    mediaDataLocal = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.readAsDataURL(mediaFile);
+                    });
+                }
+            } 
+            
         // Susun payload untuk Supabase
         const sbPayload = {
             user_id: currentAuthUser.id,
@@ -9312,6 +9319,14 @@ window.confirmDeleteNow = confirmDeleteNow;
 window.closeDeleteConfirm = closeDeleteConfirm;
 window.toggleLike = toggleLike;
 window.addComment = addComment;
+/* PATCH 13: Jembatan untuk memperbaiki error 'deleteComment is not defined' */
+function deleteComment(postId, commentId) {
+    if (typeof handleDeleteComment === 'function') {
+        handleDeleteComment(commentId, postId);
+    } else {
+        console.warn('Fungsi handleDeleteComment belum siap');
+    }
+}
 window.deleteComment = deleteComment;
 window.sharePost = sharePost;
 window.closeModal = closeModal;
