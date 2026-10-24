@@ -1626,30 +1626,99 @@
             background: rgba(255,255,255,0.06);
         }
 
-        /* ================================================================
-   PATCH 7F-NESTED — CSS untuk Indentasi Berantai
+/* ================================================================
+   PATCH 17A — CSS untuk Threaded Comments (Balas-berbalas) RAPI
    ================================================================ */
-.comment-item[data-depth="1"] .comment-replies { margin-left: 36px; }
-.comment-item[data-depth="2"] .comment-replies { margin-left: 36px; }
-.comment-item[data-depth="3"] .comment-replies { margin-left: 28px; }
-.comment-item[data-depth="4"] .comment-replies { margin-left: 24px; }
-.comment-item[data-depth="5"] .comment-replies { margin-left: 20px; }
+.comments-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 4px 0;
+}
+.comment-item {
+    position: relative;
+    display: flex;
+    gap: 10px;
+    padding: 8px 0;
+}
+.comment-item .comment-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    overflow: hidden; border: 2px solid var(--primary);
+    flex-shrink: 0; cursor: pointer;
+    background: var(--accent-blue-gradient);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 0.75rem; font-weight: 700;
+}
+.comment-item .comment-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.comment-item .comment-body { flex: 1; min-width: 0; }
+.comment-item .comment-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 2px; }
+.comment-item .comment-name { font-size: 0.72rem; font-weight: 700; color: #0a0e1a; cursor: pointer; }
+.comment-item .comment-time { font-size: 0.55rem; color: #6b7688; }
+.comment-item .comment-text { font-size: 0.72rem; line-height: 1.5; color: #0a0e1a; word-break: break-word; margin: 3px 0 6px 0; }
+.comment-item .comment-text .mention { color: var(--primary); font-weight: 700; background: rgba(230,0,18,0.08); padding: 1px 4px; border-radius: 4px; }
+.comment-item .comment-text.deleted { color: #9aa0ab; font-style: italic; opacity: 0.7; }
 
+/* Action Bar Komentar */
+.comment-item .comment-actions { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.comment-item .comment-action-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 12px; background: transparent;
+    border: 1px solid transparent; color: #6b7688;
+    font-size: 0.62rem; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.comment-item .comment-action-btn:hover { background: #f5f7fa; color: var(--primary); }
+.comment-item .comment-action-btn.liked, .comment-item .comment-action-btn.liked i { color: var(--accent-red); }
+
+/* Balasan (Reply) */
+.comment-replies {
+    margin-top: 6px; margin-left: 42px; padding-left: 12px;
+    border-left: 2px solid rgba(230,0,18,0.15);
+    display: flex; flex-direction: column; gap: 6px;
+}
+.comment-replies .comment-item { padding: 6px 0; }
+.comment-replies .comment-item .comment-avatar { width: 28px; height: 28px; font-size: 0.65rem; }
+.comment-replies .comment-item .comment-name { font-size: 0.68rem; }
+.comment-replies .comment-item .comment-text { font-size: 0.7rem; }
+
+/* Tombol Lihat Balasan */
 .comment-show-replies-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
-    margin: 4px 0 0 42px;
-    background: transparent;
-    border: none;
-    color: #6b7688;
-    font-size: 0.62rem;
-    font-weight: 700;
-    cursor: pointer;
-    font-family: inherit;
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; margin: 4px 0 0 42px;
+    background: transparent; border: none; color: #6b7688;
+    font-size: 0.62rem; font-weight: 700; cursor: pointer; font-family: inherit;
 }
 .comment-show-replies-btn:hover { color: var(--primary); }
+.comment-show-replies-btn i { font-size: 0.55rem; }
+
+/* Input Balasan */
+.comment-reply-box {
+    margin: 6px 0 6px 42px; padding: 8px 10px;
+    background: #f5f7fa; border-radius: 10px;
+    display: none; gap: 6px; align-items: center;
+}
+.comment-reply-box.active { display: flex; }
+.comment-reply-box input {
+    flex: 1; border: 1px solid rgba(0,0,0,0.08); border-radius: 16px;
+    padding: 6px 12px; font-size: 0.68rem; background: #ffffff;
+    color: #0a0e1a; font-family: inherit;
+}
+.comment-reply-box .reply-send-btn {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--accent-blue-gradient); color: #fff;
+    border: none; cursor: pointer; display: flex;
+    align-items: center; justify-content: center; font-size: 0.65rem; flex-shrink: 0;
+}
+[data-theme="dark"] .comment-item .comment-name, [data-theme="dark"] .comment-item .comment-text { color: #f5f7fa; }
+[data-theme="dark"] .comment-replies { border-left-color: rgba(230,0,18,0.3); }
+[data-theme="dark"] .comment-reply-box { background: rgba(255,255,255,0.04); }
+[data-theme="dark"] .comment-reply-box input { background: rgba(0,0,0,0.2); color: #f5f7fa; border-color: rgba(255,255,255,0.1); }
+
+/* ================================================================
+   PATCH 17B — CSS Untuk Preview Gambar
+   ================================================================ */
+.post-media img { cursor: pointer; transition: opacity 0.2s; }
+.post-media img:active { opacity: 0.8; }
+
         
 </style>
 </head>
@@ -2316,7 +2385,7 @@
         </div>
     </div>
     </div>
-        <script>
+    <script>
 /* ====================================================================
  * SALINK v12.0 — DASHBOARD JAVASCRIPT LENGKAP
  * ====================================================================
@@ -4974,14 +5043,16 @@ if (comments.length > 0) {
         if (post.mediaType) {
             const isGDrive = !!post.gdriveId;
             const mediaSource = getMediaUrlFromPost(post);
+            
             if (post.mediaType === 'image') {
                 if (isGDrive) {
                     const primaryUrl = post.gdriveImageUrl || ('https://drive.google.com/thumbnail?id=' + post.gdriveId + '&sz=w1000');
                     const fallbackUrl1 = 'https://lh3.googleusercontent.com/d/' + post.gdriveId + '=w1000';
                     const fallbackUrl2 = 'https://drive.google.com/uc?export=view&id=' + post.gdriveId;
                     const backupThumb = post.mediaData || '';
+                    // PATCH 17D: Tambahan onclick untuk Preview
                     mediaHTML = '<div class="post-media" style="position:relative;min-height:150px;background:#f5f7fa;border-radius:8px;overflow:hidden;">' +
-                        '<img src="' + escapeAttr(primaryUrl) + '" alt="" loading="lazy" draggable="false" oncontextmenu="return false;" style="width:100%;height:auto;max-height:400px;object-fit:contain;display:block;user-select:none;-webkit-user-drag:none;border-radius:8px;" ' +
+                        '<img src="' + escapeAttr(primaryUrl) + '" onclick="openImagePreview(this.src)" style="cursor:pointer;width:100%;height:auto;max-height:400px;object-fit:contain;display:block;user-select:none;-webkit-user-drag:none;border-radius:8px;" ' +
                         'data-post-id="' + escapeAttr(post.id) + '" ' +
                         'data-fallback-1="' + escapeAttr(fallbackUrl1) + '" ' +
                         'data-fallback-2="' + escapeAttr(fallbackUrl2) + '" ' +
@@ -4990,7 +5061,8 @@ if (comments.length > 0) {
                         'onload="this.parentElement.style.minHeight=\'0\';this.parentElement.style.background=\'transparent\';">' +
                     '</div>';
                 } else if (mediaSource) {
-                    mediaHTML = '<div class="post-media"><img src="' + escapeAttr(mediaSource) + '" alt="" loading="lazy" draggable="false" oncontextmenu="return false;" style="width:100%;height:auto;max-height:400px;object-fit:contain;border-radius:8px;"></div>';
+                    // PATCH 17D: Tambahan onclick untuk Preview (Base64)
+                    mediaHTML = '<div class="post-media"><img src="' + escapeAttr(mediaSource) + '" onclick="openImagePreview(this.src)" style="cursor:pointer;width:100%;height:auto;max-height:400px;object-fit:contain;border-radius:8px;"></div>';
                 }
             } else if (post.mediaType === 'video') {
                 if (isGDrive) {
@@ -5127,15 +5199,18 @@ function renderFullPostCard(p, isExpired) {
     if (p.mediaType) {
         const isGDrive = !!p.gdriveId;
         const src = getMediaUrlFromPost(p);
+        
         if (p.mediaType === 'image') {
             if (isGDrive) {
                 const primaryUrl = p.gdriveImageUrl || ('https://drive.google.com/thumbnail?id=' + p.gdriveId + '&sz=w1000');
                 const fallbackUrl1 = 'https://lh3.googleusercontent.com/d/' + p.gdriveId + '=w1000';
                 const fallbackUrl2 = 'https://drive.google.com/uc?export=view&id=' + p.gdriveId;
                 const backupThumb = p.mediaData || '';
-                mediaBlock = '<div style="width:100%;max-height:400px;border-radius:10px;overflow:hidden;margin:10px 0;border:1px solid rgba(255,255,255,0.1);position:relative;background:rgba(255,255,255,0.04);min-height:150px;"><img src="' + escapeAttr(primaryUrl) + '" style="width:100%;height:auto;max-height:400px;object-fit:contain;display:block;user-select:none;-webkit-user-drag:none;" loading="lazy" draggable="false" oncontextmenu="return false;" data-post-id="' + escapeAttr(p.id) + '" data-fallback-1="' + escapeAttr(fallbackUrl1) + '" data-fallback-2="' + escapeAttr(fallbackUrl2) + '" data-backup-thumb="' + escapeAttr(backupThumb) + '" onerror="handleImageError(this);" onload="this.parentElement.style.minHeight=\'0\';this.parentElement.style.background=\'transparent\';"></div>';
+                // PATCH 17D: Tambahan onclick untuk Preview
+                mediaBlock = '<div style="width:100%;max-height:400px;border-radius:10px;overflow:hidden;margin:10px 0;border:1px solid rgba(255,255,255,0.1);position:relative;background:rgba(255,255,255,0.04);min-height:150px;"><img src="' + escapeAttr(primaryUrl) + '" onclick="openImagePreview(this.src)" style="cursor:pointer;width:100%;height:auto;max-height:400px;object-fit:contain;display:block;user-select:none;-webkit-user-drag:none;" loading="lazy" draggable="false" oncontextmenu="return false;" data-post-id="' + escapeAttr(p.id) + '" data-fallback-1="' + escapeAttr(fallbackUrl1) + '" data-fallback-2="' + escapeAttr(fallbackUrl2) + '" data-backup-thumb="' + escapeAttr(backupThumb) + '" onerror="handleImageError(this);" onload="this.parentElement.style.minHeight=\'0\';this.parentElement.style.background=\'transparent\';"></div>';
             } else if (src) {
-                mediaBlock = '<div style="width:100%;max-height:400px;border-radius:10px;overflow:hidden;margin:10px 0;border:1px solid rgba(255,255,255,0.1);"><img src="' + escapeAttr(src) + '" style="width:100%;height:auto;max-height:400px;object-fit:contain;display:block;" loading="lazy" draggable="false" oncontextmenu="return false;"></div>';
+                // PATCH 17D: Tambahan onclick untuk Preview (Base64)
+                mediaBlock = '<div style="width:100%;max-height:400px;border-radius:10px;overflow:hidden;margin:10px 0;border:1px solid rgba(255,255,255,0.1);"><img src="' + escapeAttr(src) + '" onclick="openImagePreview(this.src)" style="cursor:pointer;width:100%;height:auto;max-height:400px;object-fit:contain;display:block;" loading="lazy" draggable="false" oncontextmenu="return false;"></div>';
             }
         } else if (p.mediaType === 'video') {
             if (isGDrive) {
@@ -5145,6 +5220,7 @@ function renderFullPostCard(p, isExpired) {
             }
         }
     }
+    
     return '<div class="post-card-full ' + cssClass + ' ' + (isExpired ? 'expired' : '') + '" data-post-id="' + escapeAttr(p.id) + '">' +
         '<div class="pcf-header"><span class="pcf-icon">' + icon + '</span><span class="pcf-type ' + cssClass + '">' + label + '</span><span class="pcf-time">' + getTimeAgo(p.timestamp) + '</span></div>' +
         '<div class="pcf-sender">📤 Dilaporkan oleh: <strong onclick="handleProfileClick(\'' + escapeAttr(p.userId) + '\')">' + escapeHTML(p.userFullName) + '</strong></div>' +
@@ -5316,12 +5392,9 @@ function buildCommentItemHTML(c, postId, isReply, depth) {
     '</div>';
 }
 
-/* Render blok balasan */
-/* ================================================================
- * PATCH 7F-NESTED — Render blok balasan dengan tombol expand
- * ================================================================ */
+/* Render blok balasan (DIPERBAIKI) */
 function renderRepliesBlock(parent, replies, repliesByParent, postId, parentDepth) {
-    const MAX_VISIBLE = 2;
+    const MAX_VISIBLE = 2; 
     const total = replies.length;
     const showAll = total <= MAX_VISIBLE;
     const visibleCount = showAll ? total : MAX_VISIBLE;
@@ -5342,13 +5415,11 @@ function renderRepliesBlock(parent, replies, repliesByParent, postId, parentDept
             '<i class="fas fa-chevron-down"></i> Lihat ' + hiddenCount + ' balasan lainnya' +
         '</button>';
     }
-
     if (showAll && total > MAX_VISIBLE) {
         html += '<button class="comment-show-replies-btn" data-action="hide-replies" data-comment-id="' + escapeAttr(parent.id) + '" data-post-id="' + escapeAttr(postId) + '" type="button">' +
             '<i class="fas fa-chevron-up"></i> Sembunyikan balasan' +
         '</button>';
     }
-
     return html;
 }
             
@@ -5376,11 +5447,16 @@ function attachPostListeners() {
             }
         };
     });
+        // Menu Titik Tiga
     document.querySelectorAll('.post-menu-toggle').forEach(el => {
         el.onclick = function(e) {
             e.stopPropagation();
-            const m = document.getElementById('postMenu-' + this.dataset.postId);
-            if (m) m.classList.toggle('active');
+            const menuId = 'postMenu-' + this.dataset.postId;
+            const menu = document.getElementById(menuId);
+            document.querySelectorAll('.post-menu-dropdown').forEach(m => {
+                if (m.id !== menuId) m.classList.remove('active');
+            });
+            if (menu) menu.classList.toggle('active');
         };
     });
     document.querySelectorAll('.edit-post').forEach(el => {
@@ -9419,6 +9495,76 @@ window.openProductInToko = openProductInToko;
 window.openOrderTracking = openOrderTracking;
 window.refreshMiniMarketplace = refreshMiniMarketplace;
 
+// ==========================================
+// PATCH 17: LOGIKA PREVIEW GAMBAR & KLIK LUAR
+// ==========================================
+let currentPreviewImageUrl = '';
+
+function openImagePreview(url) {
+    currentPreviewImageUrl = url;
+    document.getElementById('previewImageSrc').src = url;
+    document.getElementById('imagePreviewModal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeImagePreview() {
+    document.getElementById('imagePreviewModal').style.display = 'none';
+    document.getElementById('imageMenuDropdown').style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+function toggleImageMenu() {
+    const menu = document.getElementById('imageMenuDropdown');
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function downloadImage() {
+    if (!currentPreviewImageUrl) return;
+    const a = document.createElement('a');
+    a.href = currentPreviewImageUrl;
+    a.download = 'SALINK_Image_' + Date.now() + '.jpg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    showToast('✅', 'Gambar berhasil diunduh', 'fa-check-circle');
+    toggleImageMenu();
+}
+
+async function shareImage() {
+    if (!currentPreviewImageUrl) return;
+    try {
+        const response = await fetch(currentPreviewImageUrl);
+        const blob = await response.blob();
+        const file = new File([blob], 'SALINK_Image.jpg', { type: blob.type });
+        
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: 'Bagikan Gambar', text: 'Dikirim dari Aplikasi SALINK' });
+        } else {
+            showToast('⚠️ Info', 'Fitur bagikan tidak didukung di browser ini', 'fa-info-circle');
+        }
+    } catch (err) { console.warn('Share error:', err); }
+    toggleImageMenu();
+}
+
+function reportImage() {
+    showToast('⚠️ Laporan Terkirim', 'Tim Admin akan meninjau foto ini.', 'fa-exclamation-triangle');
+    toggleImageMenu();
+}
+
+// Klik di luar modal untuk menutup
+document.addEventListener('click', function(e) {
+    if (e.target.id === 'imagePreviewModal') closeImagePreview();
+    const menu = document.getElementById('imageMenuDropdown');
+    if (menu && menu.style.display === 'block' && !e.target.closest('div[style*="position:absolute; top:20px; left:20px"]')) {
+        menu.style.display = 'none';
+    }
+    
+    // Tutup menu titik tiga postingan jika klik di luar
+    if (!e.target.closest('.post-menu-toggle') && !e.target.closest('.post-menu-dropdown')) {
+        document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
+    }
+});
+        
 // ====================================================================
 // 58. BOOTSTRAP — Load awal (fallback kalau DOMContentLoaded sudah lewat)
 // ====================================================================
@@ -9506,5 +9652,21 @@ console.log('🎉 SALINK Dashboard v12.0 — FULL SCRIPT LOADED');
       });
     })();
     </script>
+        <!-- PATCH 17B: Modal Preview Gambar -->
+    <div class="image-preview-modal" id="imagePreviewModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:999999; align-items:center; justify-content:center; flex-direction:column;">
+        <button onclick="closeImagePreview()" style="position:absolute; top:20px; right:20px; background:rgba(255,255,255,0.2); border:none; color:#fff; font-size:1.5rem; width:40px; height:40px; border-radius:50%; cursor:pointer; z-index:10;"><i class="fas fa-times"></i></button>
+        
+        <!-- Titik Tiga -->
+        <div style="position:absolute; top:20px; left:20px; z-index:10;">
+            <button onclick="toggleImageMenu()" style="background:rgba(255,255,255,0.2); border:none; color:#fff; font-size:1.2rem; width:40px; height:40px; border-radius:50%; cursor:pointer;"><i class="fas fa-ellipsis-v"></i></button>
+            <div id="imageMenuDropdown" style="display:none; position:absolute; top:50px; left:0; background:#fff; border-radius:10px; overflow:hidden; box-shadow:0 5px 15px rgba(0,0,0,0.5); width:200px;">
+                <button onclick="downloadImage()" style="display:flex; align-items:center; gap:10px; width:100%; padding:12px 15px; border:none; background:#fff; color:#333; font-size:0.85rem; border-bottom:1px solid #eee; cursor:pointer;"><i class="fas fa-download"></i> Simpan ke telepon</button>
+                <button onclick="shareImage()" style="display:flex; align-items:center; gap:10px; width:100%; padding:12px 15px; border:none; background:#fff; color:#333; font-size:0.85rem; border-bottom:1px solid #eee; cursor:pointer;"><i class="fas fa-share"></i> Bagikan eksternal</button>
+                <button onclick="reportImage()" style="display:flex; align-items:center; gap:10px; width:100%; padding:12px 15px; border:none; background:#fff; color:#e60012; font-size:0.85rem; cursor:pointer;"><i class="fas fa-exclamation-circle"></i> Laporkan foto</button>
+            </div>
+        </div>
+
+        <img id="previewImageSrc" src="" style="max-width:100%; max-height:85vh; object-fit:contain; border-radius:8px;">
+    </div>
 </body>
 </html>
