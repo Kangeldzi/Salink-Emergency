@@ -2876,8 +2876,8 @@ function adaptPostFromSupabase(row) {
 
     return {
         id: row.id,
-        userId: profile.username || row.user_username || row.user_id,
-        userAuthId: row.user_id,                          // UUID Supabase (untuk operasi delete/like)
+        // PATCH 16: Perbaikan ambil nama profil
+        userId: profile.username || row.user_username || 'user',
         userFullName: profile.full_name || row.user_full_name || 'Pengguna SALINK',
         userGender: normalizeGenderProfile(profile.gender || row.user_gender || 'Laki-laki'),
         userProfilePic: profile.profile_picture || row.user_profile_pic || '',
@@ -3793,7 +3793,7 @@ console.log('[commentsByPost DEBUG] Total posts with comments:',
             // ============================================
             // ADAPT: Buat objek post final
             // ============================================
-                        const adapted = rawPosts.map(row => {
+                const adapted = rawPosts.map(row => {
                 row.comments = commentsByPost[row.id] || [];
                 row.media = mediaByPost[row.id] ? [mediaByPost[row.id]] : [];
                 row.likes = likesByPost[row.id] || [];
@@ -6267,7 +6267,7 @@ async function addComment(postId, text, parentId = null) {
     broadcastSync('new_post', { id: postId });
     playRegularSound();
 
-        // ============================================================
+    // ============================================================
     // PATCH 6D — Kirim NOTIFIKASI ke pemilik post / parent comment
     // ============================================================
     try {
@@ -7545,11 +7545,15 @@ async function loadData() {
     let localPosts = [];
     try { localPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]'); } catch(e) {}
     
-    // 1. SELALU TAMPILKAN LOCAL STORAGE DULU (Agar layar tidak kosong)
+    // PATCH 16: Filter super ketat agar data sampah (NaN/undefined) tidak muncul
     posts = localPosts
-        .filter(p => p && p.id && p.userId && p.userFullName && !isDeleted(p.id))
+        .filter(p => {
+            if (!p || !p.id || isDeleted(p.id)) return false;
+            if (!p.userFullName || p.userFullName === 'undefined') return false;
+            if (!p.timestamp || isNaN(new Date(p.timestamp).getTime())) return false;
+            return true;
+        })
         .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
     renderPosts();
     renderPostsStats();
 
