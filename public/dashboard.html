@@ -2793,6 +2793,11 @@ function adaptPostFromSupabase(row) {
     // Media URL dari tabel media
     let mediaType = '';
     let mediaData = '';
+    // PATCH 15: Baca media_data (Base64) dari Supabase
+    if (row.media_data) {
+        mediaData = row.media_data;
+        mediaType = 'image'; // Asumsi default gambar
+    }
     let mediaId = '';
     let gdriveId = '';
     let gdriveImageUrl = '';
@@ -3788,14 +3793,15 @@ console.log('[commentsByPost DEBUG] Total posts with comments:',
             // ============================================
             // ADAPT: Buat objek post final
             // ============================================
-            const adapted = rawPosts.map(row => {
-                // Sisipkan comments, media, likes ke row dulu
+                        const adapted = rawPosts.map(row => {
                 row.comments = commentsByPost[row.id] || [];
                 row.media = mediaByPost[row.id] ? [mediaByPost[row.id]] : [];
                 row.likes = likesByPost[row.id] || [];
-
                 return adaptPostFromSupabase(row);
-            }).filter(p => p !== null);
+            }).filter(p => {
+                // PATCH 15: Jangan buang post yang punya teks atau media_data (Base64)
+                return p !== null && (p.text || p.mediaData);
+            });
 
             console.log('✅ [SALINK] Posts dari Supabase (multi-query):', adapted.length);
             return adapted;
