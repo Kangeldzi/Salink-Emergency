@@ -5449,16 +5449,24 @@ function attachPostListeners() {
             }
         };
     });
-        // Menu Titik Tiga
+    
+    // PATCH 19: Toggle Menu Titik Tiga (Lebih Bersih)
     document.querySelectorAll('.post-menu-toggle').forEach(el => {
         el.onclick = function(e) {
-            e.stopPropagation();
+            e.stopPropagation(); // Mencegah klik tembus ke background
             const menuId = 'postMenu-' + this.dataset.postId;
             const menu = document.getElementById(menuId);
-            document.querySelectorAll('.post-menu-dropdown').forEach(m => {
-                if (m.id !== menuId) m.classList.remove('active');
-            });
-            if (menu) menu.classList.toggle('active');
+            
+            // Cek apakah menu ini sedang terbuka
+            const isActive = menu.classList.contains('active');
+            
+            // Tutup semua menu dulu
+            document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
+            
+            // Kalau tadi tertutup, buka. Kalau tadi terbuka, biarkan tertutup (Toggle)
+            if (!isActive && menu) {
+                menu.classList.add('active');
+            }
         };
     });
     document.querySelectorAll('.edit-post').forEach(el => {
