@@ -2470,6 +2470,7 @@ let recentSearches = JSON.parse(localStorage.getItem('salink_recent_searches') |
 const MAX_RECENT_SEARCHES = 8;
 let currentGpsData = null;
 let fullScreenAlarmActive = false;
+let currentPreviewImageUrl = '';
 let _audioContext = null;
 let _audioUnlocked = false;
 let sentInvites = JSON.parse(localStorage.getItem('salink_sent_invites') || '{}');
@@ -4264,38 +4265,39 @@ if ('serviceWorker' in navigator) {
 // ====================================================================
 // 20. MEDIA HELPERS (safeSavePosts, getMediaUrl, handleImageError)
 // ====================================================================
+// PATCH 18B: Fungsi simpan yang lebih pintar (Bypass Quota)
 function safeSavePosts(postsArray) {
     try {
-        const fullPosts = postsArray.filter(p => p && p.id);
-        const fullJson = JSON.stringify(fullPosts);
-        if (fullJson.length < 4 * 1024 * 1024) {
-            localStorage.setItem('salink_posts', fullJson);
-            console.log('✅ [safeSavePosts] Saved full:', fullPosts.length, 'posts,', (fullJson.length / 1024).toFixed(1), 'KB');
-            return true;
-        }
-        const lightPosts = fullPosts.map(p => {
+        // 1. Buang gambar Base64 dari LocalStorage agar tidak penuh!
+        const cleanPosts = postsArray.filter(p => p && p.id).map(p => {
             const copy = Object.assign({}, p);
-            if (copy.mediaData && copy.mediaData.length > 50000) {
-                copy.mediaData = copy.mediaData.substring(0, 50000);
+            // JANGAN SIMPAN Base64 di HP, biarkan Supabase yang simpan
+            if (copy.mediaData && copy.mediaData.indexOf('data:') === 0) {
+                delete copy.mediaData; 
             }
             return copy;
         });
-        localStorage.setItem('salink_posts', JSON.stringify(lightPosts));
-        console.log('✅ [safeSavePosts] Saved light:', lightPosts.length, 'posts');
-        return true;
-    } catch (e) {
-        console.error('❌ [safeSavePosts] Error:', e.message);
+
+        const fullJson = JSON.stringify(cleanPosts);
+        
+        // 2. Coba simpan
         try {
-            const noMediaPosts = postsArray.filter(p => p && p.id).map(p => {
-                const copy = Object.assign({}, p);
-                delete copy.mediaData;
-                return copy;
-            });
-            localStorage.setItem('salink_posts', JSON.stringify(noMediaPosts));
+            localStorage.setItem('salink_posts', fullJson);
+            console.log('✅ [safeSavePosts] Saved:', cleanPosts.length, 'posts');
             return true;
-        } catch (e2) {
-            return false;
+        } catch (quotaError) {
+            // 3. Kalau masih penuh, hapus semua cache dan simpan 5 post terakhir
+            console.warn('⚠️ Memori penuh, bersihkan cache lama...');
+            localStorage.removeItem('salink_posts');
+            localStorage.removeItem('salink_post_media');
+            
+            const minimalPosts = cleanPosts.slice(0, 5);
+            localStorage.setItem('salink_posts', JSON.stringify(minimalPosts));
+            return true;
         }
+    } catch (e) {
+        console.error('❌ [safeSavePosts] Error fatal:', e.message);
+        return false;
     }
 }
 
@@ -9418,6 +9420,14 @@ function deleteComment(postId, commentId) {
     }
 }
 window.deleteComment = deleteComment;
+// PATCH 18A: Dummy sharePost untuk mencegah error
+function sharePost(postId) {
+    if (navigator.share) {
+        navigator.share({ title: 'SALINK', text: 'Lihat postingan ini di SALINK', url: window.location.href + '?post=' + postId });
+    } else {
+        showToast('ℹ️', 'Fitur bagikan tidak didukung', 'fa-info-circle');
+    }
+}
 window.sharePost = sharePost;
 window.closeModal = closeModal;
 window.openModal = openModal;
@@ -9498,7 +9508,6 @@ window.refreshMiniMarketplace = refreshMiniMarketplace;
 // ==========================================
 // PATCH 17: LOGIKA PREVIEW GAMBAR & KLIK LUAR
 // ==========================================
-let currentPreviewImageUrl = '';
 
 function openImagePreview(url) {
     currentPreviewImageUrl = url;
