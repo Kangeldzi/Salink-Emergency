@@ -4439,6 +4439,7 @@ async function confirmDeleteNow() {
  * 8) Broadcast sync
  * 9) Render ulang
  * ================================================================ */
+
 async function deletePostPermanent(postId, options) {
     options = options || {};
     const silent = options.silent || false;
@@ -4449,7 +4450,22 @@ async function deletePostPermanent(postId, options) {
         return false;
     }
 
+    // ================================================================
+    // PATCH 21: PROTEKSI KEAMANAN (Cek Kepemilikan)
+    // ================================================================
+    if (!currentUser || !currentUser.username) {
+        showToast('🔒 Akses Ditolak', 'Anda harus login untuk menghapus', 'fa-lock');
+        return false;
+    }
+
     const post = posts.find(p => p.id === postId);
+    
+    // Cek apakah user yang login adalah pemilik postingan
+    if (post && currentUser.username !== post.userId) {
+        showToast('⚠️ Akses Ditolak', 'Anda hanya bisa menghapus postingan sendiri', 'fa-exclamation-triangle');
+        return false;
+    }
+
     const isEmergency = post && post.isSpecial && post.specialType;
     const isUUID = isSupabaseUUID(postId);
 
@@ -5469,8 +5485,14 @@ function attachPostListeners() {
             }
         };
     });
+
+        // PATCH 20A: Fungsi Edit Post
     document.querySelectorAll('.edit-post').forEach(el => {
-        el.onclick = function() {
+        el.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
+            
             const p = posts.find(x => x.id === this.dataset.postId);
             if (!p) return;
             const nt = prompt('Edit postingan:', p.text || '');
@@ -5480,15 +5502,23 @@ function attachPostListeners() {
                 renderPosts();
                 broadcastSync('new_post', { id: p.id });
                 showToast('✅', 'Postingan diedit', 'fa-edit');
-                playRegularSound();
             }
         };
     });
+
+    // PATCH 20A: Fungsi Hapus Post (Tombol di Menu Titik Tiga)
     document.querySelectorAll('.delete-post').forEach(el => {
         el.onclick = function(e) {
             e.preventDefault();
             e.stopPropagation();
-            window.handleDeleteFromMenu(this.dataset.postId);
+            document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
+            
+            const postId = this.dataset.postId;
+            if (typeof deletePostPermanent === 'function') {
+                deletePostPermanent(postId);
+            } else {
+                showToast('⚠️ Error', 'Fungsi hapus tidak ditemukan', 'fa-exclamation-triangle');
+            }
         };
     });
 
@@ -9489,7 +9519,12 @@ window.triggerLocalEmergencyVisual = triggerLocalEmergencyVisual;
 window.EMERGENCY_SOUND_PLAYLIST = EMERGENCY_SOUND_PLAYLIST;
 window.deletePostPermanent = deletePostPermanent;
 window.handleDeleteFromMenu = handleDeleteFromMenu;
-window.handleDeleteFromStatsCard = handleDeleteFromStatsCard;
+// PATCH 20B: Fungsi Hapus dari Card Postingan Baru
+window.handleDeleteFromStatsCard = function(postId) {
+    if (typeof deletePostPermanent === 'function') {
+        deletePostPermanent(postId);
+    }
+};
 window.handleDeleteFromHologram = handleDeleteFromHologram;
 window.handleDeleteFromNotif = handleDeleteFromNotif;
 window.showClearCacheMenu = showClearCacheMenu;
@@ -9568,19 +9603,24 @@ function reportImage() {
     toggleImageMenu();
 }
 
-// Klik di luar modal untuk menutup
+// PATCH 20C: Tutup Menu Titik Tiga & Preview Gambar Jika Klik Sembarang Tempat
 document.addEventListener('click', function(e) {
-    if (e.target.id === 'imagePreviewModal') closeImagePreview();
-    const menu = document.getElementById('imageMenuDropdown');
-    if (menu && menu.style.display === 'block' && !e.target.closest('div[style*="position:absolute; top:20px; left:20px"]')) {
-        menu.style.display = 'none';
-    }
-    
-    // Tutup menu titik tiga postingan jika klik di luar
+    // 1. Tutup Menu Titik Tiga Postingan
     if (!e.target.closest('.post-menu-toggle') && !e.target.closest('.post-menu-dropdown')) {
         document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
     }
-});
+    
+    // 2. Tutup Modal Preview Gambar
+    if (e.target.id === 'imagePreviewModal') {
+        closeImagePreview();
+    }
+    
+    // 3. Tutup Dropdown Titik Tiga Gambar
+    const menuImg = document.getElementById('imageMenuDropdown');
+    if (menuImg && menuImg.style.display === 'block' && !e.target.closest('div[style*="position:absolute; top:20px; left:20px"]')) {
+        menuImg.style.display = 'none';
+    }
+}, true); // <--- Perhatikan tambahan 'true' di akhir (Capture Phase)
         
 // ====================================================================
 // 58. BOOTSTRAP — Load awal (fallback kalau DOMContentLoaded sudah lewat)
