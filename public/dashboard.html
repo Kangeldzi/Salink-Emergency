@@ -2846,162 +2846,81 @@ function adaptPost(p) {
  * PATCH D3-A — ADAPTER SUPABASE → JS & JS → SUPABASE
  * Konversi antara format Supabase (snake_case) dan dashboard (camelCase).
  * ================================================================ */
-
-/* Supabase → Dashboard JS
- * Input: row dari Supabase (dengan JOIN profiles & counts)
- * Output: objek yang kompatibel dengan renderPosts() dll.
- */
 function adaptPostFromSupabase(row) {
     if (!row) return null;
 
-    // Joined profile data (dari Supabase JOIN)
     const profile = row.profiles || {};
-
-    // Media (kalau ada JOIN ke media)
     const mediaArr = Array.isArray(row.media) ? row.media : (row.media ? [row.media] : []);
     const firstMedia = mediaArr.length > 0 ? mediaArr[0] : null;
 
-    // Likes & comments count (kalau ada aggregate)
-    const likesCount = typeof row.likes_count === 'number' 
-        ? row.likes_count 
-        : (Array.isArray(row.likes) ? row.likes.length : 0);
-    const commentsCount = typeof row.comments_count === 'number'
-        ? row.comments_count
-        : (Array.isArray(row.comments) ? row.comments.length : 0);
+    const likesArray = Array.isArray(row.likes) ? row.likes.map(l => l.user_id || l) : [];
+    const commentsArray = Array.isArray(row.comments) ? row.comments.map(c => {
+        const cProfile = c.profiles || c.profile || {};
+        return {
+            id: c.id, user_id: c.user_id, userId: cProfile.username || c.user_id,
+            userFullName: cProfile.full_name || c.user_full_name || '',
+            userGender: normalizeGenderProfile(cProfile.gender || 'Laki-laki'),
+            userProfilePic: cProfile.profile_picture || c.user_profile_pic || '',
+            content: c.content || '', text: c.content || '',
+            parent_id: c.parent_id || null, parentId: c.parent_id || null,
+            created_at: c.created_at, timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
+            updated_at: null, deleted_at: c.deleted_at || null
+        };
+    }) : [];
 
-    // Timestamp: Supabase pakai created_at, dashboard pakai timestamp
     const tsRaw = row.created_at || row.timestamp || new Date().toISOString();
     const ts = typeof tsRaw === 'number' ? tsRaw : new Date(tsRaw).getTime();
 
-    // Media URL dari tabel media
     let mediaType = '';
-    let mediaData = '';
-    // PATCH 15: Baca media_data (Base64) dari Supabase
-    if (row.media_data) {
-        mediaData = row.media_data;
-        mediaType = 'image'; // Asumsi default gambar
-    }
-    let mediaId = '';
+    let mediaData = row.media_data || '';
+    if (mediaData) mediaType = 'image';
+
     let gdriveId = '';
     let gdriveImageUrl = '';
     let gdriveVideoEmbed = '';
 
     if (firstMedia) {
         mediaType = firstMedia.media_type || '';
-        mediaId = firstMedia.id || '';
-        // Bangun URL dari object_key (asumsi Supabase Storage public)
         if (firstMedia.object_key) {
             const bucket = firstMedia.bucket || 'salink-media';
             const url = 'https://dtmzrcsqpprtkcgsdijg.supabase.co/storage/v1/object/public/' + bucket + '/' + firstMedia.object_key;
-            if (mediaType === 'image') {
-                gdriveImageUrl = url;
-            } else if (mediaType === 'video') {
-                gdriveVideoEmbed = url;
-            }
+            if (mediaType === 'image') gdriveImageUrl = url;
+            else if (mediaType === 'video') gdriveVideoEmbed = url;
         }
-        // Fallback: pakai mediaData lama kalau ada
-        mediaData = firstMedia.media_data || '';
     }
-
-    // Likes & comments array untuk backward compat dengan renderPosts lama
-    // (renderPosts lama baca post.likes & post.comments sebagai JSON string)
-        const likesArray = Array.isArray(row.likes) 
-        ? row.likes.map(l => l.user_id || l) 
-        : [];
-    
-       // PATCH D3-Fix-10 — Jangan overwrite kalau sudah ada di c.userFullName
-    const commentsArray = Array.isArray(row.comments)
-        ? row.comments.map(c => {
-            // Kalau c.userFullName sudah terisi (dari commentProfileMap), jangan overwrite
-            const hasFullName = c.userFullName && c.userFullName.trim() !== '';
-            const hasProfilePic = c.userProfilePic && c.userProfilePic.trim() !== '';
-            
-            if (hasFullName && hasProfilePic) {
-                // Sudah lengkap, return apa adanya
-                return {
-                    id: c.id,
-                    user_id: c.user_id,
-                    userId: c.userId || c.user_id,
-                    userFullName: c.userFullName,
-                    userGender: c.userGender || 'male',
-                    userProfilePic: c.userProfilePic,
-                    content: c.content || '',
-                    text: c.content || c.text || '',
-                    parent_id: c.parent_id || c.parentId || null,
-                    parentId: c.parent_id || c.parentId || null,
-                    created_at: c.created_at,
-                    timestamp: c.timestamp || (c.created_at ? new Date(c.created_at).getTime() : Date.now()),
-                    updated_at: c.updated_at,
-                    deleted_at: c.deleted_at
-                };
-            }
-            
-            // Fallback: pakai c.profiles (untuk backward compat)
-            const profile = c.profiles || c.profile || {};
-            return {
-                id: c.id,
-                user_id: c.user_id,
-                userId: profile.username || c.user_id,
-                userFullName: profile.full_name || c.user_full_name || '',
-                userGender: normalizeGenderProfile(profile.gender || c.user_gender || 'Laki-laki'),
-                userProfilePic: profile.profile_picture || c.user_profile_pic || '',
-                content: c.content || '',
-                text: c.content || c.text || '',
-                parent_id: c.parent_id || null,
-                parentId: c.parent_id || null,
-                created_at: c.created_at,
-                timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
-                updated_at: c.updated_at,
-                deleted_at: c.deleted_at
-            };
-        })
-        : []; 
 
     return {
         id: row.id,
-        // PATCH 16: Perbaikan ambil nama profil
         userId: profile.username || row.user_username || 'user',
         userFullName: profile.full_name || row.user_full_name || 'Pengguna SALINK',
         userGender: normalizeGenderProfile(profile.gender || row.user_gender || 'Laki-laki'),
         userProfilePic: profile.profile_picture || row.user_profile_pic || '',
-
         text: row.text || '',
         mediaType: mediaType,
         mediaData: mediaData,
-        mediaId: mediaId,
-        mediaThumbnail: '',
         gdriveId: gdriveId,
         gdriveImageUrl: gdriveImageUrl,
         gdriveVideoEmbed: gdriveVideoEmbed,
-        gdriveThumbnail: '',
-
         timestamp: ts,
         likes: JSON.stringify(likesArray),
         comments: JSON.stringify(commentsArray),
         viewerCount: parseInt(row.viewer_count || 0, 10) || 0,
-
         isSpecial: row.is_special === true || row.is_special === 'TRUE' || row.is_special === 'true',
         specialType: row.special_type || '',
         specialLocation: row.special_location || '',
         specialAddress: row.special_address || '',
-
         latitude: row.latitude || '',
         longitude: row.longitude || '',
         mapsURL: row.maps_url || '',
-
         postType: row.post_type || 'biasa',
         status: row.status || 'published',
-
         country: row.country || '',
         province: row.province || '',
         city: row.city || '',
         district: row.district || '',
         village: row.village || '',
         address: row.address || '',
-
-        // Metadata tambahan untuk debugging
-        _source: 'supabase',
-        _raw: row
+        _source: 'supabase'
     };
 }
 
@@ -9568,8 +9487,9 @@ window.openOrderTracking = openOrderTracking;
 window.refreshMiniMarketplace = refreshMiniMarketplace;
 
 // ==========================================
-// PATCH 17: LOGIKA PREVIEW GAMBAR & KLIK LUAR
+// PATCH 24B: LOGIKA PREVIEW GAMBAR & KLIK LUAR (BERSIH)
 // ==========================================
+let currentPreviewImageUrl = '';
 
 function openImagePreview(url) {
     currentPreviewImageUrl = url;
@@ -9594,9 +9514,7 @@ function downloadImage() {
     const a = document.createElement('a');
     a.href = currentPreviewImageUrl;
     a.download = 'SALINK_Image_' + Date.now() + '.jpg';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     showToast('✅', 'Gambar berhasil diunduh', 'fa-check-circle');
     toggleImageMenu();
 }
@@ -9607,7 +9525,6 @@ async function shareImage() {
         const response = await fetch(currentPreviewImageUrl);
         const blob = await response.blob();
         const file = new File([blob], 'SALINK_Image.jpg', { type: blob.type });
-        
         if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
             await navigator.share({ files: [file], title: 'Bagikan Gambar', text: 'Dikirim dari Aplikasi SALINK' });
         } else {
@@ -9622,28 +9539,23 @@ function reportImage() {
     toggleImageMenu();
 }
 
-// PATCH 24: Tutup Menu Titik Tiga & Preview Gambar Jika Klik Sembarang Tempat
-document.body.addEventListener('click', function(e) {
+// EVENT LISTENER KLIK DI LUAR (Hanya Satu, Menggunakan Capture Phase)
+window.addEventListener('click', function(e) {
     // 1. Tutup Menu Titik Tiga Postingan
     if (!e.target.closest('.post-menu-toggle') && !e.target.closest('.post-menu-dropdown')) {
-        document.querySelectorAll('.post-menu-dropdown').forEach(m => {
-            if (m.classList.contains('active')) {
-                m.classList.remove('active');
-            }
-        });
+        const openMenus = document.querySelectorAll('.post-menu-dropdown.active');
+        if (openMenus.length > 0) openMenus.forEach(m => m.classList.remove('active'));
     }
     
     // 2. Tutup Modal Preview Gambar
-    if (e.target.id === 'imagePreviewModal') {
-        if (typeof closeImagePreview === 'function') closeImagePreview();
-    }
+    if (e.target.id === 'imagePreviewModal') closeImagePreview();
     
     // 3. Tutup Dropdown Titik Tiga Gambar
     const menuImg = document.getElementById('imageMenuDropdown');
     if (menuImg && menuImg.style.display === 'block' && !e.target.closest('div[style*="position:absolute; top:20px; left:20px"]')) {
         menuImg.style.display = 'none';
     }
-});
+}, true); 
         
 // ====================================================================
 // 58. BOOTSTRAP — Load awal (fallback kalau DOMContentLoaded sudah lewat)
