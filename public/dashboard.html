@@ -8817,8 +8817,25 @@ function initHeaderNotif() {
         });
     }
 }
+
 function initRipple() {
-   
+    document.addEventListener('click', function(e) {
+        const rippleEl = e.target.closest('.ripple');
+        if (!rippleEl) return;
+        const rect = rippleEl.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        const x = e.clientX - rect.left - size / 2;
+        const y = e.clientY - rect.top - size / 2;
+        const ripple = document.createElement('span');
+        ripple.className = 'ripple-effect';
+        ripple.style.width = ripple.style.height = size + 'px';
+        ripple.style.left = x + 'px';
+        ripple.style.top = y + 'px';
+        rippleEl.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 600);
+    });
+} 
+        
 function initStorageEvents() {
     window.addEventListener('storage', function(e) {
                 if (e.key === 'salink_sync_trigger' && e.newValue) {
@@ -9605,16 +9622,20 @@ function reportImage() {
     toggleImageMenu();
 }
 
-// PATCH 20C: Tutup Menu Titik Tiga & Preview Gambar Jika Klik Sembarang Tempat
-document.addEventListener('click', function(e) {
+// PATCH 24: Tutup Menu Titik Tiga & Preview Gambar Jika Klik Sembarang Tempat
+document.body.addEventListener('click', function(e) {
     // 1. Tutup Menu Titik Tiga Postingan
     if (!e.target.closest('.post-menu-toggle') && !e.target.closest('.post-menu-dropdown')) {
-        document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
+        document.querySelectorAll('.post-menu-dropdown').forEach(m => {
+            if (m.classList.contains('active')) {
+                m.classList.remove('active');
+            }
+        });
     }
     
     // 2. Tutup Modal Preview Gambar
     if (e.target.id === 'imagePreviewModal') {
-        closeImagePreview();
+        if (typeof closeImagePreview === 'function') closeImagePreview();
     }
     
     // 3. Tutup Dropdown Titik Tiga Gambar
@@ -9622,7 +9643,7 @@ document.addEventListener('click', function(e) {
     if (menuImg && menuImg.style.display === 'block' && !e.target.closest('div[style*="position:absolute; top:20px; left:20px"]')) {
         menuImg.style.display = 'none';
     }
-}, true); // <--- Perhatikan tambahan 'true' di akhir (Capture Phase)
+});
         
 // ====================================================================
 // 58. BOOTSTRAP — Load awal (fallback kalau DOMContentLoaded sudah lewat)
