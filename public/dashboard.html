@@ -530,21 +530,21 @@
         .chart-nav-btn.active { background: var(--accent-blue-gradient); color: #fff; border-color: var(--primary); box-shadow: 0 4px 12px rgba(230,0,18,0.35); }
         .chart-container { margin-top: 10px; display: none; min-height: 200px; }
         .chart-container.active { display: block; }
-        .chart-container canvas { max-height: 280px; max-width: 100%; }
-        .chart-container .chart-wrapper { position: relative; width: 100%; max-width: 380px; margin: 0 auto; }
-        /* PATCH 22: Fix ukuran Chart agar konsisten */
-        .chart-container .chart-wrapper {
-               position: relative;
-               width: 100%;
-               height: 250px !important; /* Kunci tingginya agar konsisten */
-               max-width: 380px;
-               margin: 0 auto;
-         }
-        .chart-container canvas {
-               width: 100% !important;
-               height: 100% !important;
-               max-height: 250px;
-         }
+        /* PATCH 26: Fix ukuran Chart agar konsisten (Full Width) */
+.chart-container .chart-wrapper {
+    position: relative;
+    width: 100%;
+    height: 280px; /* Kunci tinggi agar tidak mengecil */
+    max-width: 100%; /* Biarkan penuh */
+    margin: 0 auto;
+    padding: 10px;
+}
+.chart-container canvas {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 260px;
+    display: block;
+}
         .chart-period-info { text-align: center; margin-top: 10px; font-size: 0.6rem; color: rgba(255,255,255,0.65); border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; font-weight: 600; }
         .heatmap-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 10px 0; max-width: 380px; margin: 0 auto; }
         .heatmap-cell { aspect-ratio: 1; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 0.58rem; font-weight: 700; border: 1px solid rgba(255,255,255,0.1); min-height: 32px; color: #ffffff; }
@@ -9538,23 +9538,21 @@ function reportImage() {
     toggleImageMenu();
 }
 
-// EVENT LISTENER KLIK DI LUAR (Hanya Satu, Menggunakan Capture Phase)
-window.addEventListener('click', function(e) {
-    // 1. Tutup Menu Titik Tiga Postingan
+// PATCH 26: TUTUP MENU TITIK TIGA (KLIK DI LUAR)
+document.addEventListener('click', function(e) {
+    // Jika yang diklik BUKAN tombol titik tiga DAN BUKAN menu dropdown-nya
     if (!e.target.closest('.post-menu-toggle') && !e.target.closest('.post-menu-dropdown')) {
-        const openMenus = document.querySelectorAll('.post-menu-dropdown.active');
-        if (openMenus.length > 0) openMenus.forEach(m => m.classList.remove('active'));
+        // Cari semua menu yang sedang terbuka, lalu tutup
+        document.querySelectorAll('.post-menu-dropdown').forEach(function(menu) {
+            menu.classList.remove('active');
+        });
     }
     
-    // 2. Tutup Modal Preview Gambar
-    if (e.target.id === 'imagePreviewModal') closeImagePreview();
-    
-    // 3. Tutup Dropdown Titik Tiga Gambar
-    const menuImg = document.getElementById('imageMenuDropdown');
-    if (menuImg && menuImg.style.display === 'block' && !e.target.closest('div[style*="position:absolute; top:20px; left:20px"]')) {
-        menuImg.style.display = 'none';
+    // Khusus untuk modal gambar
+    if (e.target.id === 'imagePreviewModal') {
+        closeImagePreview();
     }
-}, true); 
+});
         
 // ====================================================================
 // 58. BOOTSTRAP — Load awal (fallback kalau DOMContentLoaded sudah lewat)
