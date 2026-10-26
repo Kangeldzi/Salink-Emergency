@@ -5374,6 +5374,7 @@ function renderRepliesBlock(parent, replies, repliesByParent, postId, parentDept
 }
             
 function attachPostListeners() {
+    // 1. Tombol Komentar (Buka/Tutup)
     document.querySelectorAll('.comment-toggle').forEach(el => {
         el.onclick = function(e) {
             if (isPreviewMode) { showPreviewOverlay(); e.stopPropagation(); return; }
@@ -5381,6 +5382,8 @@ function attachPostListeners() {
             if (s) s.style.display = s.style.display === 'none' ? 'block' : 'none';
         };
     });
+
+    // 2. Tombol Kirim Komentar
     document.querySelectorAll('.send-comment').forEach(el => {
         el.onclick = function(e) {
             if (isPreviewMode) { showPreviewOverlay(); e.stopPropagation(); return; }
@@ -5389,6 +5392,8 @@ function attachPostListeners() {
             if (text) { addComment(this.dataset.postId, text); input.value = ''; }
         };
     });
+
+    // 3. Tombol Enter di Komentar
     document.querySelectorAll('.comment-input').forEach(el => {
         el.onkeypress = function(e) {
             if (e.key === 'Enter') {
@@ -5397,6 +5402,77 @@ function attachPostListeners() {
             }
         };
     });
+
+    // 4. TOMBOL TITIK TIGA (Buka/Tutup Menu)
+    document.querySelectorAll('.post-menu-toggle').forEach(el => {
+        el.onclick = function(e) {
+            e.stopPropagation(); // Hentikan klik agar tidak tembus ke body
+            e.preventDefault();
+            
+            const menuId = 'postMenu-' + this.dataset.postId;
+            const menu = document.getElementById(menuId);
+            
+            // Cek apakah menu ini sedang terbuka
+            const isOpen = menu.classList.contains('active');
+            
+            // Tutup semua menu yang ada
+            document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
+            
+            // Kalau tadi tertutup, buka. Kalau tadi terbuka, biarkan tertutup.
+            if (!isOpen) {
+                menu.classList.add('active');
+            }
+        };
+    });
+
+    // 5. TOMBOL EDIT & HAPUS DI DALAM MENU
+    document.querySelectorAll('.edit-post').forEach(el => {
+        el.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
+            const p = posts.find(x => x.id === this.dataset.postId);
+            if (!p) return;
+            const nt = prompt('Edit postingan:', p.text || '');
+            if (nt !== null && nt.trim() !== '') {
+                p.text = nt.trim();
+                safeSavePosts(posts);
+                renderPosts();
+                broadcastSync('new_post', { id: p.id });
+                showToast('✅', 'Postingan diedit', 'fa-edit');
+            }
+        };
+    });
+
+    document.querySelectorAll('.delete-post').forEach(el => {
+        el.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
+            if (typeof deletePostPermanent === 'function') deletePostPermanent(this.dataset.postId);
+        };
+    });
+
+    // 6. EVENT LISTENER GLOBAL (KLIK DI LUAR MENU)
+    // Kita hapus event lama dan pasang yang baru di sini agar pasti jalan.
+    if (window._salinkClickOutsideListener) {
+        document.removeEventListener('click', window._salinkClickOutsideListener);
+    }
+    window._salinkClickOutsideListener = function(e) {
+        if (!e.target.closest('.post-menu-toggle') && !e.target.closest('.post-menu-dropdown')) {
+            document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
+        }
+    };
+    document.addEventListener('click', window._salinkClickOutsideListener);
+    
+    // 7. EVENT UNTUK BALASAN KOMENTAR (Sederhana)
+    document.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(el => {
+        el.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (isPreviewMode) { showPreviewOverlay(); return; }
+            const box = document.getElementById('replyBox-' + this.dataset.commentId);
+            if (box) box.classList.toggle('active');
+        };
+    });
+}
     
     // PATCH 19: Toggle Menu Titik Tiga (Lebih Bersih)
     document.querySelectorAll('.post-menu-toggle').forEach(el => {
@@ -7025,7 +7101,7 @@ function initAllCharts() {
             chartInstances.pie = new Chart(pieCtx, {
                 type: 'pie',
                 data: { labels: labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#141b2e', borderWidth: 2 }] },
-                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } }
             });
         }
     }
@@ -7038,7 +7114,7 @@ function initAllCharts() {
             chartInstances.bar = new Chart(barCtx, {
                 type: 'bar',
                 data: { labels: labels, datasets: [{ label: 'Jumlah', data: values, backgroundColor: bgColors, borderRadius: 6 }] },
-                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } }
             });
         }
     }
@@ -7060,7 +7136,7 @@ function initAllCharts() {
                     { label: '🚓 Kriminal', data: weekly.crime, borderColor: colors.security, backgroundColor: colors.security + '30', tension: 0.4 },
                     { label: '🌪️ Bencana', data: weekly.disaster, borderColor: colors.disaster, backgroundColor: colors.disaster + '30', tension: 0.4 }
                 ] },
-                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } }
             });
         }
     }
@@ -7082,7 +7158,7 @@ function initAllCharts() {
                     { label: '🚓 Kriminal', data: weekly.crime, borderColor: colors.security, backgroundColor: colors.security + '50', tension: 0.4, fill: true },
                     { label: '🌪️ Bencana', data: weekly.disaster, borderColor: colors.disaster, backgroundColor: colors.disaster + '50', tension: 0.4, fill: true }
                 ] },
-                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, stacked: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } }
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 9 } } } }, scales: { y: { beginAtZero: true, stacked: true, grid: { color: colors.grid }, ticks: { color: colors.text, stepSize: 1 } }, x: { grid: { display: false }, ticks: { color: colors.text } } } }
             });
         }
     }
@@ -7095,7 +7171,7 @@ function initAllCharts() {
             chartInstances.doughnut = new Chart(doughnutCtx, {
                 type: 'doughnut',
                 data: { labels: labels, datasets: [{ data: values, backgroundColor: bgColors, borderColor: '#141b2e', borderWidth: 3, hoverOffset: 10 }] },
-                options: { responsive: true, maintainAspectRatio: true, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } }
+                options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { color: colors.text, font: { size: 10 } } } } }
             });
         }
     }
@@ -7104,28 +7180,33 @@ function initAllCharts() {
 }
 
 function switchChart(type) {
-    document.querySelectorAll('.chart-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.chart === type));
-    const map = {
+    // 1. Sembunyikan semua container
+    document.querySelectorAll('.chart-container').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.chart-nav-btn').forEach(b => b.classList.remove('active'));
+    
+    // 2. Tampilkan container yang dipilih
+    const containerMap = {
         pie: 'pieChartContainer', bar: 'barChartContainer', line: 'lineChartContainer',
         area: 'areaChartContainer', doughnut: 'doughnutChartContainer',
         gauge: 'gaugeChartContainer', heatmap: 'heatmapChartContainer', map: 'mapChartContainer'
     };
-    Object.keys(map).forEach(k => {
-        const el = document.getElementById(map[k]);
-        if (el) el.classList.toggle('active', k === type);
-    });
+    const container = document.getElementById(containerMap[type]);
+    if (container) container.classList.add('active');
+    
+    const btn = document.querySelector('.chart-nav-btn[data-chart="' + type + '"]');
+    if (btn) btn.classList.add('active');
+
+    // 3. Paksa Chart menggambar ulang setelah container terlihat
     setTimeout(() => {
-        const chart = chartInstances[type];
-        if (chart) chart.resize();
-                if (chart) {
-            chart.resize();
-            chart.update(); // <--- TAMBAHKAN INI agar chart menggambar ulang saat tab dibuka
+        if (chartInstances[type]) {
+            chartInstances[type].resize();
+            chartInstances[type].update();
         }
         if (type === 'gauge') updateGaugeChart();
         else if (type === 'heatmap') updateHeatmap();
         else if (type === 'map') updateMap();
         else if (type === 'line' || type === 'area') updateLineAreaCharts();
-    }, 100);
+    }, 150); // Beri waktu 150ms agar CSS render dulu
 }
 
 function updateAllCharts() {
@@ -9537,22 +9618,6 @@ function reportImage() {
     showToast('⚠️ Laporan Terkirim', 'Tim Admin akan meninjau foto ini.', 'fa-exclamation-triangle');
     toggleImageMenu();
 }
-
-// PATCH 26: TUTUP MENU TITIK TIGA (KLIK DI LUAR)
-document.addEventListener('click', function(e) {
-    // Jika yang diklik BUKAN tombol titik tiga DAN BUKAN menu dropdown-nya
-    if (!e.target.closest('.post-menu-toggle') && !e.target.closest('.post-menu-dropdown')) {
-        // Cari semua menu yang sedang terbuka, lalu tutup
-        document.querySelectorAll('.post-menu-dropdown').forEach(function(menu) {
-            menu.classList.remove('active');
-        });
-    }
-    
-    // Khusus untuk modal gambar
-    if (e.target.id === 'imagePreviewModal') {
-        closeImagePreview();
-    }
-});
         
 // ====================================================================
 // 58. BOOTSTRAP — Load awal (fallback kalau DOMContentLoaded sudah lewat)
