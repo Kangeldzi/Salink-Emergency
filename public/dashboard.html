@@ -5406,19 +5406,17 @@ function attachPostListeners() {
     // 4. TOMBOL TITIK TIGA (Buka/Tutup Menu)
     document.querySelectorAll('.post-menu-toggle').forEach(el => {
         el.onclick = function(e) {
-            e.stopPropagation(); // Hentikan klik agar tidak tembus ke body
+            e.stopPropagation(); 
             e.preventDefault();
             
             const menuId = 'postMenu-' + this.dataset.postId;
             const menu = document.getElementById(menuId);
-            
-            // Cek apakah menu ini sedang terbuka
             const isOpen = menu.classList.contains('active');
             
             // Tutup semua menu yang ada
             document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
             
-            // Kalau tadi tertutup, buka. Kalau tadi terbuka, biarkan tertutup.
+            // Buka menu yang diklik jika sebelumnya tertutup
             if (!isOpen) {
                 menu.classList.add('active');
             }
@@ -5451,19 +5449,19 @@ function attachPostListeners() {
         };
     });
 
-    // 6. EVENT LISTENER GLOBAL (KLIK DI LUAR MENU)
-    // Kita hapus event lama dan pasang yang baru di sini agar pasti jalan.
+    // 6. EVENT LISTENER GLOBAL (KLIK DI LUAR MENU) - SATU UNTUK SEMUA
     if (window._salinkClickOutsideListener) {
         document.removeEventListener('click', window._salinkClickOutsideListener);
     }
     window._salinkClickOutsideListener = function(e) {
+        // Jika yang diklik BUKAN tombol titik tiga DAN BUKAN menu dropdown
         if (!e.target.closest('.post-menu-toggle') && !e.target.closest('.post-menu-dropdown')) {
             document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
         }
     };
     document.addEventListener('click', window._salinkClickOutsideListener);
     
-    // 7. EVENT UNTUK BALASAN KOMENTAR (Sederhana)
+    // 7. EVENT UNTUK BALASAN KOMENTAR
     document.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(el => {
         el.onclick = function(e) {
             e.preventDefault(); e.stopPropagation();
@@ -7180,7 +7178,7 @@ function initAllCharts() {
 }
 
 function switchChart(type) {
-    // 1. Sembunyikan semua container
+    // 1. Sembunyikan semua container & nonaktifkan semua tombol
     document.querySelectorAll('.chart-container').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.chart-nav-btn').forEach(b => b.classList.remove('active'));
     
@@ -7196,17 +7194,20 @@ function switchChart(type) {
     const btn = document.querySelector('.chart-nav-btn[data-chart="' + type + '"]');
     if (btn) btn.classList.add('active');
 
-    // 3. Paksa Chart menggambar ulang setelah container terlihat
+    // 3. Paksa Chart.js menghitung ulang ukuran SETELAH container terlihat
     setTimeout(() => {
-        if (chartInstances[type]) {
-            chartInstances[type].resize();
-            chartInstances[type].update();
+        const chart = chartInstances[type];
+        if (chart) {
+            chart.resize(); // Paksa hitung ulang ukuran canvas
+            chart.update(); // Gambar ulang dengan ukuran baru
         }
+        
+        // Update konten chart non-Chart.js
         if (type === 'gauge') updateGaugeChart();
         else if (type === 'heatmap') updateHeatmap();
         else if (type === 'map') updateMap();
         else if (type === 'line' || type === 'area') updateLineAreaCharts();
-    }, 150); // Beri waktu 150ms agar CSS render dulu
+    }, 200); // 200ms cukup untuk browser menyelesaikan layout container
 }
 
 function updateAllCharts() {
@@ -9546,6 +9547,14 @@ window.handleDeleteFromStatsCard = function(postId) {
 };
 window.handleDeleteFromHologram = handleDeleteFromHologram;
 window.handleDeleteFromNotif = handleDeleteFromNotif;
+// PATCH 28: Fungsi Hapus dari Card Postingan Baru
+window.handleDeleteFromStatsCard = function(postId) {
+    if (typeof deletePostPermanent === 'function') {
+        deletePostPermanent(postId);
+    } else {
+        showToast('⚠️ Error', 'Fungsi hapus tidak ditemukan', 'fa-exclamation-triangle');
+    }
+};
 window.showClearCacheMenu = showClearCacheMenu;
 window.closeClearCacheModal = closeClearCacheModal;
 window.showStorageDetail = showStorageDetail;
