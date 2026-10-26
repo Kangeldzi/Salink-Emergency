@@ -530,21 +530,32 @@
         .chart-nav-btn.active { background: var(--accent-blue-gradient); color: #fff; border-color: var(--primary); box-shadow: 0 4px 12px rgba(230,0,18,0.35); }
         .chart-container { margin-top: 10px; display: none; min-height: 200px; }
         .chart-container.active { display: block; }
-        /* PATCH 26: Fix ukuran Chart agar konsisten (Full Width) */
-.chart-container .chart-wrapper {
-    position: relative;
-    width: 100%;
-    height: 280px; /* Kunci tinggi agar tidak mengecil */
-    max-width: 100%; /* Biarkan penuh */
-    margin: 0 auto;
-    padding: 10px;
-}
-.chart-container canvas {
-    width: 100% !important;
-    height: 100% !important;
-    max-height: 260px;
-    display: block;
-}
+/* ================================================================
+   FIX CHART SIZE (Full Width & Proportional)
+   ================================================================ */
+       .chart-container {
+              margin-top: 10px; 
+              display: none; 
+              width: 100%; 
+              position: relative;
+       }
+       .chart-container.active {
+              display: block;
+       }
+       .chart-container .chart-wrapper {
+              position: relative;
+              width: 100% !important;
+              height: 300px !important; /* Kunci tinggi agar tidak mengecil */
+              max-width: 100% !important;
+              margin: 0 auto;
+              padding: 10px;
+       }
+       .chart-container canvas {
+              width: 100% !important;
+              height: 100% !important;
+              max-height: 280px !important;
+              display: block;
+       }
         .chart-period-info { text-align: center; margin-top: 10px; font-size: 0.6rem; color: rgba(255,255,255,0.65); border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; font-weight: 600; }
         .heatmap-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 10px 0; max-width: 380px; margin: 0 auto; }
         .heatmap-cell { aspect-ratio: 1; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 0.58rem; font-weight: 700; border: 1px solid rgba(255,255,255,0.1); min-height: 32px; color: #ffffff; }
@@ -5188,9 +5199,8 @@ function renderFullPostCard(p, isExpired) {
 }
 
 // ====================================================================
-// 28. ATTACH POST LISTENERS
+// 28. ATTACH POST LISTENERS (FIX TOTAL - BERSIH TANPA TUMPANG TINDIH)
 // ====================================================================
-
 /* ================================================================
  * PATCH 7F-NESTED — Render komentar berantai (nested unlimited)
  * ================================================================ */
@@ -5393,7 +5403,7 @@ function attachPostListeners() {
         };
     });
 
-    // 3. Tombol Enter di Komentar
+    // 3. Enter di Komentar
     document.querySelectorAll('.comment-input').forEach(el => {
         el.onkeypress = function(e) {
             if (e.key === 'Enter') {
@@ -5406,14 +5416,14 @@ function attachPostListeners() {
     // 4. TOMBOL TITIK TIGA (Buka/Tutup Menu)
     document.querySelectorAll('.post-menu-toggle').forEach(el => {
         el.onclick = function(e) {
-            e.stopPropagation(); 
+            e.stopPropagation(); // Cegah bubbling agar tidak langsung tertutup
             e.preventDefault();
             
             const menuId = 'postMenu-' + this.dataset.postId;
             const menu = document.getElementById(menuId);
             const isOpen = menu.classList.contains('active');
             
-            // Tutup semua menu yang ada
+            // Tutup semua menu yang terbuka
             document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
             
             // Buka menu yang diklik jika sebelumnya tertutup
@@ -5423,11 +5433,13 @@ function attachPostListeners() {
         };
     });
 
-    // 5. TOMBOL EDIT & HAPUS DI DALAM MENU
+    // 5. TOMBOL EDIT (Di dalam menu)
     document.querySelectorAll('.edit-post').forEach(el => {
         el.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
+            e.preventDefault(); 
+            e.stopPropagation();
             document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
+            
             const p = posts.find(x => x.id === this.dataset.postId);
             if (!p) return;
             const nt = prompt('Edit postingan:', p.text || '');
@@ -5441,36 +5453,34 @@ function attachPostListeners() {
         };
     });
 
+    // 6. TOMBOL HAPUS (Di dalam menu)
     document.querySelectorAll('.delete-post').forEach(el => {
         el.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
+            e.preventDefault(); 
+            e.stopPropagation();
             document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
-            if (typeof deletePostPermanent === 'function') deletePostPermanent(this.dataset.postId);
+            
+            if (typeof deletePostPermanent === 'function') {
+                deletePostPermanent(this.dataset.postId);
+            }
         };
     });
 
-    // 6. EVENT LISTENER GLOBAL (KLIK DI LUAR MENU) - SATU UNTUK SEMUA
+    // 7. KLIK DI LUAR MENU (AUTO CLOSE)
+    // Hapus listener lama jika ada (mencegah penumpukan memori)
     if (window._salinkClickOutsideListener) {
         document.removeEventListener('click', window._salinkClickOutsideListener);
     }
+    
+    // Buat listener global baru
     window._salinkClickOutsideListener = function(e) {
-        // Jika yang diklik BUKAN tombol titik tiga DAN BUKAN menu dropdown
         if (!e.target.closest('.post-menu-toggle') && !e.target.closest('.post-menu-dropdown')) {
             document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
         }
     };
     document.addEventListener('click', window._salinkClickOutsideListener);
-    
-    // 7. EVENT UNTUK BALASAN KOMENTAR
-    document.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(el => {
-        el.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (isPreviewMode) { showPreviewOverlay(); return; }
-            const box = document.getElementById('replyBox-' + this.dataset.commentId);
-            if (box) box.classList.toggle('active');
-        };
-    });
 }
+
     
     // PATCH 19: Toggle Menu Titik Tiga (Lebih Bersih)
     document.querySelectorAll('.post-menu-toggle').forEach(el => {
@@ -7177,6 +7187,9 @@ function initAllCharts() {
     updateHeatmap();
 }
 
+// ====================================================================
+// FIX CHART SWITCHING (Force Resize agar tidak mengecil)
+// ====================================================================
 function switchChart(type) {
     // 1. Sembunyikan semua container & nonaktifkan semua tombol
     document.querySelectorAll('.chart-container').forEach(el => el.classList.remove('active'));
@@ -7195,19 +7208,20 @@ function switchChart(type) {
     if (btn) btn.classList.add('active');
 
     // 3. Paksa Chart.js menghitung ulang ukuran SETELAH container terlihat
+    // (Butuh jeda 250ms agar CSS 'display: block' selesai dihitung browser)
     setTimeout(() => {
         const chart = chartInstances[type];
-        if (chart) {
-            chart.resize(); // Paksa hitung ulang ukuran canvas
-            chart.update(); // Gambar ulang dengan ukuran baru
+        if (chart && typeof chart.resize === 'function') {
+            chart.resize();
+            chart.update();
         }
         
-        // Update konten chart non-Chart.js
+        // Update chart manual (Bukan Chart.js)
         if (type === 'gauge') updateGaugeChart();
         else if (type === 'heatmap') updateHeatmap();
         else if (type === 'map') updateMap();
         else if (type === 'line' || type === 'area') updateLineAreaCharts();
-    }, 200); // 200ms cukup untuk browser menyelesaikan layout container
+    }, 250); 
 }
 
 function updateAllCharts() {
@@ -9405,7 +9419,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // --- Preview overlay kalau belum login ---
     if (isPreviewMode) setTimeout(() => showPreviewOverlay(), 1200);
 
-        // PATCH 14: Matikan Auto-Refresh sementara untuk testing
+    // PATCH 14: Matikan Auto-Refresh sementara untuk testing
     // setInterval(() => {
     //     if (!document.hidden) loadData();
     // }, AUTO_REFRESH);
@@ -9539,10 +9553,19 @@ window.triggerLocalEmergencyVisual = triggerLocalEmergencyVisual;
 window.EMERGENCY_SOUND_PLAYLIST = EMERGENCY_SOUND_PLAYLIST;
 window.deletePostPermanent = deletePostPermanent;
 window.handleDeleteFromMenu = handleDeleteFromMenu;
-// PATCH 20B: Fungsi Hapus dari Card Postingan Baru
+// ====================================================================
+// PATCH FINAL: HANDLE DELETE DARI STATS CARD (Hanya 1 Fungsi, Tanpa Duplikat)
+// ====================================================================
 window.handleDeleteFromStatsCard = function(postId) {
+    if (!postId) {
+        showToast('⚠️ Error', 'ID postingan tidak ditemukan', 'fa-exclamation-triangle');
+        return;
+    }
+    // Panggil fungsi hapus utama
     if (typeof deletePostPermanent === 'function') {
         deletePostPermanent(postId);
+    } else {
+        showToast('⚠️ Error', 'Fungsi hapus tidak ditemukan', 'fa-exclamation-triangle');
     }
 };
 window.handleDeleteFromHologram = handleDeleteFromHologram;
