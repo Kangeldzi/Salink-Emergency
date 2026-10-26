@@ -532,6 +532,19 @@
         .chart-container.active { display: block; }
         .chart-container canvas { max-height: 280px; max-width: 100%; }
         .chart-container .chart-wrapper { position: relative; width: 100%; max-width: 380px; margin: 0 auto; }
+        /* PATCH 22: Fix ukuran Chart agar konsisten */
+        .chart-container .chart-wrapper {
+               position: relative;
+               width: 100%;
+               height: 250px !important; /* Kunci tingginya agar konsisten */
+               max-width: 380px;
+               margin: 0 auto;
+         }
+        .chart-container canvas {
+               width: 100% !important;
+               height: 100% !important;
+               max-height: 250px;
+         }
         .chart-period-info { text-align: center; margin-top: 10px; font-size: 0.6rem; color: rgba(255,255,255,0.65); border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; font-weight: 600; }
         .heatmap-container { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 10px 0; max-width: 380px; margin: 0 auto; }
         .heatmap-cell { aspect-ratio: 1; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 0.58rem; font-weight: 700; border: 1px solid rgba(255,255,255,0.1); min-height: 32px; color: #ffffff; }
@@ -7185,6 +7198,10 @@ function switchChart(type) {
     setTimeout(() => {
         const chart = chartInstances[type];
         if (chart) chart.resize();
+                if (chart) {
+            chart.resize();
+            chart.update(); // <--- TAMBAHKAN INI agar chart menggambar ulang saat tab dibuka
+        }
         if (type === 'gauge') updateGaugeChart();
         else if (type === 'heatmap') updateHeatmap();
         else if (type === 'map') updateMap();
@@ -8801,22 +8818,27 @@ function initHeaderNotif() {
     }
 }
 function initRipple() {
-    document.addEventListener('click', function(e) {
-        const rippleEl = e.target.closest('.ripple');
-        if (!rippleEl) return;
-        const rect = rippleEl.getBoundingClientRect();
-        const size = Math.max(rect.width, rect.height);
-        const x = e.clientX - rect.left - size / 2;
-        const y = e.clientY - rect.top - size / 2;
-        const ripple = document.createElement('span');
-        ripple.className = 'ripple-effect';
-        ripple.style.width = ripple.style.height = size + 'px';
-        ripple.style.left = x + 'px';
-        ripple.style.top = y + 'px';
-        rippleEl.appendChild(ripple);
-        setTimeout(() => ripple.remove(), 600);
-    });
-}
+   // PATCH 22: TUTUP MENU TITIK TIGA & PREVIEW GAMBAR SAAT KLIK DI LUAR
+window.addEventListener('click', function(e) {
+    // 1. Tutup Menu Titik Tiga Postingan
+    if (!e.target.closest('.post-menu-toggle') && !e.target.closest('.post-menu-dropdown')) {
+        const openMenus = document.querySelectorAll('.post-menu-dropdown.active');
+        if (openMenus.length > 0) {
+            openMenus.forEach(m => m.classList.remove('active'));
+        }
+    }
+    
+    // 2. Tutup Modal Preview Gambar
+    if (e.target.id === 'imagePreviewModal') {
+        if (typeof closeImagePreview === 'function') closeImagePreview();
+    }
+    
+    // 3. Tutup Dropdown Titik Tiga Gambar
+    const menuImg = document.getElementById('imageMenuDropdown');
+    if (menuImg && menuImg.style.display === 'block' && !e.target.closest('div[style*="position:absolute; top:20px; left:20px"]')) {
+        menuImg.style.display = 'none';
+    }
+}, true);
 function initStorageEvents() {
     window.addEventListener('storage', function(e) {
                 if (e.key === 'salink_sync_trigger' && e.newValue) {
