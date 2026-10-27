@@ -3585,7 +3585,9 @@ async function apiGetPosts() {
         if (window.SALINK_SB_READY && window.salinkSupabase) {
             const client = window.salinkSupabase;
 
-            // QUERY 1: Posts
+            console.log('[apiGetPosts] Mulai query Supabase...');
+
+            // 1. Ambil Posts (Wajib)
             const { data: rawPosts, error: postsError } = await client
                 .from('posts')
                 .select('*')
@@ -3595,54 +3597,64 @@ async function apiGetPosts() {
             if (postsError) throw postsError;
             if (!rawPosts || rawPosts.length === 0) throw new Error('Supabase posts kosong');
 
-            // QUERY 2: Profiles (Pembuat Post)
+            // 2. Ambil Profil (Opsional - Kalau gagal, jangan batalkan Posts)
             let profileMap = {};
             try {
                 const userIds = [...new Set(rawPosts.map(p => p.user_id).filter(Boolean))];
                 if (userIds.length > 0) {
-                    const { data: profilesData, error: profilesError } = await client
+                    const { data: profilesData } = await client
                         .from('profiles')
                         .select('id, username, full_name, profile_picture, gender')
                         .in('id', userIds);
                     
-                    if (profilesError) {
-                        console.error('[apiGetPosts] Gagal ambil profil:', profilesError.message);
-                    } else if (profilesData) {
+                    if (profilesData) {
                         profilesData.forEach(p => { profileMap[p.id] = p; });
                     }
                 }
-            } catch (e) { console.error('[apiGetPosts] Catch profil:', e.message); }
+            } catch (e) { 
+                console.warn('[apiGetPosts] Gagal ambil profil (abaikan):', e.message); 
+            }
 
-            // QUERY 3: Media, Likes, Comments, CommentLikes
-            const [mediaRes, likesRes, commentsRes, commentLikesRes] = await Promise.all([
+            // 3. Ambil Relasi (Media, Likes, Comments)
+            const [mediaRes, likesRes, commentsRes, commentLikesRes] = await Promise.allSettled([
                 client.from('media').select('*').not('post_id', 'is', null).limit(1000),
-                client.from('likes').select('id, user_id, post_id').limit(2000),
-                client.from('comments').select('*').is('deleted_at', null).order('created_at', { ascending: true }).range(0, 999),
-                client.from('comment_likes').select('id, user_id, comment_id').limit(5000)
+                client.from('likes').select('*').limit(2000),
+                client.from('comments').select('*').is('deleted_at', null).limit(1000),
+                client.from('comment_likes').select('*').limit(5000)
             ]);
 
-            const rawMedia = Array.isArray(mediaRes.data) ? mediaRes.data : [];
-            const rawLikes = Array.isArray(likesRes.data) ? likesRes.data : [];
-            const rawComments = Array.isArray(commentsRes.data) ? commentsRes.data : [];
-            const rawCommentLikes = Array.isArray(commentLikesRes.data) ? commentLikesRes.data : [];
+            const rawMedia = mediaRes.status === 'fulfilled' && mediaRes.value.data ? mediaRes.value.data : [];
+            const rawLikes = likesRes.status === 'fulfilled' && likesRes.value.data ? likesRes.value.data : [];
+            const rawComments = commentsRes.status === 'fulfilled' && commentsRes.value.data ? commentsRes.value.data : [];
+            const rawCommentLikes = commentLikesRes.status === 'fulfilled' && commentLikesRes.value.data ? commentLikesRes.value.data : [];
 
-            // QUERY 4: Profiles (Komentator)
+            // 4. Ambil Profil Komentator
             let commentProfileMap = {};
             try {
                 const commentUserIds = [...new Set(rawComments.map(c => c.user_id).filter(Boolean))];
                 if (commentUserIds.length > 0) {
-                    const { data: cProfiles, error: cProfilesErr } = await client
+                    const { data: cProfiles } = await client
                         .from('profiles')
                         .select('id, username, full_name, profile_picture, gender')
                         .in('id', commentUserIds);
                     
-                    if (!cProfilesErr && cProfiles) {
+                    if (cProfiles) {
                         cProfiles.forEach(p => { commentProfileMap[p.id] = p; });
                     }
                 }
             } catch(e) {}
 
-            // BANGUN COMMENTS
+            // 5. Bangun Map Data
+            const mediaByPost = {};
+            rawMedia.forEach(m => { if (m.post_id) mediaByPost[m.post_id] = m; });
+
+            const likesByPost = {};
+            rawLikes.forEach(l => {
+                if (!l.post_id) return;
+                if (!likesByPost[l.post_id]) likesByPost[l.post_id] = [];
+                likesByPost[l.post_id].push(l.user_id);
+            });
+
             const commentsByPost = {};
             rawComments.forEach(c => {
                 if (!c.post_id) return;
@@ -3659,48 +3671,41 @@ async function apiGetPosts() {
                     parent_id: c.parent_id || null, parentId: c.parent_id || null,
                     created_at: c.created_at,
                     timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
-                    deleted_at: c.deleted_at || null,
                     likes_count: rawCommentLikes.filter(cl => cl.comment_id === c.id).length,
                     is_liked: rawCommentLikes.some(cl => cl.comment_id === c.id && cl.user_id === currentAuthUser?.id)
                 });
             });
 
-            // BANGUN MEDIA & LIKES
-            const mediaByPost = {};
-            rawMedia.forEach(m => { if (m.post_id) mediaByPost[m.post_id] = m; });
-
-            const likesByPost = {};
-            rawLikes.forEach(l => {
-                if (!l.post_id) return;
-                if (!likesByPost[l.post_id]) likesByPost[l.post_id] = [];
-                likesByPost[l.post_id].push(l.user_id);
-            });
-
-            // GABUNGKAN
+            // 6. GABUNGKAN (Tanpa Filter Ketat)
             const adapted = rawPosts.map(row => {
+                // Sisipkan profil (jika ketemu)
                 row.profiles = profileMap[row.user_id] || {};
+                
+                // Sisipkan relasi
                 row.comments = commentsByPost[row.id] || [];
                 row.media = mediaByPost[row.id] ? [mediaByPost[row.id]] : [];
                 row.likes = likesByPost[row.id] || [];
-                return adaptPostFromSupabase(row);
-            }).filter(p => p !== null && (p.text || p.mediaData));
 
-            console.log('✅ [SALINK] Posts dari Supabase:', adapted.length);
+                // Konversi ke format dashboard
+                const postObj = adaptPostFromSupabase(row);
+                return postObj;
+            }).filter(p => p !== null); // Hanya buang kalau datanya benar-benar null
+
+            console.log('✅ [SALINK] Posts berhasil dimuat:', adapted.length);
             return adapted;
         }
     } catch (err) {
-        console.warn('[SALINK] Supabase gagal, fallback GAS:', err.message);
+        console.warn('[SALINK] Supabase error, fallback GAS:', err.message);
     }
 
-    // Fallback GAS
+    // Fallback GAS (jika Supabase down)
     try {
         const r = await apiCall('get_posts');
         return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptPost) : [];
     } catch (err) {
         return [];
     }
-}
-                
+}               
 
 async function apiGetEmergencies() {
     const r = await apiCall('get_emergencies');
