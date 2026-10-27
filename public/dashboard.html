@@ -6842,7 +6842,6 @@ function updateMap() {
     // Cari emergency yang punya koordinat valid
     const ems = getActiveEmergencies();
     const withCoords = ems.find(e => {
-        // Cek apakah latitude dan longitude ada dan bukan string kosong
         return e.latitude && e.longitude && 
                !isNaN(parseFloat(e.latitude)) && 
                !isNaN(parseFloat(e.longitude)) &&
@@ -6850,15 +6849,12 @@ function updateMap() {
     });
 
     if (withCoords) {
-        // Jika ada, tampilkan peta di titik kejadian
         const lat = parseFloat(withCoords.latitude);
         const lng = parseFloat(withCoords.longitude);
         f.src = 'https://maps.google.com/maps?q=' + lat + ',' + lng + '&z=15&output=embed';
     } else if (userLat && userLng) {
-        // Jika tidak ada emergency, tampilkan lokasi user
         f.src = 'https://maps.google.com/maps?q=' + userLat + ',' + userLng + '&z=13&output=embed';
     } else {
-        // Jika tidak ada keduanya, tampilkan peta Indonesia
         f.src = 'https://maps.google.com/maps?q=Indonesia&z=5&output=embed';
     }
 }
@@ -7543,16 +7539,23 @@ function getTrendingPosts() {
     });
     return todayPosts.slice(0, 5);
 }
+
 function performSearch(query) {
     const q = query.trim().toLowerCase();
     if (!q) {
-        document.getElementById('searchActiveResults').style.display = 'none';
-        document.getElementById('searchDefaultView').style.display = 'block';
+        const sar = document.getElementById('searchActiveResults');
+        if (sar) sar.style.display = 'none';
+        const sdv = document.getElementById('searchDefaultView');
+        if (sdv) sdv.style.display = 'block';
         return;
     }
-    document.getElementById('searchDefaultView').style.display = 'none';
-    document.getElementById('searchActiveResults').style.display = 'block';
-    document.getElementById('clearSearchBtn').classList.add('visible');
+    
+    const sdv = document.getElementById('searchDefaultView');
+    if (sdv) sdv.style.display = 'none';
+    const sar = document.getElementById('searchActiveResults');
+    if (sar) sar.style.display = 'block';
+    const cb = document.getElementById('clearSearchBtn');
+    if (cb) cb.classList.add('visible');
 
     // 1. Cari Users
     const users = allUsers.filter(u => 
@@ -7616,8 +7619,10 @@ function performSearch(query) {
     if (totalCount === 0) {
         html = '<div class="search-empty-state"><div class="empty-big-icon">🔍</div><h4>Tidak ditemukan hasil</h4><p>Coba kata kunci lain.</p></div>';
     }
-    document.getElementById('searchActiveResults').innerHTML = html;
+    
+    if (sar) sar.innerHTML = html;
 }
+    
 function searchUsers(q) {
     let users = allUsers.length > 0 ? allUsers : JSON.parse(localStorage.getItem('salink_users') || '[]');
     return users.filter(u => (u.fullName || '').toLowerCase().indexOf(q) !== -1 || (u.username || '').toLowerCase().indexOf(q) !== -1 || (u.email || '').toLowerCase().indexOf(q) !== -1);
