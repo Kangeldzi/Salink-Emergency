@@ -2857,27 +2857,21 @@ function adaptPost(p) {
  * PATCH D3-A — ADAPTER SUPABASE → JS & JS → SUPABASE
  * Konversi antara format Supabase (snake_case) dan dashboard (camelCase).
  * ================================================================ */
+
 function adaptPostFromSupabase(row) {
     if (!row) return null;
 
     const profile = row.profiles || {};
+    
+    // Ambil nama dari profil, jika kosong coba dari row.user_username, jika kosong juga pakai "Pengguna"
+    const finalFullName = profile.full_name || row.user_full_name || '';
+    const finalUsername = profile.username || row.user_username || 'user';
+
     const mediaArr = Array.isArray(row.media) ? row.media : (row.media ? [row.media] : []);
     const firstMedia = mediaArr.length > 0 ? mediaArr[0] : null;
 
     const likesArray = Array.isArray(row.likes) ? row.likes.map(l => l.user_id || l) : [];
-    const commentsArray = Array.isArray(row.comments) ? row.comments.map(c => {
-        const cProfile = c.profiles || c.profile || {};
-        return {
-            id: c.id, user_id: c.user_id, userId: cProfile.username || c.user_id,
-            userFullName: cProfile.full_name || c.user_full_name || '',
-            userGender: normalizeGenderProfile(cProfile.gender || 'Laki-laki'),
-            userProfilePic: cProfile.profile_picture || c.user_profile_pic || '',
-            content: c.content || '', text: c.content || '',
-            parent_id: c.parent_id || null, parentId: c.parent_id || null,
-            created_at: c.created_at, timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
-            updated_at: null, deleted_at: c.deleted_at || null
-        };
-    }) : [];
+    const commentsArray = Array.isArray(row.comments) ? row.comments : [];
 
     const tsRaw = row.created_at || row.timestamp || new Date().toISOString();
     const ts = typeof tsRaw === 'number' ? tsRaw : new Date(tsRaw).getTime();
@@ -2902,8 +2896,8 @@ function adaptPostFromSupabase(row) {
 
     return {
         id: row.id,
-        userId: profile.username || row.user_username || 'user',
-        userFullName: profile.full_name || row.user_full_name || 'Pengguna SALINK',
+        userId: finalUsername,           // ← Gunakan username
+        userFullName: finalFullName,     // ← Gunakan full name
         userGender: normalizeGenderProfile(profile.gender || row.user_gender || 'Laki-laki'),
         userProfilePic: profile.profile_picture || row.user_profile_pic || '',
         text: row.text || '',
@@ -3587,15 +3581,11 @@ async function apiCall(action, data) {
  * ================================================================ */
 
 async function apiGetPosts() {
-    // 1) Coba Supabase dulu
     try {
         if (window.SALINK_SB_READY && window.salinkSupabase) {
             const client = window.salinkSupabase;
-            console.log('[apiGetPosts] Mulai query Supabase...');
 
-            // ============================================
             // QUERY 1: Posts
-            // ============================================
             const { data: rawPosts, error: postsError } = await client
                 .from('posts')
                 .select('*')
@@ -3605,41 +3595,29 @@ async function apiGetPosts() {
             if (postsError) throw postsError;
             if (!rawPosts || rawPosts.length === 0) throw new Error('Supabase posts kosong');
 
-            // ============================================
-            // AMBIL PROFILES (Pembuat Post)
-            // ============================================
+            // QUERY 2: Profiles (Pembuat Post)
             let profileMap = {};
             try {
-                // Kumpulkan user_id unik
                 const userIds = [...new Set(rawPosts.map(p => p.user_id).filter(Boolean))];
-                
                 if (userIds.length > 0) {
-                    console.log('[apiGetPosts] Mengambil', userIds.length, 'profil user...');
-                    
                     const { data: profilesData, error: profilesError } = await client
                         .from('profiles')
                         .select('id, username, full_name, profile_picture, gender')
                         .in('id', userIds);
                     
                     if (profilesError) {
-                        // TAMPILKAN ERROR JIKA GAGAL MENGAMBIL PROFIL
-                        console.error('❌ [apiGetPosts] GAGAL ambil profil:', profilesError.message);
+                        console.error('[apiGetPosts] Gagal ambil profil:', profilesError.message);
                     } else if (profilesData) {
                         profilesData.forEach(p => { profileMap[p.id] = p; });
-                        console.log('✅ [apiGetPosts] Berhasil ambil', profilesData.length, 'profil');
                     }
                 }
-            } catch (e) { 
-                console.error('❌ [apiGetPosts] Catch profil:', e.message); 
-            }
+            } catch (e) { console.error('[apiGetPosts] Catch profil:', e.message); }
 
-            // ============================================
-            // AMBIL MEDIA, LIKES, COMMENTS
-            // ============================================
+            // QUERY 3: Media, Likes, Comments, CommentLikes
             const [mediaRes, likesRes, commentsRes, commentLikesRes] = await Promise.all([
-                client.from('media').select('id, post_id, media_type, bucket, object_key').not('post_id', 'is', null).limit(1000),
+                client.from('media').select('*').not('post_id', 'is', null).limit(1000),
                 client.from('likes').select('id, user_id, post_id').limit(2000),
-                client.from('comments').select('id, post_id, user_id, parent_id, content, created_at, deleted_at').is('deleted_at', null).order('created_at', { ascending: true }).range(0, 999),
+                client.from('comments').select('*').is('deleted_at', null).order('created_at', { ascending: true }).range(0, 999),
                 client.from('comment_likes').select('id, user_id, comment_id').limit(5000)
             ]);
 
@@ -3648,9 +3626,7 @@ async function apiGetPosts() {
             const rawComments = Array.isArray(commentsRes.data) ? commentsRes.data : [];
             const rawCommentLikes = Array.isArray(commentLikesRes.data) ? commentLikesRes.data : [];
 
-            // ============================================
-            // AMBIL PROFILES KOMENTATOR
-            // ============================================
+            // QUERY 4: Profiles (Komentator)
             let commentProfileMap = {};
             try {
                 const commentUserIds = [...new Set(rawComments.map(c => c.user_id).filter(Boolean))];
@@ -3664,11 +3640,9 @@ async function apiGetPosts() {
                         cProfiles.forEach(p => { commentProfileMap[p.id] = p; });
                     }
                 }
-            } catch(e) { console.warn('Profil komentator error:', e.message); }
+            } catch(e) {}
 
-            // ============================================
-            // BANGUN DATA COMMENTS
-            // ============================================
+            // BANGUN COMMENTS
             const commentsByPost = {};
             rawComments.forEach(c => {
                 if (!c.post_id) return;
@@ -3677,7 +3651,7 @@ async function apiGetPosts() {
                 
                 commentsByPost[c.post_id].push({
                     id: c.id, user_id: c.user_id,
-                    userId: profile.username || c.user_id,
+                    userId: profile.username || c.user_id || 'user',
                     userFullName: profile.full_name || 'Pengguna',
                     userGender: normalizeGenderProfile(profile.gender || 'Laki-laki'),
                     userProfilePic: profile.profile_picture || '',
@@ -3685,15 +3659,13 @@ async function apiGetPosts() {
                     parent_id: c.parent_id || null, parentId: c.parent_id || null,
                     created_at: c.created_at,
                     timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
-                    updated_at: null, deleted_at: c.deleted_at || null,
+                    deleted_at: c.deleted_at || null,
                     likes_count: rawCommentLikes.filter(cl => cl.comment_id === c.id).length,
                     is_liked: rawCommentLikes.some(cl => cl.comment_id === c.id && cl.user_id === currentAuthUser?.id)
                 });
             });
 
-            // ============================================
-            // BANGUN DATA MEDIA & LIKES
-            // ============================================
+            // BANGUN MEDIA & LIKES
             const mediaByPost = {};
             rawMedia.forEach(m => { if (m.post_id) mediaByPost[m.post_id] = m; });
 
@@ -3704,42 +3676,31 @@ async function apiGetPosts() {
                 likesByPost[l.post_id].push(l.user_id);
             });
 
-            // ============================================
-            // ADAPT: GABUNGKAN SEMUA
-            // ============================================
+            // GABUNGKAN
             const adapted = rawPosts.map(row => {
-                // Suntikkan profil pembuat post (jika ada)
-                if (row.user_id && profileMap[row.user_id]) {
-                    row.profiles = profileMap[row.user_id];
-                } else {
-                    console.warn('⚠️ [apiGetPosts] Profil tidak ditemukan untuk user_id:', row.user_id);
-                }
-                
+                row.profiles = profileMap[row.user_id] || {};
                 row.comments = commentsByPost[row.id] || [];
                 row.media = mediaByPost[row.id] ? [mediaByPost[row.id]] : [];
                 row.likes = likesByPost[row.id] || [];
-
                 return adaptPostFromSupabase(row);
             }).filter(p => p !== null && (p.text || p.mediaData));
 
-            console.log('✅ [SALINK] Total post di-render:', adapted.length);
+            console.log('✅ [SALINK] Posts dari Supabase:', adapted.length);
             return adapted;
         }
     } catch (err) {
-        console.warn('❌ [SALINK] Supabase getPosts gagal, fallback ke GAS:', err.message);
+        console.warn('[SALINK] Supabase gagal, fallback GAS:', err.message);
     }
 
-    // 2) Fallback: GAS
+    // Fallback GAS
     try {
-        console.log('📡 [SALINK] Fallback: Posts dari GAS');
         const r = await apiCall('get_posts');
         return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptPost) : [];
     } catch (err) {
-        console.error('[SALINK] GAS getPosts error:', err.message);
         return [];
     }
 }
-
+                
 
 async function apiGetEmergencies() {
     const r = await apiCall('get_emergencies');
