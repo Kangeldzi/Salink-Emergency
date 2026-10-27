@@ -5199,7 +5199,7 @@ function renderFullPostCard(p, isExpired) {
 }
 
 // ====================================================================
-// 28. ATTACH POST LISTENERS (FIX TOTAL - BERSIH TANPA TUMPANG TINDIH)
+// 28a. ATTACH POST LISTENERS (FIX TOTAL - BERSIH TANPA TUMPANG TINDIH)
 // ====================================================================
 /* ================================================================
  * PATCH 7F-NESTED — Render komentar berantai (nested unlimited)
@@ -5382,7 +5382,10 @@ function renderRepliesBlock(parent, replies, repliesByParent, postId, parentDept
     }
     return html;
 }
-            
+
+// ====================================================================
+// 28b. ATTACH POST LISTENERS (FIX TOTAL - BERSIH TANPA TUMPANG TINDIH)
+// ====================================================================
 function attachPostListeners() {
     // 1. Tombol Komentar (Buka/Tutup)
     document.querySelectorAll('.comment-toggle').forEach(el => {
@@ -5416,17 +5419,17 @@ function attachPostListeners() {
     // 4. TOMBOL TITIK TIGA (Buka/Tutup Menu)
     document.querySelectorAll('.post-menu-toggle').forEach(el => {
         el.onclick = function(e) {
-            e.stopPropagation(); // Cegah bubbling agar tidak langsung tertutup
+            e.stopPropagation(); // Cegah bubbling agar menu tidak langsung tertutup
             e.preventDefault();
             
             const menuId = 'postMenu-' + this.dataset.postId;
             const menu = document.getElementById(menuId);
             const isOpen = menu.classList.contains('active');
             
-            // Tutup semua menu yang terbuka
+            // Tutup semua menu lain yang terbuka
             document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
             
-            // Buka menu yang diklik jika sebelumnya tertutup
+            // Buka menu yang diklik
             if (!isOpen) {
                 menu.classList.add('active');
             }
@@ -5467,97 +5470,29 @@ function attachPostListeners() {
     });
 
     // 7. KLIK DI LUAR MENU (AUTO CLOSE)
-    // Hapus listener lama jika ada (mencegah penumpukan memori)
     if (window._salinkClickOutsideListener) {
         document.removeEventListener('click', window._salinkClickOutsideListener);
     }
     
-    // Buat listener global baru
     window._salinkClickOutsideListener = function(e) {
         if (!e.target.closest('.post-menu-toggle') && !e.target.closest('.post-menu-dropdown')) {
             document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
         }
     };
     document.addEventListener('click', window._salinkClickOutsideListener);
-}
 
-    
-    // PATCH 19: Toggle Menu Titik Tiga (Lebih Bersih)
-    document.querySelectorAll('.post-menu-toggle').forEach(el => {
-        el.onclick = function(e) {
-            e.stopPropagation(); // Mencegah klik tembus ke background
-            const menuId = 'postMenu-' + this.dataset.postId;
-            const menu = document.getElementById(menuId);
-            
-            // Cek apakah menu ini sedang terbuka
-            const isActive = menu.classList.contains('active');
-            
-            // Tutup semua menu dulu
-            document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
-            
-            // Kalau tadi tertutup, buka. Kalau tadi terbuka, biarkan tertutup (Toggle)
-            if (!isActive && menu) {
-                menu.classList.add('active');
-            }
-        };
-    });
-
-        // PATCH 20A: Fungsi Edit Post
-    document.querySelectorAll('.edit-post').forEach(el => {
-        el.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
-            
-            const p = posts.find(x => x.id === this.dataset.postId);
-            if (!p) return;
-            const nt = prompt('Edit postingan:', p.text || '');
-            if (nt !== null && nt.trim() !== '') {
-                p.text = nt.trim();
-                safeSavePosts(posts);
-                renderPosts();
-                broadcastSync('new_post', { id: p.id });
-                showToast('✅', 'Postingan diedit', 'fa-edit');
-            }
-        };
-    });
-
-    // PATCH 20A: Fungsi Hapus Post (Tombol di Menu Titik Tiga)
-    document.querySelectorAll('.delete-post').forEach(el => {
-        el.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
-            
-            const postId = this.dataset.postId;
-            if (typeof deletePostPermanent === 'function') {
-                deletePostPermanent(postId);
-            } else {
-                showToast('⚠️ Error', 'Fungsi hapus tidak ditemukan', 'fa-exclamation-triangle');
-            }
-        };
-    });
-
-    /* ================================================================
-     * PATCH 3B — Event listeners untuk komentar baru (Balas, Like, Edit, Hapus)
-     * ================================================================ */
-    
-    // Tombol BALAS
+    // 8. EVENT LISTENER UNTUK BALASAN KOMENTAR (Sesuai Patch 3B)
     document.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(el => {
         el.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             if (isPreviewMode) { showPreviewOverlay(); return; }
-            const commentId = this.dataset.commentId;
-            toggleReplyBox(commentId);
+            toggleReplyBox(this.dataset.commentId);
         };
     });
-    
-    // Tombol KIRIM BALASAN (di reply box)
+
     document.querySelectorAll('.comment-reply-box .reply-send-btn').forEach(el => {
         el.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             if (isPreviewMode) { showPreviewOverlay(); return; }
             const parentId = this.dataset.parentId;
             const postId = this.dataset.postId;
@@ -5566,14 +5501,11 @@ function attachPostListeners() {
             if (text) {
                 addComment(postId, text, parentId);
                 input.value = '';
-                // Sembunyikan reply box
-                const box = this.parentElement;
-                box.classList.remove('active');
+                this.parentElement.classList.remove('active');
             }
         };
     });
-    
-    // Enter di input balasan
+
     document.querySelectorAll('.comment-reply-box input').forEach(el => {
         el.onkeypress = function(e) {
             if (e.key === 'Enter') {
@@ -5582,488 +5514,46 @@ function attachPostListeners() {
             }
         };
     });
-    
-    // Tombol LIKE komentar
+
     document.querySelectorAll('.comment-action-btn[data-action="like-comment"]').forEach(el => {
         el.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             if (isPreviewMode) { showPreviewOverlay(); return; }
-            const commentId = this.dataset.commentId;
-            const postId = this.dataset.postId;
-            toggleCommentLike(commentId, postId);
+            toggleCommentLike(this.dataset.commentId, this.dataset.postId);
         };
     });
-    
-    // Tombol EDIT komentar
+
     document.querySelectorAll('.comment-action-btn[data-action="edit-comment"]').forEach(el => {
         el.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             if (isPreviewMode) { showPreviewOverlay(); return; }
-            const commentId = this.dataset.commentId;
-            const postId = this.dataset.postId;
-            handleEditComment(commentId, postId);
+            handleEditComment(this.dataset.commentId, this.dataset.postId);
         };
     });
-    
-    // Tombol HAPUS komentar
+
     document.querySelectorAll('.comment-action-btn[data-action="delete-comment"]').forEach(el => {
         el.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             if (isPreviewMode) { showPreviewOverlay(); return; }
-            const commentId = this.dataset.commentId;
-            const postId = this.dataset.postId;
-            handleDeleteComment(commentId, postId);
+            handleDeleteComment(this.dataset.commentId, this.dataset.postId);
         };
     });
-    
-    // Tombol LIHAT BALASAN
+
     document.querySelectorAll('.comment-show-replies-btn[data-action="show-replies"]').forEach(el => {
         el.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            const commentId = this.dataset.commentId;
-            const postId = this.dataset.postId;
-            showAllReplies(commentId, postId);
+            e.preventDefault(); e.stopPropagation();
+            showAllReplies(this.dataset.commentId, this.dataset.postId);
         };
     });
-    
-    // Tombol SEMBUNYIKAN BALASAN
+
     document.querySelectorAll('.comment-show-replies-btn[data-action="hide-replies"]').forEach(el => {
         el.onclick = function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            const commentId = this.dataset.commentId;
-            const postId = this.dataset.postId;
-            hideReplies(commentId, postId);
+            e.preventDefault(); e.stopPropagation();
+            hideReplies(this.dataset.commentId, this.dataset.postId);
         };
     });
 }
-
-/* ================================================================
- * PATCH 3B — Placeholder functions (untuk Patch 4, 5, 6)
- * Akan diganti di patch berikutnya
- * ================================================================ */
-function toggleReplyBox(commentId) {
-    const box = document.getElementById('replyBox-' + commentId);
-    if (!box) return;
-    // Close all other reply boxes
-    document.querySelectorAll('.comment-reply-box.active').forEach(b => {
-        if (b.id !== 'replyBox-' + commentId) b.classList.remove('active');
-    });
-    box.classList.toggle('active');
-    if (box.classList.contains('active')) {
-        const input = box.querySelector('input');
-        if (input) setTimeout(() => input.focus(), 100);
-    }
-}
-
-/* ================================================================
- * PATCH 5B — toggleCommentLike()
- * Like/Unlike komentar (fungsional)
- * ================================================================ */
-async function toggleCommentLike(commentId, postId) {
-    if (!currentUser) { redirectToLogin(); return; }
-    if (!currentAuthUser?.id) {
-        showToast('⚠️', 'Session tidak valid', 'fa-exclamation-triangle');
-        return;
-    }
-
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-
-    let comments = [];
-    try { comments = JSON.parse(post.comments || '[]'); } catch(e) { comments = []; }
-    
-    const comment = comments.find(c => c.id === commentId);
-    if (!comment) {
-        console.warn('[Like] Comment tidak ditemukan:', commentId);
-        return;
-    }
-
-    // Cek apakah user like komentar sendiri
-    const isOwn = (comment.userId === currentUser.username) || 
-                  (comment.userAuthId === currentAuthUser.id);
-    if (isOwn) {
-        showToast('ℹ️', 'Tidak bisa like komentar sendiri', 'fa-info-circle');
-        return;
-    }
-
-    const isUUID = isSupabaseUUID(commentId);
-    const currentIsLiked = !!comment.is_liked;
-    const currentCount = parseInt(comment.likes_count || 0, 10) || 0;
-
-    // Optimistic UI update
-    comment.is_liked = !currentIsLiked;
-    comment.likes_count = currentIsLiked ? Math.max(0, currentCount - 1) : currentCount + 1;
-    post.comments = JSON.stringify(comments);
-    setPostComments(postId, comments);
-    safeSavePosts(posts);
-
-    // Update UI langsung
-    const btn = document.querySelector('.comment-action-btn[data-action="like-comment"][data-comment-id="' + commentId + '"]');
-    if (btn) {
-        btn.classList.toggle('liked', comment.is_liked);
-        const icon = btn.querySelector('i');
-        if (icon) icon.className = (comment.is_liked ? 'fas' : 'far') + ' fa-heart';
-        const counter = btn.querySelector('.like-counter');
-        if (counter) {
-            counter.textContent = comment.likes_count;
-            counter.classList.toggle('empty', comment.likes_count === 0);
-            counter.classList.remove('bump');
-            void counter.offsetWidth;
-            counter.classList.add('bump');
-        }
-    }
-
-    // Sync ke Supabase
-    let supabaseOk = false;
-    if (isUUID && window.SALINK_SB_READY && window.salinkSupabase) {
-        try {
-            const client = window.salinkSupabase;
-            if (currentIsLiked) {
-                // Unlike — DELETE
-                const { error } = await client
-                    .from('comment_likes')
-                    .delete()
-                    .eq('comment_id', commentId)
-                    .eq('user_id', currentAuthUser.id);
-                if (error) console.warn('[Like] Unlike error:', error.message);
-                else supabaseOk = true;
-            } else {
-                // Like — INSERT
-                const { error } = await client
-                    .from('comment_likes')
-                    .insert({
-                        comment_id: commentId,
-                        user_id: currentAuthUser.id
-                    });
-                if (error) {
-                    if (error.code === '23505') supabaseOk = true;  // duplicate = OK
-                    else console.warn('[Like] Like error:', error.message);
-                } else supabaseOk = true;
-            }
-        } catch (e) {
-            console.warn('[Like] Catch:', e.message);
-        }
-    }
-
-    playRegularSound();
-    console.log('[Like Comment]', { commentId, supabaseOk, isLiked: comment.is_liked, count: comment.likes_count });
-}
-
-/* ================================================================
- * PATCH 5C — handleEditComment()
- * Edit komentar (fungsional, dengan tanda "(diedit)")
- * ================================================================ */
-async function handleEditComment(commentId, postId) {
-    if (!currentUser) { redirectToLogin(); return; }
-    
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-
-    let comments = [];
-    try { comments = JSON.parse(post.comments || '[]'); } catch(e) { comments = []; }
-    
-    const comment = comments.find(c => c.id === commentId);
-    if (!comment) {
-        console.warn('[Edit] Comment tidak ditemukan:', commentId);
-        return;
-    }
-
-    // Cek apakah user adalah pemilik
-    const isOwn = (comment.userId === currentUser.username) || 
-                  (comment.userAuthId === currentAuthUser?.id);
-    if (!isOwn) {
-        showToast('⚠️', 'Anda hanya bisa edit komentar sendiri', 'fa-exclamation-triangle');
-        return;
-    }
-
-    // Prompt edit
-    const currentText = comment.text || comment.content || '';
-    const newText = prompt('Edit komentar:', currentText);
-    
-    if (newText === null) return;  // Cancel
-    const trimmed = newText.trim();
-    if (!trimmed || trimmed === currentText) return;
-
-    // Optimistic update
-    comment.text = trimmed;
-    comment.content = trimmed;
-    comment.updated_at = new Date().toISOString();
-    comment.is_edited = true;
-    post.comments = JSON.stringify(comments);
-    setPostComments(postId, comments);
-    safeSavePosts(posts);
-
-    // Sync ke Supabase
-    const isUUID = isSupabaseUUID(commentId);
-    let supabaseOk = false;
-    
-    if (isUUID && window.SALINK_SB_READY && window.salinkSupabase) {
-        try {
-            const client = window.salinkSupabase;
-            const { error } = await client
-                .from('comments')
-                .update({
-                    content: trimmed,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', commentId);
-
-            if (error) console.warn('[Edit] Supabase error:', error.message);
-            else supabaseOk = true;
-        } catch (e) {
-            console.warn('[Edit] Catch:', e.message);
-        }
-    }
-
-    // Re-render feed
-    renderPosts();
-    broadcastSync('new_post', { id: postId });
-    playRegularSound();
-
-    showToast('✅ Berhasil', 'Komentar diedit', 'fa-check-circle');
-    console.log('[Edit Comment]', { commentId, supabaseOk, newText: trimmed.substring(0, 30) });
-}
-
-/* ================================================================
- * PATCH 6C-REVISI — handleDeleteComment() dengan HARD DELETE
- * Sesuai kesepakatan awal: hapus permanen dari Supabase
- * ================================================================ */
-async function handleDeleteComment(commentId, postId) {
-    if (!currentUser) { redirectToLogin(); return; }
-    if (!currentAuthUser?.id) {
-        showToast('⚠️', 'Session tidak valid', 'fa-exclamation-triangle');
-        return;
-    // PATCH 11B: Kunci sinkronisasi otomatis selama proses hapus
-    window._salinkDeleteInProgress = true;
-    setTimeout(() => { window._salinkDeleteInProgress = false; }, 5000); // Buka kunci setelah 5 detik
-    }
-    
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-
-    let comments = [];
-    try { comments = JSON.parse(post.comments || '[]'); } catch(e) { comments = []; }
-    
-    const comment = comments.find(c => c.id === commentId);
-    if (!comment) {
-        console.warn('[Delete 6C-R] Comment tidak ditemukan:', commentId);
-        return;
-    }
-
-    // Cek apakah user adalah pemilik
-    const isOwn = (comment.userId === currentUser.username) || 
-                  (comment.userAuthId === currentAuthUser.id);
-    if (!isOwn) {
-        showToast('⚠️', 'Anda hanya bisa hapus komentar sendiri', 'fa-exclamation-triangle');
-        return;
-    }
-
-    // Cek apakah punya balasan
-    const replyCount = comments.filter(c => 
-        (c.parent_id || c.parentId) === commentId && !c.deleted_at
-    ).length;
-    const hasReplies = replyCount > 0;
-    
-    // Konfirmasi
-    const confirmMsg = hasReplies
-        ? 'Komentar ini punya ' + replyCount + ' balasan.\n\n' +
-          '⚠️ PERHATIAN: Balasan juga akan ikut terhapus (CASCADE).\n\n' +
-          'Lanjutkan?'
-        : 'Hapus komentar ini?\n\nTindakan ini TIDAK BISA DIBATALKAN.';
-    
-    if (!confirm('🗑️ ' + confirmMsg)) return;
-
-    const isUUID = isSupabaseUUID(commentId);
-    console.log('[Delete 6C-R] Start (HARD DELETE):', { commentId, isUUID, isOwn, replyCount });
-
-    // ============================================================
-    // 1) HAPUS DARI SUPABASE (HARD DELETE)
-    // ============================================================
-    let supabaseOk = false;
-    
-    if (isUUID && window.SALINK_SB_READY && window.salinkSupabase) {
-        try {
-            const client = window.salinkSupabase;
-            // PATCH 11C: Soft Delete (Isi deleted_at, jangan hapus permanen)
-            const { data: deleted, error } = await client
-                .from('comments')
-                .update({ deleted_at: new Date().toISOString() })
-                .eq('id', commentId)
-                .select();
-
-            if (error) {
-                console.error('[Delete 6C-R] Supabase error:', error.message);
-                showToast('❌ Gagal', 'Tidak bisa hapus di server: ' + error.message, 'fa-times-circle');
-                return;
-            } else {
-                supabaseOk = true;
-                console.log('[Delete 6C-R] Supabase OK, rows deleted:', deleted?.length || 0);
-            }
-        } catch (e) {
-            console.error('[Delete 6C-R] Catch:', e.message);
-            showToast('❌ Gagal', 'Error: ' + e.message, 'fa-times-circle');
-            return;
-        }
-    } else {
-        console.warn('[Delete 6C-R] Skip Supabase (bukan UUID atau tidak ready)');
-    }
-
-    // ============================================================
-    // 2) HAPUS DARI LOCAL STATE
-    // ============================================================
-    // Hapus comment + balasannya (kalau ada)
-    const commentIdsToRemove = [commentId];
-    if (hasReplies) {
-        comments.forEach(c => {
-            if ((c.parent_id || c.parentId) === commentId) {
-                commentIdsToRemove.push(c.id);
-            }
-        });
-    }
-    
-    const filteredComments = comments.filter(c => !commentIdsToRemove.includes(c.id));
-    post.comments = JSON.stringify(filteredComments);
-    setPostComments(postId, filteredComments);
-    safeSavePosts(posts);
-
-    // ============================================================
-    // 3) RE-RENDER
-    // ============================================================
-    renderPosts();
-    broadcastSync('new_post', { id: postId });
-    playRegularSound();
-
-    const successMsg = hasReplies
-        ? 'Komentar + ' + replyCount + ' balasan dihapus'
-        : 'Komentar dihapus';
-    showToast('✅ Terhapus', successMsg, 'fa-check-circle');
-    console.log('[Delete 6C-R] DONE:', { commentId, supabaseOk, removed: commentIdsToRemove.length });
-}
-
-/* PATCH 7F-NESTED — Tampilkan semua balasan (re-render) */
-function showAllReplies(commentId, postId) {
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-
-    const comments = JSON.parse(post.comments || '[]');
-    const container = document.getElementById('replies-' + commentId);
-    if (!container) return;
-
-    const parent = comments.find(c => c.id === commentId);
-    if (!parent) return;
-
-    const repliesByParent = {};
-    comments.forEach(c => {
-        const pid = c.parent_id || c.parentId;
-        if (!pid) return;
-        if (!repliesByParent[pid]) repliesByParent[pid] = [];
-        repliesByParent[pid].push(c);
-    });
-    Object.keys(repliesByParent).forEach(pid => {
-        repliesByParent[pid].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-    });
-
-    const children = repliesByParent[commentId] || [];
-    if (children.length === 0) return;
-
-    let parentDepth = 0;
-    let cur = parent;
-    let guard = 0;
-    while (cur && guard < 30) {
-        const pid = cur.parent_id || cur.parentId;
-        if (!pid) break;
-        parentDepth++;
-        cur = comments.find(c => c.id === pid);
-        guard++;
-    }
-
-    let html = '';
-    const depth = parentDepth + 1;
-    for (let i = 0; i < children.length; i++) {
-        html += renderCommentTree(children[i], repliesByParent, postId, depth);
-    }
-    container.innerHTML = html;
-    container.dataset.visible = children.length;
-
-    const btn = document.querySelector('.comment-show-replies-btn[data-action="show-replies"][data-comment-id="' + commentId + '"]');
-    if (btn && children.length > 2) {
-        btn.outerHTML = '<button class="comment-show-replies-btn" data-action="hide-replies" data-comment-id="' + commentId + '" data-post-id="' + postId + '" type="button">' +
-            '<i class="fas fa-chevron-up"></i> Sembunyikan balasan' +
-        '</button>';
-    } else if (btn) {
-        btn.remove();
-    }
-
-    attachPostListeners();
-}
-
-/* PATCH 7F-NESTED — Sembunyikan balasan (kembali ke MAX_VISIBLE) */
-function hideReplies(commentId, postId) {
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-
-    const comments = JSON.parse(post.comments || '[]');
-    const parent = comments.find(c => c.id === commentId);
-    if (!parent) return;
-
-    const repliesByParent = {};
-    comments.forEach(c => {
-        const pid = c.parent_id || c.parentId;
-        if (!pid) return;
-        if (!repliesByParent[pid]) repliesByParent[pid] = [];
-        repliesByParent[pid].push(c);
-    });
-    Object.keys(repliesByParent).forEach(pid => {
-        repliesByParent[pid].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-    });
-
-    const children = repliesByParent[commentId] || [];
-    if (children.length === 0) return;
-
-    let parentDepth = 0;
-    let cur = parent;
-    let guard = 0;
-    while (cur && guard < 30) {
-        const pid = cur.parent_id || cur.parentId;
-        if (!pid) break;
-        parentDepth++;
-        cur = comments.find(c => c.id === pid);
-        guard++;
-    }
-
-    const MAX_VISIBLE = 2;
-    const visibleCount = Math.min(MAX_VISIBLE, children.length);
-    const hiddenCount = children.length - visibleCount;
-
-    let html = '';
-    const depth = parentDepth + 1;
-    for (let i = 0; i < visibleCount; i++) {
-        html += renderCommentTree(children[i], repliesByParent, postId, depth);
-    }
-
-    const container = document.getElementById('replies-' + commentId);
-    if (container) {
-        container.innerHTML = html;
-        container.dataset.visible = visibleCount;
-    }
-
-    const btn = document.querySelector('.comment-show-replies-btn[data-action="hide-replies"][data-comment-id="' + commentId + '"]');
-    if (btn && hiddenCount > 0) {
-        btn.outerHTML = '<button class="comment-show-replies-btn" data-action="show-replies" data-comment-id="' + commentId + '" data-post-id="' + postId + '" type="button">' +
-            '<i class="fas fa-chevron-down"></i> Lihat ' + hiddenCount + ' balasan lainnya' +
-        '</button>';
-    } else if (btn) {
-        btn.remove();
-    }
-
-    attachPostListeners();
-}
-    
+        
 // ====================================================================
 // 29. POST CLICK HANDLERS
 // ====================================================================
@@ -7207,8 +6697,8 @@ function switchChart(type) {
     const btn = document.querySelector('.chart-nav-btn[data-chart="' + type + '"]');
     if (btn) btn.classList.add('active');
 
-    // 3. Paksa Chart.js menghitung ulang ukuran SETELAH container terlihat
-    // (Butuh jeda 250ms agar CSS 'display: block' selesai dihitung browser)
+    // 3. Jeda 250ms memberi waktu browser untuk merender layout (display: block)
+    // sebelum Chart.js dipaksa menggambar ulang ukurannya.
     setTimeout(() => {
         const chart = chartInstances[type];
         if (chart && typeof chart.resize === 'function') {
@@ -7216,7 +6706,6 @@ function switchChart(type) {
             chart.update();
         }
         
-        // Update chart manual (Bukan Chart.js)
         if (type === 'gauge') updateGaugeChart();
         else if (type === 'heatmap') updateHeatmap();
         else if (type === 'map') updateMap();
@@ -9561,7 +9050,6 @@ window.handleDeleteFromStatsCard = function(postId) {
         showToast('⚠️ Error', 'ID postingan tidak ditemukan', 'fa-exclamation-triangle');
         return;
     }
-    // Panggil fungsi hapus utama
     if (typeof deletePostPermanent === 'function') {
         deletePostPermanent(postId);
     } else {
@@ -9570,14 +9058,6 @@ window.handleDeleteFromStatsCard = function(postId) {
 };
 window.handleDeleteFromHologram = handleDeleteFromHologram;
 window.handleDeleteFromNotif = handleDeleteFromNotif;
-// PATCH 28: Fungsi Hapus dari Card Postingan Baru
-window.handleDeleteFromStatsCard = function(postId) {
-    if (typeof deletePostPermanent === 'function') {
-        deletePostPermanent(postId);
-    } else {
-        showToast('⚠️ Error', 'Fungsi hapus tidak ditemukan', 'fa-exclamation-triangle');
-    }
-};
 window.showClearCacheMenu = showClearCacheMenu;
 window.closeClearCacheModal = closeClearCacheModal;
 window.showStorageDetail = showStorageDetail;
