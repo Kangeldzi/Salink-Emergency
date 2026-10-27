@@ -3597,18 +3597,12 @@ async function apiGetPosts() {
             // QUERY 1: Posts + profiles pembuat post
             // ============================================
             const postsPromise = client
-                .from('posts')
-                .select(`
-                    *,
-                    profiles!posts_user_id_fkey (
-                        username,
-                        full_name,
-                        profile_picture,
-                        gender
-                    )
-                `)
+              .from('posts')
+              .select('*') // Ambil semua kolom, tanpa JOIN
+              .order('created_at', { ascending: false })
+              .limit(100);
                 .order('created_at', { ascending: false })
-                .limit(100);
+              .limit(100);
 
             // ============================================
             // QUERY 2: Media untuk posts
@@ -3803,6 +3797,28 @@ console.log('[commentsByPost DEBUG] Total posts with comments:',
                 console.warn('[apiGetPosts FIX-2] Catch:', e.message);
             }
 
+            // PATCH 29A: Ambil profile pembuat post secara terpisah
+              let postProfileMap = {};
+              try {
+              const postUserIds = [...new Set(rawPosts.map(p => p.user_id).filter(Boolean))];
+              if (postUserIds.length > 0) {
+              const { data: postProfiles } = await client
+                .from('profiles')
+                .select('id, username, full_name, profile_picture, gender')
+                .in('id', postUserIds);
+        
+               if (postProfiles && postProfiles.length > 0) {
+                   postProfiles.forEach(p => { postProfileMap[p.id] = p; });
+             }
+           }
+        } catch(e) { console.warn('[PATCH 29A] Error:', e.message); }
+
+               const adapted = rawPosts.map(row => {
+              // Sisipkan profile ke dalam row sebelum di-adaptasi
+               if (row.user_id && postProfileMap[row.user_id]) {
+                   row.profiles = postProfileMap[row.user_id];
+        }
+    
             // ============================================
             // ADAPT: Buat objek post final
             // ============================================
@@ -6823,15 +6839,29 @@ function updateHeatmap() {
 
 function updateMap() {
     const f = document.getElementById('emergencyMapFrame');
-    if (f && userLat && userLng) {
-        f.src = 'https://www.google.com/maps?q=' + userLat + ',' + userLng + '&output=embed';
-    } else if (f) {
-        const ems = getActiveEmergencies();
-        const withCoords = ems.find(e => e.coords && e.coords.indexOf(',') !== -1);
-        if (withCoords) {
-            const parts = withCoords.coords.split(',').map(s => s.trim());
-            f.src = 'https://www.google.com/maps?q=' + parts[0] + ',' + parts[1] + '&output=embed';
-        }
+    if (!f) return;
+
+    // Cari emergency yang punya koordinat valid
+    const ems = getActiveEmergencies();
+    const withCoords = ems.find(e => {
+        // Cek apakah latitude dan longitude ada dan bukan string kosong
+        return e.latitude && e.longitude && 
+               !isNaN(parseFloat(e.latitude)) && 
+               !isNaN(parseFloat(e.longitude)) &&
+               parseFloat(e.latitude) !== 0;
+    });
+
+    if (withCoords) {
+        // Jika ada, tampilkan peta di titik kejadian
+        const lat = parseFloat(withCoords.latitude);
+        const lng = parseFloat(withCoords.longitude);
+        f.src = 'https://maps.google.com/maps?q=' + lat + ',' + lng + '&z=15&output=embed';
+    } else if (userLat && userLng) {
+        // Jika tidak ada emergency, tampilkan lokasi user
+        f.src = 'https://maps.google.com/maps?q=' + userLat + ',' + userLng + '&z=13&output=embed';
+    } else {
+        // Jika tidak ada keduanya, tampilkan peta Indonesia
+        f.src = 'https://maps.google.com/maps?q=Indonesia&z=5&output=embed';
     }
 }
 
@@ -7518,60 +7548,77 @@ function getTrendingPosts() {
 function performSearch(query) {
     const q = query.trim().toLowerCase();
     if (!q) {
-        const sar = document.getElementById('searchActiveResults');
-        if (sar) sar.style.display = 'none';
-        const sdv = document.getElementById('searchDefaultView');
-        if (sdv) sdv.style.display = 'block';
+        document.getElementById('searchActiveResults').style.display = 'none';
+        document.getElementById('searchDefaultView').style.display = 'block';
         return;
     }
-    const sdv = document.getElementById('searchDefaultView');
-    if (sdv) sdv.style.display = 'none';
-    const sar = document.getElementById('searchActiveResults');
-    if (sar) sar.style.display = 'block';
-    const cb = document.getElementById('clearSearchBtn');
-    if (cb) cb.classList.add('visible');
+    document.getElementById('searchDefaultView').style.display = 'none';
+    document.getElementById('searchActiveResults').style.display = 'block';
+    document.getElementById('clearSearchBtn').classList.add('visible');
 
-    const users = searchUsers(q);
-    const matchedPosts = searchPosts(q);
-    const matchedEm = searchEmergencies(q);
+    // 1. Cari Users
+    const users = allUsers.filter(u => 
+        (u.fullName || '').toLowerCase().includes(q) || 
+        (u.username || '').toLowerCase().includes(q)
+    );
+
+    // 2. Cari Posts
+    const matchedPosts = posts.filter(p => 
+        !isDeleted(p.id) && (
+            (p.text || '').toLowerCase().includes(q) || 
+            (p.userFullName || '').toLowerCase().includes(q) || 
+            (p.specialLocation || '').toLowerCase().includes(q)
+        )
+    );
+
+    // 3. Cari Emergencies
+    let matchedEm = getActiveEmergencies().filter(e => 
+        (e.location || '').toLowerCase().includes(q) || 
+        (e.text || '').toLowerCase().includes(q) || 
+        (e.sender || '').toLowerCase().includes(q)
+    );
+    if (searchEmergencyFilter !== 'all') {
+        matchedEm = matchedEm.filter(e => e.type === searchEmergencyFilter);
+    }
 
     let html = '';
     let totalCount = 0;
-    const showUsers = (searchTab === 'all' || searchTab === 'users');
-    const showPosts = (searchTab === 'all' || searchTab === 'posts');
-    const showEm = (searchTab === 'all' || searchTab === 'emergency');
 
-    if (showUsers && users.length > 0) {
+    // Tampilkan Users
+    if ((searchTab === 'all' || searchTab === 'users') && users.length > 0) {
         totalCount += users.length;
         html += '<div class="search-section-title"><span>👤 Pengguna</span><span class="count-pill">' + users.length + '</span></div>';
         html += users.slice(0, 10).map(u => {
             const initial = (u.fullName || u.username || 'U').charAt(0).toUpperCase();
             const avatar = u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" alt="">' : initial;
-            const statusDot = u.isOnline ? '<span class="online-dot"></span>' : '<span class="offline-dot"></span>';
-            const loc = [u.city, u.province].filter(Boolean).join(', ') || u.country || 'Lokasi tidak diketahui';
-            return '<div class="search-result-item" onclick="goToUser(\'' + escapeAttr(u.username) + '\')"><div class="result-avatar">' + avatar + statusDot + '</div><div class="result-info"><div class="result-title">' + highlightText(u.fullName || u.username, query) + '</div><div class="result-sub">@' + highlightText(u.username, query) + ' • 📍 ' + escapeHTML(loc) + '</div></div><i class="fas fa-chevron-right result-arrow"></i></div>';
+            return '<div class="search-result-item" onclick="goToUser(\'' + escapeAttr(u.username) + '\')"><div class="result-avatar">' + avatar + '</div><div class="result-info"><div class="result-title">' + highlightText(u.fullName || u.username, query) + '</div><div class="result-sub">@' + highlightText(u.username, query) + '</div></div><i class="fas fa-chevron-right result-arrow"></i></div>';
         }).join('');
     }
-    if (showPosts && matchedPosts.length > 0) {
+
+    // Tampilkan Posts
+    if ((searchTab === 'all' || searchTab === 'posts') && matchedPosts.length > 0) {
         totalCount += matchedPosts.length;
         html += '<div class="search-section-title"><span>📝 Postingan</span><span class="count-pill">' + matchedPosts.length + '</span></div>';
         html += matchedPosts.slice(0, 10).map(p => {
             const isEm = p.isSpecial && p.specialType;
             const iconCls = isEm ? p.specialType : 'post';
             const icon = isEm ? (EMERGENCY_ICONS[p.specialType] || '🚨') : '📝';
-            let likes = 0;
-            try { likes = JSON.parse(p.likes || '[]').length; } catch(e) {}
             const textPreview = p.text ? p.text.substring(0, 60) : 'Postingan media';
-            return '<div class="search-result-item" onclick="goToPost(\'' + escapeAttr(p.id) + '\')"><div class="result-icon ' + iconCls + '">' + icon + '</div><div class="result-info"><div class="result-title">' + highlightText(textPreview, query) + '</div><div class="result-sub">' + escapeHTML(p.userFullName) + ' • ❤️ ' + likes + '</div></div><div class="result-time">' + getTimeAgo(p.timestamp) + '</div></div>';
+            return '<div class="search-result-item" onclick="goToPost(\'' + escapeAttr(p.id) + '\')"><div class="result-icon ' + iconCls + '">' + icon + '</div><div class="result-info"><div class="result-title">' + highlightText(textPreview, query) + '</div><div class="result-sub">' + escapeHTML(p.userFullName) + '</div></div><div class="result-time">' + getTimeAgo(p.timestamp) + '</div></div>';
         }).join('');
     }
-    if (showEm && matchedEm.length > 0) {
+
+    // Tampilkan Emergencies
+    if ((searchTab === 'all' || searchTab === 'emergency') && matchedEm.length > 0) {
         totalCount += matchedEm.length;
         html += '<div class="search-section-title"><span>🚨 Emergency</span><span class="count-pill">' + matchedEm.length + '</span></div>';
-        html += matchedEm.slice(0, 10).map(em => '<div class="search-result-item" onclick="goToEmergency(\'' + escapeAttr(em.id) + '\')"><div class="result-icon ' + em.type + '">' + (EMERGENCY_ICONS[em.type] || '🚨') + '</div><div class="result-info"><div class="result-title">' + highlightText(EMERGENCY_LABELS[em.type], query) + '</div><div class="result-sub">📍 ' + highlightText(em.location || '-', query) + ' • ' + escapeHTML(em.sender) + '</div></div><div class="result-time">' + getTimeAgo(em.timestamp) + '</div></div>').join('');
+        html += matchedEm.slice(0, 10).map(em => '<div class="search-result-item" onclick="goToEmergency(\'' + escapeAttr(em.id) + '\')"><div class="result-icon ' + em.type + '">' + (EMERGENCY_ICONS[em.type] || '🚨') + '</div><div class="result-info"><div class="result-title">' + highlightText(EMERGENCY_LABELS[em.type], query) + '</div><div class="result-sub">📍 ' + highlightText(em.location || '-', query) + '</div></div><div class="result-time">' + getTimeAgo(em.timestamp) + '</div></div>').join('');
     }
-    if (totalCount === 0) html = '<div class="search-empty-state"><div class="empty-big-icon">🔍</div><h4>Tidak ditemukan hasil</h4><p>Coba kata kunci lain.</p></div>';
-    if (sar) sar.innerHTML = html;
+
+    if (totalCount === 0) {
+        html = '<div class="search-empty-state"><div class="empty-big-icon">🔍</div><h4>Tidak ditemukan hasil</h4><p>Coba kata kunci lain.</p></div>';
+    }
+    document.getElementById('searchActiveResults').innerHTML = html;
 }
 function searchUsers(q) {
     let users = allUsers.length > 0 ? allUsers : JSON.parse(localStorage.getItem('salink_users') || '[]');
@@ -9041,6 +9088,14 @@ window.triggerEmergencyAutoAlarm = triggerEmergencyAutoAlarm;
 window.triggerLocalEmergencyVisual = triggerLocalEmergencyVisual;
 window.EMERGENCY_SOUND_PLAYLIST = EMERGENCY_SOUND_PLAYLIST;
 window.deletePostPermanent = deletePostPermanent;
+// PATCH 29B: Jembatan Hapus dari Card Stats
+window.handleDeleteFromStatsCard = function(postId) {
+    if (typeof deletePostPermanent === 'function') {
+        deletePostPermanent(postId);
+    } else {
+        showToast('⚠️ Error', 'Fungsi hapus tidak ditemukan', 'fa-exclamation-triangle');
+    }
+};
 window.handleDeleteFromMenu = handleDeleteFromMenu;
 // ====================================================================
 // PATCH FINAL: HANDLE DELETE DARI STATS CARD (Hanya 1 Fungsi, Tanpa Duplikat)
