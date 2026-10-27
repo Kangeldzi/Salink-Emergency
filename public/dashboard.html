@@ -2857,25 +2857,28 @@ function adaptPost(p) {
  * PATCH D3-A — ADAPTER SUPABASE → JS & JS → SUPABASE
  * Konversi antara format Supabase (snake_case) dan dashboard (camelCase).
  * ================================================================ */
-
 function adaptPostFromSupabase(row) {
     if (!row) return null;
 
     const profile = row.profiles || {};
     
-    // Ambil nama dari profil, jika kosong coba dari row.user_username, jika kosong juga pakai "Pengguna"
-    const finalFullName = profile.full_name || row.user_full_name || '';
+    // 1. Perbaikan Nama & Username (Urutan Prioritas Diperbaiki)
+    const finalFullName = profile.full_name || row.user_full_name || profile.username || row.user_username || 'Pengguna SALINK';
     const finalUsername = profile.username || row.user_username || 'user';
 
+    // 2. Olah Media
     const mediaArr = Array.isArray(row.media) ? row.media : (row.media ? [row.media] : []);
     const firstMedia = mediaArr.length > 0 ? mediaArr[0] : null;
 
+    // 3. Olah Likes & Comments
     const likesArray = Array.isArray(row.likes) ? row.likes.map(l => l.user_id || l) : [];
     const commentsArray = Array.isArray(row.comments) ? row.comments : [];
 
+    // 4. Olah Timestamp
     const tsRaw = row.created_at || row.timestamp || new Date().toISOString();
     const ts = typeof tsRaw === 'number' ? tsRaw : new Date(tsRaw).getTime();
 
+    // 5. Olah Media URL (GDrive / Storage)
     let mediaType = '';
     let mediaData = row.media_data || '';
     if (mediaData) mediaType = 'image';
@@ -2894,10 +2897,11 @@ function adaptPostFromSupabase(row) {
         }
     }
 
+    // 6. RETURN OBJECT LENGKAP
     return {
         id: row.id,
-        userId: finalUsername,           // ← Gunakan username
-        userFullName: finalFullName,     // ← Gunakan full name
+        userId: finalUsername,           
+        userFullName: finalFullName,     
         userGender: normalizeGenderProfile(profile.gender || row.user_gender || 'Laki-laki'),
         userProfilePic: profile.profile_picture || row.user_profile_pic || '',
         text: row.text || '',
@@ -3579,15 +3583,15 @@ async function apiCall(action, data) {
  * - Comments + profiles komentator di-query dengan JOIN
  * - Tidak ada duplikasi, tidak ada kode rusak
  * ================================================================ */
-
-async function apiGetPosts() {
+  async function apiGetPosts() {
     try {
         if (window.SALINK_SB_READY && window.salinkSupabase) {
             const client = window.salinkSupabase;
+            const authUserId = currentAuthUser?.id || null; // Guard currentAuthUser
 
             console.log('[apiGetPosts] Mulai query Supabase...');
 
-            // 1. Ambil Posts (Wajib)
+            // 1. Ambil Posts
             const { data: rawPosts, error: postsError } = await client
                 .from('posts')
                 .select('*')
@@ -3595,27 +3599,31 @@ async function apiGetPosts() {
                 .limit(100);
 
             if (postsError) throw postsError;
-            if (!rawPosts || rawPosts.length === 0) throw new Error('Supabase posts kosong');
+            if (!rawPosts || rawPosts.length === 0) {
+                console.warn('[apiGetPosts] Tabel posts kosong.');
+                return []; // Kembalikan array kosong, jangan throw error
+            }
 
-            // 2. Ambil Profil (Opsional - Kalau gagal, jangan batalkan Posts)
+            // 2. Ambil Profil (dengan fallback jika RLS gagal)
             let profileMap = {};
             try {
                 const userIds = [...new Set(rawPosts.map(p => p.user_id).filter(Boolean))];
                 if (userIds.length > 0) {
-                    const { data: profilesData } = await client
+                    const { data: profilesData, error: profErr } = await client
                         .from('profiles')
                         .select('id, username, full_name, profile_picture, gender')
                         .in('id', userIds);
                     
+                    if (profErr) console.warn('[apiGetPosts] Gagal ambil profiles:', profErr.message);
                     if (profilesData) {
                         profilesData.forEach(p => { profileMap[p.id] = p; });
                     }
                 }
             } catch (e) { 
-                console.warn('[apiGetPosts] Gagal ambil profil (abaikan):', e.message); 
+                console.warn('[apiGetPosts] Profiles error (abaikan):', e.message); 
             }
 
-            // 3. Ambil Relasi (Media, Likes, Comments)
+            // 3. Ambil Relasi
             const [mediaRes, likesRes, commentsRes, commentLikesRes] = await Promise.allSettled([
                 client.from('media').select('*').not('post_id', 'is', null).limit(1000),
                 client.from('likes').select('*').limit(2000),
@@ -3672,24 +3680,21 @@ async function apiGetPosts() {
                     created_at: c.created_at,
                     timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
                     likes_count: rawCommentLikes.filter(cl => cl.comment_id === c.id).length,
-                    is_liked: rawCommentLikes.some(cl => cl.comment_id === c.id && cl.user_id === currentAuthUser?.id)
+                    is_liked: authUserId ? rawCommentLikes.some(cl => cl.comment_id === c.id && cl.user_id === authUserId) : false
                 });
             });
 
-            // 6. GABUNGKAN (Tanpa Filter Ketat)
+            // 6. GABUNGKAN & ADAPTASI
             const adapted = rawPosts.map(row => {
-                // Sisipkan profil (jika ketemu)
+                // Suntikkan profil ke row
                 row.profiles = profileMap[row.user_id] || {};
-                
-                // Sisipkan relasi
                 row.comments = commentsByPost[row.id] || [];
                 row.media = mediaByPost[row.id] ? [mediaByPost[row.id]] : [];
                 row.likes = likesByPost[row.id] || [];
 
                 // Konversi ke format dashboard
-                const postObj = adaptPostFromSupabase(row);
-                return postObj;
-            }).filter(p => p !== null); // Hanya buang kalau datanya benar-benar null
+                return adaptPostFromSupabase(row);
+            }).filter(p => p !== null);
 
             console.log('✅ [SALINK] Posts berhasil dimuat:', adapted.length);
             return adapted;
@@ -3698,14 +3703,14 @@ async function apiGetPosts() {
         console.warn('[SALINK] Supabase error, fallback GAS:', err.message);
     }
 
-    // Fallback GAS (jika Supabase down)
+    // Fallback GAS
     try {
         const r = await apiCall('get_posts');
         return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptPost) : [];
     } catch (err) {
         return [];
     }
-}               
+}             
 
 async function apiGetEmergencies() {
     const r = await apiCall('get_emergencies');
@@ -7092,23 +7097,27 @@ async function loadData() {
         const supabasePosts = apiPosts.filter(p => p && p._source === 'supabase');
 
         if (supabasePosts.length > 0) {
+            // Jika Supabase mengembalikan data, GABUNGKAN dengan data lokal (jangan timpa total)
             const postMap = new Map();
-            // Masukkan data Supabase
+            
+            // Masukkan data Supabase (prioritas utama)
             supabasePosts.forEach(p => { if (p && p.id && !isDeleted(p.id)) postMap.set(p.id, p); });
             
-            // Masukkan data lokal yang baru dibuat (umur < 2 menit)
+            // Masukkan data lokal yang mungkin belum ter-sync ke Supabase (umur < 5 menit)
             posts.forEach(p => { 
                 if (p && p.id && !postMap.has(p.id)) {
                     const ts = p.timestamp || Date.now();
-                    if (Date.now() - ts < 120000) postMap.set(p.id, p);
+                    if (Date.now() - ts < 300000) postMap.set(p.id, p);
                 }
             });
 
             posts = Array.from(postMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
             safeSavePosts(posts);
-            console.log('✅ [loadData 12A] Sinkronisasi Sukses:', posts.length, 'posts');
+            console.log('✅ [loadData] Sinkronisasi Sukses:', posts.length, 'posts');
         } else {
-            console.log('⚠️ [loadData 12A] Supabase kosong, mempertahankan data lokal.');
+            // JIKA SUPABASE KOSONG ATAU ERROR: JANGAN HAPUS DATA LOKAL!
+            console.log('⚠️ [loadData] Supabase kosong/gagal. Mempertahankan data lokal:', posts.length, 'posts');
+            // Jangan ada kode `posts = []` di sini!
         }
 
         // ==============================
