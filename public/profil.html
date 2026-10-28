@@ -4306,12 +4306,54 @@ async function apiGetEmergencies() {
     return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
 }
 async function apiGetNotifications() {
-    const r = await apiCall('get_notifications');
-    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
+    try {
+        if (window.SALINK_SB_READY && window.salinkSupabase && currentAuthUser?.id) {
+            const { data, error } = await window.salinkSupabase
+                .from('notifications')
+                .select('*')
+                .eq('user_id', currentAuthUser.id)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            
+            // Format agar cocok dengan UI notif
+            return (data || []).map(n => ({
+                id: n.id,
+                type: n.type || 'info',
+                title: n.title || 'Notifikasi',
+                message: n.message || '',
+                sender: n.sender_username || 'Sistem',
+                link: n.link || '',
+                timestamp: n.created_at ? new Date(n.created_at).getTime() : Date.now(),
+                read: n.read_at !== null,
+            }));
+        }
+    } catch (err) { console.warn('[Notif] Error:', err.message); }
+    return [];
 }
 async function apiGetUsers() {
-    const r = await apiCall('get_users');
-    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
+    try {
+        if (window.SALINK_SB_READY && window.salinkSupabase) {
+            const { data, error } = await window.salinkSupabase
+                .from('profiles')
+                .select('id, username, full_name, profile_picture, gender, city, province')
+                .neq('username', currentUser?.username || ''); // Jangan tampilkan diri sendiri
+            
+            if (error) throw error;
+            
+            // Sesuaikan format dengan UI aplikasi (camelCase)
+            return (data || []).map(u => ({
+                username: u.username,
+                fullName: u.full_name,
+                profilePicture: u.profile_picture,
+                gender: u.gender,
+                city: u.city || '',
+                province: u.province || '',
+                isOnline: true // Supabase online tracker (bisa di-update nanti)
+            }));
+        }
+    } catch (err) { console.warn('[Users] Error:', err.message); }
+    return [];
 }
 async function apiGetFriends() {
     const r = await apiCall('get_friends');
@@ -4835,10 +4877,13 @@ async function saveProfileToSupabase(userData) {
  * LOAD DATA (posts, emergencies, users, friends, notifications)
  * ================================================================ */
 async function loadData() {
-    // 1. AMBIL POSTS DARI SUPABASE (Prioritas Utama)
+    // 1. AMBIL POSTS + LIKES + COMMENTS DARI SUPABASE (Prioritas Utama)
     try {
         if (window.SALINK_SB_READY && window.salinkSupabase) {
-            const { data: rawPosts, error } = await window.salinkSupabase
+            const client = window.salinkSupabase;
+
+            // Ambil posts + profil pembuat
+            const { data: rawPosts, error: postsErr } = await client
                 .from('posts')
                 .select(`
                     *,
@@ -4847,18 +4892,50 @@ async function loadData() {
                 .order('created_at', { ascending: false })
                 .limit(100);
 
-            if (!error && rawPosts) {
+            if (!postsErr && rawPosts) {
+                // Ambil relasi Media, Likes, dan Comments
+                const [mediaRes, likesRes, commentsRes] = await Promise.allSettled([
+                    client.from('media').select('*').not('post_id', 'is', null),
+                    client.from('likes').select('*'),
+                    client.from('comments').select('*').is('deleted_at', null)
+                ]);
+
+                const rawMedia = mediaRes.status === 'fulfilled' && mediaRes.value.data ? mediaRes.value.data : [];
+                const rawLikes = likesRes.status === 'fulfilled' && likesRes.value.data ? likesRes.value.data : [];
+                const rawComments = commentsRes.status === 'fulfilled' && commentsRes.value.data ? commentsRes.value.data : [];
+
+                // Petakan data
+                const mediaByPost = {};
+                rawMedia.forEach(m => { if (m.post_id) mediaByPost[m.post_id] = m; });
+
+                const likesByPost = {};
+                rawLikes.forEach(l => {
+                    if (!l.post_id) return;
+                    if (!likesByPost[l.post_id]) likesByPost[l.post_id] = [];
+                    likesByPost[l.post_id].push(l.user_id);
+                });
+
+                const commentsByPost = {};
+                rawComments.forEach(c => {
+                    if (!c.post_id) return;
+                    if (!commentsByPost[c.post_id]) commentsByPost[c.post_id] = [];
+                    commentsByPost[c.post_id].push(c);
+                });
+
                 posts = rawPosts.map(row => {
                     const p = row.profiles || {};
-                    const mediaArr = Array.isArray(row.media) ? row.media : (row.media ? [row.media] : []);
-                    const firstMedia = mediaArr.length > 0 ? mediaArr[0] : null;
+                    const m = mediaByPost[row.id];
                     
                     let mediaUrl = row.media_data || '';
                     let mType = row.media_data ? 'image' : '';
-                    if (firstMedia && firstMedia.object_key) {
-                        mediaUrl = 'https://dtmzrcsqpprtkcgsdijg.supabase.co/storage/v1/object/public/' + (firstMedia.bucket || 'salink-media') + '/' + firstMedia.object_key;
-                        mType = firstMedia.media_type;
+                    if (m && m.object_key) {
+                        mediaUrl = 'https://dtmzrcsqpprtkcgsdijg.supabase.co/storage/v1/object/public/' + (m.bucket || 'salink-media') + '/' + m.object_key;
+                        mType = m.media_type;
                     }
+
+                    // Ambil jumlah likes & komentar yang sesuai
+                    const postLikes = likesByPost[row.id] || [];
+                    const postComments = commentsByPost[row.id] || [];
 
                     return {
                         id: row.id,
@@ -4872,8 +4949,8 @@ async function loadData() {
                         gdriveVideoEmbed: mType === 'video' ? mediaUrl : '',
                         mediaData: row.media_data || '',
                         timestamp: new Date(row.created_at).getTime(),
-                        likes: JSON.stringify(row.likes || []), 
-                        comments: JSON.stringify(row.comments || []),
+                        likes: JSON.stringify(postLikes),       // <-- Injeksi data likes asli
+                        comments: JSON.stringify(postComments), // <-- Injeksi data komentar asli
                         viewerCount: row.viewer_count || 0,
                         isSpecial: row.is_special || false,
                         specialType: row.special_type || '',
@@ -4881,22 +4958,21 @@ async function loadData() {
                         specialAddress: row.special_address || ''
                     };
                 });
-                console.log('✅ [Profil] Posts dari Supabase:', posts.length);
+                console.log('✅ [Profil] Posts & Relasi dari Supabase:', posts.length);
             }
         }
     } catch (e) {
         console.warn('⚠️ [Profil] Gagal load posts Supabase, pakai cache:', e.message);
-        // Fallback ke localstorage (jika error)
         try { posts = JSON.parse(localStorage.getItem('salink_posts') || '[]'); } catch(err) {}
     }
 
-    // 2. EMERGENCIES & USERS & NOTIFS (Tetap pakai API GAS untuk backup jika Supabase gagal)
+    // 2. EMERGENCIES & USERS & NOTIFS (API GAS)
     try { allEmergencies = await apiGetEmergencies(); } catch(e) { allEmergencies = []; }
     try { allUsers = await apiGetUsers(); } catch(e) { allUsers = []; }
     try { notifications = await apiGetNotifications(); } catch(e) { notifications = []; }
     try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); } catch(e) { readNotifs = {}; }
 
-    // 3. FRIENDS (Relasi pertemanan)
+    // 3. FRIENDS
     let apiFriends = [];
     try { apiFriends = await apiGetFriends(); } catch(e) {}
     let localFriends = [];
@@ -4910,6 +4986,7 @@ async function loadData() {
     friends = Array.from(friendsMap.values());
     try { localStorage.setItem('salink_friends', JSON.stringify(friends)); } catch(e) {}
 }
+                
 
 /* ================================================================
  * RENDER PROFILE HEADER
