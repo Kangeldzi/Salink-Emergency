@@ -9082,16 +9082,21 @@ async function shareImage() {
 }
 
 // ==========================================
-// PATCH FINAL: SISTEM LAPORKAN FOTO KE SUPABASE
+// PATCH FINAL: LAPORKAN FOTO (FIX NAMA KOLOM DB)
 // ==========================================
 async function reportImage() {
+    console.log('🟢 [Report] Tombol Laporkan diklik');
+    
+    // Tutup menu titik tiga terlebih dahulu
+    if (typeof toggleImageMenu === 'function') toggleImageMenu();
+
     // 1. Cek Login
     if (!currentUser || !currentAuthUser) {
         showToast('🔒 Akses Ditolak', 'Anda harus login untuk melaporkan foto', 'fa-lock');
         return;
     }
 
-    // 2. Tanya alasan via Prompt (Bisa diganti Modal jika mau lebih cantik)
+    // 2. Tanya alasan
     const alasan = prompt('⚠️ LAPORKAN FOTO\n\nMengapa Anda melaporkan foto ini?\n(Contoh: Spam, Konten Dewasa, SARA, Hoaks)\n\nKetik alasan Anda:');
     
     if (!alasan || alasan.trim() === '') {
@@ -9099,59 +9104,38 @@ async function reportImage() {
         return;
     }
 
-    // Tutup menu titik tiga
-    toggleImageMenu();
-
-    // 3. Tampilkan loading sementara
     showToast('⏳ Mengirim...', 'Sedang memproses laporan Anda', 'fa-spinner fa-spin');
 
     try {
-        // 4. Kirim Data ke Supabase
-        if (window.SALINK_SB_READY && window.salinkSupabase) {
-            
-            // Cari tahu post_id terkait gambar ini (jika ada)
-            // Kita cari di array posts berdasarkan URL gambarnya
-            let relatedPostId = null;
-            let relatedUserId = null;
-            
-            const foundPost = posts.find(p => 
-                (p.gdriveImageUrl && p.gdriveImageUrl === currentPreviewImageUrl) || 
-                (p.mediaData && p.mediaData === currentPreviewImageUrl)
-            );
-            
-            if (foundPost) {
-                relatedPostId = isSupabaseUUID(foundPost.id) ? foundPost.id : null;
-                // Ambil ID user pemilik post (jika ada di database)
-                relatedUserId = foundPost.userAuthId || null; 
-            }
+        // 3. Siapkan data sesuai kolom tabel Supabase Anda
+        const reportPayload = {
+            user_id: currentAuthUser.id,          // Sesuai kolom 'user_id' di gambar
+            type: 'image_report',                 // Sesuai kolom 'type' di gambar
+            image_url: currentPreviewImageUrl ? currentPreviewImageUrl.substring(0, 500) : 'No URL',
+            reason: alasan.trim(),                // Sesuai kolom 'reason' di gambar
+            status: 'pending'                     
+        };
+        
+        console.log('📤 [Report] Mengirim data:', reportPayload);
 
-            // Payload laporan
-            const reportPayload = {
-                reporter_id: currentAuthUser.id,
-                reported_user_id: relatedUserId,
-                post_id: relatedPostId,
-                image_url: currentPreviewImageUrl.substring(0, 500), // Batasi panjang URL
-                reason: alasan.trim(),
-                status: 'pending'
-            };
+        // 4. Kirim ke Supabase
+        const { data, error } = await window.salinkSupabase
+            .from('reports')
+            .insert([reportPayload])
+            .select();
 
-            const { error } = await window.salinkSupabase
-                .from('reports')
-                .insert(reportPayload);
-
-            if (error) throw error;
-
-            // 5. Sukses
-            showToast('✅ Laporan Terkirim', 'Tim Admin akan segera meninjau foto ini. Terima kasih!', 'fa-check-circle');
-            
-            // Opsional: Mainkan suara notifikasi
-            playRegularSound();
-
-        } else {
-            throw new Error('Koneksi database terputus');
+        if (error) {
+            console.error('🔴 [Report] Supabase Error:', error);
+            throw error;
         }
+
+        console.log('✅ [Report] Sukses terkirim! Respons:', data);
+        showToast('✅ Laporan Terkirim', 'Tim Admin akan meninjau foto ini.', 'fa-check-circle');
+        
+        if (typeof playRegularSound === 'function') playRegularSound();
+
     } catch (err) {
-        console.error('[Report Image] Error:', err);
+        console.error('🔴 [Report] Catch Error:', err.message);
         showToast('❌ Gagal', 'Gagal mengirim laporan: ' + err.message, 'fa-times-circle');
     }
 }
