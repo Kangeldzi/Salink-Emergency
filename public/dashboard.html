@@ -9081,9 +9081,79 @@ async function shareImage() {
     toggleImageMenu();
 }
 
-function reportImage() {
-    showToast('⚠️ Laporan Terkirim', 'Tim Admin akan meninjau foto ini.', 'fa-exclamation-triangle');
+// ==========================================
+// PATCH FINAL: SISTEM LAPORKAN FOTO KE SUPABASE
+// ==========================================
+async function reportImage() {
+    // 1. Cek Login
+    if (!currentUser || !currentAuthUser) {
+        showToast('🔒 Akses Ditolak', 'Anda harus login untuk melaporkan foto', 'fa-lock');
+        return;
+    }
+
+    // 2. Tanya alasan via Prompt (Bisa diganti Modal jika mau lebih cantik)
+    const alasan = prompt('⚠️ LAPORKAN FOTO\n\nMengapa Anda melaporkan foto ini?\n(Contoh: Spam, Konten Dewasa, SARA, Hoaks)\n\nKetik alasan Anda:');
+    
+    if (!alasan || alasan.trim() === '') {
+        showToast('ℹ️ Dibatalkan', 'Laporan memerlukan alasan', 'fa-info-circle');
+        return;
+    }
+
+    // Tutup menu titik tiga
     toggleImageMenu();
+
+    // 3. Tampilkan loading sementara
+    showToast('⏳ Mengirim...', 'Sedang memproses laporan Anda', 'fa-spinner fa-spin');
+
+    try {
+        // 4. Kirim Data ke Supabase
+        if (window.SALINK_SB_READY && window.salinkSupabase) {
+            
+            // Cari tahu post_id terkait gambar ini (jika ada)
+            // Kita cari di array posts berdasarkan URL gambarnya
+            let relatedPostId = null;
+            let relatedUserId = null;
+            
+            const foundPost = posts.find(p => 
+                (p.gdriveImageUrl && p.gdriveImageUrl === currentPreviewImageUrl) || 
+                (p.mediaData && p.mediaData === currentPreviewImageUrl)
+            );
+            
+            if (foundPost) {
+                relatedPostId = isSupabaseUUID(foundPost.id) ? foundPost.id : null;
+                // Ambil ID user pemilik post (jika ada di database)
+                relatedUserId = foundPost.userAuthId || null; 
+            }
+
+            // Payload laporan
+            const reportPayload = {
+                reporter_id: currentAuthUser.id,
+                reported_user_id: relatedUserId,
+                post_id: relatedPostId,
+                image_url: currentPreviewImageUrl.substring(0, 500), // Batasi panjang URL
+                reason: alasan.trim(),
+                status: 'pending'
+            };
+
+            const { error } = await window.salinkSupabase
+                .from('reports')
+                .insert(reportPayload);
+
+            if (error) throw error;
+
+            // 5. Sukses
+            showToast('✅ Laporan Terkirim', 'Tim Admin akan segera meninjau foto ini. Terima kasih!', 'fa-check-circle');
+            
+            // Opsional: Mainkan suara notifikasi
+            playRegularSound();
+
+        } else {
+            throw new Error('Koneksi database terputus');
+        }
+    } catch (err) {
+        console.error('[Report Image] Error:', err);
+        showToast('❌ Gagal', 'Gagal mengirim laporan: ' + err.message, 'fa-times-circle');
+    }
 }
         
 // ====================================================================
