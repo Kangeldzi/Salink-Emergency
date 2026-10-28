@@ -3716,9 +3716,39 @@ async function apiGetEmergencies() {
     const r = await apiCall('get_emergencies');
     return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptEmergency) : [];
 }
+// ==========================================
+// PATCH: AMBIL NOTIFIKASI DARI SUPABASE
+// ==========================================
 async function apiGetNotifications() {
-    const r = await apiCall('get_notifications');
-    return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptNotification) : [];
+    try {
+        if (window.SALINK_SB_READY && window.salinkSupabase && currentAuthUser?.id) {
+            const { data, error } = await window.salinkSupabase
+                .from('notifications')
+                .select('*')
+                .eq('user_id', currentAuthUser.id)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            
+            // Konversi format agar cocok dengan UI Dashboard
+            return (data || []).map(n => ({
+                id: n.id,
+                type: n.type || 'info',
+                title: n.title || 'Notifikasi',
+                message: n.message || '',
+                sender: n.sender_username || 'Sistem',
+                senderUsername: n.sender_username || 'sistem',
+                link: n.link || '',
+                postId: n.post_id || '',
+                timestamp: n.created_at ? new Date(n.created_at).getTime() : Date.now(),
+                read: n.read_at !== null,
+                soundKey: n.sound_key || ''
+            }));
+        }
+    } catch (err) {
+        console.warn('[apiGetNotifications] Error:', err.message);
+    }
+    return []; // Kembalikan array kosong jika gagal
 }
 async function apiGetStatistics() {
     const r = await apiCall('get_statistics');
@@ -9081,15 +9111,10 @@ async function shareImage() {
     toggleImageMenu();
 }
 
-// ==========================================
-// PATCH FINAL: LAPORKAN FOTO + AUTO NOTIFIKASI (FIXED)
-// ==========================================
-// ==========================================
-// PATCH FINAL: LAPORKAN FOTO + AUTO NOTIFIKASI (FIX KOLOM 'read')
+ // ==========================================
+// PATCH FINAL: LAPORKAN FOTO + NOTIFIKASI (SUPABASE MURNI)
 // ==========================================
 async function reportImage() {
-    console.log('🟢 [Report] Tombol Laporkan diklik');
-    
     if (typeof toggleImageMenu === 'function') toggleImageMenu();
 
     if (!currentUser || !currentAuthUser) {
@@ -9098,36 +9123,31 @@ async function reportImage() {
     }
 
     const alasan = prompt('⚠️ LAPORKAN FOTO\n\nMengapa Anda melaporkan foto ini?\n(Contoh: Spam, Konten Dewasa, SARA, Hoaks)\n\nKetik alasan Anda:');
-    
-    if (!alasan || alasan.trim() === '') {
-        showToast('ℹ️ Dibatalkan', 'Laporan memerlukan alasan', 'fa-info-circle');
-        return;
-    }
+    if (!alasan || alasan.trim() === '') return;
 
     showToast('⏳ Mengirim...', 'Sedang memproses laporan Anda', 'fa-spinner fa-spin');
 
     try {
-        // 1. SIMPAN LAPORAN (Seperti yang sudah sukses)
-        const reportPayload = {
-            user_id: currentAuthUser.id,
-            type: 'Laporan Foto: ' + alasan.trim() 
-        };
-        
+        // 1. SIMPAN KE TABEL REPORTS
         const { error: reportError } = await window.salinkSupabase
             .from('reports')
-            .insert([reportPayload]);
+            .insert([{ 
+                user_id: currentAuthUser.id, 
+                type: 'Laporan Foto: ' + alasan.trim() 
+            }]);
 
         if (reportError) throw reportError;
-        console.log('✅ [Report] Laporan masuk ke database');
 
-        // 2. SIMPAN NOTIFIKASI (Ganti is_read menjadi read)
+        // 2. SIMPAN KE TABEL NOTIFICATIONS (Disesuaikan dengan 100% kolom Anda)
         const notifPayload = {
-            user_id: currentAuthUser.id, 
-            sender_id: currentAuthUser.id, 
-            type: 'system_alert', 
+            user_id: currentAuthUser.id,
+            sender_id: currentAuthUser.id,
+            type: 'system_alert',
             title: '✅ Laporan Diterima',
-            message: 'Laporan foto Anda terkait "' + alasan.trim() + '" sedang ditinjau oleh Tim Admin. Terima kasih!',
-            read: false // <--- INI DIPERBAIKI
+            message: 'Laporan foto Anda terkait "' + alasan.trim() + '" sedang ditinjau oleh Tim Admin.',
+            link: 'dashboard.html', // Wajib diisi agar sistem tidak error
+            sound_key: 'system_alert',
+            read_at: null // Sesuai kolom di tabel Anda (null artinya belum dibaca)
         };
 
         const { error: notifError } = await window.salinkSupabase
@@ -9135,32 +9155,48 @@ async function reportImage() {
             .insert([notifPayload]);
 
         if (notifError) {
-            console.error('🔴 [Notif Error] Gagal insert notifikasi:', notifError.message);
-            alert('Laporan sukses, TAPI Notifikasi gagal dibuat.\n\nPesan Error: ' + notifError.message);
+            console.error('🔴 [Notif Error]', notifError.message);
+            alert('Laporan sukses, tapi Notifikasi gagal dibuat:\n' + notifError.message);
         } else {
-            console.log('✅ [Notif] Notifikasi berhasil dibuat');
+            console.log('✅ [Notif] Notifikasi berhasil masuk database');
             
-            // 3. PAKSA REFRESH BADGE DAN DAFTAR NOTIFIKASI
-            const r = await apiCall('get_notifications');
-            if (r.status === 'success' && Array.isArray(r.data)) {
-                notifications = r.data.map(adaptNotification).filter(n => !isDeleted(n.id));
+            // 3. REFRESH NOTIFIKASI LANGSUNG DARI SUPABASE
+            // Kita ambil data notif khusus untuk user ini
+            const { data: latestNotifs, error: fetchError } = await window.salinkSupabase
+                .from('notifications')
+                .select('*')
+                .eq('user_id', currentAuthUser.id)
+                .order('created_at', { ascending: false });
+
+            if (!fetchError && latestNotifs) {
+                // Ubah format Supabase ke format UI Dashboard
+                notifications = latestNotifs.map(n => ({
+                    id: n.id,
+                    type: n.type || 'info',
+                    title: n.title,
+                    message: n.message,
+                    sender: n.sender_username || 'Sistem',
+                    senderUsername: n.sender_username || 'sistem',
+                    link: n.link || '',
+                    postId: n.post_id || '',
+                    timestamp: new Date(n.created_at).getTime(),
+                    read: n.read_at !== null, // Jika read_at ada isinya, berarti sudah dibaca
+                    soundKey: n.sound_key || ''
+                }));
+                
                 if (typeof updateNotifBadge === 'function') updateNotifBadge();
-                if (document.getElementById('notifModal')?.classList.contains('active')) {
-                    if (typeof renderNotifList === 'function') renderNotifList();
-                }
             }
         }
 
-        // 4. SELESAI
-        showToast('✅ Laporan Terkirim', 'Laporan Anda sedang ditinjau. Cek notifikasi!', 'fa-check-circle');
+        showToast('✅ Laporan Terkirim', 'Cek ikon Lonceng 🔔 Anda', 'fa-check-circle');
         if (typeof playRegularSound === 'function') playRegularSound();
 
     } catch (err) {
         console.error('🔴 [Report] Catch Error:', err.message);
-        showToast('❌ Gagal', 'Gagal memproses laporan', 'fa-times-circle');
-        alert('GAGAL SIMPAN KE SUPABASE:\n' + err.message);
+        showToast('❌ Gagal', 'Gagal memproses laporan: ' + err.message, 'fa-times-circle');
+        alert('GAGAL: ' + err.message);
     }
-}
+}   
         
 // ====================================================================
 // 58. BOOTSTRAP — Load awal (fallback kalau DOMContentLoaded sudah lewat)
