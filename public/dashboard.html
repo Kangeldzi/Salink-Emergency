@@ -9019,11 +9019,41 @@ function closeImagePreview() {
     document.getElementById('imagePreviewModal').style.display = 'none';
     document.getElementById('imageMenuDropdown').style.display = 'none';
     document.body.style.overflow = '';
+    
+    // Bersihkan event listener agar tidak bentrok
+    document.removeEventListener('click', closeImageMenuOutside);
 }
 
+// ==========================================
+// PATCH PERBAIKAN: MENU PREVIEW GAMBAR AUTO-CLOSE
+// ==========================================
 function toggleImageMenu() {
     const menu = document.getElementById('imageMenuDropdown');
-    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    if (!menu) return;
+    
+    // Toggle buka/tutup
+    const isHidden = menu.style.display === 'none' || menu.style.display === '';
+    menu.style.display = isHidden ? 'block' : 'none';
+    
+    // Jika menu dibuka, pasang event listener "klik di luar" sementara
+    if (isHidden) {
+        // Gunakan setTimeout agar klik pada tombol titik tiga saat ini tidak langsung menutup menunya
+        setTimeout(() => {
+            document.addEventListener('click', closeImageMenuOutside);
+        }, 10);
+    } else {
+        document.removeEventListener('click', closeImageMenuOutside);
+    }
+}
+
+// Fungsi pembantu untuk mendeteksi klik di luar menu
+function closeImageMenuOutside(e) {
+    const menu = document.getElementById('imageMenuDropdown');
+    // Jika yang diklik BUKAN menu itu sendiri dan BUKAN tombol titik tiganya
+    if (menu && !e.target.closest('#imageMenuDropdown') && !e.target.closest('button[onclick="toggleImageMenu()"]')) {
+        menu.style.display = 'none';
+        document.removeEventListener('click', closeImageMenuOutside);
+    }
 }
 
 function downloadImage() {
