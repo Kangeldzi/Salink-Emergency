@@ -9082,7 +9082,7 @@ async function shareImage() {
 }
 
 // ==========================================
-// PATCH FINAL: LAPORKAN FOTO (FIX KOLOM TIDAK ADA)
+// PATCH FINAL: LAPORKAN FOTO + AUTO NOTIFIKASI
 // ==========================================
 async function reportImage() {
     console.log('🟢 [Report] Tombol Laporkan diklik');
@@ -9104,33 +9104,64 @@ async function reportImage() {
     showToast('⏳ Mengirim...', 'Sedang memproses laporan Anda', 'fa-spinner fa-spin');
 
     try {
-        // KITA HANYA MENGIRIM KOLOM YANG PASTI ADA (Berdasarkan screenshot Anda)
-        // Kita masukkan alasan laporan ke dalam kolom 'type'
+        // 1. SIMPAN LAPORAN KE TABEL REPORTS
         const reportPayload = {
             user_id: currentAuthUser.id,
             type: 'Laporan Foto: ' + alasan.trim() 
         };
         
-        console.log('📤 [Report] Mengirim data:', reportPayload);
-
-        const { data, error } = await window.salinkSupabase
+        const { data: reportData, error: reportError } = await window.salinkSupabase
             .from('reports')
             .insert([reportPayload])
             .select();
 
-        if (error) {
-            console.error('🔴 [Report] Supabase Error:', error);
-            alert('GAGAL SIMPAN KE SUPABASE:\n' + error.message + '\n\nKode: ' + error.code);
-            throw error;
+        if (reportError) throw reportError;
+        console.log('✅ [Report] Laporan masuk ke database:', reportData);
+
+        // 2. BUAT NOTIFIKASI OTOMATIS UNTUK USER
+        const notifPayload = {
+            // Sesuaikan nama kolom ini dengan tabel 'notifications' di Supabase Anda
+            user_id: currentAuthUser.id, 
+            sender_id: currentAuthUser.id, 
+            type: 'system_alert', 
+            title: '✅ Laporan Diterima',
+            message: 'Laporan foto Anda terkait "' + alasan.trim() + '" sedang ditinjau oleh Tim Admin. Terima kasih!',
+            read: false,
+            created_at: new Date().toISOString()
+        };
+
+        const { error: notifError } = await window.salinkSupabase
+            .from('notifications')
+            .insert([notifPayload]);
+
+        if (notifError) {
+            console.warn('⚠️ [Report] Laporan sukses, tapi gagal buat notifikasi:', notifError.message);
+            // Kita tidak melempar error ke user karena laporan utamanya sudah sukses
+        } else {
+            console.log('✅ [Notif] Notifikasi "Laporan Diterima" berhasil dibuat');
+            
+            // 3. REFRESH BADGE NOTIFIKASI & UI JIKA FUNGSINYA TERSEDIA
+            if (typeof updateNotifBadge === 'function') updateNotifBadge();
+            
+            // Paksa ambil data notif terbaru agar saat modal dibuka langsung muncul
+            if (typeof apiGetNotifications === 'function') {
+                apiGetNotifications().then(notifs => {
+                    if (notifs && notifs.length > 0) {
+                        notifications = notifs; 
+                        if (typeof renderNotifList === 'function') renderNotifList();
+                    }
+                });
+            }
         }
 
-        console.log('✅ [Report] Sukses terkirim! Respons:', data);
-        showToast('✅ Laporan Terkirim', 'Tim Admin akan meninjau foto ini.', 'fa-check-circle');
-        
+        // 4. TAMPILKAN PESAN SUKSES KE USER
+        showToast('✅ Laporan Terkirim', 'Laporan Anda sedang ditinjau. Cek notifikasi!', 'fa-check-circle');
         if (typeof playRegularSound === 'function') playRegularSound();
 
     } catch (err) {
         console.error('🔴 [Report] Catch Error:', err.message);
+        showToast('❌ Gagal', 'Gagal memproses laporan: ' + err.message, 'fa-times-circle');
+        alert('GAGAL SIMPAN KE SUPABASE:\n' + err.message);
     }
 }
         
