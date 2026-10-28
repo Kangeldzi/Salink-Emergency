@@ -5458,6 +5458,66 @@ function attachPostListeners() {
             hideReplies(this.dataset.commentId, this.dataset.postId);
         };
     });
+
+    // 16. EVENT LISTENER UNTUK BALASAN KOMENTAR (NESTED)
+    document.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(el => {
+        el.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (isPreviewMode) { showPreviewOverlay(); return; }
+            const box = document.getElementById('replyBox-' + this.dataset.commentId);
+            if (box) box.classList.toggle('active');
+        };
+    });
+
+    document.querySelectorAll('.comment-reply-box .reply-send-btn').forEach(el => {
+        el.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (isPreviewMode) { showPreviewOverlay(); return; }
+            const parentId = this.dataset.parentId;
+            const postId = this.dataset.postId;
+            const input = this.parentElement.querySelector('input');
+            const text = input.value.trim();
+            if (text) {
+                addComment(postId, text, parentId);
+                input.value = '';
+                this.parentElement.classList.remove('active');
+            }
+        };
+    });
+
+    document.querySelectorAll('.comment-reply-box input').forEach(el => {
+        el.onkeypress = function(e) {
+            if (e.key === 'Enter') {
+                const btn = this.parentElement.querySelector('.reply-send-btn');
+                if (btn) btn.click();
+            }
+        };
+    });
+
+    document.querySelectorAll('.comment-action-btn[data-action="like-comment"]').forEach(el => {
+        el.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (isPreviewMode) { showPreviewOverlay(); return; }
+            toggleCommentLike(this.dataset.commentId, this.dataset.postId);
+        };
+    });
+
+    document.querySelectorAll('.comment-action-btn[data-action="edit-comment"]').forEach(el => {
+        el.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (isPreviewMode) { showPreviewOverlay(); return; }
+            handleEditComment(this.dataset.commentId, this.dataset.postId);
+        };
+    });
+
+    document.querySelectorAll('.comment-action-btn[data-action="delete-comment"]').forEach(el => {
+        el.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (isPreviewMode) { showPreviewOverlay(); return; }
+            handleDeleteComment(this.dataset.commentId, this.dataset.postId);
+        };
+    });
+
 }
         
 // ====================================================================
