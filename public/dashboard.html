@@ -9082,7 +9082,7 @@ async function shareImage() {
 }
 
 // ==========================================
-// PATCH FINAL: LAPORKAN FOTO (MINIMALIS & AMAN)
+// PATCH FINAL: LAPORKAN FOTO (FIX KOLOM TIDAK ADA)
 // ==========================================
 async function reportImage() {
     console.log('🟢 [Report] Tombol Laporkan diklik');
@@ -9104,14 +9104,14 @@ async function reportImage() {
     showToast('⏳ Mengirim...', 'Sedang memproses laporan Anda', 'fa-spinner fa-spin');
 
     try {
-        // KITA HANYA MENGIRIM KOLOM YANG PASTI ADA DI TABEL ANDA
+        // KITA HANYA MENGIRIM KOLOM YANG PASTI ADA (Berdasarkan screenshot Anda)
+        // Kita masukkan alasan laporan ke dalam kolom 'type'
         const reportPayload = {
             user_id: currentAuthUser.id,
-            type: 'image_report',
-            reason: alasan.trim()
+            type: 'Laporan Foto: ' + alasan.trim() 
         };
         
-        console.log('📤 [Report] Mengirim data minimalis:', reportPayload);
+        console.log('📤 [Report] Mengirim data:', reportPayload);
 
         const { data, error } = await window.salinkSupabase
             .from('reports')
@@ -9119,7 +9119,6 @@ async function reportImage() {
             .select();
 
         if (error) {
-            // TAMPILKAN ERROR ASLI DARI SUPABASE DI LAYAR
             console.error('🔴 [Report] Supabase Error:', error);
             alert('GAGAL SIMPAN KE SUPABASE:\n' + error.message + '\n\nKode: ' + error.code);
             throw error;
@@ -9132,7 +9131,6 @@ async function reportImage() {
 
     } catch (err) {
         console.error('🔴 [Report] Catch Error:', err.message);
-        showToast('❌ Gagal', 'Gagal mengirim laporan', 'fa-times-circle');
     }
 }
         
