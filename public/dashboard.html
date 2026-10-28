@@ -9084,6 +9084,9 @@ async function shareImage() {
 // ==========================================
 // PATCH FINAL: LAPORKAN FOTO + AUTO NOTIFIKASI (FIXED)
 // ==========================================
+// ==========================================
+// PATCH FINAL: LAPORKAN FOTO + AUTO NOTIFIKASI (FIX KOLOM 'read')
+// ==========================================
 async function reportImage() {
     console.log('🟢 [Report] Tombol Laporkan diklik');
     
@@ -9117,14 +9120,14 @@ async function reportImage() {
         if (reportError) throw reportError;
         console.log('✅ [Report] Laporan masuk ke database');
 
-        // 2. SIMPAN NOTIFIKASI (Disesuaikan agar lebih aman)
+        // 2. SIMPAN NOTIFIKASI (Ganti is_read menjadi read)
         const notifPayload = {
             user_id: currentAuthUser.id, 
             sender_id: currentAuthUser.id, 
             type: 'system_alert', 
             title: '✅ Laporan Diterima',
             message: 'Laporan foto Anda terkait "' + alasan.trim() + '" sedang ditinjau oleh Tim Admin. Terima kasih!',
-            is_read: false // Ubah ke 'read' jika di database Anda namanya 'read'
+            read: false // <--- INI DIPERBAIKI
         };
 
         const { error: notifError } = await window.salinkSupabase
@@ -9133,21 +9136,15 @@ async function reportImage() {
 
         if (notifError) {
             console.error('🔴 [Notif Error] Gagal insert notifikasi:', notifError.message);
-            alert('Laporan sukses, TAPI Notifikasi gagal dibuat.\n\nPesan Error dari Database: ' + notifError.message);
-            // Kita tidak return di sini, biarkan user tahu laporannya tetap masuk
+            alert('Laporan sukses, TAPI Notifikasi gagal dibuat.\n\nPesan Error: ' + notifError.message);
         } else {
             console.log('✅ [Notif] Notifikasi berhasil dibuat');
             
             // 3. PAKSA REFRESH BADGE DAN DAFTAR NOTIFIKASI
-            // Ambil data notif terbaru langsung dari server
             const r = await apiCall('get_notifications');
             if (r.status === 'success' && Array.isArray(r.data)) {
                 notifications = r.data.map(adaptNotification).filter(n => !isDeleted(n.id));
-                
-                // Update angka badge
                 if (typeof updateNotifBadge === 'function') updateNotifBadge();
-                
-                // Jika modal notif sedang terbuka, render ulang
                 if (document.getElementById('notifModal')?.classList.contains('active')) {
                     if (typeof renderNotifList === 'function') renderNotifList();
                 }
