@@ -3971,84 +3971,22 @@
 
     </div> <!-- /app-shell (tutup) -->
 
-    
-    <!-- ========================================================= -->
-    <!-- PATCH 1 — SUPABASE CLIENT SALINK                          -->
-    <!-- Gunakan proyek yang sama dengan login-register.html       -->
-    <!-- ========================================================= -->
-
-    <!-- CDN Supabase JS (WAJIB — belum ada di profil.html) -->
+    <!-- ============================================================ -->
+    <!-- SCRIPT UTAMA — PROFIL v9.0 FINAL (FULL & BERSIH)             -->
+    <!-- ============================================================ -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
     <script>
-    (function () {
-        'use strict';
-
-        const SUPABASE_URL =
-            'https://dtmzrcsqpprtkcgsdijg.supabase.co';
-
-        // Gunakan publishable key yang sama dengan login-register.html.
-        // Jangan pernah memasukkan service_role key ke HTML frontend.
-        const SUPABASE_PUBLISHABLE_KEY =
-            'sb_publishable_l3CvU_zCWEgyoa-LTiG2-w_aXqjXQGd';
-
-        window.SALINK_SB_READY = false;
-
-        if (!window.supabase || !window.supabase.createClient) {
-            console.error(
-                '[SALINK] Supabase JS belum dimuat. Periksa CDN Supabase.'
-            );
-            return;
-        }
-
-        // Hindari membuat client kedua jika sudah tersedia.
-        if (!window.salinkSupabase) {
-            window.salinkSupabase = window.supabase.createClient(
-                SUPABASE_URL,
-                SUPABASE_PUBLISHABLE_KEY,
-                {
-                    auth: {
-                        persistSession: true,
-                        autoRefreshToken: true,
-                        // Halaman profil tidak menerima token dari URL.
-                        // Session sudah tersimpan via persistSession.
-                        detectSessionInUrl: false
-                    }
-                }
-            );
-        }
-
-        window.SALINK_SB_READY = true;
-        console.log('[SALINK] Supabase client tersedia.');
-    })();
-    </script>
-
-    
-<!-- ============================================================ -->
-<!-- SCRIPT UTAMA — PROFIL v9.0 (FULL SUPABASE INTEGRATION)       -->
-<!-- ============================================================ -->
-<script>
-/* ====================================================================
- * SALINK PROFIL — FINAL v9.0
- * ====================================================================
- * 100% Bebas Fungsi Ganda. Terintegrasi penuh dengan Supabase.
- * ==================================================================== */
 (function() {
     'use strict';
 
     /* ================================================================
-     * 1. KONSTANTA & STATE GLOBAL
+     * 1. KONSTANTA & INISIALISASI SUPABASE
      * ================================================================ */
     const LOGIN_URL = 'login-register.html';
     const DASHBOARD_URL = 'dashboard.html';
     const PROFILE_URL = 'profil.html';
     const PROFILE_USER_URL = 'profile-user.html';
-    const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
     const REGULAR_SOUND_URL = '/Music/smsblackber_4a537f155087133.mp3';
-
-    const EMERGENCY_LABELS = { 'fire': '🔥 Kebakaran', 'medical': '🚑 Medis & Kematian', 'crime': '🚓 Kriminal', 'disaster': '🌪️ Bencana Alam' };
-    const EMERGENCY_ICONS = { 'fire': '🔥', 'medical': '🚑', 'crime': '🚓', 'disaster': '🌪️' };
-    const DEFAULT_PRIVACY = { allowWhatsApp: true, allowVoiceCall: true, allowVideoCall: true, allowPhoneCall: false };
 
     let currentUser = null;
     let profileUser = null;
@@ -4059,31 +3997,8 @@
     let notifications = [];
     let friends = [];
     let currentTheme = 'dark';
-    let currentFotoFilter = 'semua';
-    let currentFollowTab = 'followers';
-    let currentNotifFilter = 'all';
-    let lightboxImages = [];
-    let currentLightboxIndex = 0;
-    let pendingDelete = null;
-    let readNotifs = {};
-    let syncChannel = null;
-    let mapLat = null, mapLng = null;
-    
-    let regularSound = null;
-    let floatingNotificationTimeout = null;
-    let deferredPrompt = null;
 
-    // Carousel state
-    let postinganIndex = 0;
-    let postinganSlidesCount = 0;
-    let postinganAutoTimer = null;
-    let postinganPaused = false;
-
-    // Marketplace state
-    let miniAllProducts = [];
-    let miniAllTransactions = [];
-
-    // Supabase Client Init
+    // Init Supabase
     window.SALINK_SB_READY = false;
     if (window.supabase && window.supabase.createClient) {
         window.salinkSupabase = window.supabase.createClient(
@@ -4092,6 +4007,7 @@
             { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } }
         );
         window.SALINK_SB_READY = true;
+        console.log('✅ Supabase Client Siap');
     }
 
     /* ================================================================
@@ -4106,27 +4022,8 @@
         const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
         return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} • ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
     }
-    function getTimeAgo(ts) {
-        const diff = Date.now() - ts;
-        const sec = Math.floor(diff/1000), min = Math.floor(sec/60), hr = Math.floor(min/60), day = Math.floor(hr/24);
-        if (sec < 60) return 'Baru saja';
-        if (min < 60) return `${min}m lalu`;
-        if (hr < 24) return `${hr}j lalu`;
-        if (day < 7) return `${day}h lalu`;
-        return new Date(ts).toLocaleDateString('id-ID');
-    }
-    function formatRupiahMini(num) {
-        const n = Number(num || 0);
-        if (n >= 1000000) return 'Rp ' + (n / 1000000).toFixed(1).replace('.0', '') + 'jt';
-        if (n >= 1000) return 'Rp ' + (n / 1000).toFixed(0) + 'rb';
-        return 'Rp ' + n.toLocaleString('id-ID');
-    }
-    function playRegularSound() {
-        try {
-            if (!regularSound) regularSound = new Audio(REGULAR_SOUND_URL);
-            regularSound.currentTime = 0; regularSound.volume = 1.0; regularSound.play().catch(() => {});
-        } catch(e) {}
-    }
+    function playRegularSound() { try { new Audio(REGULAR_SOUND_URL).play().catch(()=>{}); } catch(e) {} }
+    
     function showToast(title, message, icon = 'fa-info-circle', type = 'info') {
         document.querySelectorAll('.toast').forEach(t => t.remove());
         const container = document.getElementById('toastContainer');
@@ -4138,6 +4035,7 @@
         container.appendChild(toast);
         setTimeout(() => { toast.classList.add('hide'); setTimeout(() => toast.remove(), 400); }, 4500);
     }
+
     function loadTheme() {
         const t = localStorage.getItem('salink_theme') || 'dark';
         if (t === 'light') {
@@ -4150,14 +4048,17 @@
             if(document.getElementById('toggleIcon')) document.getElementById('toggleIcon').className = 'fas fa-moon';
         }
     }
-    function toggleTheme() {
-        const nt = currentTheme === 'dark' ? 'light' : 'dark';
-        localStorage.setItem('salink_theme', nt); loadTheme();
-    }
+    function toggleTheme() { const nt = currentTheme === 'dark' ? 'light' : 'dark'; localStorage.setItem('salink_theme', nt); loadTheme(); }
+    
+    // Modal & Sidebar Controls
     function openModal(id) { const m = document.getElementById(id); if (m) { m.classList.add('active'); document.body.style.overflow = 'hidden'; } }
     function closeModal(id) { const m = document.getElementById(id); if (m) { m.classList.remove('active'); document.body.style.overflow = ''; } }
     function openSidebar() { document.getElementById('sidebar')?.classList.add('active'); document.getElementById('sidebarOverlay')?.classList.add('active'); document.body.style.overflow = 'hidden'; }
     function closeSidebar() { document.getElementById('sidebar')?.classList.remove('active'); document.getElementById('sidebarOverlay')?.classList.remove('active'); document.body.style.overflow = ''; }
+
+    // Expose untuk HTML onclick
+    window.closeModal = closeModal;
+    window.openModal = openModal;
 
     /* ================================================================
      * 3. SUPABASE AUTH & DATA FETCHING
@@ -4185,12 +4086,10 @@
                 phone: profile.phone || '', country: profile.country || '', province: profile.province || '',
                 city: profile.city || '', district: profile.district || '', village: profile.village || '',
                 address: profile.address || '', bio: profile.bio || '', mapLink: profile.map_link || '',
-                profilePicture: profile.profile_picture || '', joinedAt: joinedAtRaw, joinedDate: joinedAtRaw,
-                privacy: { ...DEFAULT_PRIVACY }
+                profilePicture: profile.profile_picture || '', joinedAt: joinedAtRaw, joinedDate: joinedAtRaw
             };
             profileUser = { ...currentUser };
             
-            // Mirror to LS for dashboard compatibility
             const mirror = { ...currentUser }; delete mirror.profilePicture;
             localStorage.setItem('salink_user', JSON.stringify(mirror));
             localStorage.setItem('salink_logged_in', 'true');
@@ -4199,9 +4098,8 @@
     }
 
     async function loadData() {
-        // 1. Fetch Posts (Supabase)
         try {
-            if (window.SALINK_SB_READY && window.salinkSupabase) {
+            if (window.salinkSupabase) {
                 const client = window.salinkSupabase;
                 const { data: rawPosts, error: postsErr } = await client.from('posts').select(`*, profiles!posts_user_id_fkey (username, full_name, profile_picture, gender)`).order('created_at', { ascending: false }).limit(100);
                 
@@ -4212,13 +4110,9 @@
                         client.from('comments').select('*').is('deleted_at', null)
                     ]);
 
-                    const rawMedia = mediaRes.status === 'fulfilled' && mediaRes.value.data ? mediaRes.value.data : [];
-                    const rawLikes = likesRes.status === 'fulfilled' && likesRes.value.data ? likesRes.value.data : [];
-                    const rawComments = commentsRes.status === 'fulfilled' && commentsRes.value.data ? commentsRes.value.data : [];
-
-                    const mediaByPost = {}; rawMedia.forEach(m => { if (m.post_id) mediaByPost[m.post_id] = m; });
-                    const likesByPost = {}; rawLikes.forEach(l => { if (l.post_id) { if(!likesByPost[l.post_id]) likesByPost[l.post_id] = []; likesByPost[l.post_id].push(l.user_id); } });
-                    const commentsByPost = {}; rawComments.forEach(c => { if (c.post_id) { if(!commentsByPost[c.post_id]) commentsByPost[c.post_id] = []; commentsByPost[c.post_id].push(c); } });
+                    const mediaByPost = {}; (mediaRes.value?.data || []).forEach(m => { if (m.post_id) mediaByPost[m.post_id] = m; });
+                    const likesByPost = {}; (likesRes.value?.data || []).forEach(l => { if (l.post_id) { if(!likesByPost[l.post_id]) likesByPost[l.post_id] = []; likesByPost[l.post_id].push(l.user_id); } });
+                    const commentsByPost = {}; (commentsRes.value?.data || []).forEach(c => { if (c.post_id) { if(!commentsByPost[c.post_id]) commentsByPost[c.post_id] = []; commentsByPost[c.post_id].push(c); } });
 
                     posts = rawPosts.map(row => {
                         const p = row.profiles || {}; const m = mediaByPost[row.id];
@@ -4242,55 +4136,16 @@
             }
         } catch (e) { console.warn('Fallback posts', e); try { posts = JSON.parse(localStorage.getItem('salink_posts') || '[]'); } catch(err) {} }
 
-        // 2. Fetch Users, Notifications, Emergencies, Friends
-        try { allUsers = await apiGetUsers(); } catch(e) { allUsers = []; }
-        try { notifications = await apiGetNotifications(); } catch(e) { notifications = []; }
-        try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); } catch(e) { readNotifs = {}; }
-        try { allEmergencies = await apiGetEmergencies(); } catch(e) { allEmergencies = []; }
-        try { friends = await apiGetFriends(); } catch(e) { friends = []; }
-    }
-
-    async function apiGetUsers() {
         try {
             if (window.salinkSupabase) {
-                const { data, error } = await window.salinkSupabase.from('profiles').select('id, username, full_name, profile_picture, gender, city, province').neq('username', currentUser?.username || '');
-                if (error) throw error;
-                return (data || []).map(u => ({ username: u.username, fullName: u.full_name, profilePicture: u.profile_picture, gender: u.gender, city: u.city || '', province: u.province || '', isOnline: true }));
+                const { data } = await window.salinkSupabase.from('notifications').select('*').eq('user_id', currentAuthUser.id).order('created_at', { ascending: false });
+                notifications = data || [];
             }
-        } catch (err) { console.warn('[Users]', err.message); }
-        return [];
-    }
-
-    async function apiGetNotifications() {
-        try {
-            if (window.salinkSupabase && currentAuthUser?.id) {
-                const { data, error } = await window.salinkSupabase.from('notifications').select('*').eq('user_id', currentAuthUser.id).order('created_at', { ascending: false });
-                if (error) throw error;
-                return (data || []).map(n => ({
-                    id: n.id, type: n.type || 'info', title: n.title || 'Notifikasi', message: n.message || '',
-                    sender: n.sender_username || 'Sistem', link: n.link || '', timestamp: new Date(n.created_at).getTime(),
-                    read: n.read_at !== null
-                }));
-            }
-        } catch (err) { console.warn('[Notif]', err.message); }
-        return [];
-    }
-
-    async function apiGetEmergencies() {
-        try {
-            if (window.salinkSupabase) {
-                const { data } = await window.salinkSupabase.from('posts').select('*').eq('is_special', true).order('created_at', { ascending: false }).limit(20);
-                return data || [];
-            }
-        } catch(e) {}
-        return [];
-    }
-    async function apiGetFriends() {
-        try { return JSON.parse(localStorage.getItem('salink_friends') || '[]'); } catch(e) { return []; }
+        } catch(e) { notifications = []; }
     }
 
     /* ================================================================
-     * 4. RENDER UI PROFIL
+     * 4. RENDER UI PROFIL & STATS
      * ================================================================ */
     function renderProfile() {
         const avatarEl = document.getElementById('profileAvatarLarge');
@@ -4327,11 +4182,16 @@
         const upd = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = formatNumber(val); };
         upd('profileStatPosts', myPosts.length);
         upd('profileStatLikes', totalLikes);
-        
-        const myUsername = profileUser.username;
-        upd('profileStatFollowers', friends.filter(f => String(f.user2 || '').trim() === myUsername).length);
-        upd('profileStatFollowing', friends.filter(f => String(f.user1 || '').trim() === myUsername).length);
+        upd('profileStatFollowers', 0); // Bisa dihubungkan ke tabel follows nanti
+        upd('profileStatFollowing', 0);
         if(document.getElementById('postinganCountPill')) document.getElementById('postinganCountPill').textContent = myPosts.length;
+        
+        // Badge Notif Lonceng
+        const unread = notifications.filter(n => !n.read_at).length;
+        if(document.getElementById('notifBadge')) {
+            document.getElementById('notifBadge').textContent = unread;
+            document.getElementById('notifBadge').style.display = unread > 0 ? 'flex' : 'none';
+        }
     }
 
     /* ================================================================
@@ -4347,10 +4207,10 @@
         const myPosts = getMyPosts();
         if (myPosts.length === 0) {
             track.innerHTML = `<div class="postingan-slide active"><div class="postingan-empty"><div class="empty-icon">📄</div><div class="empty-title">Belum Ada Postingan</div></div></div>`;
-            postinganSlidesCount = 1; postinganIndex = 0; updatePostinganProgressBar(0, 1); return;
+            return;
         }
         track.innerHTML = myPosts.map((post, idx) => buildPostinganSlide(post, idx, myPosts.length)).join('');
-        postinganSlidesCount = myPosts.length; postinganIndex = 0;
+        
         const pagination = document.getElementById('postinganPagination');
         if (pagination) {
             if (myPosts.length <= 1) { pagination.innerHTML = ''; pagination.style.display = 'none'; } 
@@ -4359,7 +4219,7 @@
                 pagination.innerHTML = myPosts.map((_, i) => `<button class="postingan-dot${i === 0 ? ' active' : ''}" data-index="${i}" type="button"></button>`).join('');
             }
         }
-        goToPostinganSlide(0); attachPostinganActionListeners();
+        attachPostinganActionListeners();
     }
 
     function buildPostinganSlide(post, idx, total) {
@@ -4367,7 +4227,7 @@
         const profilePic = post.userProfilePic ? `<img src="${escapeAttr(post.userProfilePic)}" alt="">` : (post.userGender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>');
         let mediaHTML = '';
         if (post.mediaType === 'image') {
-            mediaHTML = `<div class="postingan-card-media"><img src="${escapeAttr(post.gdriveImageUrl || post.mediaData)}" onclick="window.openLightbox('${post.id}')" style="cursor:zoom-in;"></div>`;
+            mediaHTML = `<div class="postingan-card-media"><img src="${escapeAttr(post.gdriveImageUrl || post.mediaData)}" style="cursor:zoom-in;"></div>`;
         } else if (post.mediaType === 'video') {
             mediaHTML = `<div class="postingan-card-media"><video controls preload="metadata"><source src="${escapeAttr(post.gdriveVideoEmbed || post.mediaData)}"></video></div>`;
         }
@@ -4382,7 +4242,7 @@
                     <div class="postingan-card-header">
                         <div class="postingan-card-avatar">${profilePic}</div>
                         <div class="postingan-card-user">
-                            <h4>${escapeHTML(post.userFullName)} ${isSpecial ? '<span class="postingan-card-badge">'+EMERGENCY_ICONS[post.specialType]+'</span>' : ''}</h4>
+                            <h4>${escapeHTML(post.userFullName)} ${isSpecial ? '<span class="postingan-card-badge">'+ (post.specialType||'') +'</span>' : ''}</h4>
                             <small>${formatDate(post.timestamp)}</small>
                         </div>
                     </div>
@@ -4396,9 +4256,6 @@
                         </button>
                         <button class="postingan-action" data-action="comment" data-post-id="${escapeAttr(post.id)}" type="button">
                             <i class="far fa-comment"></i> <span class="comment-count" data-post-id="${escapeAttr(post.id)}">${comments.length}</span>
-                        </button>
-                        <button class="postingan-action" data-action="viewer" data-post-id="${escapeAttr(post.id)}" type="button">
-                            <i class="fas fa-eye"></i> <span>${post.viewerCount || 0}</span>
                         </button>
                         <button class="postingan-action delete" data-action="delete" data-post-id="${escapeAttr(post.id)}" type="button"><i class="fas fa-trash"></i></button>
                     </div>
@@ -4416,19 +4273,17 @@
                 else if (action === 'delete') { if (confirm('Hapus postingan?')) deletePostPermanent(postId); }
             };
         });
-    }
-
-    function goToPostinganSlide(index) {
-        const track = document.getElementById('postinganTrack'); if (!track) return;
-        postinganIndex = index;
-        track.style.transform = `translateX(-${index * 100}%)`;
-        track.querySelectorAll('.postingan-slide').forEach((s, i) => s.classList.toggle('active', i === index));
-        const dots = document.querySelectorAll('.postingan-dot');
-        dots.forEach((d, i) => d.classList.toggle('active', i === index));
-        updatePostinganProgressBar(index, postinganSlidesCount);
-    }
-    function updatePostinganProgressBar(current, total) {
-        const fill = document.getElementById('postinganProgressFill'); if (fill) fill.style.width = (total <= 1 ? 100 : ((current + 1) / total) * 100) + '%';
+        
+        // Handle Dot Pagination Click
+        document.querySelectorAll('.postingan-dot').forEach(dot => {
+            dot.onclick = function() {
+                const idx = parseInt(this.getAttribute('data-index'));
+                const track = document.getElementById('postinganTrack');
+                if(track) track.style.transform = `translateX(-${idx * 100}%)`;
+                document.querySelectorAll('.postingan-dot').forEach(d => d.classList.remove('active'));
+                this.classList.add('active');
+            };
+        });
     }
 
     async function handlePostinganLike(postId) {
@@ -4465,9 +4320,9 @@
         modal = document.createElement('div'); modal.className = 'modal-overlay'; modal.id = 'dynamicCommentModal';
         modal.innerHTML = `
             <div class="modal-content">
-                <div class="modal-header"><div class="modal-title">💬 Komentar (${comments.length})</div><button class="modal-close" onclick="document.getElementById('dynamicCommentModal').remove()">✕</button></div>
+                <div class="modal-header"><div class="modal-title">💬 Komentar</div><button class="modal-close" onclick="document.getElementById('dynamicCommentModal').remove()">✕</button></div>
                 <div class="modal-body">
-                    <div id="commentsList" style="max-height:300px;overflow-y:auto;margin-bottom:10px;">
+                    <div style="max-height:300px;overflow-y:auto;margin-bottom:10px;">
                         ${comments.map(c => `<div style="padding:8px;background:var(--bg-input);border-radius:8px;margin-bottom:8px;"><div style="font-size:0.7rem;font-weight:bold;color:var(--primary);">${escapeHTML(c.userFullName||'User')}</div><div style="font-size:0.75rem;">${escapeHTML(c.text||c.content)}</div></div>`).join('') || '<div style="text-align:center;font-size:0.7rem;color:var(--text-muted);">Belum ada komentar</div>'}
                     </div>
                     <div style="display:flex;gap:6px;">
@@ -4486,7 +4341,7 @@
             await window.salinkSupabase.from('comments').insert({ user_id: currentAuthUser.id, post_id: postId, content: text });
             showToast('✅', 'Komentar terkirim', 'fa-check-circle', 'success');
             document.getElementById('dynamicCommentModal').remove();
-            await loadData(); renderPostinganCarousel();
+            await loadData(); renderProfile();
         } catch(e) { showToast('❌', 'Gagal komentar', 'fa-times-circle', 'error'); }
     }
 
@@ -4500,7 +4355,7 @@
     }
 
     /* ================================================================
-     * 6. SETTINGS & PROFILE UPDATE
+     * 6. SETTINGS & MODAL LAINNYA
      * ================================================================ */
     function openSettingsModal() {
         if (!currentUser) return;
@@ -4529,9 +4384,6 @@
         } catch(e) { showToast('❌', 'Gagal simpan', 'fa-times-circle', 'error'); }
     }
 
-    /* ================================================================
-     * 7. LOGOUT & INIT
-     * ================================================================ */
     async function handleLogout() {
         if (!confirm('Keluar dari akun?')) return;
         if (window.salinkSupabase) await window.salinkSupabase.auth.signOut();
@@ -4539,24 +4391,34 @@
         window.location.href = LOGIN_URL;
     }
 
+    /* ================================================================
+     * 7. INIT EVENT LISTENERS
+     * ================================================================ */
     document.addEventListener('DOMContentLoaded', async () => {
         loadTheme();
+        
+        // Header Buttons
         document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
         document.getElementById('menuBtn')?.addEventListener('click', openSidebar);
         document.getElementById('sidebarClose')?.addEventListener('click', closeSidebar);
         document.getElementById('sidebarOverlay')?.addEventListener('click', closeSidebar);
         document.getElementById('logoutBtn')?.addEventListener('click', (e) => { e.preventDefault(); handleLogout(); });
+        
+        // Modals
         document.getElementById('settingsNavLink')?.addEventListener('click', (e) => { e.preventDefault(); openSettingsModal(); });
+        document.getElementById('headerNotifBtn')?.addEventListener('click', () => openModal('notifModal'));
         
         // Load Data
         const ok = await loadUser();
         if (!ok) { window.location.href = LOGIN_URL; return; }
         await loadData();
         renderProfile();
+        
+        console.log('🚀 Profil v9.0 Ready!');
     });
 
 })();
-    
-</script>           
+   
+</script>            
 </body>
 </html>
