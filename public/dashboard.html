@@ -9082,7 +9082,7 @@ async function shareImage() {
 }
 
 // ==========================================
-// PATCH FINAL: LAPORKAN FOTO + AUTO NOTIFIKASI
+// PATCH FINAL: LAPORKAN FOTO + AUTO NOTIFIKASI (FIXED)
 // ==========================================
 async function reportImage() {
     console.log('🟢 [Report] Tombol Laporkan diklik');
@@ -9104,30 +9104,27 @@ async function reportImage() {
     showToast('⏳ Mengirim...', 'Sedang memproses laporan Anda', 'fa-spinner fa-spin');
 
     try {
-        // 1. SIMPAN LAPORAN KE TABEL REPORTS
+        // 1. SIMPAN LAPORAN (Seperti yang sudah sukses)
         const reportPayload = {
             user_id: currentAuthUser.id,
             type: 'Laporan Foto: ' + alasan.trim() 
         };
         
-        const { data: reportData, error: reportError } = await window.salinkSupabase
+        const { error: reportError } = await window.salinkSupabase
             .from('reports')
-            .insert([reportPayload])
-            .select();
+            .insert([reportPayload]);
 
         if (reportError) throw reportError;
-        console.log('✅ [Report] Laporan masuk ke database:', reportData);
+        console.log('✅ [Report] Laporan masuk ke database');
 
-        // 2. BUAT NOTIFIKASI OTOMATIS UNTUK USER
+        // 2. SIMPAN NOTIFIKASI (Disesuaikan agar lebih aman)
         const notifPayload = {
-            // Sesuaikan nama kolom ini dengan tabel 'notifications' di Supabase Anda
             user_id: currentAuthUser.id, 
             sender_id: currentAuthUser.id, 
             type: 'system_alert', 
             title: '✅ Laporan Diterima',
             message: 'Laporan foto Anda terkait "' + alasan.trim() + '" sedang ditinjau oleh Tim Admin. Terima kasih!',
-            read: false,
-            created_at: new Date().toISOString()
+            is_read: false // Ubah ke 'read' jika di database Anda namanya 'read'
         };
 
         const { error: notifError } = await window.salinkSupabase
@@ -9135,32 +9132,35 @@ async function reportImage() {
             .insert([notifPayload]);
 
         if (notifError) {
-            console.warn('⚠️ [Report] Laporan sukses, tapi gagal buat notifikasi:', notifError.message);
-            // Kita tidak melempar error ke user karena laporan utamanya sudah sukses
+            console.error('🔴 [Notif Error] Gagal insert notifikasi:', notifError.message);
+            alert('Laporan sukses, TAPI Notifikasi gagal dibuat.\n\nPesan Error dari Database: ' + notifError.message);
+            // Kita tidak return di sini, biarkan user tahu laporannya tetap masuk
         } else {
-            console.log('✅ [Notif] Notifikasi "Laporan Diterima" berhasil dibuat');
+            console.log('✅ [Notif] Notifikasi berhasil dibuat');
             
-            // 3. REFRESH BADGE NOTIFIKASI & UI JIKA FUNGSINYA TERSEDIA
-            if (typeof updateNotifBadge === 'function') updateNotifBadge();
-            
-            // Paksa ambil data notif terbaru agar saat modal dibuka langsung muncul
-            if (typeof apiGetNotifications === 'function') {
-                apiGetNotifications().then(notifs => {
-                    if (notifs && notifs.length > 0) {
-                        notifications = notifs; 
-                        if (typeof renderNotifList === 'function') renderNotifList();
-                    }
-                });
+            // 3. PAKSA REFRESH BADGE DAN DAFTAR NOTIFIKASI
+            // Ambil data notif terbaru langsung dari server
+            const r = await apiCall('get_notifications');
+            if (r.status === 'success' && Array.isArray(r.data)) {
+                notifications = r.data.map(adaptNotification).filter(n => !isDeleted(n.id));
+                
+                // Update angka badge
+                if (typeof updateNotifBadge === 'function') updateNotifBadge();
+                
+                // Jika modal notif sedang terbuka, render ulang
+                if (document.getElementById('notifModal')?.classList.contains('active')) {
+                    if (typeof renderNotifList === 'function') renderNotifList();
+                }
             }
         }
 
-        // 4. TAMPILKAN PESAN SUKSES KE USER
+        // 4. SELESAI
         showToast('✅ Laporan Terkirim', 'Laporan Anda sedang ditinjau. Cek notifikasi!', 'fa-check-circle');
         if (typeof playRegularSound === 'function') playRegularSound();
 
     } catch (err) {
         console.error('🔴 [Report] Catch Error:', err.message);
-        showToast('❌ Gagal', 'Gagal memproses laporan: ' + err.message, 'fa-times-circle');
+        showToast('❌ Gagal', 'Gagal memproses laporan', 'fa-times-circle');
         alert('GAGAL SIMPAN KE SUPABASE:\n' + err.message);
     }
 }
