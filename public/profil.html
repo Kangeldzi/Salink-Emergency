@@ -5023,6 +5023,10 @@ async function loadData() {
     } catch (e) { 
         console.warn('Gagal load posts:', e.message); 
         try { posts = JSON.parse(localStorage.getItem('salink_posts') || '[]'); } catch(err) {}
+
+    // PATCH: Panggil fungsi render carousel setiap kali data selesai dimuat
+    renderPostinganCarousel(); 
+    
     }
 
     // 2. EMERGENCIES & USERS & NOTIFS (API GAS)
@@ -5837,7 +5841,7 @@ function goToPostinganSlideById(postId) {
     if (section) section.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
- function openPostinganCommentsModal(postId) {
+function openPostinganCommentsModal(postId) {
     const post = posts.find(p => p.id === postId);
     if (!post) return;
 
@@ -5859,7 +5863,7 @@ function goToPostinganSlideById(postId) {
                     <span>💬 Komentar</span>
                     <span class="badge-count">${comments.length}</span>
                 </div>
-                <button class="modal-close" onclick="closeCommentsModal()" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
+                <button class="modal-close" id="closeModalBtn" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <div id="commentsListDynamic" style="max-height:50vh;overflow-y:auto;margin-bottom:10px;">
@@ -5878,6 +5882,15 @@ function goToPostinganSlideById(postId) {
     document.body.appendChild(modal);
     setTimeout(() => modal.classList.add('active'), 10);
 
+    // ================================================================
+    // PATCH: PAKSA EVENT LISTENER UNTUK TOMBOL X (SILANG)
+    // ================================================================
+    modal.querySelector('#closeModalBtn').onclick = function(e) {
+        e.preventDefault();
+        closeCommentsModal();
+    };
+
+    // Tombol Kirim Komentar Utama
     modal.querySelector('.send-comment').onclick = function() {
         sendPostinganComment(postId, modal);
     };
@@ -5887,7 +5900,96 @@ function goToPostinganSlideById(postId) {
     modal.addEventListener('click', function(e) {
         if (e.target === modal) closeCommentsModal();
     });
-}       
+
+    // ================================================================
+    // PATCH: PASANG EVENT LISTENER UNTUK BALASAN
+    // ================================================================
+    attachReplyListeners(postId);
+}
+
+// Fungsi pembantu untuk memasang listener balasan (dipanggil setiap modal dibuat)
+function attachReplyListeners(postId) {
+    // 1. Tombol Balas
+    document.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(btn => {
+        btn.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            toggleReplyBoxProfile(this.dataset.commentId);
+        };
+    });
+
+    // 2. Tombol Kirim Balasan
+    document.querySelectorAll('.comment-reply-box .reply-send-btn').forEach(btn => {
+        btn.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            const parentId = this.dataset.parentId;
+            const input = this.parentElement.querySelector('input');
+            const text = input.value.trim();
+            if (text) {
+                sendNestedReply(parentId, postId, text, this.parentElement);
+            }
+        };
+    });
+
+    // 3. Enter di Input Balasan
+    document.querySelectorAll('.comment-reply-box input').forEach(input => {
+        input.onkeypress = function(e) {
+            if (e.key === 'Enter') {
+                const btn = this.parentElement.querySelector('.reply-send-btn');
+                if (btn) btn.click();
+            }
+        };
+    });
+}
+
+// PERBAIKAN FUNGSI sendNestedReply: Agar tidak muncul Toast Gagal
+async function sendNestedReply(parentId, postId, text, parentElement) {
+    if (!currentAuthUser) {
+        showToast('🔒 Login', 'Silakan login untuk membalas', 'fa-lock', 'error'); 
+        return;
+    }
+    
+    try {
+        // Kirim ke Supabase
+        const { data, error } = await window.salinkSupabase.from('comments').insert({
+            user_id: currentAuthUser.id,
+            post_id: postId,
+            content: text,
+            parent_id: parentId
+        }).select().single();
+
+        if (error) throw error;
+
+        // Sembunyikan kotak balasan
+        if (parentElement) {
+            parentElement.classList.remove('active');
+            parentElement.querySelector('input').value = '';
+        }
+
+        // Refresh data komentar
+        await loadData();
+        const updatedPost = posts.find(p => p.id === postId);
+        const modal = document.getElementById('postinganCommentsModal');
+        
+        if (modal && updatedPost) {
+            let comments = JSON.parse(updatedPost.comments || '[]');
+            modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+            
+            // Update counter komentar di carousel utama
+            const countEl = document.querySelector(`.comment-count[data-post-id="${postId}"]`);
+            if (countEl) countEl.textContent = comments.length;
+            
+            // Pasang ulang listener untuk komentar baru
+            attachReplyListeners(postId);
+        }
+        
+        showToast('✅', 'Balasan terkirim', 'fa-check-circle', 'success');
+        playRegularSound();
+
+    } catch(e) {
+        console.error('[Reply Error]', e);
+        showToast('❌ Gagal', 'Terjadi kesalahan: ' + e.message, 'fa-times-circle', 'error');
+    }
+}
         
 /* ================================================================
  * MODAL KOMENTAR
