@@ -4341,15 +4341,15 @@ async function apiGetUsers() {
             
             if (error) throw error;
             
-            // Sesuaikan format dengan UI aplikasi (camelCase)
             return (data || []).map(u => ({
+                id: u.id,
                 username: u.username,
                 fullName: u.full_name,
                 profilePicture: u.profile_picture,
                 gender: u.gender,
                 city: u.city || '',
                 province: u.province || '',
-                isOnline: true // Supabase online tracker (bisa di-update nanti)
+                isOnline: true 
             }));
         }
     } catch (err) { console.warn('[Users] Error:', err.message); }
@@ -5453,7 +5453,47 @@ async function editCommentProfile(commentId, postId) {
         showToast('✅', 'Komentar diedit', 'fa-check-circle');
     } catch(e) { console.error(e); }
 }
+        
+window.editCommentProfile = async function(commentId, postId) {
+    if (!currentAuthUser) return;
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    let comments = JSON.parse(post.comments || '[]');
+    const c = comments.find(x => x.id === commentId);
+    if (!c) return;
 
+    const newText = prompt('Edit komentar:', c.text || c.content);
+    if (newText === null) return;
+    const trimmed = newText.trim();
+    if (!trimmed || trimmed === (c.text || c.content)) return;
+
+    try {
+        await window.salinkSupabase.from('comments').update({ content: trimmed, updated_at: new Date().toISOString() }).eq('id', commentId);
+        c.text = trimmed; c.content = trimmed;
+        post.comments = JSON.stringify(comments);
+        const modal = document.getElementById('postinganCommentsModal');
+        if (modal) modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+        showToast('✅', 'Komentar diedit', 'fa-check-circle');
+    } catch(e) { console.error(e); }
+};
+
+window.deleteCommentProfile = async function(commentId, postId) {
+    if (!currentAuthUser) return;
+    if (!confirm('Hapus komentar ini secara permanen?')) return;
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+
+    try {
+        await window.salinkSupabase.from('comments').update({ deleted_at: new Date().toISOString() }).eq('id', commentId);
+        let comments = JSON.parse(post.comments || '[]');
+        comments = comments.filter(x => x.id !== commentId && x.parent_id !== commentId);
+        post.comments = JSON.stringify(comments);
+        const modal = document.getElementById('postinganCommentsModal');
+        if (modal) modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+        showToast('✅', 'Komentar dihapus', 'fa-check-circle');
+    } catch(e) { console.error(e); }
+};
+        
 // Hapus Komentar (Soft Delete)
 async function deleteCommentProfile(commentId, postId) {
     if (!currentAuthUser) return;
@@ -5847,216 +5887,70 @@ async function sendPostinganComment(postId, modal) {
  * PATCH 30: SISTEM KOMENTAR NESTED (DARI DASHBOARD)
  * ================================================================ */
 function renderCommentsListDynamic(comments, postId) {
-    if (!Array.isArray(comments)) comments = [];
-
-    // Pisahkan komentar utama (top-level) dan balasan (replies)
-    const topLevel = comments.filter(c => !c.parent_id && !c.parentId);
-    const repliesByParent = {};
-    
-    comments.forEach(c => {
-        const pid = c.parent_id || c.parentId;
-        if (!pid) return;
-        if (!repliesByParent[pid]) repliesByParent[pid] = [];
-        repliesByParent[pid].push(c);
-    });
-
-    // Urutkan berdasarkan waktu
-    topLevel.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-    Object.keys(repliesByParent).forEach(pid => {
-        repliesByParent[pid].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-    });
-
-    if (topLevel.length === 0) {
+    if (!comments || comments.length === 0) {
         return '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.72rem;">Belum ada komentar</div>';
     }
-
-    let html = '<div class="comments-thread">';
-    topLevel.forEach(parent => {
-        html += renderCommentTreeDynamic(parent, repliesByParent, postId, 0);
-    });
-    html += '</div>';
-    return html;
-}
-
-// Render satu komentar + descendant-nya (rekursif)
-function renderCommentTreeDynamic(comment, repliesByParent, postId, depth) {
-    if (!comment) return '';
-    let html = '';
-    const isReply = depth > 0;
-    html += buildCommentItemHTMLDynamic(comment, postId, isReply, depth);
-    const children = repliesByParent[comment.id] || [];
-    if (children.length > 0) {
-        html += renderRepliesBlockDynamic(comment, children, repliesByParent, postId, depth);
-    }
-    return html;
-}
-
-// Render satu item komentar (HTML)
-function buildCommentItemHTMLDynamic(c, postId, isReply, depth) {
-    depth = depth || 0;
-    const isOwn = currentUser && (c.userId === currentUser.username || c.userAuthId === currentAuthUser?.id);
-    const isDeleted = !!c.deleted_at;
-    
-    // Avatar
-    let avatarHTML;
-    if (c.userProfilePic) {
-        avatarHTML = `<img src="${escapeAttr(c.userProfilePic)}" alt="">`;
-    } else {
-        avatarHTML = c.userGender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>';
-    }
-    
-    // Nama
-    const nameHTML = isDeleted 
-        ? '<span class="comment-name" style="color:#9aa0ab;">[Dihapus]</span>'
-        : `<span class="comment-name" onclick="goToCommentProfile('${escapeAttr(c.userId)}')">${escapeHTML(c.userFullName || 'Pengguna')}</span>`;
-    
-    // Waktu
-    const timeFull = formatDate(c.timestamp || Date.now());
-    const timeAgo = getTimeAgo(c.timestamp || Date.now());
-    const editedBadge = c.updated_at && c.updated_at !== c.created_at 
-        ? ' <span class="comment-edited-badge">(diedit)</span>' 
-        : '';
-    
-    // Text
-    let textHTML = '';
-    if (isDeleted) {
-        textHTML = '<div class="comment-text deleted">Komentar dihapus oleh user</div>';
-    } else {
-        let text = escapeHTML(c.text || c.content || '');
-        text = text.replace(/@([a-zA-Z0-9_]+)/g, '<span class="mention">@$1</span>');
-        textHTML = `<div class="comment-text">${text}</div>`;
-    }
-    
-    // Like & Actions
-    const likeCount = parseInt(c.likes_count || 0, 10) || 0;
-    const isLiked = !!c.is_liked;
-    
-    let actionsHTML = '';
-    if (!isDeleted) {
-        // Tombol Like
-        if (!isOwn) {
-            actionsHTML += `<button class="comment-action-btn ${isLiked ? 'liked' : ''}" data-action="like-comment" data-comment-id="${escapeAttr(c.id)}" data-post-id="${escapeAttr(postId)}" type="button">
-                <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i>
-                <span class="action-counter like-counter">${likeCount}</span>
-            </button>`;
-        } else {
-            actionsHTML += `<span class="comment-action-btn" style="cursor:default;" title="Anda tidak bisa like komentar sendiri">
-                <i class="fas fa-heart" style="color:${likeCount > 0 ? 'var(--accent-red)' : '#9aa0ab'};"></i>
-                <span class="action-counter like-counter">${likeCount}</span>
-            </span>`;
-        }
+    return comments.map(c => {
+        const cp = c.userProfilePic
+            ? `<img src="${escapeAttr(c.userProfilePic)}" alt="" style="width:100%;height:100%;object-fit:cover;">`
+            : (c.userGender === 'female' ? '<i class="fas fa-female" style="color:#fff;font-size:0.7rem;"></i>' : '<i class="fas fa-male" style="color:#fff;font-size:0.7rem;"></i>');
         
-        // Tombol Balas
-        actionsHTML += `<button class="comment-action-btn" data-action="reply-comment" data-comment-id="${escapeAttr(c.id)}" data-post-id="${escapeAttr(postId)}" type="button">
-            <i class="far fa-comment"></i>
-            <span>Balas</span>
-        </button>`;
+        const isOwn = currentAuthUser && (c.userId === currentUser.username || c.userAuthId === currentAuthUser.id);
+        const isLiked = !!c.is_liked;
+        const likeCount = c.likes_count || 0;
         
-        // Tombol Edit & Hapus (hanya milik sendiri)
-        if (isOwn) {
-            actionsHTML += `<button class="comment-action-btn" data-action="edit-comment" data-comment-id="${escapeAttr(c.id)}" data-post-id="${escapeAttr(postId)}" type="button">
-                <i class="fas fa-pen"></i>
-                <span>Edit</span>
-            </button>`;
-            actionsHTML += `<button class="comment-action-btn delete-btn" data-action="delete-comment" data-comment-id="${escapeAttr(c.id)}" data-post-id="${escapeAttr(postId)}" type="button">
-                <i class="fas fa-trash"></i>
-                <span>Hapus</span>
-            </button>`;
-        }
-    }
-    
-    // Reply Box (hidden)
-    const replyBoxHTML = `<div class="comment-reply-box" id="replyBox-${escapeAttr(c.id)}">
-        <input type="text" placeholder="Balas @${escapeAttr(c.userId)}..." data-parent-id="${escapeAttr(c.id)}" data-post-id="${escapeAttr(postId)}">
-        <button class="reply-send-btn" data-parent-id="${escapeAttr(c.id)}" data-post-id="${escapeAttr(postId)}" type="button"><i class="fas fa-paper-plane"></i></button>
-    </div>`;
-    
-    return `<div class="comment-item" data-comment-id="${escapeAttr(c.id)}" data-depth="${depth}">
-        <div class="comment-avatar" onclick="${isDeleted ? '' : `goToCommentProfile('${escapeAttr(c.userId)}')`}">${avatarHTML}</div>
-        <div class="comment-body">
-            <div class="comment-head">${nameHTML}<span class="comment-time" title="${escapeAttr(timeFull)}">${timeAgo} • ${timeFull}</span>${editedBadge}</div>
-            ${textHTML}
-            ${actionsHTML ? `<div class="comment-actions">${actionsHTML}</div>` : ''}
-            ${replyBoxHTML}
-        </div>
-    </div>`;
-}
-
-// Render blok balasan
-function renderRepliesBlockDynamic(parent, replies, repliesByParent, postId, parentDepth) {
-    const MAX_VISIBLE = 2; 
-    const total = replies.length;
-    const showAll = total <= MAX_VISIBLE;
-    const visibleCount = showAll ? total : MAX_VISIBLE;
-    const hiddenCount = total - visibleCount;
-
-    const containerId = 'replies-' + escapeAttr(parent.id);
-    const depth = parentDepth + 1;
-
-    let html = `<div class="comment-replies" id="${containerId}" data-total="${total}" data-visible="${visibleCount}">`;
-    for (let i = 0; i < visibleCount; i++) {
-        html += renderCommentTreeDynamic(replies[i], repliesByParent, postId, depth);
-    }
-    html += '</div>';
-
-    if (!showAll && hiddenCount > 0) {
-        html += `<button class="comment-show-replies-btn" data-action="show-replies" data-comment-id="${escapeAttr(parent.id)}" data-post-id="${escapeAttr(postId)}" type="button">
-            <i class="fas fa-chevron-down"></i> Lihat ${hiddenCount} balasan lainnya
-        </button>`;
-    }
-    if (showAll && total > MAX_VISIBLE) {
-        html += `<button class="comment-show-replies-btn" data-action="hide-replies" data-comment-id="${escapeAttr(parent.id)}" data-post-id="${escapeAttr(postId)}" type="button">
-            <i class="fas fa-chevron-up"></i> Sembunyikan balasan
-        </button>`;
-    }
-    return html;
-}
-
-// Fungsi untuk mengirim balasan (nested)
-window.sendNestedReply = async function(parentId, postId) {
-    if (!currentAuthUser) return;
-    const input = document.getElementById('replyInput-' + parentId);
-    const text = input.value.trim();
-    if (!text) return;
-
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-
-    try {
-        await window.salinkSupabase.from('comments').insert({
-            user_id: currentAuthUser.id,
-            post_id: postId,
-            content: text,
-            parent_id: parentId
-        });
-        
-        // Ambil ulang data komentar terbaru dari Supabase
-        await loadData();
-        const updatedPost = posts.find(p => p.id === postId);
-        const modal = document.getElementById('postinganCommentsModal');
-        if (modal && updatedPost) {
-            let comments = JSON.parse(updatedPost.comments || '[]');
-            // Susun ulang nested array
-            const top = comments.filter(c => !c.parent_id);
-            top.forEach(t => {
-                t.replies = comments.filter(c => c.parent_id === t.id);
+        // Render Balasan (Nested)
+        let repliesHTML = '';
+        if (c.replies && c.replies.length > 0) {
+            repliesHTML = '<div style="margin-left:36px;margin-top:8px;border-left:2px solid rgba(230,0,18,0.2);padding-left:8px;">';
+            c.replies.forEach(r => {
+                const rcp = r.userProfilePic
+                    ? `<img src="${escapeAttr(r.userProfilePic)}" alt="" style="width:100%;height:100%;object-fit:cover;">`
+                    : (r.userGender === 'female' ? '<i class="fas fa-female" style="color:#fff;font-size:0.6rem;"></i>' : '<i class="fas fa-male" style="color:#fff;font-size:0.6rem;"></i>');
+                repliesHTML += `
+                    <div style="display:flex;gap:6px;margin-bottom:6px;padding:6px;background:var(--bg-card);border-radius:8px;">
+                        <div style="width:22px;height:22px;border-radius:50%;overflow:hidden;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;flex-shrink:0;" onclick="goToCommentProfile('${escapeAttr(r.userId)}')">${rcp}</div>
+                        <div style="flex:1;min-width:0;">
+                            <div style="font-size:0.65rem;font-weight:700;color:var(--primary);cursor:pointer;" onclick="goToCommentProfile('${escapeAttr(r.userId)}')">${escapeHTML(r.userFullName)}</div>
+                            <div style="font-size:0.65rem;color:var(--text-primary);margin:2px 0;line-height:1.4;">${escapeHTML(r.text)}</div>
+                        </div>
+                    </div>
+                `;
             });
-            modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(top, postId);
-            input.value = '';
-            document.getElementById('replyBox-' + parentId).style.display = 'none';
+            repliesHTML += '</div>';
         }
-    } catch(e) {
-        console.error(e);
-        showToast('Gagal', 'Tidak dapat membalas komentar', 'fa-times-circle', 'error');
-    }
-};
 
-function closeCommentsModal() {
-    const modal = document.getElementById('postinganCommentsModal');
-    if (modal) {
-        modal.classList.remove('active');
-        setTimeout(() => modal.remove(), 300);
-    }
+        return `
+            <div style="margin-bottom:12px;">
+                <div style="display:flex;gap:8px;padding:8px;background:var(--bg-input);border-radius:8px;">
+                    <div style="width:28px;height:28px;border-radius:50%;overflow:hidden;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1.5px solid var(--primary);cursor:pointer;" onclick="goToCommentProfile('${escapeAttr(c.userId)}')">${cp}</div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:0.68rem;font-weight:700;color:var(--primary);cursor:pointer;" onclick="goToCommentProfile('${escapeAttr(c.userId)}')">${escapeHTML(c.userFullName)}</div>
+                        <div style="font-size:0.7rem;color:var(--text-primary);margin:3px 0;line-height:1.5;">${escapeHTML(c.text)}</div>
+                        <div style="display:flex;gap:10px;font-size:0.6rem;color:var(--text-muted);margin-top:4px;flex-wrap:wrap;">
+                            <span style="cursor:pointer;" onclick="toggleCommentLikeProfile('${c.id}', '${postId}')">
+                                <i class="${isLiked ? 'fas' : 'far'} fa-heart" style="color:${isLiked ? 'var(--accent-red)' : 'inherit'};"></i> ${likeCount}
+                            </span>
+                            <span style="cursor:pointer;" onclick="toggleReplyBoxProfile('${c.id}')">
+                                <i class="far fa-comment"></i> Balas
+                            </span>
+                            ${isOwn ? `
+                            <span style="cursor:pointer;" onclick="editCommentProfile('${c.id}', '${postId}')"><i class="fas fa-pen"></i> Edit</span>
+                            <span style="cursor:pointer; color:var(--accent-red);" onclick="deleteCommentProfile('${c.id}', '${postId}')"><i class="fas fa-trash"></i> Hapus</span>
+                            ` : ''}
+                            <span>${getTimeAgo(c.timestamp)}</span>
+                        </div>
+                        
+                        <div id="replyBox-${c.id}" class="comment-reply-box">
+                            <input type="text" id="replyInput-${c.id}" placeholder="Balas komentar..." style="flex:1;padding:6px 10px;font-size:0.65rem;border-radius:12px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-primary);">
+                            <button onclick="sendNestedReply('${c.id}', '${postId}')" style="background:var(--accent-blue-gradient);border:none;color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;flex-shrink:0;"><i class="fas fa-paper-plane" style="font-size:0.6rem;"></i></button>
+                        </div>
+                    </div>
+                </div>
+                ${repliesHTML}
+            </div>
+        `;
+    }).join('');
 }
 
 /* ================================================================
@@ -7081,6 +6975,7 @@ function openInviteModal() {
         };
     }
 }
+        
 function renderInviteUsers(query) {
     const container = document.getElementById('inviteUserList');
     if (!container) return;
@@ -7126,6 +7021,7 @@ function renderInviteUsers(query) {
         });
     });
 }
+        
 async function sendInvite(username, btnEl) {
     if (!currentUser || !username) return;
     btnEl.disabled = true;
