@@ -4921,9 +4921,8 @@ async function loadData() {
         if (window.SALINK_SB_READY && window.salinkSupabase) {
             const client = window.salinkSupabase;
 
-            const { data: rawPosts, error: postsErr } = await client
-                .from('posts')
-                .select(`*, profiles!posts_user_id_fkey (username, full_name, profile_picture, gender)`)
+            // Pastikan ada .is('deleted_at', null)
+                const { data: rawComments, error: commentsRes } = await client.from('comments').select('*').is('deleted_at', null);
                 .order('created_at', { ascending: false })
                 .limit(100);
 
@@ -5197,6 +5196,9 @@ function buildScrollPostCard(post) {
         ? `<img src="${escapeAttr(post.userProfilePic)}" alt="">`
         : (post.userGender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>');
 
+    // Cek apakah user saat ini adalah pemilik postingan
+    const isOwner = currentUser && post.userId === currentUser.username;
+
     let mediaHTML = '';
     if (post.mediaType === 'image') {
         const imgSrc = post.gdriveImageUrl || post.mediaData || '';
@@ -5223,12 +5225,20 @@ function buildScrollPostCard(post) {
 
     return `
         <div class="scroll-post-card" data-post-id="${escapeAttr(post.id)}">
-            <div class="scroll-post-header">
+            <div class="scroll-post-header" style="position:relative;">
                 <div class="scroll-post-avatar">${profilePic}</div>
                 <div class="scroll-post-user">
                     <h4>${escapeHTML(post.userFullName)}</h4>
                     <small>${formatDate(new Date(post.timestamp).getTime())}</small>
                 </div>
+                <!-- TAMBAHAN: Tombol Titik Tiga -->
+                ${isOwner ? `
+                <button class="post-menu-toggle" onclick="toggleProfilePostMenu(event, '${escapeAttr(post.id)}')" style="position:absolute; top:0; right:0; background:#f5f7fa; border:1px solid rgba(0,0,0,0.08); color:#6b7688; cursor:pointer; padding:4px 8px; border-radius:8px; font-size:0.75rem; z-index:10;"><i class="fas fa-ellipsis-v"></i></button>
+                <div class="post-menu-dropdown" id="menu-${escapeAttr(post.id)}" style="display:none; position:absolute; top:30px; right:0; background:#ffffff; border:1px solid rgba(0,0,0,0.1); border-radius:10px; padding:4px 0; min-width:140px; z-index:20; box-shadow:0 10px 30px rgba(0,0,0,0.2);">
+                    <button class="menu-item" onclick="event.stopPropagation(); editPostProfile('${escapeAttr(post.id)}')"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="menu-item" onclick="event.stopPropagation(); deletePostProfile('${escapeAttr(post.id)}')"><i class="fas fa-trash"></i> Hapus</button>
+                </div>
+                ` : ''}
             </div>
             <div class="scroll-post-text">${escapeHTML(post.text)}</div>
             ${mediaHTML}
@@ -5245,6 +5255,7 @@ function buildScrollPostCard(post) {
                 <button class="scroll-post-btn" onclick="handlePostinganShare('${escapeAttr(post.id)}')">
                     <i class="fas fa-share-alt"></i> Bagikan
                 </button>
+                <!-- Tombol Hapus di baris bawah tetap dipertahankan -->
                 <button class="scroll-post-btn delete" onclick="requestDelete('post', '${escapeAttr(post.id)}', 'Postingan')">
                     <i class="fas fa-trash"></i> Hapus
                 </button>
@@ -5252,6 +5263,45 @@ function buildScrollPostCard(post) {
         </div>
     `;
 }
+
+// Fungsi pembantu untuk buka/tutup menu titik tiga
+window.toggleProfilePostMenu = function(event, postId) {
+    event.stopPropagation();
+    // Tutup semua menu lain
+    document.querySelectorAll('.post-menu-dropdown').forEach(m => {
+        if(m.id !== 'menu-' + postId) m.style.display = 'none';
+    });
+    const menu = document.getElementById('menu-' + postId);
+    if (menu) {
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+};
+
+// Fungsi Edit Postingan
+window.editPostProfile = function(postId) {
+    const p = posts.find(x => x.id === postId);
+    if (!p) return;
+    const nt = prompt('Edit postingan:', p.text || '');
+    if (nt !== null && nt.trim() !== '') {
+        p.text = nt.trim();
+        safeSavePosts(posts);
+        renderPostinganCarousel();
+        showToast('✅', 'Postingan diedit', 'fa-edit');
+    }
+};
+
+// Fungsi Hapus Postingan
+window.deletePostProfile = function(postId) {
+    requestDelete('post', postId, 'Postingan');
+};
+
+// Klik di luar untuk menutup menu
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.post-menu-toggle') && !e.target.closest('.post-menu-dropdown')) {
+        document.querySelectorAll('.post-menu-dropdown').forEach(m => m.style.display = 'none');
+    }
+});
+
 
 function buildPostinganSlide(post, idx, total) {
     const profilePic = post.userProfilePic
@@ -5863,7 +5913,8 @@ function openPostinganCommentsModal(postId) {
                     <span>💬 Komentar</span>
                     <span class="badge-count">${comments.length}</span>
                 </div>
-                <button class="modal-close" id="closeModalBtn" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
+                <!-- PERBAIKAN: Tombol X langsung memanggil closeCommentsModal -->
+                <button class="modal-close" onclick="closeCommentsModal()" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
             </div>
             <div class="modal-body">
                 <div id="commentsListDynamic" style="max-height:50vh;overflow-y:auto;margin-bottom:10px;">
@@ -5882,6 +5933,97 @@ function openPostinganCommentsModal(postId) {
     document.body.appendChild(modal);
     setTimeout(() => modal.classList.add('active'), 10);
 
+    // Kirim Komentar Utama
+    modal.querySelector('.send-comment').onclick = function() {
+        sendPostinganComment(postId, modal);
+    };
+    modal.querySelector('#newCommentInput').onkeypress = function(e) {
+        if (e.key === 'Enter') sendPostinganComment(postId, modal);
+    };
+    
+    // Pasang listener untuk balasan
+    attachReplyListeners(postId);
+}
+
+// FUNGSI BARU UNTUK MEMASANG LISTENER BALASAN
+function attachReplyListeners(postId) {
+    // Tombol Balas
+    document.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(btn => {
+        btn.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            toggleReplyBoxProfile(this.dataset.commentId);
+        };
+    });
+
+    // Tombol Kirim Balasan
+    document.querySelectorAll('.comment-reply-box .reply-send-btn').forEach(btn => {
+        btn.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            const parentId = this.dataset.parentId;
+            // Ambil input dari parent element tombol ini berada
+            const input = this.parentElement.querySelector('input');
+            const text = input.value.trim();
+            if (text) {
+                sendNestedReply(parentId, postId, text, this.parentElement);
+            } else {
+                showToast('⚠️ Perhatian', 'Komentar tidak boleh kosong', 'fa-exclamation-triangle');
+            }
+        };
+    });
+}
+
+// FUNGSI BARU UNTUK MENGIRIM BALASAN
+async function sendNestedReply(parentId, postId, text, parentElement) {
+    if (!currentAuthUser) {
+        showToast('🔒 Login', 'Silakan login untuk membalas', 'fa-lock', 'error'); 
+        return;
+    }
+    
+    // Cek teks kosong sebelum dikirim ke database
+    if (!text || text.trim() === '') {
+        showToast('⚠️ Perhatian', 'Komentar tidak boleh kosong', 'fa-exclamation-triangle');
+        return;
+    }
+    
+    try {
+        const { data, error } = await window.salinkSupabase.from('comments').insert({
+            user_id: currentAuthUser.id,
+            post_id: postId,
+            content: text.trim(),
+            parent_id: parentId
+        }).select().single();
+
+        if (error) throw error;
+
+        // Sembunyikan kotak balasan dan kosongkan input
+        if (parentElement) {
+            parentElement.classList.remove('active');
+            const inp = parentElement.querySelector('input');
+            if(inp) inp.value = '';
+        }
+
+        // Refresh data komentar
+        await loadData();
+        const updatedPost = posts.find(p => p.id === postId);
+        const modal = document.getElementById('postinganCommentsModal');
+        
+        if (modal && updatedPost) {
+            let comments = JSON.parse(updatedPost.comments || '[]');
+            modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+            
+            // Pasang ulang listener untuk komentar baru
+            attachReplyListeners(postId);
+        }
+        
+        showToast('✅', 'Balasan terkirim', 'fa-check-circle', 'success');
+        playRegularSound();
+
+    } catch(e) {
+        console.error('[Reply Error]', e);
+        showToast('❌ Gagal', 'Terjadi kesalahan: ' + e.message, 'fa-times-circle', 'error');
+    }
+}
+        
     // ================================================================
     // PATCH: PAKSA EVENT LISTENER UNTUK TOMBOL X (SILANG)
     // ================================================================
@@ -5900,96 +6042,6 @@ function openPostinganCommentsModal(postId) {
     modal.addEventListener('click', function(e) {
         if (e.target === modal) closeCommentsModal();
     });
-
-    // ================================================================
-    // PATCH: PASANG EVENT LISTENER UNTUK BALASAN
-    // ================================================================
-    attachReplyListeners(postId);
-}
-
-// Fungsi pembantu untuk memasang listener balasan (dipanggil setiap modal dibuat)
-function attachReplyListeners(postId) {
-    // 1. Tombol Balas
-    document.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(btn => {
-        btn.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
-            toggleReplyBoxProfile(this.dataset.commentId);
-        };
-    });
-
-    // 2. Tombol Kirim Balasan
-    document.querySelectorAll('.comment-reply-box .reply-send-btn').forEach(btn => {
-        btn.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
-            const parentId = this.dataset.parentId;
-            const input = this.parentElement.querySelector('input');
-            const text = input.value.trim();
-            if (text) {
-                sendNestedReply(parentId, postId, text, this.parentElement);
-            }
-        };
-    });
-
-    // 3. Enter di Input Balasan
-    document.querySelectorAll('.comment-reply-box input').forEach(input => {
-        input.onkeypress = function(e) {
-            if (e.key === 'Enter') {
-                const btn = this.parentElement.querySelector('.reply-send-btn');
-                if (btn) btn.click();
-            }
-        };
-    });
-}
-
-// PERBAIKAN FUNGSI sendNestedReply: Agar tidak muncul Toast Gagal
-async function sendNestedReply(parentId, postId, text, parentElement) {
-    if (!currentAuthUser) {
-        showToast('🔒 Login', 'Silakan login untuk membalas', 'fa-lock', 'error'); 
-        return;
-    }
-    
-    try {
-        // Kirim ke Supabase
-        const { data, error } = await window.salinkSupabase.from('comments').insert({
-            user_id: currentAuthUser.id,
-            post_id: postId,
-            content: text,
-            parent_id: parentId
-        }).select().single();
-
-        if (error) throw error;
-
-        // Sembunyikan kotak balasan
-        if (parentElement) {
-            parentElement.classList.remove('active');
-            parentElement.querySelector('input').value = '';
-        }
-
-        // Refresh data komentar
-        await loadData();
-        const updatedPost = posts.find(p => p.id === postId);
-        const modal = document.getElementById('postinganCommentsModal');
-        
-        if (modal && updatedPost) {
-            let comments = JSON.parse(updatedPost.comments || '[]');
-            modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
-            
-            // Update counter komentar di carousel utama
-            const countEl = document.querySelector(`.comment-count[data-post-id="${postId}"]`);
-            if (countEl) countEl.textContent = comments.length;
-            
-            // Pasang ulang listener untuk komentar baru
-            attachReplyListeners(postId);
-        }
-        
-        showToast('✅', 'Balasan terkirim', 'fa-check-circle', 'success');
-        playRegularSound();
-
-    } catch(e) {
-        console.error('[Reply Error]', e);
-        showToast('❌ Gagal', 'Terjadi kesalahan: ' + e.message, 'fa-times-circle', 'error');
-    }
-}
         
 /* ================================================================
  * MODAL KOMENTAR
@@ -6069,7 +6121,9 @@ function renderCommentsListDynamic(comments, postId) {
         const isLiked = !!c.is_liked;
         const likeCount = c.likes_count || 0;
         
-        // Render Balasan (Nested)
+        // ================================================================
+        // Render Balasan (Nested) DENGAN TOMBOL AKSI LENGKAP
+        // ================================================================
         let repliesHTML = '';
         if (c.replies && c.replies.length > 0) {
             repliesHTML = '<div style="margin-left:36px;margin-top:8px;border-left:2px solid rgba(230,0,18,0.2);padding-left:8px;">';
@@ -6077,12 +6131,32 @@ function renderCommentsListDynamic(comments, postId) {
                 const rcp = r.userProfilePic
                     ? `<img src="${escapeAttr(r.userProfilePic)}" alt="" style="width:100%;height:100%;object-fit:cover;">`
                     : (r.userGender === 'female' ? '<i class="fas fa-female" style="color:#fff;font-size:0.6rem;"></i>' : '<i class="fas fa-male" style="color:#fff;font-size:0.6rem;"></i>');
+                
+                const isReplyOwn = currentAuthUser && (r.userId === currentUser.username || r.userAuthId === currentAuthUser.id);
+                const isReplyLiked = !!r.is_liked;
+                const replyLikeCount = r.likes_count || 0;
+
                 repliesHTML += `
-                    <div style="display:flex;gap:6px;margin-bottom:6px;padding:6px;background:var(--bg-card);border-radius:8px;">
-                        <div style="width:22px;height:22px;border-radius:50%;overflow:hidden;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;flex-shrink:0;" onclick="goToCommentProfile('${escapeAttr(r.userId)}')">${rcp}</div>
-                        <div style="flex:1;min-width:0;">
-                            <div style="font-size:0.65rem;font-weight:700;color:var(--primary);cursor:pointer;" onclick="goToCommentProfile('${escapeAttr(r.userId)}')">${escapeHTML(r.userFullName)}</div>
-                            <div style="font-size:0.65rem;color:var(--text-primary);margin:2px 0;line-height:1.4;">${escapeHTML(r.text)}</div>
+                    <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px;padding:6px;background:var(--bg-card);border-radius:8px;">
+                        <div style="display:flex;gap:6px;">
+                            <div style="width:22px;height:22px;border-radius:50%;overflow:hidden;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;" onclick="goToCommentProfile('${escapeAttr(r.userId)}')">${rcp}</div>
+                            <div style="flex:1;min-width:0;">
+                                <div style="font-size:0.65rem;font-weight:700;color:var(--primary);cursor:pointer;" onclick="goToCommentProfile('${escapeAttr(r.userId)}')">${escapeHTML(r.userFullName)}</div>
+                                <div style="font-size:0.65rem;color:var(--text-primary);margin:2px 0;line-height:1.4;">${escapeHTML(r.text)}</div>
+                            </div>
+                        </div>
+                        <!-- TOMBOL AKSI DI BALASAN -->
+                        <div style="display:flex;gap:10px;font-size:0.6rem;color:var(--text-muted);margin-top:2px;margin-left:28px;flex-wrap:wrap;">
+                            <span style="cursor:pointer;" onclick="toggleCommentLikeProfile('${r.id}', '${postId}')">
+                                <i class="${isReplyLiked ? 'fas' : 'far'} fa-heart" style="color:${isReplyLiked ? 'var(--accent-red)' : 'inherit'};"></i> ${replyLikeCount}
+                            </span>
+                            <span style="cursor:pointer;" onclick="toggleReplyBoxProfile('${r.id}')">
+                                <i class="far fa-comment"></i> Balas
+                            </span>
+                            ${isReplyOwn ? `
+                            <span style="cursor:pointer;" onclick="editCommentProfile('${r.id}', '${postId}')"><i class="fas fa-pen"></i> Edit</span>
+                            <span style="cursor:pointer; color:var(--accent-red);" onclick="deleteCommentProfile('${r.id}', '${postId}')"><i class="fas fa-trash"></i> Hapus</span>
+                            ` : ''}
                         </div>
                     </div>
                 `;
@@ -6113,7 +6187,7 @@ function renderCommentsListDynamic(comments, postId) {
                         
                         <div id="replyBox-${c.id}" class="comment-reply-box">
                             <input type="text" id="replyInput-${c.id}" placeholder="Balas komentar..." style="flex:1;padding:6px 10px;font-size:0.65rem;border-radius:12px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-primary);">
-                            <button onclick="sendNestedReply('${c.id}', '${postId}')" style="background:var(--accent-blue-gradient);border:none;color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;flex-shrink:0;"><i class="fas fa-paper-plane" style="font-size:0.6rem;"></i></button>
+                            <button class="reply-send-btn" data-parent-id="${c.id}" data-post-id="${postId}" style="background:var(--accent-blue-gradient);border:none;color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;flex-shrink:0;"><i class="fas fa-paper-plane" style="font-size:0.6rem;"></i></button>
                         </div>
                     </div>
                 </div>
