@@ -5273,6 +5273,7 @@ function buildPostinganSlide(post, idx, total) {
 }
 
 function attachPostinganActionListeners() {
+    // 1. Tombol Aksi Postingan (Like, Komentar, Viewer, Share, Delete)
     document.querySelectorAll('.postingan-action[data-action]').forEach(btn => {
         btn.onclick = function(e) {
             e.preventDefault();
@@ -5288,8 +5289,193 @@ function attachPostinganActionListeners() {
             }
         };
     });
+
+    // 2. Tombol Aksi Komentar (Like, Balas, Edit, Hapus)
+    document.querySelectorAll('.comment-action-btn[data-action]').forEach(btn => {
+        btn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const action = this.getAttribute('data-action');
+            const commentId = this.getAttribute('data-comment-id');
+            const postId = this.getAttribute('data-post-id');
+            
+            if (action === 'like-comment') toggleCommentLikeProfile(commentId, postId);
+            else if (action === 'reply-comment') toggleReplyBoxProfile(commentId);
+            else if (action === 'edit-comment') editCommentProfile(commentId, postId);
+            else if (action === 'delete-comment') deleteCommentProfile(commentId, postId);
+        };
+    });
+
+    // 3. Tombol Kirim Balasan
+    document.querySelectorAll('.comment-reply-box .reply-send-btn').forEach(btn => {
+        btn.onclick = function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const parentId = this.dataset.parentId;
+            const postId = this.dataset.postId;
+            const input = this.parentElement.querySelector('input');
+            const text = input.value.trim();
+            if (text) {
+                sendNestedReply(parentId, postId, text);
+                input.value = '';
+                this.parentElement.classList.remove('active');
+            }
+        };
+    });
+
+    // 4. Enter di Input Balasan
+    document.querySelectorAll('.comment-reply-box input').forEach(input => {
+        input.onkeypress = function(e) {
+            if (e.key === 'Enter') {
+                const btn = this.parentElement.querySelector('.reply-send-btn');
+                if (btn) btn.click();
+            }
+        };
+    });
+
+    // 5. Tombol Lihat Sembunyikan Balasan
+    document.querySelectorAll('.comment-show-replies-btn[data-action="show-replies"]').forEach(btn => {
+        btn.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            showAllRepliesProfile(this.dataset.commentId, this.dataset.postId);
+        };
+    });
+
+    document.querySelectorAll('.comment-show-replies-btn[data-action="hide-replies"]').forEach(btn => {
+        btn.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            hideRepliesProfile(this.dataset.commentId, this.dataset.postId);
+        };
+    });
 }
 
+// Toggle kotak balasan
+function toggleReplyBoxProfile(commentId) {
+    const box = document.getElementById('replyBox-' + commentId);
+    if (!box) return;
+    document.querySelectorAll('.comment-reply-box.active').forEach(b => {
+        if (b.id !== 'replyBox-' + commentId) b.classList.remove('active');
+    });
+    box.classList.toggle('active');
+    if (box.classList.contains('active')) {
+        const input = box.querySelector('input');
+        if (input) setTimeout(() => input.focus(), 100);
+    }
+}
+
+// Kirim balasan (nested reply)
+async function sendNestedReply(parentId, postId, text) {
+    if (!currentAuthUser) return;
+    
+    try {
+        const { error } = await window.salinkSupabase.from('comments').insert({
+            user_id: currentAuthUser.id,
+            post_id: postId,
+            content: text,
+            parent_id: parentId
+        });
+        
+        if (error) throw error;
+
+        // Refresh data komentar dari Supabase
+        await loadData();
+        const updatedPost = posts.find(p => p.id === postId);
+        const modal = document.getElementById('postinganCommentsModal');
+        if (modal && updatedPost) {
+            let comments = JSON.parse(updatedPost.comments || '[]');
+            modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+            
+            // Update counter komentar di carousel
+            const countEl = document.querySelector(`.comment-count[data-post-id="${postId}"]`);
+            if (countEl) countEl.textContent = comments.length;
+        }
+    } catch(e) {
+        console.error(e);
+        showToast('Gagal', 'Tidak dapat membalas komentar', 'fa-times-circle', 'error');
+    }
+}
+
+// Toggle Like Komentar
+async function toggleCommentLikeProfile(commentId, postId) {
+    if (!currentAuthUser) return;
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    let comments = JSON.parse(post.comments || '[]');
+    const c = comments.find(x => x.id === commentId);
+    if (!c) return;
+
+    const isLiked = c.is_liked;
+    try {
+        if (isLiked) {
+            await window.salinkSupabase.from('comment_likes').delete().eq('comment_id', commentId).eq('user_id', currentAuthUser.id);
+            c.is_liked = false;
+            c.likes_count = Math.max(0, (c.likes_count || 1) - 1);
+        } else {
+            await window.salinkSupabase.from('comment_likes').insert({ comment_id: commentId, user_id: currentAuthUser.id });
+            c.is_liked = true;
+            c.likes_count = (c.likes_count || 0) + 1;
+        }
+        
+        post.comments = JSON.stringify(comments);
+        const modal = document.getElementById('postinganCommentsModal');
+        if (modal) {
+            modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+        }
+    } catch(e) { console.error(e); }
+}
+
+// Edit Komentar
+async function editCommentProfile(commentId, postId) {
+    if (!currentAuthUser) return;
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    let comments = JSON.parse(post.comments || '[]');
+    const c = comments.find(x => x.id === commentId);
+    if (!c) return;
+
+    const newText = prompt('Edit komentar:', c.text || c.content);
+    if (newText === null) return;
+    const trimmed = newText.trim();
+    if (!trimmed || trimmed === (c.text || c.content)) return;
+
+    try {
+        await window.salinkSupabase.from('comments').update({ content: trimmed, updated_at: new Date().toISOString() }).eq('id', commentId);
+        c.text = trimmed;
+        c.content = trimmed;
+        post.comments = JSON.stringify(comments);
+        
+        const modal = document.getElementById('postinganCommentsModal');
+        if (modal) {
+            modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+        }
+        showToast('✅', 'Komentar diedit', 'fa-check-circle');
+    } catch(e) { console.error(e); }
+}
+
+// Hapus Komentar (Soft Delete)
+async function deleteCommentProfile(commentId, postId) {
+    if (!currentAuthUser) return;
+    if (!confirm('Hapus komentar ini secara permanen?')) return;
+
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+
+    try {
+        await window.salinkSupabase.from('comments').update({ deleted_at: new Date().toISOString() }).eq('id', commentId);
+        let comments = JSON.parse(post.comments || '[]');
+        comments = comments.filter(x => x.id !== commentId && x.parent_id !== commentId);
+        post.comments = JSON.stringify(comments);
+        
+        const modal = document.getElementById('postinganCommentsModal');
+        if (modal) {
+            modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+        }
+        showToast('✅', 'Komentar dihapus', 'fa-check-circle');
+    } catch(e) { console.error(e); }
+}        
+        
 /* ================================================================
  * POSTINGAN CAROUSEL — NAVIGATION
  * ================================================================ */
@@ -5543,6 +5729,58 @@ function goToPostinganSlideById(postId) {
     if (section) section.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
+ function openPostinganCommentsModal(postId) {
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+
+    let comments = [];
+    try { comments = typeof post.comments === 'string' ? JSON.parse(post.comments) : (post.comments || []); } catch(e) { comments = []; }
+    if (!Array.isArray(comments)) comments = [];
+
+    let existingModal = document.getElementById('postinganCommentsModal');
+    if (existingModal) existingModal.remove();
+
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'postinganCommentsModal';
+    modal.innerHTML = `
+        <div class="modal-content" style="max-width:520px;">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-comments"></i>
+                    <span>💬 Komentar</span>
+                    <span class="badge-count">${comments.length}</span>
+                </div>
+                <button class="modal-close" onclick="closeCommentsModal()" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div id="commentsListDynamic" style="max-height:50vh;overflow-y:auto;margin-bottom:10px;">
+                    ${renderCommentsListDynamic(comments, postId)}
+                </div>
+                <div class="add-comment" style="display:flex;gap:6px;align-items:center;">
+                    <input type="text" class="comment-input" id="newCommentInput" placeholder="Tulis komentar..." style="flex:1;padding:8px 12px;background:var(--bg-input);border:1px solid var(--border-color);border-radius:18px;color:var(--text-primary);font-size:0.7rem;font-family:inherit;">
+                    <button class="send-comment" data-post-id="${escapeAttr(postId)}" style="background:var(--accent-blue-gradient);border:none;width:34px;height:34px;border-radius:50%;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:0.7rem;flex-shrink:0;" type="button"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-close-modal" onclick="closeCommentsModal()" type="button">Tutup</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    setTimeout(() => modal.classList.add('active'), 10);
+
+    modal.querySelector('.send-comment').onclick = function() {
+        sendPostinganComment(postId, modal);
+    };
+    modal.querySelector('#newCommentInput').onkeypress = function(e) {
+        if (e.key === 'Enter') sendPostinganComment(postId, modal);
+    };
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) closeCommentsModal();
+    });
+}       
+        
 /* ================================================================
  * MODAL KOMENTAR
  * ================================================================ */
@@ -5605,76 +5843,173 @@ async function sendPostinganComment(postId, modal) {
     showToast('💬 Terkirim', savedToDb ? 'Komentar tersimpan di database' : 'Komentar tersimpan lokal', 'fa-check-circle', 'success');
 }
 
+/* ================================================================
+ * PATCH 30: SISTEM KOMENTAR NESTED (DARI DASHBOARD)
+ * ================================================================ */
 function renderCommentsListDynamic(comments, postId) {
-    if (!comments || comments.length === 0) {
+    if (!Array.isArray(comments)) comments = [];
+
+    // Pisahkan komentar utama (top-level) dan balasan (replies)
+    const topLevel = comments.filter(c => !c.parent_id && !c.parentId);
+    const repliesByParent = {};
+    
+    comments.forEach(c => {
+        const pid = c.parent_id || c.parentId;
+        if (!pid) return;
+        if (!repliesByParent[pid]) repliesByParent[pid] = [];
+        repliesByParent[pid].push(c);
+    });
+
+    // Urutkan berdasarkan waktu
+    topLevel.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    Object.keys(repliesByParent).forEach(pid => {
+        repliesByParent[pid].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    });
+
+    if (topLevel.length === 0) {
         return '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.72rem;">Belum ada komentar</div>';
     }
-    return comments.map(c => {
-        const cp = c.userProfilePic
-            ? `<img src="${escapeAttr(c.userProfilePic)}" alt="" style="width:100%;height:100%;object-fit:cover;">`
-            : (c.userGender === 'female' ? '<i class="fas fa-female" style="color:#fff;font-size:0.7rem;"></i>' : '<i class="fas fa-male" style="color:#fff;font-size:0.7rem;"></i>');
-        
-        const isOwn = currentAuthUser && c.user_id === currentAuthUser.id;
-        
-        // Render Balasan (Nested)
-        let repliesHTML = '';
-        if (c.replies && c.replies.length > 0) {
-            repliesHTML = '<div style="margin-left:36px;margin-top:8px;border-left:2px solid rgba(230,0,18,0.2);padding-left:8px;">';
-            c.replies.forEach(r => {
-                const rcp = r.userProfilePic
-                    ? `<img src="${escapeAttr(r.userProfilePic)}" alt="" style="width:100%;height:100%;object-fit:cover;">`
-                    : (r.userGender === 'female' ? '<i class="fas fa-female" style="color:#fff;font-size:0.6rem;"></i>' : '<i class="fas fa-male" style="color:#fff;font-size:0.6rem;"></i>');
-                repliesHTML += `
-                    <div style="display:flex;gap:6px;margin-bottom:6px;padding:6px;background:var(--bg-card);border-radius:8px;">
-                        <div style="width:22px;height:22px;border-radius:50%;overflow:hidden;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;flex-shrink:0;" onclick="goToCommentProfile('${escapeAttr(r.userId)}')">${rcp}</div>
-                        <div style="flex:1;min-width:0;">
-                            <div style="font-size:0.65rem;font-weight:700;color:var(--primary);cursor:pointer;" onclick="goToCommentProfile('${escapeAttr(r.userId)}')">${escapeHTML(r.userFullName)}</div>
-                            <div style="font-size:0.65rem;color:var(--text-primary);margin:2px 0;line-height:1.4;">${escapeHTML(r.text)}</div>
-                        </div>
-                    </div>
-                `;
-            });
-            repliesHTML += '</div>';
+
+    let html = '<div class="comments-thread">';
+    topLevel.forEach(parent => {
+        html += renderCommentTreeDynamic(parent, repliesByParent, postId, 0);
+    });
+    html += '</div>';
+    return html;
+}
+
+// Render satu komentar + descendant-nya (rekursif)
+function renderCommentTreeDynamic(comment, repliesByParent, postId, depth) {
+    if (!comment) return '';
+    let html = '';
+    const isReply = depth > 0;
+    html += buildCommentItemHTMLDynamic(comment, postId, isReply, depth);
+    const children = repliesByParent[comment.id] || [];
+    if (children.length > 0) {
+        html += renderRepliesBlockDynamic(comment, children, repliesByParent, postId, depth);
+    }
+    return html;
+}
+
+// Render satu item komentar (HTML)
+function buildCommentItemHTMLDynamic(c, postId, isReply, depth) {
+    depth = depth || 0;
+    const isOwn = currentUser && (c.userId === currentUser.username || c.userAuthId === currentAuthUser?.id);
+    const isDeleted = !!c.deleted_at;
+    
+    // Avatar
+    let avatarHTML;
+    if (c.userProfilePic) {
+        avatarHTML = `<img src="${escapeAttr(c.userProfilePic)}" alt="">`;
+    } else {
+        avatarHTML = c.userGender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>';
+    }
+    
+    // Nama
+    const nameHTML = isDeleted 
+        ? '<span class="comment-name" style="color:#9aa0ab;">[Dihapus]</span>'
+        : `<span class="comment-name" onclick="goToCommentProfile('${escapeAttr(c.userId)}')">${escapeHTML(c.userFullName || 'Pengguna')}</span>`;
+    
+    // Waktu
+    const timeFull = formatDate(c.timestamp || Date.now());
+    const timeAgo = getTimeAgo(c.timestamp || Date.now());
+    const editedBadge = c.updated_at && c.updated_at !== c.created_at 
+        ? ' <span class="comment-edited-badge">(diedit)</span>' 
+        : '';
+    
+    // Text
+    let textHTML = '';
+    if (isDeleted) {
+        textHTML = '<div class="comment-text deleted">Komentar dihapus oleh user</div>';
+    } else {
+        let text = escapeHTML(c.text || c.content || '');
+        text = text.replace(/@([a-zA-Z0-9_]+)/g, '<span class="mention">@$1</span>');
+        textHTML = `<div class="comment-text">${text}</div>`;
+    }
+    
+    // Like & Actions
+    const likeCount = parseInt(c.likes_count || 0, 10) || 0;
+    const isLiked = !!c.is_liked;
+    
+    let actionsHTML = '';
+    if (!isDeleted) {
+        // Tombol Like
+        if (!isOwn) {
+            actionsHTML += `<button class="comment-action-btn ${isLiked ? 'liked' : ''}" data-action="like-comment" data-comment-id="${escapeAttr(c.id)}" data-post-id="${escapeAttr(postId)}" type="button">
+                <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i>
+                <span class="action-counter like-counter">${likeCount}</span>
+            </button>`;
+        } else {
+            actionsHTML += `<span class="comment-action-btn" style="cursor:default;" title="Anda tidak bisa like komentar sendiri">
+                <i class="fas fa-heart" style="color:${likeCount > 0 ? 'var(--accent-red)' : '#9aa0ab'};"></i>
+                <span class="action-counter like-counter">${likeCount}</span>
+            </span>`;
         }
+        
+        // Tombol Balas
+        actionsHTML += `<button class="comment-action-btn" data-action="reply-comment" data-comment-id="${escapeAttr(c.id)}" data-post-id="${escapeAttr(postId)}" type="button">
+            <i class="far fa-comment"></i>
+            <span>Balas</span>
+        </button>`;
+        
+        // Tombol Edit & Hapus (hanya milik sendiri)
+        if (isOwn) {
+            actionsHTML += `<button class="comment-action-btn" data-action="edit-comment" data-comment-id="${escapeAttr(c.id)}" data-post-id="${escapeAttr(postId)}" type="button">
+                <i class="fas fa-pen"></i>
+                <span>Edit</span>
+            </button>`;
+            actionsHTML += `<button class="comment-action-btn delete-btn" data-action="delete-comment" data-comment-id="${escapeAttr(c.id)}" data-post-id="${escapeAttr(postId)}" type="button">
+                <i class="fas fa-trash"></i>
+                <span>Hapus</span>
+            </button>`;
+        }
+    }
+    
+    // Reply Box (hidden)
+    const replyBoxHTML = `<div class="comment-reply-box" id="replyBox-${escapeAttr(c.id)}">
+        <input type="text" placeholder="Balas @${escapeAttr(c.userId)}..." data-parent-id="${escapeAttr(c.id)}" data-post-id="${escapeAttr(postId)}">
+        <button class="reply-send-btn" data-parent-id="${escapeAttr(c.id)}" data-post-id="${escapeAttr(postId)}" type="button"><i class="fas fa-paper-plane"></i></button>
+    </div>`;
+    
+    return `<div class="comment-item" data-comment-id="${escapeAttr(c.id)}" data-depth="${depth}">
+        <div class="comment-avatar" onclick="${isDeleted ? '' : `goToCommentProfile('${escapeAttr(c.userId)}')`}">${avatarHTML}</div>
+        <div class="comment-body">
+            <div class="comment-head">${nameHTML}<span class="comment-time" title="${escapeAttr(timeFull)}">${timeAgo} • ${timeFull}</span>${editedBadge}</div>
+            ${textHTML}
+            ${actionsHTML ? `<div class="comment-actions">${actionsHTML}</div>` : ''}
+            ${replyBoxHTML}
+        </div>
+    </div>`;
+}
 
-        const isLiked = !!c.is_liked;
-        const likeCount = c.likes_count || 0;
+// Render blok balasan
+function renderRepliesBlockDynamic(parent, replies, repliesByParent, postId, parentDepth) {
+    const MAX_VISIBLE = 2; 
+    const total = replies.length;
+    const showAll = total <= MAX_VISIBLE;
+    const visibleCount = showAll ? total : MAX_VISIBLE;
+    const hiddenCount = total - visibleCount;
 
-        return `
-            <div style="margin-bottom:12px;">
-                <div style="display:flex;gap:8px;padding:8px;background:var(--bg-input);border-radius:8px;">
-                    <div style="width:28px;height:28px;border-radius:50%;overflow:hidden;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1.5px solid var(--primary);cursor:pointer;" onclick="goToCommentProfile('${escapeAttr(c.userId)}')">${cp}</div>
-                    <div style="flex:1;min-width:0;">
-                        <div style="font-size:0.68rem;font-weight:700;color:var(--primary);cursor:pointer;" onclick="goToCommentProfile('${escapeAttr(c.userId)}')">${escapeHTML(c.userFullName)}</div>
-                        <div style="font-size:0.7rem;color:var(--text-primary);margin:3px 0;line-height:1.5;">${escapeHTML(c.text)}</div>
-                        <div style="display:flex;gap:10px;font-size:0.6rem;color:var(--text-muted);margin-top:4px;">
-                            <span style="cursor:pointer;" onclick="toggleCommentLikeProfile('${c.id}', '${postId}')">
-                                <i class="${isLiked ? 'fas' : 'far'} fa-heart" style="color:${isLiked ? 'var(--accent-red)' : 'inherit'};"></i> ${likeCount}
-                            </span>
-                            <span style="cursor:pointer;" onclick="document.getElementById('replyBox-${c.id}').style.display='flex'">
-                                <i class="far fa-comment"></i> Balas
-                            </span>
-                            ${isOwn ? `
-                            <span style="cursor:pointer;" onclick="editCommentProfile('${c.id}', '${postId}')">
-                                <i class="fas fa-pen"></i> Edit
-                            </span>
-                            <span style="cursor:pointer; color:var(--accent-red);" onclick="deleteCommentProfile('${c.id}', '${postId}')">
-                                <i class="fas fa-trash"></i> Hapus
-                            </span>
-                            ` : ''}
-                            <span>${getTimeAgo(c.timestamp)}</span>
-                        </div>
-                        
-                        <div id="replyBox-${c.id}" style="display:none;gap:6px;margin-top:8px;">
-                            <input type="text" id="replyInput-${c.id}" placeholder="Balas komentar..." style="flex:1;padding:6px 10px;font-size:0.65rem;border-radius:12px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-primary);">
-                            <button onclick="sendNestedReply('${c.id}', '${postId}')" style="background:var(--accent-blue-gradient);border:none;color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;"><i class="fas fa-paper-plane" style="font-size:0.6rem;"></i></button>
-                        </div>
-                    </div>
-                </div>
-                ${repliesHTML}
-            </div>
-        `;
-    }).join('');
+    const containerId = 'replies-' + escapeAttr(parent.id);
+    const depth = parentDepth + 1;
+
+    let html = `<div class="comment-replies" id="${containerId}" data-total="${total}" data-visible="${visibleCount}">`;
+    for (let i = 0; i < visibleCount; i++) {
+        html += renderCommentTreeDynamic(replies[i], repliesByParent, postId, depth);
+    }
+    html += '</div>';
+
+    if (!showAll && hiddenCount > 0) {
+        html += `<button class="comment-show-replies-btn" data-action="show-replies" data-comment-id="${escapeAttr(parent.id)}" data-post-id="${escapeAttr(postId)}" type="button">
+            <i class="fas fa-chevron-down"></i> Lihat ${hiddenCount} balasan lainnya
+        </button>`;
+    }
+    if (showAll && total > MAX_VISIBLE) {
+        html += `<button class="comment-show-replies-btn" data-action="hide-replies" data-comment-id="${escapeAttr(parent.id)}" data-post-id="${escapeAttr(postId)}" type="button">
+            <i class="fas fa-chevron-up"></i> Sembunyikan balasan
+        </button>`;
+    }
+    return html;
 }
 
 // Fungsi untuk mengirim balasan (nested)
