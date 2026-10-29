@@ -3193,7 +3193,63 @@
         [data-theme="light"] .postingan-card-location { background: rgba(230,0,18,0.06); color: #6b7688; }
         [data-theme="light"] .mini-marketplace { background: var(--grad-marketplace); }
         [data-theme="light"] .stats-3x2-section { background: var(--grad-stats2x3); }
-    </style>
+  
+  /* ================================================================
+   PATCH: SCROLLABLE POSTINGAN BARU (MIRIP DASHBOARD)
+   ================================================================ */
+.scrollable-posts-wrapper {
+    max-height: 450px; /* Batas tinggi kotak */
+    overflow-y: auto;
+    padding-right: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scrollbar-width: thin;
+}
+.scrollable-posts-wrapper::-webkit-scrollbar { width: 4px; }
+.scrollable-posts-wrapper::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+
+/* Desain Card Postingan di dalam Scroll */
+.scroll-post-card {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 14px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.1);
+    color: #0a0e1a;
+    position: relative;
+}
+.scroll-post-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.scroll-post-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--accent-blue-gradient);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; overflow: hidden; border: 2px solid var(--primary);
+}
+.scroll-post-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.scroll-post-user h4 { font-size: 0.8rem; font-weight: 700; color: #0a0e1a; margin: 0; }
+.scroll-post-user small { font-size: 0.55rem; color: #6b7688; }
+.scroll-post-text { font-size: 0.75rem; line-height: 1.5; margin-bottom: 10px; color: #333; }
+.scroll-post-media { width: 100%; border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+.scroll-post-media img { width: 100%; max-height: 250px; object-fit: cover; display: block; }
+.scroll-post-actions {
+    display: flex; gap: 4px; padding-top: 10px; border-top: 1px solid rgba(0,0,0,0.08);
+    flex-wrap: wrap;
+}
+.scroll-post-btn {
+    display: flex; align-items: center; gap: 4px; padding: 5px 8px; border-radius: 8px;
+    font-size: 0.65rem; font-weight: 700; color: #6b7688; cursor: pointer;
+    background: transparent; border: none; font-family: inherit; transition: all 0.2s;
+}
+.scroll-post-btn:active { background: #f5f7fa; transform: scale(0.95); }
+.scroll-post-btn.liked { color: var(--accent-red); }
+.scroll-post-btn.delete { color: var(--accent-red); margin-left: auto; }
+
+</style>
 </head>
 <body>
 
@@ -3406,8 +3462,8 @@
             <a href="jual.html" class="profile-nav-item"><span>🛍️</span><span>Jual</span></a>
         </div>
 
-        <!-- ============================================================ -->
-        <!-- NEW v8.0 — POSTINGAN SAYA CAROUSEL                            -->
+                <!-- ============================================================ -->
+        <!-- PATCH: POSTINGAN SAYA (SCROLLABLE) -->
         <!-- ============================================================ -->
         <div class="postingan-carousel-section" id="postinganCarouselSection">
             <div class="postingan-carousel-header">
@@ -3417,34 +3473,18 @@
                 </div>
                 <div class="header-right">
                     <span class="count-pill" id="postinganCountPill">0</span>
-                    <button class="view-all-btn" id="postinganViewAllHeaderBtn" type="button">
+                    <button class="view-all-btn" onclick="openPostinganLengkapModal()" type="button">
                         <i class="fas fa-list"></i> Semua
                     </button>
                 </div>
             </div>
 
-            <div class="postingan-carousel" id="postinganCarousel">
-                <div class="postingan-track" id="postinganTrack">
-                    <!-- Slides di-inject oleh JS -->
-                    <div class="postingan-empty">
-                        <div class="empty-icon">📄</div>
-                        <div class="empty-title">Memuat Postingan...</div>
-                        <div class="empty-desc">Mengambil data postingan Anda...</div>
-                    </div>
+            <!-- Wadah Scrollable Baru -->
+            <div class="scrollable-posts-wrapper" id="myPostsScrollContainer">
+                <div class="postingan-empty">
+                    <div class="empty-icon">📄</div>
+                    <div class="empty-title">Memuat Postingan...</div>
                 </div>
-            </div>
-
-            <div class="postingan-progress-bar" id="postinganProgressBar">
-                <div class="postingan-progress-fill" id="postinganProgressFill"></div>
-            </div>
-            <div class="postingan-pagination-wrapper">
-                <div class="postingan-pagination" id="postinganPagination"></div>
-            </div>
-
-            <div class="postingan-carousel-footer">
-                <button class="postingan-view-all-footer" id="postinganViewAllFooterBtn" type="button">
-                    Lihat Postingan Selengkapnya <i class="fas fa-arrow-right"></i>
-                </button>
             </div>
         </div>
 
@@ -5120,65 +5160,93 @@ function getMyPosts() {
 }
 
 function renderPostinganCarousel() {
-    const track = document.getElementById('postinganTrack');
-    const pagination = document.getElementById('postinganPagination');
-    if (!track) return;
+    const container = document.getElementById('myPostsScrollContainer');
+    if (!container) return;
 
     const myPosts = getMyPosts();
+    
+    // Update angka pill
+    const pill = document.getElementById('postinganCountPill');
+    if (pill) pill.textContent = myPosts.length;
 
     if (myPosts.length === 0) {
-        track.innerHTML = `
-            <div class="postingan-slide active">
-                <div class="postingan-empty">
-                    <div class="empty-icon">📄</div>
-                    <div class="empty-title">Belum Ada Postingan</div>
-                    <div class="empty-desc">Postingan akan muncul di sini saat Anda membuat postingan baru</div>
-                </div>
+        container.innerHTML = `
+            <div class="postingan-empty">
+                <div class="empty-icon">📄</div>
+                <div class="empty-title">Belum Ada Postingan</div>
+                <div class="empty-desc">Postingan akan muncul di sini</div>
             </div>
         `;
-        if (pagination) pagination.innerHTML = '';
-        postinganSlidesCount = 1;
-        postinganIndex = 0;
-        updatePostinganProgressBar(0, 1);
         return;
     }
 
-    let slidesHTML = '';
-    myPosts.forEach((post, idx) => {
-        slidesHTML += buildPostinganSlide(post, idx, myPosts.length);
+    let html = '';
+    myPosts.forEach(post => {
+        html += buildScrollPostCard(post);
     });
-    track.innerHTML = slidesHTML;
+    container.innerHTML = html;
+}
 
-    postinganSlidesCount = myPosts.length;
-    postinganIndex = 0;
+// Fungsi pembantu membuat desain Card di dalam Scroll
+function buildScrollPostCard(post) {
+    const profilePic = post.userProfilePic
+        ? `<img src="${escapeAttr(post.userProfilePic)}" alt="">`
+        : (post.userGender === 'female' ? '<i class="fas fa-female"></i>' : '<i class="fas fa-male"></i>');
 
-    if (pagination) {
-        if (myPosts.length <= 1) {
-            pagination.innerHTML = '';
-            pagination.style.display = 'none';
-        } else {
-            pagination.style.display = 'flex';
-            const maxDots = Math.min(myPosts.length, 50);
-            let dotsHTML = '';
-            for (let i = 0; i < maxDots; i++) {
-                dotsHTML += `<button class="postingan-dot${i === 0 ? ' active' : ''}" data-index="${i}" aria-label="Slide ${i + 1}" type="button"></button>`;
-            }
-            pagination.innerHTML = dotsHTML;
-            pagination.onclick = function(e) {
-                const dot = e.target.closest('.postingan-dot');
-                if (!dot) return;
-                const idx = parseInt(dot.dataset.index);
-                if (isNaN(idx)) return;
-                postinganPaused = true;
-                goToPostinganSlide(idx);
-                setTimeout(() => { postinganPaused = false; }, 8000);
-            };
+    let mediaHTML = '';
+    if (post.mediaType === 'image') {
+        const imgSrc = post.gdriveImageUrl || post.mediaData || '';
+        if (imgSrc) mediaHTML = `<div class="scroll-post-media"><img src="${escapeAttr(imgSrc)}" onclick="openLightboxFromPost('${escapeAttr(post.id)}')" style="cursor:zoom-in;" alt=""></div>`;
+    } else if (post.mediaType === 'video') {
+        const vidSrc = post.gdriveVideoEmbed || post.mediaData || '';
+        if (post.gdriveId && vidSrc) {
+            mediaHTML = `<div class="scroll-post-media" style="position:relative;padding-bottom:56.25%;height:0;"><iframe src="${escapeAttr(vidSrc)}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0;" allowfullscreen></iframe></div>`;
+        } else if (vidSrc) {
+            mediaHTML = `<div class="scroll-post-media"><video controls preload="metadata"><source src="${escapeAttr(vidSrc)}"></video></div>`;
         }
     }
 
-    goToPostinganSlide(0);
-    startPostinganAuto(postinganSlidesCount);
-    attachPostinganActionListeners();
+    let likes = [], comments = [];
+    try {
+        if (typeof post.likes === 'string') likes = JSON.parse(post.likes) || [];
+        else if (Array.isArray(post.likes)) likes = post.likes;
+        if (typeof post.comments === 'string') comments = JSON.parse(post.comments) || [];
+        else if (Array.isArray(post.comments)) comments = post.comments;
+    } catch(e) { likes = []; comments = []; }
+
+    const isLiked = currentUser && likes.indexOf(currentUser.username) !== -1;
+    const viewerCount = parseInt(post.viewerCount || 0, 10) || 0;
+
+    return `
+        <div class="scroll-post-card" data-post-id="${escapeAttr(post.id)}">
+            <div class="scroll-post-header">
+                <div class="scroll-post-avatar">${profilePic}</div>
+                <div class="scroll-post-user">
+                    <h4>${escapeHTML(post.userFullName)}</h4>
+                    <small>${formatDate(new Date(post.timestamp).getTime())}</small>
+                </div>
+            </div>
+            <div class="scroll-post-text">${escapeHTML(post.text)}</div>
+            ${mediaHTML}
+            <div class="scroll-post-actions">
+                <button class="scroll-post-btn ${isLiked ? 'liked' : ''}" onclick="handlePostinganLike('${escapeAttr(post.id)}')">
+                    <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> <span class="like-count">${likes.length}</span>
+                </button>
+                <button class="scroll-post-btn" onclick="openPostinganCommentsModal('${escapeAttr(post.id)}')">
+                    <i class="far fa-comment"></i> Komentar (${comments.length})
+                </button>
+                <button class="scroll-post-btn" onclick="handlePostinganViewer('${escapeAttr(post.id)}')">
+                    <i class="fas fa-eye"></i> <span class="viewer-count">${viewerCount}</span>
+                </button>
+                <button class="scroll-post-btn" onclick="handlePostinganShare('${escapeAttr(post.id)}')">
+                    <i class="fas fa-share-alt"></i> Bagikan
+                </button>
+                <button class="scroll-post-btn delete" onclick="requestDelete('post', '${escapeAttr(post.id)}', 'Postingan')">
+                    <i class="fas fa-trash"></i> Hapus
+                </button>
+            </div>
+        </div>
+    `;
 }
 
 function buildPostinganSlide(post, idx, total) {
