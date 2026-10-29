@@ -4419,14 +4419,18 @@ async function apiGetNotifications() {
 async function apiGetUsers() {
     try {
         if (window.SALINK_SB_READY && window.salinkSupabase) {
+            // Ambil data dari tabel profiles Supabase
             const { data, error } = await window.salinkSupabase
                 .from('profiles')
-                .select('id, username, full_name, profile_picture, gender, city, province')
-                .neq('username', currentUser?.username || ''); // Jangan tampilkan diri sendiri
+                .select('id, username, full_name, profile_picture, gender, city, province');
             
             if (error) throw error;
             
-            return (data || []).map(u => ({
+            // Filter keluar diri sendiri
+            const filtered = (data || []).filter(u => u.username !== currentUser?.username);
+            
+            // Format ulang ke camelCase agar cocok dengan UI
+            return filtered.map(u => ({
                 id: u.id,
                 username: u.username,
                 fullName: u.full_name,
@@ -4434,10 +4438,12 @@ async function apiGetUsers() {
                 gender: u.gender,
                 city: u.city || '',
                 province: u.province || '',
-                isOnline: true 
+                isOnline: true // Default online
             }));
         }
-    } catch (err) { console.warn('[Users] Error:', err.message); }
+    } catch (err) { 
+        console.warn('[Users] Error:', err.message); 
+    }
     return [];
 }
 async function apiGetFriends() {
@@ -5236,9 +5242,18 @@ function buildScrollPostCard(post) {
     try {
         if (typeof post.likes === 'string') likes = JSON.parse(post.likes) || [];
         else if (Array.isArray(post.likes)) likes = post.likes;
+        
         if (typeof post.comments === 'string') comments = JSON.parse(post.comments) || [];
         else if (Array.isArray(post.comments)) comments = post.comments;
     } catch(e) { likes = []; comments = []; }
+
+    // HITUNG TOTAL KOMENTAR (Top-Level + Replies)
+    let totalComments = comments.length;
+    comments.forEach(c => {
+        if (c.replies && Array.isArray(c.replies)) {
+            totalComments += c.replies.length;
+        }
+    });
 
     const isLiked = currentUser && likes.indexOf(currentUser.username) !== -1;
     const viewerCount = parseInt(post.viewerCount || 0, 10) || 0;
@@ -5266,7 +5281,7 @@ function buildScrollPostCard(post) {
                     <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> <span class="like-count">${likes.length}</span>
                 </button>
                 <button class="scroll-post-btn" onclick="openPostinganCommentsModal('${escapeAttr(post.id)}')">
-                    <i class="far fa-comment"></i> Komentar (${comments.length})
+                    <i class="far fa-comment"></i> Komentar (${totalComments})
                 </button>
                 <button class="scroll-post-btn" onclick="handlePostinganViewer('${escapeAttr(post.id)}')">
                     <i class="fas fa-eye"></i> <span class="viewer-count">${viewerCount}</span>
