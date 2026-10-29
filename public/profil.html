@@ -5614,6 +5614,8 @@ function renderCommentsListDynamic(comments, postId) {
             ? `<img src="${escapeAttr(c.userProfilePic)}" alt="" style="width:100%;height:100%;object-fit:cover;">`
             : (c.userGender === 'female' ? '<i class="fas fa-female" style="color:#fff;font-size:0.7rem;"></i>' : '<i class="fas fa-male" style="color:#fff;font-size:0.7rem;"></i>');
         
+        const isOwn = currentAuthUser && c.user_id === currentAuthUser.id;
+        
         // Render Balasan (Nested)
         let repliesHTML = '';
         if (c.replies && c.replies.length > 0) {
@@ -5652,6 +5654,14 @@ function renderCommentsListDynamic(comments, postId) {
                             <span style="cursor:pointer;" onclick="document.getElementById('replyBox-${c.id}').style.display='flex'">
                                 <i class="far fa-comment"></i> Balas
                             </span>
+                            ${isOwn ? `
+                            <span style="cursor:pointer;" onclick="editCommentProfile('${c.id}', '${postId}')">
+                                <i class="fas fa-pen"></i> Edit
+                            </span>
+                            <span style="cursor:pointer; color:var(--accent-red);" onclick="deleteCommentProfile('${c.id}', '${postId}')">
+                                <i class="fas fa-trash"></i> Hapus
+                            </span>
+                            ` : ''}
                             <span>${getTimeAgo(c.timestamp)}</span>
                         </div>
                         
@@ -5756,6 +5766,57 @@ window.toggleCommentLikeProfile = async function(commentId, postId) {
         if (modal) {
             modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
         }
+    } catch(e) { console.error(e); }
+};
+
+// Fungsi untuk edit komentar di profil
+window.editCommentProfile = async function(commentId, postId) {
+    if (!currentAuthUser) return;
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+    
+    let comments = JSON.parse(post.comments || '[]');
+    const c = comments.find(x => x.id === commentId);
+    if (!c) return;
+
+    const newText = prompt('Edit komentar:', c.text || c.content);
+    if (newText === null) return;
+    const trimmed = newText.trim();
+    if (!trimmed || trimmed === (c.text || c.content)) return;
+
+    try {
+        await window.salinkSupabase.from('comments').update({ content: trimmed, updated_at: new Date().toISOString() }).eq('id', commentId);
+        c.text = trimmed;
+        c.content = trimmed;
+        post.comments = JSON.stringify(comments);
+        
+        const modal = document.getElementById('postinganCommentsModal');
+        if (modal) {
+            modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+        }
+        showToast('✅', 'Komentar diedit', 'fa-check-circle');
+    } catch(e) { console.error(e); }
+};
+
+// Fungsi untuk hapus komentar di profil
+window.deleteCommentProfile = async function(commentId, postId) {
+    if (!currentAuthUser) return;
+    if (!confirm('Hapus komentar ini secara permanen?')) return;
+
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+
+    try {
+        await window.salinkSupabase.from('comments').update({ deleted_at: new Date().toISOString() }).eq('id', commentId);
+        let comments = JSON.parse(post.comments || '[]');
+        comments = comments.filter(x => x.id !== commentId && x.parent_id !== commentId); // Hapus komentar & balasannya
+        post.comments = JSON.stringify(comments);
+        
+        const modal = document.getElementById('postinganCommentsModal');
+        if (modal) {
+            modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+        }
+        showToast('✅', 'Komentar dihapus', 'fa-check-circle');
     } catch(e) { console.error(e); }
 };
         
