@@ -4876,7 +4876,7 @@ async function saveProfileToSupabase(userData) {
 /* ================================================================
  * LOAD DATA (posts, emergencies, users, friends, notifications)
  * ================================================================ */
-   async function loadData() {
+async function loadData() {
     try {
         if (window.SALINK_SB_READY && window.salinkSupabase) {
             const client = window.salinkSupabase;
@@ -4910,7 +4910,6 @@ async function saveProfileToSupabase(userData) {
                     likesByPost[l.post_id].push(l.user_id);
                 });
 
-                // Ambil Profile Komentator
                 const userIds = [...new Set(rawComments.map(c => c.user_id).filter(Boolean))];
                 let profileMap = {};
                 if (userIds.length > 0) {
@@ -4939,14 +4938,13 @@ async function saveProfileToSupabase(userData) {
                     });
                 });
 
-                // Susun Nested Comment (Top-level & Replies)
                 Object.keys(commentsByPost).forEach(postId => {
                     const allComments = commentsByPost[postId];
                     const top = allComments.filter(c => !c.parent_id);
                     top.forEach(t => {
                         t.replies = allComments.filter(c => c.parent_id === t.id);
                     });
-                    commentsByPost[postId] = top; // Simpan hanya top-level, replies ada di dalamnya
+                    commentsByPost[postId] = top;
                 });
 
                 posts = rawPosts.map(row => {
@@ -4982,9 +4980,10 @@ async function saveProfileToSupabase(userData) {
                 });
             }
         }
-    } catch (e) { console.warn('Gagal load:', e.message); }
-}
-                    
+    } catch (e) { 
+        console.warn('Gagal load posts:', e.message); 
+        try { posts = JSON.parse(localStorage.getItem('salink_posts') || '[]'); } catch(err) {}
+    }
 
     // 2. EMERGENCIES & USERS & NOTIFS (API GAS)
     try { allEmergencies = await apiGetEmergencies(); } catch(e) { allEmergencies = []; }
@@ -5006,7 +5005,7 @@ async function saveProfileToSupabase(userData) {
     friends = Array.from(friendsMap.values());
     try { localStorage.setItem('salink_friends', JSON.stringify(friends)); } catch(e) {}
 }
-                
+
 
 /* ================================================================
  * RENDER PROFILE HEADER
