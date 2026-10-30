@@ -8554,6 +8554,632 @@ window.openJoinSellerModal = openJoinSellerModal;
 // Supabase & patched functions
 window.handleLogout = handleLogout;
 
+
+/* ============================================================
+ * SALINK COMMENT SYSTEM PATCH v1.0
+ * RESTORE + EDIT + DELETE + REALTIME SYNC
+ * Tempel sebelum log SALINK Profil v8.1 Part 2/2 Loaded
+ * ============================================================ */
+(function () {
+    'use strict';
+
+    const SB = window.salinkSupabase;
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    if (!SB) {
+        console.error('[SALINK COMMENTS] Supabase client tidak tersedia.');
+        return;
+    }
+
+    function parseComments(value) {
+        try {
+            const parsed = typeof value === 'string'
+                ? JSON.parse(value || '[]')
+                : (value || []);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            console.error('[SALINK COMMENTS] Gagal membaca komentar:', e);
+            return [];
+        }
+    }
+
+    function getComments(post) {
+        return post ? parseComments(post.comments) : [];
+    }
+
+    function findComment(comments, id) {
+        for (const comment of comments) {
+            if (comment.id === id) {
+                return { comment, parent: null };
+            }
+
+            if (Array.isArray(comment.replies)) {
+                const found = findComment(comment.replies, id);
+                if (found) {
+                    return { comment: found.comment, parent: comment };
+                }
+            }
+        }
+        return null;
+    }
+
+    function countComments(comments) {
+        return comments.reduce((total, comment) => {
+            return total + 1 + (
+                Array.isArray(comment.replies)
+                    ? comment.replies.length
+                    : 0
+            );
+        }, 0);
+    }
+
+    function enrichCommentOwners(comments) {
+        comments.forEach(comment => {
+            comment.userAuthId = comment.user_id || comment.userAuthId || null;
+            comment.text = comment.text || comment.content || '';
+            comment.content = comment.content || comment.text || '';
+
+            if (Array.isArray(comment.replies)) {
+                enrichCommentOwners(comment.replies);
+            }
+        });
+    }
+
+    function refreshCommentModal(postId) {
+        const modal = document.getElementById('postinganCommentsModal');
+        const post = posts.find(p => p.id === postId);
+
+        if (!modal || !post) return;
+
+        const comments = getComments(post);
+        const list = modal.querySelector('#commentsListDynamic');
+
+        if (list) {
+            list.innerHTML = renderCommentsListDynamic(comments, postId);
+            attachCommentListeners(modal, postId);
+        }
+
+        const badge = modal.querySelector('.modal-title .badge-count');
+        if (badge) badge.textContent = countComments(comments);
+
+        renderPostinganCarousel();
+    }
+
+    async function reloadComments(postId) {
+        await loadData();
+
+        posts.forEach(post => {
+            const comments = getComments(post);
+            enrichCommentOwners(comments);
+            post.comments = JSON.stringify(comments);
+        });
+
+        refreshCommentModal(postId);
+    }
+
+    function requireLogin() {
+        if (!currentAuthUser || !currentAuthUser.id) {
+            showToast('🔒 Login', 'Silakan login terlebih dahulu.', 'fa-lock', 'error');
+            return false;
+        }
+        return true;
+    }
+
+    function showCommentError(action, error) {
+        console.error('[SALINK COMMENTS]', action, error);
+        showToast(
+            '❌ Gagal',
+            error?.message || 'Operasi komentar gagal. Periksa koneksi dan izin Supabase.',
+            'fa-times-circle',
+            'error'
+        );
+    }
+
+    // ---------------------------------------------------------
+    // 1. Perbaiki identitas pemilik komentar setelah loadData()
+    // ---------------------------------------------------------
+    const originalLoadData = loadData;
+
+    loadData = async function () {
+        await originalLoadData();
+
+        posts.forEach(post => {
+            const comments = getComments(post);
+            enrichCommentOwners(comments);
+            post.comments = JSON.stringify(comments);
+        });
+    };
+
+    // ---------------------------------------------------------
+    // 2. Pemulihan komentar dari localStorage ke Supabase
+    // Jalankan manual setelah SQL Patch 1 berhasil.
+    // ---------------------------------------------------------
+    window.salinkRestoreCommentsFromLocalBackup = async function () {
+        if (!requireLogin()) return;
+
+        const confirmRestore = confirm(
+            'Pulihkan komentar dari backup lokal ke Supabase?\n\n' +
+            'Data lokal tidak akan dihapus. Komentar yang sudah ada ' +
+            'tidak akan dimasukkan ulang.'
+        );
+
+        if (!confirmRestore) return;
+
+        let cachedPosts = [];
+
+        try {
+            cachedPosts = JSON.parse(
+                localStorage.getItem('salink_posts') || '[]'
+            );
+        } catch (e) {
+            showCommentError('Membaca backup lokal', e);
+            return;
+        }
+
+        if (!Array.isArray(cachedPosts) || !cachedPosts.length) {
+            showToast('ℹ️ Backup kosong', 'Tidak ditemukan data postingan lokal.', 'fa-info-circle');
+            return;
+        }
+
+        const rows = [];
+        const seen = new Set();
+
+        function addComment(comment, postId, inheritedParentId) {
+            if (!comment || typeof comment !== 'object') return;
+
+            const id = comment.id;
+            const userId = comment.user_id || comment.userAuthId;
+            const content = String(
+                comment.content || comment.text || ''
+            ).trim();
+
+            const parentId = comment.parent_id || inheritedParentId || null;
+
+            if (
+                UUID_RE.test(String(id || '')) &&
+                UUID_RE.test(String(postId || '')) &&
+                UUID_RE.test(String(userId || '')) &&
+                content &&
+                !seen.has(id)
+            ) {
+                seen.add(id);
+
+                let createdAt = comment.created_at || null;
+
+                if (!createdAt && comment.timestamp) {
+                    const time = Number(comment.timestamp);
+                    if (Number.isFinite(time)) {
+                        createdAt = new Date(time).toISOString();
+                    }
+                }
+
+                rows.push({
+                    id: id,
+                    post_id: postId,
+                    user_id: userId,
+                    parent_id: parentId && UUID_RE.test(String(parentId))
+                        ? parentId
+                        : null,
+                    content: content,
+                    created_at: createdAt
+                });
+            }
+
+            if (Array.isArray(comment.replies)) {
+                comment.replies.forEach(reply => {
+                    addComment(reply, postId, id);
+                });
+            }
+        }
+
+        cachedPosts.forEach(post => {
+            const comments = parseComments(post.comments);
+            comments.forEach(comment => {
+                addComment(comment, post.id, null);
+            });
+        });
+
+        if (!rows.length) {
+            showToast(
+                '⚠️ Tidak ada data valid',
+                'Backup tidak memiliki komentar dengan ID dan user_id UUID yang valid.',
+                'fa-exclamation-triangle',
+                'error'
+            );
+            console.warn('[SALINK RESTORE] Data lokal:', cachedPosts);
+            return;
+        }
+
+        console.table(rows.map(row => ({
+            id: row.id,
+            post_id: row.post_id,
+            user_id: row.user_id,
+            parent_id: row.parent_id,
+            content: row.content
+        })));
+
+        try {
+            const { data, error } = await SB.rpc(
+                'salink_restore_my_comments',
+                { p_rows: rows }
+            );
+
+            if (error) throw error;
+
+            console.log('[SALINK RESTORE RESULT]', data);
+
+            await reloadComments(
+                rows[0]?.post_id
+            );
+
+            showToast(
+                '✅ Pemulihan selesai',
+                'Masuk: ' + (data?.inserted ?? 0) +
+                ' | Dilewati: ' + (data?.skipped ?? 0),
+                'fa-check-circle',
+                'success'
+            );
+
+            return data;
+
+        } catch (error) {
+            showCommentError('Pemulihan komentar', error);
+            throw error;
+        }
+    };
+
+    // ---------------------------------------------------------
+    // 3. Kirim komentar utama dan balasan
+    // ---------------------------------------------------------
+    async function insertComment(postId, content, parentId) {
+        if (!requireLogin()) return;
+
+        const payload = {
+            post_id: postId,
+            user_id: currentAuthUser.id,
+            content: content
+        };
+
+        if (parentId) payload.parent_id = parentId;
+
+        const { error } = await SB
+            .from('comments')
+            .insert(payload);
+
+        if (error) throw error;
+
+        await reloadComments(postId);
+    }
+
+    sendPostinganComment = async function (postId, modal) {
+        const input = modal?.querySelector('#newCommentInput');
+        const content = input?.value?.trim();
+
+        if (!content) return;
+        if (!requireLogin()) return;
+
+        try {
+            const button = modal.querySelector('.send-comment');
+            if (button) button.disabled = true;
+
+            await insertComment(postId, content, null);
+
+            if (input) input.value = '';
+
+            playRegularSound();
+            showToast(
+                '💬 Terkirim',
+                'Komentar berhasil disimpan.',
+                'fa-check-circle',
+                'success'
+            );
+        } catch (error) {
+            showCommentError('Mengirim komentar', error);
+        } finally {
+            const button = modal?.querySelector('.send-comment');
+            if (button) button.disabled = false;
+        }
+    };
+
+    // ---------------------------------------------------------
+    // 4. Edit komentar utama maupun balasan
+    // ---------------------------------------------------------
+    async function editComment(commentId, postId) {
+        if (!requireLogin()) return;
+
+        const post = posts.find(p => p.id === postId);
+        if (!post) return;
+
+        const comments = getComments(post);
+        const found = findComment(comments, commentId);
+
+        if (!found) {
+            showToast('⚠️ Tidak ditemukan', 'Komentar tidak ditemukan.', 'fa-info-circle');
+            return;
+        }
+
+        if (found.comment.user_id !== currentAuthUser.id &&
+            found.comment.userAuthId !== currentAuthUser.id) {
+            showToast('🔒 Ditolak', 'Kamu bukan pemilik komentar ini.', 'fa-lock', 'error');
+            return;
+        }
+
+        const oldText = found.comment.content || found.comment.text || '';
+        const newText = prompt('Edit komentar:', oldText);
+
+        if (newText === null) return;
+
+        const content = newText.trim();
+        if (!content || content === oldText) return;
+
+        try {
+            const { data, error } = await SB
+                .from('comments')
+                .update({ content: content })
+                .eq('id', commentId)
+                .eq('user_id', currentAuthUser.id)
+                .is('deleted_at', null)
+                .select('id')
+                .maybeSingle();
+
+            if (error) throw error;
+
+            if (!data) {
+                throw new Error(
+                    'Tidak ada baris yang berhasil diperbarui. Periksa kepemilikan dan kebijakan UPDATE RLS.'
+                );
+            }
+
+            await reloadComments(postId);
+
+            showToast(
+                '✅ Berhasil',
+                'Komentar berhasil diperbarui.',
+                'fa-check-circle',
+                'success'
+            );
+
+        } catch (error) {
+            showCommentError('Edit komentar', error);
+        }
+    }
+
+    window.editCommentProfile = editComment;
+
+    // ---------------------------------------------------------
+    // 5. Hapus komentar + balasan secara atomik melalui RPC
+    // ---------------------------------------------------------
+    async function deleteComment(commentId, postId) {
+        if (!requireLogin()) return;
+
+        if (!confirm(
+            'Hapus komentar ini beserta seluruh balasannya?\n\n' +
+            'Tindakan ini tidak dapat dibatalkan.'
+        )) return;
+
+        try {
+            const { data, error } = await SB.rpc(
+                'salink_delete_comment_tree',
+                { p_comment_id: commentId }
+            );
+
+            if (error) throw error;
+
+            await reloadComments(postId);
+
+            showToast(
+                '🗑️ Berhasil',
+                'Komentar dan ' +
+                Math.max(0, (data?.deleted || 1) - 1) +
+                ' balasan berhasil dihapus.',
+                'fa-check-circle',
+                'success'
+            );
+
+        } catch (error) {
+            showCommentError('Menghapus komentar', error);
+        }
+    }
+
+    window.deleteCommentProfile = deleteComment;
+
+    // ---------------------------------------------------------
+    // 6. Event listener tunggal untuk modal komentar
+    // ---------------------------------------------------------
+    attachCommentListeners = function (modal, postId) {
+        if (!modal) return;
+
+        modal.querySelectorAll(
+            '.comment-action-btn[data-action="reply-comment"]'
+        ).forEach(button => {
+            button.onclick = function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const id = this.dataset.commentId;
+                const box = modal.querySelector('#replyBox-' + CSS.escape(id));
+
+                if (!box) return;
+
+                const opening =
+                    box.style.display === 'none' ||
+                    box.style.display === '';
+
+                modal.querySelectorAll('.comment-reply-box').forEach(item => {
+                    item.style.display = 'none';
+                });
+
+                box.style.display = opening ? 'flex' : 'none';
+
+                if (opening) {
+                    const input = box.querySelector('input');
+                    if (input) input.focus();
+                }
+            };
+        });
+
+        modal.querySelectorAll('.reply-send-btn').forEach(button => {
+            button.onclick = async function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const parentId = this.dataset.parentId;
+                const box = this.parentElement;
+                const input = box?.querySelector('input');
+                const content = input?.value?.trim();
+
+                if (!content) return;
+                if (!requireLogin()) return;
+
+                this.disabled = true;
+
+                try {
+                    await insertComment(postId, content, parentId);
+                    if (input) input.value = '';
+
+                    showToast(
+                        '✅ Balasan terkirim',
+                        'Balasan berhasil disimpan.',
+                        'fa-check-circle',
+                        'success'
+                    );
+                } catch (error) {
+                    showCommentError('Mengirim balasan', error);
+                } finally {
+                    this.disabled = false;
+                }
+            };
+        });
+
+        modal.querySelectorAll(
+            '.comment-action-btn[data-action="edit-comment"]'
+        ).forEach(button => {
+            button.onclick = function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                editComment(this.dataset.commentId, postId);
+            };
+        });
+
+        modal.querySelectorAll(
+            '.comment-action-btn[data-action="delete-comment"]'
+        ).forEach(button => {
+            button.onclick = function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                deleteComment(this.dataset.commentId, postId);
+            };
+        });
+
+        // Like komentar dan balasan tetap berfungsi.
+        modal.querySelectorAll(
+            '.comment-action-btn[data-action="like-comment"]'
+        ).forEach(button => {
+            button.onclick = async function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (!requireLogin()) return;
+
+                const commentId = this.dataset.commentId;
+                const post = posts.find(p => p.id === postId);
+                if (!post) return;
+
+                const comments = getComments(post);
+                const found = findComment(comments, commentId);
+                if (!found) return;
+
+                try {
+                    const { data: existing, error: selectError } = await SB
+                        .from('comment_likes')
+                        .select('comment_id')
+                        .eq('comment_id', commentId)
+                        .eq('user_id', currentAuthUser.id)
+                        .maybeSingle();
+
+                    if (selectError) throw selectError;
+
+                    if (existing) {
+                        const { error } = await SB
+                            .from('comment_likes')
+                            .delete()
+                            .eq('comment_id', commentId)
+                            .eq('user_id', currentAuthUser.id);
+
+                        if (error) throw error;
+                    } else {
+                        const { error } = await SB
+                            .from('comment_likes')
+                            .insert({
+                                comment_id: commentId,
+                                user_id: currentAuthUser.id
+                            });
+
+                        if (error) throw error;
+                    }
+
+                    await reloadComments(postId);
+
+                } catch (error) {
+                    showCommentError('Like komentar', error);
+                }
+            };
+        });
+    };
+
+    // ---------------------------------------------------------
+    // 7. Sinkronisasi otomatis komentar dari perangkat lain
+    // ---------------------------------------------------------
+    if (window.__salinkCommentsChannel) {
+        SB.removeChannel(window.__salinkCommentsChannel);
+        window.__salinkCommentsChannel = null;
+    }
+
+    window.__salinkCommentsChannel = SB
+        .channel('salink-comments-live-v1')
+        .on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'comments'
+            },
+            function () {
+                clearTimeout(window.__salinkCommentSyncTimer);
+
+                window.__salinkCommentSyncTimer = setTimeout(async () => {
+                    const modal = document.getElementById('postinganCommentsModal');
+
+                    let activePostId = null;
+
+                    if (modal) {
+                        const sendButton = modal.querySelector('.send-comment');
+                        activePostId = sendButton?.dataset.postId || null;
+
+                        if (!activePostId) {
+                            const title = modal.querySelector('.modal-title');
+                            activePostId = title?.dataset.postId || null;
+                        }
+                    }
+
+                    try {
+                        await reloadComments(activePostId);
+                    } catch (error) {
+                        console.warn('[SALINK REALTIME] Sinkronisasi gagal:', error);
+                    }
+                }, 350);
+            }
+        )
+        .subscribe(status => {
+            console.log('[SALINK COMMENTS REALTIME]', status);
+        });
+
+    console.log('✅ [SALINK COMMENT PATCH v1.0] Aktif');
+    console.log('Pemulihan: window.salinkRestoreCommentsFromLocalBackup()');
+
+})();
+
+
 log('✅ SALINK Profil v8.1 Part 2/2 Loaded');
     </script>
 
