@@ -3507,7 +3507,7 @@
             <a href="jual.html" class="profile-nav-item"><span>🛍️</span><span>Jual</span></a>
         </div>
 
-                <!-- ============================================================ -->
+        <!-- ============================================================ -->
         <!-- PATCH: POSTINGAN SAYA (SCROLLABLE) -->
         <!-- ============================================================ -->
         <div class="postingan-carousel-section" id="postinganCarouselSection">
@@ -3519,7 +3519,7 @@
                 <div class="header-right">
                     <span class="count-pill" id="postinganCountPill">0</span>
                     <button class="view-all-btn" onclick="openPostinganLengkapModal()" type="button">
-                        <i class="fas fa-list"></i> Semua
+                    <i class="fas fa-list"></i> Semua
                     </button>
                 </div>
             </div>
@@ -4551,34 +4551,39 @@ async function confirmDeleteNow() {
     document.getElementById('deleteConfirmModal')?.classList.remove('active');
     pendingDelete = null;
     showSyncIndicator();
+
     try {
+        if (type === 'post' || type === 'emergency') {
+            // Hapus dari Database Supabase
+            if (window.salinkSupabase && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+                const { error } = await window.salinkSupabase.from('posts').delete().eq('id', id);
+                if (error) {
+                    showToast('❌ Gagal', 'Gagal menghapus dari database: ' + error.message, 'fa-times-circle');
+                    hideSyncIndicator();
+                    return;
+                }
+            }
+        }
+
+        // Hapus dari LocalStorage (jika ada)
         let allPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]');
         allPosts = allPosts.filter(p => p.id !== id);
         localStorage.setItem('salink_posts', JSON.stringify(allPosts));
 
-        let ems = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-        ems = ems.filter(e => e.id !== id && e.postId !== id);
-        localStorage.setItem('salink_emergencies', JSON.stringify(ems));
+        // Hapus dari Array Global
+        posts = posts.filter(p => p.id !== id);
 
-        try {
-            await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({
-                    action: 'delete_content',
-                    data: { type, id, userId: currentUser?.username || '' }
-                })
-            });
-        } catch(e) {}
-
+        // Broadcast ke tab lain
         broadcastSync('delete_post', { id });
-        await loadData();
-        renderProfile();
+
+        // Refresh UI
         renderPostinganCarousel();
+        renderProfile(); // Update statistik
         updateStats();
-        showToast('✅ Dihapus', 'Data dihapus dari semua halaman', 'fa-check-circle', 'success');
+
+        showToast('✅ Dihapus', 'Data berhasil dihapus permanen', 'fa-check-circle', 'success');
     } catch(e) {
-        showToast('⚠️ Gagal', 'Tidak dapat menghapus data', 'fa-exclamation-triangle', 'error');
+        showToast('⚠️ Gagal', 'Tidak dapat menghapus data: ' + e.message, 'fa-exclamation-triangle', 'error');
     }
     hideSyncIndicator();
 }
@@ -4968,17 +4973,25 @@ async function saveProfileToSupabase(userData) {
  * LOAD DATA (posts, emergencies, users, friends, notifications)
  * ================================================================ */
 async function loadData() {
+    // 1. Tampilkan UI Loading cepat
+    const container = document.getElementById('myPostsScrollContainer');
+    if (container && container.innerHTML.includes('Memuat')) {
+        // Biarkan loading sebentar
+    }
+
     try {
         if (window.SALINK_SB_READY && window.salinkSupabase) {
             const client = window.salinkSupabase;
 
+            // Ambil posts + profiles
             const { data: rawPosts, error: postsErr } = await client
                 .from('posts')
                 .select(`*, profiles!posts_user_id_fkey (username, full_name, profile_picture, gender)`)
                 .order('created_at', { ascending: false })
-                .limit(100);
+                .limit(50); // Batasi 50 agar cepat
 
             if (!postsErr && rawPosts) {
+                // Ambil data relasi secara paralel
                 const [mediaRes, likesRes, commentsRes, cLikesRes] = await Promise.allSettled([
                     client.from('media').select('*').not('post_id', 'is', null),
                     client.from('likes').select('*'),
@@ -4991,6 +5004,7 @@ async function loadData() {
                 const rawComments = commentsRes.status === 'fulfilled' && commentsRes.value.data ? commentsRes.value.data : [];
                 const rawCLikes = cLikesRes.status === 'fulfilled' && cLikesRes.value.data ? cLikesRes.value.data : [];
 
+                // Petakan Media & Likes
                 const mediaByPost = {};
                 rawMedia.forEach(m => { if (m.post_id) mediaByPost[m.post_id] = m; });
 
@@ -5001,6 +5015,7 @@ async function loadData() {
                     likesByPost[l.post_id].push(l.user_id);
                 });
 
+                // Petakan Profil Komentator
                 const userIds = [...new Set(rawComments.map(c => c.user_id).filter(Boolean))];
                 let profileMap = {};
                 if (userIds.length > 0) {
@@ -5008,6 +5023,7 @@ async function loadData() {
                     if (profiles) profiles.forEach(p => { profileMap[p.id] = p; });
                 }
 
+                // Susun Komentar
                 const commentsByPost = {};
                 rawComments.forEach(c => {
                     if (!c.post_id) return;
@@ -5026,6 +5042,7 @@ async function loadData() {
                     });
                 });
 
+                // Susun Nested Replies
                 Object.keys(commentsByPost).forEach(postId => {
                     const allComments = commentsByPost[postId];
                     const top = allComments.filter(c => !c.parent_id);
@@ -5035,6 +5052,7 @@ async function loadData() {
                     commentsByPost[postId] = top;
                 });
 
+                // Format ke UI
                 posts = rawPosts.map(row => {
                     const p = row.profiles || {};
                     const m = mediaByPost[row.id];
@@ -5067,25 +5085,13 @@ async function loadData() {
         try { posts = JSON.parse(localStorage.getItem('salink_posts') || '[]'); } catch(err) {}
     }
 
-    try { allEmergencies = await apiGetEmergencies(); } catch(e) { allEmergencies = []; }
-    try { allUsers = await apiGetUsers(); } catch(e) { allUsers = []; }
-    try { notifications = await apiGetNotifications(); } catch(e) { notifications = []; }
-    try { readNotifs = JSON.parse(localStorage.getItem('salink_read_notifs') || '{}'); } catch(e) { readNotifs = {}; }
+    // Ambil data pendukung (Friends, Notif) tanpa memblokir UI utama
+    Promise.allSettled([apiGetFriends(), apiGetNotifications()]).then(res => {
+        if (res[0].status === 'fulfilled') friends = res[0].value || [];
+        if (res[1].status === 'fulfilled') notifications = res[1].value || [];
+    });
 
-    let apiFriends = [];
-    try { apiFriends = await apiGetFriends(); } catch(e) {}
-    let localFriends = [];
-    try {
-        const f = JSON.parse(localStorage.getItem('salink_friends') || '[]');
-        localFriends = Array.isArray(f) ? f : [];
-    } catch(e) {}
-    const friendsMap = new Map();
-    localFriends.forEach(f => { if (f.id) friendsMap.set(f.id, f); });
-    apiFriends.forEach(f => { if (f.id) friendsMap.set(f.id, f); });
-    friends = Array.from(friendsMap.values());
-    try { localStorage.setItem('salink_friends', JSON.stringify(friends)); } catch(e) {}
-
-    // PENTING: Render ulang carousel setelah data selesai dimuat
+    // RENDER UI SEKARANG JUGA
     renderPostinganCarousel();
 }
 
@@ -5400,7 +5406,39 @@ function handlePostinganShare(postId) {
             .then(() => showToast('📋 Link disalin', 'Bagikan ke teman Anda', 'fa-copy', 'success'));
     }
 }
+        
+function openPostinganLengkapModal() {
+    const body = document.getElementById('postinganLengkapModalBody');
+    const cnt = document.getElementById('postinganLengkapCount');
+    if (!body) return;
 
+    const myPosts = getMyPosts();
+    if (cnt) cnt.textContent = myPosts.length;
+
+    if (myPosts.length === 0) {
+        body.innerHTML = `<div class="empty-state"><i class="fas fa-file-alt empty-icon"></i><div class="empty-title">Belum Ada Postingan</div></div>`;
+        openModal('postinganLengkapModal');
+        return;
+    }
+
+    body.innerHTML = myPosts.map(post => {
+        return `
+            <div class="history-item" onclick="closeModal('postinganLengkapModal');setTimeout(()=>{goToPostinganSlideById('${escapeAttr(post.id)}')},300);">
+                <div class="item-icon" style="color:var(--primary);font-size:1.2rem;width:60px;height:60px;border-radius:10px;overflow:hidden;padding:0;">
+                    ${post.mediaType === 'image' ? `<img src="${post.gdriveImageUrl}" style="width:100%;height:100%;object-fit:cover;">` : '📝'}
+                </div>
+                <div class="item-content" style="margin-left:10px;">
+                    <div class="item-title" style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:3px;">${escapeHTML(post.text ? post.text.substring(0, 60) : 'Postingan media')}</div>
+                    <div class="item-sub" style="font-size:0.6rem;color:var(--text-muted);">${getTimeAgo(post.timestamp)}</div>
+                </div>
+                <i class="fas fa-chevron-right" style="color:var(--text-muted);"></i>
+            </div>
+        `;
+    }).join('');
+
+    openModal('postinganLengkapModal');
+}
+        
 /* ================================================================
  * MODAL KOMENTAR (BERSIH & TERPUSAT)
  * ================================================================ */
@@ -5599,10 +5637,12 @@ function attachCommentListeners(modal, postId) {
     });
 }
 
+// 1. FUNGSI RENDER KOMENTAR (Termasuk Balasan)
 function renderCommentsListDynamic(comments, postId) {
     if (!comments || comments.length === 0) {
         return '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.72rem;">Belum ada komentar</div>';
     }
+    
     return comments.map(c => {
         const cp = c.userProfilePic
             ? `<img src="${escapeAttr(c.userProfilePic)}" alt="" style="width:100%;height:100%;object-fit:cover;">`
@@ -5622,14 +5662,38 @@ function renderCommentsListDynamic(comments, postId) {
                     : (r.userGender === 'female' ? '<i class="fas fa-female" style="color:#fff;font-size:0.6rem;"></i>' : '<i class="fas fa-male" style="color:#fff;font-size:0.6rem;"></i>');
                 
                 const isReplyOwn = currentAuthUser && (r.userId === currentUser.username || r.userAuthId === currentAuthUser.id);
+                const isReplyLiked = !!r.is_liked;
+                const replyLikeCount = r.likes_count || 0;
 
+                // BALASAN MEMILIKI TOMBOL LENGKAP JUGA
                 repliesHTML += `
                     <div style="display:flex;gap:6px;margin-bottom:6px;padding:6px;background:var(--bg-card);border-radius:8px;">
                         <div style="width:22px;height:22px;border-radius:50%;overflow:hidden;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;" onclick="goToCommentProfile('${escapeAttr(r.userId)}')">${rcp}</div>
                         <div style="flex:1;min-width:0;">
                             <div style="font-size:0.65rem;font-weight:700;color:var(--primary);cursor:pointer;" onclick="goToCommentProfile('${escapeAttr(r.userId)}')">${escapeHTML(r.userFullName)}</div>
                             <div style="font-size:0.65rem;color:var(--text-primary);margin:2px 0;line-height:1.4;">${escapeHTML(r.text)}</div>
-                            ${isReplyOwn ? `<span style="font-size:0.55rem;color:var(--accent-red);cursor:pointer;" onclick="deleteCommentProfile('${r.id}', '${postId}')"><i class="fas fa-trash"></i> Hapus</span>` : ''}
+                            
+                            <div style="display:flex;gap:8px;font-size:0.55rem;color:var(--text-muted);margin-top:4px;flex-wrap:wrap;">
+                                <button class="comment-action-btn" data-action="like-comment" data-comment-id="${r.id}" data-post-id="${postId}" style="background:none;border:none;color:${isReplyLiked ? 'var(--accent-red)' : 'inherit'};cursor:pointer;padding:0;">
+                                    <i class="${isReplyLiked ? 'fas' : 'far'} fa-heart"></i> ${replyLikeCount}
+                                </button>
+                                <button class="comment-action-btn" data-action="reply-comment" data-comment-id="${r.id}" data-post-id="${postId}" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;">
+                                    <i class="far fa-comment"></i> Balas
+                                </button>
+                                ${isReplyOwn ? `
+                                <button class="comment-action-btn" data-action="edit-comment" data-comment-id="${r.id}" data-post-id="${postId}" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;">
+                                    <i class="fas fa-pen"></i> Edit
+                                </button>
+                                <button class="comment-action-btn" data-action="delete-comment" data-comment-id="${r.id}" data-post-id="${postId}" style="background:none;border:none;color:var(--accent-red);cursor:pointer;padding:0;">
+                                    <i class="fas fa-trash"></i> Hapus
+                                </button>
+                                ` : ''}
+                            </div>
+
+                            <div id="replyBox-${r.id}" class="comment-reply-box" style="display:none;gap:6px;margin-top:8px;">
+                                <input type="text" id="replyInput-${r.id}" placeholder="Balas..." style="flex:1;padding:6px 10px;font-size:0.65rem;border-radius:12px;border:1px solid var(--border-color);background:var(--bg-card);color:var(--text-primary);">
+                                <button class="reply-send-btn" data-parent-id="${r.id}" data-post-id="${postId}" style="background:var(--accent-blue-gradient);border:none;color:#fff;border-radius:50%;width:26px;height:26px;cursor:pointer;flex-shrink:0;"><i class="fas fa-paper-plane" style="font-size:0.6rem;"></i></button>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -5646,11 +5710,19 @@ function renderCommentsListDynamic(comments, postId) {
                         <div style="font-size:0.7rem;color:var(--text-primary);margin:3px 0;line-height:1.5;">${escapeHTML(c.text)}</div>
                         
                         <div style="display:flex;gap:10px;font-size:0.6rem;color:var(--text-muted);margin-top:4px;flex-wrap:wrap;">
-                            <button class="comment-action-btn" data-action="like-comment" data-comment-id="${c.id}" data-post-id="${postId}" style="background:none;border:none;color:${isLiked ? 'var(--accent-red)' : 'inherit'};cursor:pointer;padding:0;"><i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> ${likeCount}</button>
-                            <button class="comment-action-btn" data-action="reply-comment" data-comment-id="${c.id}" data-post-id="${postId}" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;"><i class="far fa-comment"></i> Balas</button>
+                            <button class="comment-action-btn" data-action="like-comment" data-comment-id="${c.id}" data-post-id="${postId}" style="background:none;border:none;color:${isLiked ? 'var(--accent-red)' : 'inherit'};cursor:pointer;padding:0;">
+                                <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> ${likeCount}
+                            </button>
+                            <button class="comment-action-btn" data-action="reply-comment" data-comment-id="${c.id}" data-post-id="${postId}" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;">
+                                <i class="far fa-comment"></i> Balas
+                            </button>
                             ${isOwn ? `
-                            <button class="comment-action-btn" data-action="edit-comment" data-comment-id="${c.id}" data-post-id="${postId}" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;"><i class="fas fa-pen"></i> Edit</button>
-                            <button class="comment-action-btn" data-action="delete-comment" data-comment-id="${c.id}" data-post-id="${postId}" style="background:none;border:none;color:var(--accent-red);cursor:pointer;padding:0;"><i class="fas fa-trash"></i> Hapus</button>
+                            <button class="comment-action-btn" data-action="edit-comment" data-comment-id="${c.id}" data-post-id="${postId}" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;">
+                                <i class="fas fa-pen"></i> Edit
+                            </button>
+                            <button class="comment-action-btn" data-action="delete-comment" data-comment-id="${c.id}" data-post-id="${postId}" style="background:none;border:none;color:var(--accent-red);cursor:pointer;padding:0;">
+                                <i class="fas fa-trash"></i> Hapus
+                            </button>
                             ` : ''}
                             <span>${getTimeAgo(c.timestamp)}</span>
                         </div>
@@ -5665,6 +5737,129 @@ function renderCommentsListDynamic(comments, postId) {
             </div>
         `;
     }).join('');
+}
+
+
+// 2. FUNGSI UNTUK MEMASANG EVENT LISTENER KOMENTAR (Anti Error)
+function attachCommentListeners(modal, postId) {
+    // Tombol Balas
+    modal.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(btn => {
+        btn.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            const id = this.dataset.commentId;
+            const box = document.getElementById('replyBox-' + id);
+            if (box) {
+                modal.querySelectorAll('.comment-reply-box').forEach(b => { if(b.id !== 'replyBox-'+id) b.style.display = 'none'; });
+                box.style.display = box.style.display === 'flex' ? 'none' : 'flex';
+                if (box.style.display === 'flex') box.querySelector('input').focus();
+            }
+        };
+    });
+
+    // Tombol Kirim Balasan
+    modal.querySelectorAll('.reply-send-btn').forEach(btn => {
+        btn.onclick = async function(e) {
+            e.preventDefault(); e.stopPropagation();
+            const parentId = this.dataset.parentId;
+            const input = this.parentElement.querySelector('input');
+            const text = input.value.trim();
+            if (!text || !currentAuthUser) return;
+
+            // Tampilkan loading di tombol
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            try {
+                // Kirim ke Supabase
+                const { error } = await window.salinkSupabase.from('comments').insert({
+                    user_id: currentAuthUser.id, post_id: postId, content: text, parent_id: parentId
+                });
+                if (error) throw error;
+
+                // Sukses: Ambil ulang data terbaru dan render
+                input.value = '';
+                this.parentElement.style.display = 'none';
+                this.innerHTML = '<i class="fas fa-paper-plane"></i>';
+                
+                await loadData(); // Reload data
+                const p = posts.find(x => x.id === postId);
+                let comments = JSON.parse(p.comments || '[]');
+                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+                attachCommentListeners(modal, postId); // Pasang ulang listener
+                showToast('✅', 'Balasan terkirim', 'fa-check-circle');
+            } catch(err) {
+                showToast('❌ Gagal', err.message, 'fa-times-circle');
+                this.innerHTML = '<i class="fas fa-paper-plane"></i>';
+            }
+        };
+    });
+
+    // Tombol Like
+    modal.querySelectorAll('.comment-action-btn[data-action="like-comment"]').forEach(btn => {
+        btn.onclick = async function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (!currentAuthUser) return;
+            const id = this.dataset.commentId;
+            const p = posts.find(x => x.id === postId);
+            let comments = JSON.parse(p.comments || '[]');
+            const c = comments.find(x => x.id === id);
+            
+            try {
+                if (c.is_liked) {
+                    await window.salinkSupabase.from('comment_likes').delete().eq('comment_id', id).eq('user_id', currentAuthUser.id);
+                    c.is_liked = false; c.likes_count--;
+                } else {
+                    await window.salinkSupabase.from('comment_likes').insert({ comment_id: id, user_id: currentAuthUser.id });
+                    c.is_liked = true; c.likes_count++;
+                }
+                p.comments = JSON.stringify(comments);
+                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+                attachCommentListeners(modal, postId);
+            } catch(err) { console.error(err); }
+        };
+    });
+
+    // Tombol Edit
+    modal.querySelectorAll('.comment-action-btn[data-action="edit-comment"]').forEach(btn => {
+        btn.onclick = async function(e) {
+            e.preventDefault(); e.stopPropagation();
+            const id = this.dataset.commentId;
+            const p = posts.find(x => x.id === postId);
+            let comments = JSON.parse(p.comments || '[]');
+            const c = comments.find(x => x.id === id);
+            
+            const newText = prompt('Edit komentar:', c.text);
+            if (!newText || newText.trim() === c.text) return;
+
+            try {
+                await window.salinkSupabase.from('comments').update({ content: newText.trim() }).eq('id', id);
+                c.text = newText.trim();
+                p.comments = JSON.stringify(comments);
+                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+                attachCommentListeners(modal, postId);
+                showToast('✅', 'Komentar diedit', 'fa-check-circle');
+            } catch(err) { showToast('❌ Gagal', 'Gagal edit', 'fa-times-circle'); }
+        };
+    });
+
+    // Tombol Hapus
+    modal.querySelectorAll('.comment-action-btn[data-action="delete-comment"]').forEach(btn => {
+        btn.onclick = async function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (!confirm('Hapus komentar ini permanen?')) return;
+            const id = this.dataset.commentId;
+            const p = posts.find(x => x.id === postId);
+            
+            try {
+                await window.salinkSupabase.from('comments').update({ deleted_at: new Date().toISOString() }).eq('id', id);
+                await loadData(); // Ambil data terbaru dari DB
+                const updatedP = posts.find(x => x.id === postId);
+                let comments = JSON.parse(updatedP.comments || '[]');
+                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+                attachCommentListeners(modal, postId);
+                showToast('✅', 'Komentar dihapus', 'fa-check-circle');
+            } catch(err) { showToast('❌ Gagal', 'Gagal hapus', 'fa-times-circle'); }
+        };
+    });
 }
 
 async function sendPostinganComment(postId, modal) {
@@ -6920,7 +7115,9 @@ function openHistoryPostinganModal() {
             const icon = isEm ? EMERGENCY_ICONS[p.specialType] : '📝';
             const color = isEm ? 'var(--accent-red)' : 'var(--primary)';
             const badge = isEm ? `${EMERGENCY_ICONS[p.specialType]} ${EMERGENCY_LABELS[p.specialType]}` : '📝 Biasa';
-            return `<div class="history-item" onclick="closeModal('historyPostinganModal');setTimeout(()=>{goToPostinganSlideById('${escapeAttr(p.id)}')},300);">
+            
+            // Fungsi untuk scroll ke pos yang dituju
+            return `<div class="history-item" onclick="closeModal('historyPostinganModal'); setTimeout(() => { scrollToPost('${escapeAttr(p.id)}') }, 300);" style="cursor:pointer;">
                 <div class="item-icon" style="color:${color};">${icon}</div>
                 <div class="item-content">
                     <div class="item-title">${escapeHTML(p.text ? p.text.substring(0, 50) : 'Postingan media')}</div>
@@ -6930,6 +7127,19 @@ function openHistoryPostinganModal() {
         }).join('');
     }
     openModal('historyPostinganModal');
+}
+
+// Fungsi helper untuk scroll ke Card Postingan
+function scrollToPost(postId) {
+    const card = document.querySelector(`.scroll-post-card[data-post-id="${postId}"]`);
+    if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Efek highlight
+        card.style.boxShadow = '0 0 0 3px rgba(230,0,18,0.5)';
+        setTimeout(() => { card.style.boxShadow = ''; }, 2000);
+    } else {
+        showToast('ℹ️ Info', 'Postingan berada di halaman lain', 'fa-info-circle');
+    }
 }
 
 /* ================================================================
