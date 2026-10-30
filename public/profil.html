@@ -5860,43 +5860,129 @@ function attachCommentListeners(modal, postId) {
         };
     });
 
-    // 2. Tombol Kirim Balasan
+    
+    // 2. PATCH — KIRIM BALASAN DENGAN VALIDASI SUPABASE
     modal.querySelectorAll('.reply-send-btn').forEach(btn => {
         btn.onclick = async function(e) {
-            e.preventDefault(); e.stopPropagation();
+            e.preventDefault();
+            e.stopPropagation();
+
+            const client = window.salinkSupabase;
             const parentId = this.dataset.parentId;
-            const input = this.parentElement.querySelector('input');
-            const text = input.value.trim();
-            if (!text || !currentAuthUser) return;
+            const input = this.parentElement?.querySelector('input');
+            const content = input?.value.trim();
+
+            if (!currentUser || !currentAuthUser) {
+                showToast('🔒 Login', 'Silakan login terlebih dahulu.', 'fa-lock', 'error');
+                return;
+            }
+
+            if (!window.SALINK_SB_READY || !client) {
+                showToast('⚠️ Koneksi', 'Database belum siap.', 'fa-exclamation-triangle', 'error');
+                return;
+            }
+
+            if (!parentId || !postId || !content) return;
+            if (this.disabled) return;
 
             const icon = this.querySelector('i');
-            icon.className = 'fas fa-spinner fa-spin';
+            const originalClass = icon?.className;
 
             try {
-                await window.salinkSupabase.from('comments').insert({
-                    user_id: currentAuthUser.id,
-                    post_id: postId,
-                    content: text,
-                    parent_id: parentId
-                });
-                input.value = '';
-                this.parentElement.style.display = 'none';
-                
-                await loadData();
-                const updatedPost = posts.find(p => p.id === postId);
-                if (updatedPost) {
-                    let comments = JSON.parse(updatedPost.comments || '[]');
-                    // Paksa re-render dan pasang ulang event
-                    modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+                this.disabled = true;
+
+                if (icon) {
+                    icon.className = 'fas fa-spinner fa-spin';
                 }
-                showToast('✅', 'Balasan terkirim', 'fa-check-circle');
-            } catch(err) {
-                showToast('❌ Gagal', err.message, 'fa-times-circle');
+
+                const { error } = await client
+                    .from('comments')
+                    .insert({
+                        user_id: currentAuthUser.id,
+                        post_id: postId,
+                        content: content,
+                        parent_id: parentId
+                    });
+
+                if (error) {
+                    console.error('[SALINK Reply] INSERT gagal:', error);
+                    throw error;
+                }
+
+                input.value = '';
+
+                const replyBox = this.parentElement;
+                if (replyBox) replyBox.style.display = 'none';
+
+                await loadData();
+
+                const updatedPost = posts.find(p => p.id === postId);
+
+                if (!updatedPost) {
+                    throw new Error('Balasan tersimpan, tetapi postingan tidak ditemukan saat refresh UI.');
+                }
+
+                let comments = [];
+
+                try {
+                    comments = typeof updatedPost.comments === 'string'
+                        ? JSON.parse(updatedPost.comments || '[]')
+                        : (updatedPost.comments || []);
+                } catch (parseError) {
+                    console.error('[SALINK Reply] Gagal membaca komentar:', parseError);
+                    comments = [];
+                }
+
+                if (!Array.isArray(comments)) comments = [];
+
+                const list = modal.querySelector('#commentsListDynamic');
+
+                if (list) {
+                    list.innerHTML = renderCommentsListDynamic(comments, postId);
+                    attachCommentListeners(modal, postId);
+                }
+
+                const badge = modal.querySelector('.modal-title .badge-count');
+
+                if (badge) {
+                    const total = comments.reduce(
+                        (sum, item) => sum + 1 + (Array.isArray(item.replies) ? item.replies.length : 0),
+                        0
+                    );
+                    badge.textContent = total;
+                }
+
+                renderPostinganCarousel();
+
+                showToast(
+                    '✅',
+                    'Balasan berhasil disimpan.',
+                    'fa-check-circle',
+                    'success'
+                );
+
+                console.log('[SALINK Reply] Balasan berhasil disimpan.');
+
+            } catch (error) {
+                console.error('[SALINK Reply] Gagal:', error);
+
+                showToast(
+                    '❌ Gagal',
+                    error?.message || 'Balasan tidak berhasil disimpan.',
+                    'fa-times-circle',
+                    'error'
+                );
+
             } finally {
-                icon.className = 'fas fa-paper-plane';
+                this.disabled = false;
+
+                if (icon) {
+                    icon.className = originalClass || 'fas fa-paper-plane';
+                }
             }
         };
     });
+
 
     // 3. Like Komentar
     modal.querySelectorAll('.comment-action-btn[data-action="like-comment"]').forEach(btn => {
@@ -6022,35 +6108,146 @@ modal.querySelectorAll(
     };
 }); 
         
+
+/* ================================================================
+ * PATCH KOMENTAR 1 — PENGIRIMAN KOMENTAR UTAMA
+ * Memastikan error Supabase diperiksa sebelum UI menyatakan berhasil.
+ * ================================================================ */
 async function sendPostinganComment(postId, modal) {
-    if (!currentUser || !currentAuthUser) { showToast('🔒 Login', 'Silakan login', 'fa-lock', 'error'); return; }
-    const input = modal.querySelector('#newCommentInput');
-    const text = input.value.trim();
-    if (!text) return;
+    if (!currentUser || !currentAuthUser) {
+        showToast('🔒 Login', 'Silakan login terlebih dahulu', 'fa-lock', 'error');
+        return;
+    }
+
+    const client = window.salinkSupabase;
+
+    if (!window.SALINK_SB_READY || !client) {
+        showToast('⚠️ Koneksi', 'Database belum siap. Coba beberapa saat lagi.', 'fa-exclamation-triangle', 'error');
+        return;
+    }
+
+    const input = modal?.querySelector('#newCommentInput');
+    const button = modal?.querySelector('.send-comment');
+
+    if (!input) {
+        console.error('[SALINK Comment] Input komentar tidak ditemukan.');
+        return;
+    }
+
+    const content = input.value.trim();
+
+    if (!content) {
+        showToast('ℹ️ Info', 'Komentar tidak boleh kosong.', 'fa-info-circle');
+        return;
+    }
+
+    if (!postId || !currentAuthUser.id) {
+        showToast('❌ Gagal', 'Identitas postingan atau pengguna tidak valid.', 'fa-times-circle', 'error');
+        return;
+    }
+
+    if (button?.disabled) return;
+
+    const originalHTML = button?.innerHTML;
 
     try {
-        await window.salinkSupabase.from('comments').insert({
-            user_id: currentAuthUser.id,
-            post_id: postId,
-            content: text
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+
+        console.log('[SALINK Comment] Mengirim komentar...', {
+            postId,
+            userId: currentAuthUser.id
         });
-        
+
+        const { error } = await client
+            .from('comments')
+            .insert({
+                post_id: postId,
+                user_id: currentAuthUser.id,
+                content: content,
+                parent_id: null
+            });
+
+        // WAJIB: periksa error Supabase.
+        if (error) {
+            console.error('[SALINK Comment] Supabase INSERT gagal:', error);
+            throw error;
+        }
+
+        // Hanya bersihkan input setelah INSERT berhasil.
         input.value = '';
+
+        // Ambil ulang data dari database.
         await loadData();
-        
+
         const updatedPost = posts.find(p => p.id === postId);
-        if (updatedPost) {
-            let comments = JSON.parse(updatedPost.comments || '[]');
-            modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
-            modal.querySelector('.modal-title .badge-count').textContent = countPostComments(updatedPost);
+
+        if (!updatedPost) {
+            throw new Error('Komentar tersimpan, tetapi postingan tidak ditemukan saat memperbarui tampilan.');
+        }
+
+        let comments = [];
+
+        try {
+            comments = typeof updatedPost.comments === 'string'
+                ? JSON.parse(updatedPost.comments || '[]')
+                : (updatedPost.comments || []);
+        } catch (parseError) {
+            console.error('[SALINK Comment] Gagal membaca komentar:', parseError);
+            comments = [];
+        }
+
+        if (!Array.isArray(comments)) comments = [];
+
+        const list = modal?.querySelector('#commentsListDynamic');
+        const badge = modal?.querySelector('.modal-title .badge-count');
+
+        if (list) {
+            list.innerHTML = renderCommentsListDynamic(comments, postId);
             attachCommentListeners(modal, postId);
         }
+
+        if (badge) {
+            const total = comments.reduce(
+                (sum, item) => sum + 1 + (Array.isArray(item.replies) ? item.replies.length : 0),
+                0
+            );
+            badge.textContent = total;
+        }
+
+        renderPostinganCarousel();
+
         playRegularSound();
-        showToast('💬 Terkirim', 'Komentar berhasil diposting', 'fa-check-circle', 'success');
-    } catch (e) {
-        showToast('❌ Gagal', 'Tidak dapat mengirim komentar', 'fa-times-circle', 'error');
+
+        showToast(
+            '💬 Terkirim',
+            'Komentar berhasil disimpan ke database.',
+            'fa-check-circle',
+            'success'
+        );
+
+        console.log('[SALINK Comment] Komentar berhasil disimpan.');
+
+    } catch (error) {
+        console.error('[SALINK Comment] Gagal mengirim:', error);
+
+        showToast(
+            '❌ Gagal',
+            error?.message || 'Komentar tidak berhasil disimpan.',
+            'fa-times-circle',
+            'error'
+        );
+
+    } finally {
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = originalHTML || '<i class="fas fa-paper-plane"></i>';
+        }
     }
 }
+
 
 // FUNGSI BANTUAN UNTUK KLIK PROFIL
 window.goToCommentProfile = function(username) {
