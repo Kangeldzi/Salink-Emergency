@@ -5636,192 +5636,6 @@ function closeCommentsModal() {
     }
 }
 
-function attachCommentListeners(modal, postId) {
-    // 1. Tombol Balas (Toggle Box)
-    modal.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(btn => {
-        btn.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
-            const commentId = this.dataset.commentId;
-            const box = document.getElementById('replyBox-' + commentId);
-            if (!box) return;
-            modal.querySelectorAll('.comment-reply-box').forEach(b => {
-                if (b.id !== 'replyBox-' + commentId) b.style.display = 'none';
-            });
-            const isHidden = box.style.display === 'none' || box.style.display === '';
-            box.style.display = isHidden ? 'flex' : 'none';
-            if (isHidden) {
-                const input = box.querySelector('input');
-                if (input) setTimeout(() => input.focus(), 100);
-            }
-        };
-    });
-
-    // 2. Tombol Kirim Balasan
-    modal.querySelectorAll('.reply-send-btn').forEach(btn => {
-        btn.onclick = async function(e) {
-            e.preventDefault(); e.stopPropagation();
-            const parentId = this.dataset.parentId;
-            const input = this.parentElement.querySelector('input');
-            const text = input.value.trim();
-            if (!text || !currentAuthUser) return;
-
-            const icon = this.querySelector('i');
-            icon.className = 'fas fa-spinner fa-spin';
-
-            try {
-                await window.salinkSupabase.from('comments').insert({
-                    user_id: currentAuthUser.id,
-                    post_id: postId,
-                    content: text,
-                    parent_id: parentId
-                });
-                input.value = '';
-                this.parentElement.style.display = 'none';
-                
-                await loadData();
-                const updatedPost = posts.find(p => p.id === postId);
-                if (updatedPost) {
-                    let comments = JSON.parse(updatedPost.comments || '[]');
-                    modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
-                    // Update badge count komentar
-                    const totalCount = comments.reduce((acc, c) => acc + 1 + (c.replies ? c.replies.length : 0), 0);
-                    modal.querySelector('.modal-title .badge-count').textContent = totalCount;
-                }
-                showToast('✅', 'Balasan terkirim', 'fa-check-circle');
-            } catch(err) {
-                showToast('❌ Gagal', err.message, 'fa-times-circle');
-            } finally {
-                icon.className = 'fas fa-paper-plane';
-            }
-        };
-    });
-
-    // 3. Like Komentar
-    modal.querySelectorAll('.comment-action-btn[data-action="like-comment"]').forEach(btn => {
-        btn.onclick = async function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (!currentAuthUser) return;
-            const commentId = this.dataset.commentId;
-            const post = posts.find(p => p.id === postId);
-            if (!post) return;
-            
-            let comments = JSON.parse(post.comments || '[]');
-            let targetComment = comments.find(x => x.id === commentId);
-            
-            // Cari di balasan jika tidak ketemu di top-level
-            if (!targetComment) {
-                for (let pc of comments) {
-                    if (pc.replies) {
-                        let found = pc.replies.find(r => r.id === commentId);
-                        if (found) { targetComment = found; break; }
-                    }
-                }
-            }
-            if (!targetComment) return;
-
-            try {
-                if (targetComment.is_liked) {
-                    await window.salinkSupabase.from('comment_likes').delete().eq('comment_id', commentId).eq('user_id', currentAuthUser.id);
-                    targetComment.is_liked = false; 
-                    targetComment.likes_count--;
-                } else {
-                    await window.salinkSupabase.from('comment_likes').insert({ comment_id: commentId, user_id: currentAuthUser.id });
-                    targetComment.is_liked = true; 
-                    targetComment.likes_count++;
-                }
-                post.comments = JSON.stringify(comments);
-                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
-                attachCommentListeners(modal, postId);
-            } catch(err) { console.error(err); }
-        };
-    });
-
-    // 4. Edit Komentar
-    modal.querySelectorAll('.comment-action-btn[data-action="edit-comment"]').forEach(btn => {
-        btn.onclick = async function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (!currentAuthUser) return;
-            const commentId = this.dataset.commentId;
-            const post = posts.find(p => p.id === postId);
-            if (!post) return;
-            
-            let comments = JSON.parse(post.comments || '[]');
-            let c = comments.find(x => x.id === commentId);
-            if (!c) {
-                for (let pc of comments) {
-                    if (pc.replies) {
-                        let found = pc.replies.find(r => r.id === commentId);
-                        if (found) { c = found; break; }
-                    }
-                }
-            }
-            if (!c) return;
-
-            const newText = prompt('Edit komentar:', c.text);
-            if (!newText || newText.trim() === c.text) return;
-
-            try {
-                await window.salinkSupabase.from('comments').update({ content: newText.trim() }).eq('id', commentId);
-                c.text = newText.trim(); 
-                c.content = newText.trim();
-                post.comments = JSON.stringify(comments);
-                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
-                attachCommentListeners(modal, postId);
-                showToast('✅', 'Komentar diedit', 'fa-check-circle');
-            } catch(err) { showToast('❌ Gagal', 'Gagal edit', 'fa-times-circle'); }
-        };
-    });
-
-
-// 5. Hapus Komentar / Balasan — PERMANENT DELETE
-modal.querySelectorAll(
-    '.comment-action-btn[data-action="delete-comment"]'
-).forEach(btn => {
-
-    btn.onclick = async function(e) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (!currentAuthUser) return;
-
-        if (!confirm(
-            'Hapus komentar atau balasan ini secara permanen?'
-        )) return;
-
-        const commentId = this.dataset.commentId;
-
-        const deleteButton = this;
-        deleteButton.disabled = true;
-
-        try {
-            await deleteCommentPermanently(
-                commentId,
-                postId
-            );
-
-            showToast(
-                '✅ Berhasil',
-                'Komentar dan data terkait berhasil dihapus permanen.',
-                'fa-check-circle',
-                'success'
-            );
-
-        } catch (err) {
-            console.error('[SALINK DELETE COMMENT]', err);
-
-            showToast(
-                '❌ Gagal',
-                err.message || 'Komentar gagal dihapus.',
-                'fa-times-circle',
-                'error'
-            );
-
-            deleteButton.disabled = false;
-        }
-    };
-});
-
-
 /* ============================================================
  * SALINK PATCH 2 — PERMANENT COMMENT & REPLY DELETE
  * Hard delete Supabase + refresh UI
@@ -6026,7 +5840,187 @@ function renderCommentsListDynamic(comments, postId) {
 
 
 // 2. FUNGSI UNTUK MEMASANG EVENT LISTENER KOMENTAR (Anti Error)
+function attachCommentListeners(modal, postId) {
+    // 1. Tombol Balas (Toggle Box)
+    modal.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(btn => {
+        btn.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            const commentId = this.dataset.commentId;
+            const box = document.getElementById('replyBox-' + commentId);
+            if (!box) return;
+            modal.querySelectorAll('.comment-reply-box').forEach(b => {
+                if (b.id !== 'replyBox-' + commentId) b.style.display = 'none';
+            });
+            const isHidden = box.style.display === 'none' || box.style.display === '';
+            box.style.display = isHidden ? 'flex' : 'none';
+            if (isHidden) {
+                const input = box.querySelector('input');
+                if (input) setTimeout(() => input.focus(), 100);
+            }
+        };
+    });
 
+    // 2. Tombol Kirim Balasan
+    modal.querySelectorAll('.reply-send-btn').forEach(btn => {
+        btn.onclick = async function(e) {
+            e.preventDefault(); e.stopPropagation();
+            const parentId = this.dataset.parentId;
+            const input = this.parentElement.querySelector('input');
+            const text = input.value.trim();
+            if (!text || !currentAuthUser) return;
+
+            const icon = this.querySelector('i');
+            icon.className = 'fas fa-spinner fa-spin';
+
+            try {
+                await window.salinkSupabase.from('comments').insert({
+                    user_id: currentAuthUser.id,
+                    post_id: postId,
+                    content: text,
+                    parent_id: parentId
+                });
+                input.value = '';
+                this.parentElement.style.display = 'none';
+                
+                await loadData();
+                const updatedPost = posts.find(p => p.id === postId);
+                if (updatedPost) {
+                    let comments = JSON.parse(updatedPost.comments || '[]');
+                    // Paksa re-render dan pasang ulang event
+                    modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+                }
+                showToast('✅', 'Balasan terkirim', 'fa-check-circle');
+            } catch(err) {
+                showToast('❌ Gagal', err.message, 'fa-times-circle');
+            } finally {
+                icon.className = 'fas fa-paper-plane';
+            }
+        };
+    });
+
+    // 3. Like Komentar
+    modal.querySelectorAll('.comment-action-btn[data-action="like-comment"]').forEach(btn => {
+        btn.onclick = async function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (!currentAuthUser) return;
+            const commentId = this.dataset.commentId;
+            const post = posts.find(p => p.id === postId);
+            if (!post) return;
+            
+            let comments = JSON.parse(post.comments || '[]');
+            const c = comments.find(x => x.id === commentId);
+            if (!c) return;
+
+            // Ambil dari data balasan jika bukan top-level
+            let targetComment = c;
+            if (!targetComment && c.replies) {
+                targetComment = c.replies.find(r => r.id === commentId);
+            }
+
+            try {
+                if (targetComment.is_liked) {
+                    await window.salinkSupabase.from('comment_likes').delete().eq('comment_id', commentId).eq('user_id', currentAuthUser.id);
+                    targetComment.is_liked = false; 
+                    targetComment.likes_count--;
+                } else {
+                    await window.salinkSupabase.from('comment_likes').insert({ comment_id: commentId, user_id: currentAuthUser.id });
+                    targetComment.is_liked = true; 
+                    targetComment.likes_count++;
+                }
+                post.comments = JSON.stringify(comments);
+                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+                attachCommentListeners(modal, postId);
+            } catch(err) { console.error(err); }
+        };
+    });
+
+    // 4. Edit Komentar (Top-Level & Nested)
+    modal.querySelectorAll('.comment-action-btn[data-action="edit-comment"]').forEach(btn => {
+        btn.onclick = async function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (!currentAuthUser) return;
+            const commentId = this.dataset.commentId;
+            const post = posts.find(p => p.id === postId);
+            if (!post) return;
+            
+            let comments = JSON.parse(post.comments || '[]');
+            let c = comments.find(x => x.id === commentId);
+            
+            // Jika tidak ketemu, cari di dalam balasan
+            let isNested = false;
+            let parentComment = null;
+            if (!c) {
+                for (let pc of comments) {
+                    if (pc.replies) {
+                        let found = pc.replies.find(r => r.id === commentId);
+                        if (found) { c = found; isNested = true; parentComment = pc; break; }
+                    }
+                }
+            }
+            if (!c) return;
+
+            const newText = prompt('Edit komentar:', c.text);
+            if (!newText || newText.trim() === c.text) return;
+
+            try {
+                await window.salinkSupabase.from('comments').update({ content: newText.trim() }).eq('id', commentId);
+                c.text = newText.trim(); 
+                c.content = newText.trim();
+                post.comments = JSON.stringify(comments);
+                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+                attachCommentListeners(modal, postId);
+                showToast('✅', 'Komentar diedit', 'fa-check-circle');
+            } catch(err) { showToast('❌ Gagal', 'Gagal edit', 'fa-times-circle'); }
+        };
+    });
+
+   // 5. Hapus Komentar / Balasan — PERMANENT DELETE
+modal.querySelectorAll(
+    '.comment-action-btn[data-action="delete-comment"]'
+).forEach(btn => {
+
+    btn.onclick = async function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!currentAuthUser) return;
+
+        if (!confirm(
+            'Hapus komentar atau balasan ini secara permanen?'
+        )) return;
+
+        const commentId = this.dataset.commentId;
+
+        const deleteButton = this;
+        deleteButton.disabled = true;
+
+        try {
+            await deleteCommentPermanently(
+                commentId,
+                postId
+            );
+
+            showToast(
+                '✅ Berhasil',
+                'Komentar dan data terkait berhasil dihapus permanen.',
+                'fa-check-circle',
+                'success'
+            );
+
+        } catch (err) {
+            console.error('[SALINK DELETE COMMENT]', err);
+
+            showToast(
+                '❌ Gagal',
+                err.message || 'Komentar gagal dihapus.',
+                'fa-times-circle',
+                'error'
+            );
+
+            deleteButton.disabled = false;
+        }
+    };
+}); 
         
 async function sendPostinganComment(postId, modal) {
     if (!currentUser || !currentAuthUser) { showToast('🔒 Login', 'Silakan login', 'fa-lock', 'error'); return; }
