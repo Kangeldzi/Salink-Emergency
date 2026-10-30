@@ -5422,21 +5422,48 @@ function openPostinganLengkapModal() {
     }
 
     body.innerHTML = myPosts.map(post => {
+        const isEm = post.isSpecial && post.specialType;
+        const icon = isEm ? EMERGENCY_ICONS[post.specialType] : '📝';
+        const color = isEm ? 'var(--accent-red)' : 'var(--primary)';
+        const badge = isEm ? `${EMERGENCY_ICONS[post.specialType]} ${EMERGENCY_LABELS[post.specialType]}` : '📝 Biasa';
+        
+        // Panggil fungsi scrollToPost
         return `
-            <div class="history-item" onclick="closeModal('postinganLengkapModal');setTimeout(()=>{goToPostinganSlideById('${escapeAttr(post.id)}')},300);">
-                <div class="item-icon" style="color:var(--primary);font-size:1.2rem;width:60px;height:60px;border-radius:10px;overflow:hidden;padding:0;">
-                    ${post.mediaType === 'image' ? `<img src="${post.gdriveImageUrl}" style="width:100%;height:100%;object-fit:cover;">` : '📝'}
+            <div class="history-item" onclick="closeModal('postinganLengkapModal'); setTimeout(() => { scrollToPost('${escapeAttr(post.id)}'); }, 300);" style="cursor:pointer;">
+                <div class="item-icon" style="color:${color};font-size:1.2rem;width:50px;height:50px;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.05);">
+                    ${post.mediaType === 'image' && post.gdriveImageUrl ? `<img src="${post.gdriveImageUrl}" style="width:100%;height:100%;object-fit:cover;">` : icon}
                 </div>
                 <div class="item-content" style="margin-left:10px;">
-                    <div class="item-title" style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:3px;">${escapeHTML(post.text ? post.text.substring(0, 60) : 'Postingan media')}</div>
-                    <div class="item-sub" style="font-size:0.6rem;color:var(--text-muted);">${getTimeAgo(post.timestamp)}</div>
+                    <div class="item-title" style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                        ${escapeHTML(post.text ? post.text.substring(0, 50) : 'Postingan media')}
+                    </div>
+                    <div class="item-sub" style="font-size:0.6rem;color:var(--text-muted);">
+                        <span style="color:${color}; font-weight:600;">${badge}</span> • ${getTimeAgo(post.timestamp)}
+                    </div>
                 </div>
-                <i class="fas fa-chevron-right" style="color:var(--text-muted);"></i>
+                <i class="fas fa-chevron-right" style="color:var(--text-muted); margin-left:auto;"></i>
             </div>
         `;
     }).join('');
 
     openModal('postinganLengkapModal');
+}
+
+function scrollToPost(postId) {
+    const card = document.querySelector(`.scroll-post-card[data-post-id="${postId}"]`);
+    if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Animasi Highlight (Biar user sadar posisinya)
+        card.style.transition = 'all 0.5s';
+        card.style.boxShadow = '0 0 0 4px rgba(230,0,18,0.6)';
+        card.style.transform = 'scale(1.02)';
+        setTimeout(() => { 
+            card.style.boxShadow = ''; 
+            card.style.transform = 'scale(1)';
+        }, 2500);
+    } else {
+        showToast('ℹ️ Info', 'Postingan tidak ditemukan di layar', 'fa-info-circle');
+    }
 }
         
 /* ================================================================
@@ -5737,26 +5764,37 @@ function renderCommentsListDynamic(comments, postId) {
             </div>
         `;
     }).join('');
+    
+    // Tambahkan ini di paling bawah renderCommentsListDynamic
+    setTimeout(() => {
+        const modal = document.getElementById('postinganCommentsModal');
+        if (modal) attachCommentListeners(modal, postId);
+    }, 50);
 }
 
 
 // 2. FUNGSI UNTUK MEMASANG EVENT LISTENER KOMENTAR (Anti Error)
 function attachCommentListeners(modal, postId) {
-    // Tombol Balas
+    // 1. Tombol Balas (Toggle Box)
     modal.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(btn => {
         btn.onclick = function(e) {
             e.preventDefault(); e.stopPropagation();
-            const id = this.dataset.commentId;
-            const box = document.getElementById('replyBox-' + id);
-            if (box) {
-                modal.querySelectorAll('.comment-reply-box').forEach(b => { if(b.id !== 'replyBox-'+id) b.style.display = 'none'; });
-                box.style.display = box.style.display === 'flex' ? 'none' : 'flex';
-                if (box.style.display === 'flex') box.querySelector('input').focus();
+            const commentId = this.dataset.commentId;
+            const box = document.getElementById('replyBox-' + commentId);
+            if (!box) return;
+            modal.querySelectorAll('.comment-reply-box').forEach(b => {
+                if (b.id !== 'replyBox-' + commentId) b.style.display = 'none';
+            });
+            const isHidden = box.style.display === 'none' || box.style.display === '';
+            box.style.display = isHidden ? 'flex' : 'none';
+            if (isHidden) {
+                const input = box.querySelector('input');
+                if (input) setTimeout(() => input.focus(), 100);
             }
         };
     });
 
-    // Tombol Kirim Balasan
+    // 2. Tombol Kirim Balasan
     modal.querySelectorAll('.reply-send-btn').forEach(btn => {
         btn.onclick = async function(e) {
             e.preventDefault(); e.stopPropagation();
@@ -5765,75 +5803,104 @@ function attachCommentListeners(modal, postId) {
             const text = input.value.trim();
             if (!text || !currentAuthUser) return;
 
-            // Tampilkan loading di tombol
-            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            const icon = this.querySelector('i');
+            icon.className = 'fas fa-spinner fa-spin';
 
             try {
-                // Kirim ke Supabase
-                const { error } = await window.salinkSupabase.from('comments').insert({
-                    user_id: currentAuthUser.id, post_id: postId, content: text, parent_id: parentId
+                await window.salinkSupabase.from('comments').insert({
+                    user_id: currentAuthUser.id,
+                    post_id: postId,
+                    content: text,
+                    parent_id: parentId
                 });
-                if (error) throw error;
-
-                // Sukses: Ambil ulang data terbaru dan render
                 input.value = '';
                 this.parentElement.style.display = 'none';
-                this.innerHTML = '<i class="fas fa-paper-plane"></i>';
                 
-                await loadData(); // Reload data
-                const p = posts.find(x => x.id === postId);
-                let comments = JSON.parse(p.comments || '[]');
-                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
-                attachCommentListeners(modal, postId); // Pasang ulang listener
+                await loadData();
+                const updatedPost = posts.find(p => p.id === postId);
+                if (updatedPost) {
+                    let comments = JSON.parse(updatedPost.comments || '[]');
+                    // Paksa re-render dan pasang ulang event
+                    modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+                }
                 showToast('✅', 'Balasan terkirim', 'fa-check-circle');
             } catch(err) {
                 showToast('❌ Gagal', err.message, 'fa-times-circle');
-                this.innerHTML = '<i class="fas fa-paper-plane"></i>';
+            } finally {
+                icon.className = 'fas fa-paper-plane';
             }
         };
     });
 
-    // Tombol Like
+    // 3. Like Komentar
     modal.querySelectorAll('.comment-action-btn[data-action="like-comment"]').forEach(btn => {
         btn.onclick = async function(e) {
             e.preventDefault(); e.stopPropagation();
             if (!currentAuthUser) return;
-            const id = this.dataset.commentId;
-            const p = posts.find(x => x.id === postId);
-            let comments = JSON.parse(p.comments || '[]');
-            const c = comments.find(x => x.id === id);
+            const commentId = this.dataset.commentId;
+            const post = posts.find(p => p.id === postId);
+            if (!post) return;
             
+            let comments = JSON.parse(post.comments || '[]');
+            const c = comments.find(x => x.id === commentId);
+            if (!c) return;
+
+            // Ambil dari data balasan jika bukan top-level
+            let targetComment = c;
+            if (!targetComment && c.replies) {
+                targetComment = c.replies.find(r => r.id === commentId);
+            }
+
             try {
-                if (c.is_liked) {
-                    await window.salinkSupabase.from('comment_likes').delete().eq('comment_id', id).eq('user_id', currentAuthUser.id);
-                    c.is_liked = false; c.likes_count--;
+                if (targetComment.is_liked) {
+                    await window.salinkSupabase.from('comment_likes').delete().eq('comment_id', commentId).eq('user_id', currentAuthUser.id);
+                    targetComment.is_liked = false; 
+                    targetComment.likes_count--;
                 } else {
-                    await window.salinkSupabase.from('comment_likes').insert({ comment_id: id, user_id: currentAuthUser.id });
-                    c.is_liked = true; c.likes_count++;
+                    await window.salinkSupabase.from('comment_likes').insert({ comment_id: commentId, user_id: currentAuthUser.id });
+                    targetComment.is_liked = true; 
+                    targetComment.likes_count++;
                 }
-                p.comments = JSON.stringify(comments);
+                post.comments = JSON.stringify(comments);
                 modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
                 attachCommentListeners(modal, postId);
             } catch(err) { console.error(err); }
         };
     });
 
-    // Tombol Edit
+    // 4. Edit Komentar (Top-Level & Nested)
     modal.querySelectorAll('.comment-action-btn[data-action="edit-comment"]').forEach(btn => {
         btn.onclick = async function(e) {
             e.preventDefault(); e.stopPropagation();
-            const id = this.dataset.commentId;
-            const p = posts.find(x => x.id === postId);
-            let comments = JSON.parse(p.comments || '[]');
-            const c = comments.find(x => x.id === id);
+            if (!currentAuthUser) return;
+            const commentId = this.dataset.commentId;
+            const post = posts.find(p => p.id === postId);
+            if (!post) return;
             
+            let comments = JSON.parse(post.comments || '[]');
+            let c = comments.find(x => x.id === commentId);
+            
+            // Jika tidak ketemu, cari di dalam balasan
+            let isNested = false;
+            let parentComment = null;
+            if (!c) {
+                for (let pc of comments) {
+                    if (pc.replies) {
+                        let found = pc.replies.find(r => r.id === commentId);
+                        if (found) { c = found; isNested = true; parentComment = pc; break; }
+                    }
+                }
+            }
+            if (!c) return;
+
             const newText = prompt('Edit komentar:', c.text);
             if (!newText || newText.trim() === c.text) return;
 
             try {
-                await window.salinkSupabase.from('comments').update({ content: newText.trim() }).eq('id', id);
-                c.text = newText.trim();
-                p.comments = JSON.stringify(comments);
+                await window.salinkSupabase.from('comments').update({ content: newText.trim() }).eq('id', commentId);
+                c.text = newText.trim(); 
+                c.content = newText.trim();
+                post.comments = JSON.stringify(comments);
                 modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
                 attachCommentListeners(modal, postId);
                 showToast('✅', 'Komentar diedit', 'fa-check-circle');
@@ -5841,27 +5908,41 @@ function attachCommentListeners(modal, postId) {
         };
     });
 
-    // Tombol Hapus
+    // 5. Hapus Komentar (Top-Level & Nested)
     modal.querySelectorAll('.comment-action-btn[data-action="delete-comment"]').forEach(btn => {
         btn.onclick = async function(e) {
             e.preventDefault(); e.stopPropagation();
+            if (!currentAuthUser) return;
             if (!confirm('Hapus komentar ini permanen?')) return;
-            const id = this.dataset.commentId;
-            const p = posts.find(x => x.id === postId);
+            const commentId = this.dataset.commentId;
+            const post = posts.find(p => p.id === postId);
+            if (!post) return;
             
             try {
-                await window.salinkSupabase.from('comments').update({ deleted_at: new Date().toISOString() }).eq('id', id);
-                await loadData(); // Ambil data terbaru dari DB
-                const updatedP = posts.find(x => x.id === postId);
-                let comments = JSON.parse(updatedP.comments || '[]');
+                // Eksekusi Hapus Permanen di Database
+                const { error } = await window.salinkSupabase.from('comments').delete().eq('id', commentId);
+                if (error) throw error;
+
+                // Hapus dari UI
+                let comments = JSON.parse(post.comments || '[]');
+                // Filter Top-Level
+                comments = comments.filter(x => x.id !== commentId);
+                // Filter Nested
+                comments.forEach(pc => {
+                    if (pc.replies) pc.replies = pc.replies.filter(r => r.id !== commentId);
+                });
+
+                post.comments = JSON.stringify(comments);
                 modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
                 attachCommentListeners(modal, postId);
                 showToast('✅', 'Komentar dihapus', 'fa-check-circle');
-            } catch(err) { showToast('❌ Gagal', 'Gagal hapus', 'fa-times-circle'); }
+            } catch(err) { 
+                showToast('❌ Gagal', 'Gagal hapus: ' + err.message, 'fa-times-circle'); 
+            }
         };
     });
 }
-
+        
 async function sendPostinganComment(postId, modal) {
     if (!currentUser || !currentAuthUser) { showToast('🔒 Login', 'Silakan login', 'fa-lock', 'error'); return; }
     const input = modal.querySelector('#newCommentInput');
