@@ -5224,6 +5224,68 @@ function renderPostinganCarousel() {
     container.innerHTML = html;
 }
 
+
+/* ============================================================
+ * SALINK PATCH 1 — SINGLE SOURCE OF TRUTH COMMENT COUNTER
+ * Menghitung komentar induk + seluruh balasan.
+ * ============================================================ */
+
+function parsePostComments(post) {
+    try {
+        const data = typeof post.comments === 'string'
+            ? JSON.parse(post.comments || '[]')
+            : post.comments;
+
+        return Array.isArray(data) ? data : [];
+    } catch (error) {
+        console.warn('[SALINK] Gagal membaca komentar:', error);
+        return [];
+    }
+}
+
+function countPostComments(post) {
+    const comments = parsePostComments(post);
+
+    return comments.reduce((total, comment) => {
+        const replies = Array.isArray(comment.replies)
+            ? comment.replies.length
+            : 0;
+
+        return total + 1 + replies;
+    }, 0);
+}
+
+function updatePostCommentCounter(postId) {
+    const post = posts.find(p => String(p.id) === String(postId));
+    if (!post) return;
+
+    const count = countPostComments(post);
+
+    const card = document.querySelector(
+        `.scroll-post-card[data-post-id="${postId}"]`
+    );
+
+    if (card) {
+        const button = card.querySelector(
+            'button[onclick*="openPostinganCommentsModal"]'
+        );
+
+        if (button) {
+            button.innerHTML =
+                `<i class="far fa-comment"></i> Komentar (${count})`;
+        }
+    }
+
+    const modal = document.getElementById('postinganCommentsModal');
+
+    if (modal) {
+        const badge = modal.querySelector('.badge-count');
+        if (badge) badge.textContent = count;
+    }
+
+    renderPostinganCarousel();
+}
+
 function buildScrollPostCard(post) {
     const profilePic = post.userProfilePic
         ? `<img src="${escapeAttr(post.userProfilePic)}" alt="">`
@@ -5261,7 +5323,8 @@ function buildScrollPostCard(post) {
         }
     });
 
-    const isLiked = currentUser && likes.indexOf(currentUser.username) !== -1;
+    const isLiked = currentAuthUser &&
+    likes.includes(currentAuthUser.id);
     const viewerCount = parseInt(post.viewerCount || 0, 10) || 0;
 
     return `
@@ -5337,69 +5400,98 @@ document.addEventListener('click', function(e) {
 /* ================================================================
  * POSTINGAN CAROUSEL — ACTIONS
  * ================================================================ */
+
 async function handlePostinganLike(postId) {
-    if (!currentUser || !currentAuthUser) { 
-        showToast('🔒 Login', 'Silakan masuk untuk menyukai', 'fa-lock', 'error'); 
-        return; 
+    if (!currentUser || !currentAuthUser) {
+        showToast('🔒 Login', 'Silakan masuk untuk menyukai', 'fa-lock');
+        return;
     }
 
-    const post = posts.find(p => p.id === postId);
+    const post = posts.find(p => String(p.id) === String(postId));
     if (!post) return;
 
     let likes = [];
-    try { likes = typeof post.likes === 'string' ? JSON.parse(post.likes) : (post.likes || []); } catch(e) { likes = []; }
-    if (!Array.isArray(likes)) likes = [];
 
-    const isUnlike = likes.indexOf(currentUser.username) !== -1;
-    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(postId);
-    
-    if (isUUID && window.salinkSupabase) {
-        try {
-            if (isUnlike) {
-                await window.salinkSupabase.from('likes').delete().eq('user_id', currentAuthUser.id).eq('post_id', postId);
-            } else {
-                await window.salinkSupabase.from('likes').insert({ user_id: currentAuthUser.id, post_id: postId });
-            }
-        } catch (e) { console.warn('[Like] Supabase:', e.message); }
+    try {
+        likes = typeof post.likes === 'string'
+            ? JSON.parse(post.likes || '[]')
+            : (post.likes || []);
+    } catch (e) {
+        likes = [];
     }
 
-    // 2. Update UI Lokal
-    if (isUnlike) likes.splice(likes.indexOf(currentUser.username), 1);
-    else likes.push(currentUser.username);
-    
-    post.likes = JSON.stringify(likes);
-    try { localStorage.setItem('salink_posts', JSON.stringify(posts)); } catch(e) {}
+    const userId = currentAuthUser.id;
+    const isUnlike = likes.includes(userId);
+    const client = window.salinkSupabase;
 
-    // ⭐ PENTING: Render Ulang UI
-    renderPostinganCarousel(); 
-    updateStats();
-    playRegularSound();
+    try {
+        let result;
+
+        if (isUnlike) {
+            result = await client
+                .from('likes')
+                .delete()
+                .eq('user_id', userId)
+                .eq('post_id', postId);
+        } else {
+            result = await client
+                .from('likes')
+                .insert({
+                    user_id: userId,
+                    post_id: postId
+                });
+        }
+
+        if (result.error) throw result.error;
+
+        // Ambil ulang angka Like aktual.
+        await loadData();
+        updateStats();
+
+        playRegularSound();
+
+    } catch (err) {
+        console.error('[SALINK LIKE]', err);
+
+        showToast(
+            '❌ Gagal',
+            err.message || 'Like gagal diperbarui.',
+            'fa-times-circle',
+            'error'
+        );
+    }
 }
 
-async function handlePostinganViewer(postId) {
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-    
-    // 1. Update UI optimis
-    const current = parseInt(post.viewerCount || 0, 10) + 1;
-    post.viewerCount = current;
-    
-    // ⭐ PENTING: Update Angka di Layar Utama
-    const el = document.querySelector(`.scroll-post-card[data-post-id="${postId}"] .viewer-count`);
-    if (el) {
-        el.textContent = current;
-        el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
-    }
 
-    // 2. Tembak ke Supabase
+async function handlePostinganViewer(postId) {
+    const post = posts.find(
+        p => String(p.id) === String(postId)
+    );
+
+    if (!post || !window.salinkSupabase) return;
+
     try {
-        if (window.salinkSupabase) {
-            await window.salinkSupabase.rpc('increment_viewer', { post_id: postId });
-        }
-    } catch(e) {
-        try {
-            await window.salinkSupabase.from('posts').update({ viewer_count: current }).eq('id', postId);
-        } catch(err) {}
+        // Gunakan RPC atomik agar dua viewer bersamaan
+        // tidak saling menimpa angka.
+        const { error } = await window.salinkSupabase.rpc(
+            'increment_viewer',
+            { post_id: postId }
+        );
+
+        if (error) throw error;
+
+        // Ambil viewer_count aktual dari database.
+        await loadData();
+
+    } catch (err) {
+        console.error('[SALINK VIEWER]', err);
+
+        showToast(
+            '❌ Viewer gagal diperbarui',
+            'Periksa fungsi increment_viewer di Supabase.',
+            'fa-exclamation-circle',
+            'error'
+        );
     }
 }
 
@@ -5492,13 +5584,14 @@ function openPostinganCommentsModal(postId) {
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.id = 'postinganCommentsModal';
+    modal.dataset.postId = postId;
     modal.innerHTML = `
         <div class="modal-content" style="max-width:520px;">
             <div class="modal-header">
                 <div class="modal-title">
                     <i class="fas fa-comments"></i>
                     <span>💬 Komentar</span>
-                    <span class="badge-count">${comments.length}</span>
+                    <span class="badge-count">${countPostComments(post)}</span>
                 </div>
                 <button class="modal-close" onclick="closeCommentsModal()" type="button" aria-label="Tutup"><i class="fas fa-times"></i></button>
             </div>
@@ -5679,46 +5772,153 @@ function attachCommentListeners(modal, postId) {
         };
     });
 
-    // 5. Hapus Komentar (HARD DELETE - Permanen)
-    modal.querySelectorAll('.comment-action-btn[data-action="delete-comment"]').forEach(btn => {
-        btn.onclick = async function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (!currentAuthUser) return;
-            if (!confirm('Hapus komentar ini permanen?')) return;
-            const commentId = this.dataset.commentId;
-            const post = posts.find(p => p.id === postId);
-            if (!post) return;
-            
-            try {
-                // Eksekusi Hapus Permanen di Database
-                const { error } = await window.salinkSupabase.from('comments').delete().eq('id', commentId);
-                if (error) throw error;
 
-                // Hapus dari UI secara instan
-                let comments = JSON.parse(post.comments || '[]');
-                // Filter Top-Level (jika yang dihapus induk, balasan otomatis hilang)
-                comments = comments.filter(x => x.id !== commentId);
-                // Filter Nested (jika yang dihapus adalah balasan)
-                comments.forEach(pc => {
-                    if (pc.replies) pc.replies = pc.replies.filter(r => r.id !== commentId);
-                });
+// 5. Hapus Komentar / Balasan — PERMANENT DELETE
+modal.querySelectorAll(
+    '.comment-action-btn[data-action="delete-comment"]'
+).forEach(btn => {
 
-                post.comments = JSON.stringify(comments);
-                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
-                attachCommentListeners(modal, postId);
-                
-                // Update badge count
-                const totalCount = comments.reduce((acc, c) => acc + 1 + (c.replies ? c.replies.length : 0), 0);
-                modal.querySelector('.modal-title .badge-count').textContent = totalCount;
-                
-                // Update counter di tampilan belakang (jika modal ditutup)
-                renderPostinganCarousel();
-                showToast('✅', 'Komentar dihapus permanen', 'fa-check-circle');
-            } catch(err) { 
-                showToast('❌ Gagal', 'Gagal hapus: ' + err.message, 'fa-times-circle'); 
-            }
-        };
-    });
+    btn.onclick = async function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!currentAuthUser) return;
+
+        if (!confirm(
+            'Hapus komentar atau balasan ini secara permanen?'
+        )) return;
+
+        const commentId = this.dataset.commentId;
+
+        const deleteButton = this;
+        deleteButton.disabled = true;
+
+        try {
+            await deleteCommentPermanently(
+                commentId,
+                postId
+            );
+
+            showToast(
+                '✅ Berhasil',
+                'Komentar dan data terkait berhasil dihapus permanen.',
+                'fa-check-circle',
+                'success'
+            );
+
+        } catch (err) {
+            console.error('[SALINK DELETE COMMENT]', err);
+
+            showToast(
+                '❌ Gagal',
+                err.message || 'Komentar gagal dihapus.',
+                'fa-times-circle',
+                'error'
+            );
+
+            deleteButton.disabled = false;
+        }
+    };
+});
+
+
+/* ============================================================
+ * SALINK PATCH 2 — PERMANENT COMMENT & REPLY DELETE
+ * Hard delete Supabase + refresh UI
+ * ============================================================ */
+
+async function deleteCommentPermanently(commentId, postId) {
+    const client = window.salinkSupabase;
+
+    if (!client || !currentAuthUser) {
+        throw new Error('Sesi Supabase tidak tersedia.');
+    }
+
+    const post = posts.find(p => String(p.id) === String(postId));
+
+    if (!post) {
+        throw new Error('Postingan tidak ditemukan.');
+    }
+
+    // 1. Cari seluruh balasan langsung dari komentar ini.
+    const { data: replies, error: replyError } = await client
+        .from('comments')
+        .select('id')
+        .eq('parent_id', commentId);
+
+    if (replyError) throw replyError;
+
+    const replyIds = (replies || []).map(r => r.id);
+    const allIds = [commentId, ...replyIds];
+
+    // 2. Hapus seluruh like komentar terkait.
+    const { error: likeError } = await client
+        .from('comment_likes')
+        .delete()
+        .in('comment_id', allIds);
+
+    if (likeError) throw likeError;
+
+    // 3. Hapus balasan terlebih dahulu.
+    if (replyIds.length > 0) {
+        const { error: childError } = await client
+            .from('comments')
+            .delete()
+            .in('id', replyIds);
+
+        if (childError) throw childError;
+    }
+
+    // 4. Hapus komentar induk atau balasan yang dipilih.
+    const { data: deleted, error: deleteError } = await client
+        .from('comments')
+        .delete()
+        .eq('id', commentId)
+        .select('id');
+
+    if (deleteError) throw deleteError;
+
+    if (!deleted || deleted.length === 0) {
+        throw new Error(
+            'Data tidak terhapus. Periksa izin DELETE pada Supabase RLS.'
+        );
+    }
+
+    // 5. Ambil ulang data aktual dari Supabase.
+    await loadData();
+
+    const updatedPost = posts.find(
+        p => String(p.id) === String(postId)
+    );
+
+    // 6. Perbarui modal komentar.
+    const modal = document.getElementById('postinganCommentsModal');
+
+    if (modal && updatedPost) {
+        const comments = parsePostComments(updatedPost);
+        const list = modal.querySelector('#commentsListDynamic');
+
+        if (list) {
+            list.innerHTML = renderCommentsListDynamic(
+                comments,
+                postId
+            );
+        }
+
+        const badge = modal.querySelector('.badge-count');
+
+        if (badge) {
+            badge.textContent = countPostComments(updatedPost);
+        }
+
+        attachCommentListeners(modal, postId);
+    }
+
+    // 7. Perbarui kartu postingan dan statistik.
+    updatePostCommentCounter(postId);
+    updateStats();
+
+    return true;
 }
 
 // 1. FUNGSI RENDER KOMENTAR (Termasuk Balasan)
@@ -5822,183 +6022,11 @@ function renderCommentsListDynamic(comments, postId) {
         `;
     }).join('');
     
-    // Tambahkan ini di paling bawah renderCommentsListDynamic
-    setTimeout(() => {
-        const modal = document.getElementById('postinganCommentsModal');
-        if (modal) attachCommentListeners(modal, postId);
-    }, 50);
 }
 
 
 // 2. FUNGSI UNTUK MEMASANG EVENT LISTENER KOMENTAR (Anti Error)
-function attachCommentListeners(modal, postId) {
-    // 1. Tombol Balas (Toggle Box)
-    modal.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(btn => {
-        btn.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
-            const commentId = this.dataset.commentId;
-            const box = document.getElementById('replyBox-' + commentId);
-            if (!box) return;
-            modal.querySelectorAll('.comment-reply-box').forEach(b => {
-                if (b.id !== 'replyBox-' + commentId) b.style.display = 'none';
-            });
-            const isHidden = box.style.display === 'none' || box.style.display === '';
-            box.style.display = isHidden ? 'flex' : 'none';
-            if (isHidden) {
-                const input = box.querySelector('input');
-                if (input) setTimeout(() => input.focus(), 100);
-            }
-        };
-    });
 
-    // 2. Tombol Kirim Balasan
-    modal.querySelectorAll('.reply-send-btn').forEach(btn => {
-        btn.onclick = async function(e) {
-            e.preventDefault(); e.stopPropagation();
-            const parentId = this.dataset.parentId;
-            const input = this.parentElement.querySelector('input');
-            const text = input.value.trim();
-            if (!text || !currentAuthUser) return;
-
-            const icon = this.querySelector('i');
-            icon.className = 'fas fa-spinner fa-spin';
-
-            try {
-                await window.salinkSupabase.from('comments').insert({
-                    user_id: currentAuthUser.id,
-                    post_id: postId,
-                    content: text,
-                    parent_id: parentId
-                });
-                input.value = '';
-                this.parentElement.style.display = 'none';
-                
-                await loadData();
-                const updatedPost = posts.find(p => p.id === postId);
-                if (updatedPost) {
-                    let comments = JSON.parse(updatedPost.comments || '[]');
-                    // Paksa re-render dan pasang ulang event
-                    modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
-                }
-                showToast('✅', 'Balasan terkirim', 'fa-check-circle');
-            } catch(err) {
-                showToast('❌ Gagal', err.message, 'fa-times-circle');
-            } finally {
-                icon.className = 'fas fa-paper-plane';
-            }
-        };
-    });
-
-    // 3. Like Komentar
-    modal.querySelectorAll('.comment-action-btn[data-action="like-comment"]').forEach(btn => {
-        btn.onclick = async function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (!currentAuthUser) return;
-            const commentId = this.dataset.commentId;
-            const post = posts.find(p => p.id === postId);
-            if (!post) return;
-            
-            let comments = JSON.parse(post.comments || '[]');
-            const c = comments.find(x => x.id === commentId);
-            if (!c) return;
-
-            // Ambil dari data balasan jika bukan top-level
-            let targetComment = c;
-            if (!targetComment && c.replies) {
-                targetComment = c.replies.find(r => r.id === commentId);
-            }
-
-            try {
-                if (targetComment.is_liked) {
-                    await window.salinkSupabase.from('comment_likes').delete().eq('comment_id', commentId).eq('user_id', currentAuthUser.id);
-                    targetComment.is_liked = false; 
-                    targetComment.likes_count--;
-                } else {
-                    await window.salinkSupabase.from('comment_likes').insert({ comment_id: commentId, user_id: currentAuthUser.id });
-                    targetComment.is_liked = true; 
-                    targetComment.likes_count++;
-                }
-                post.comments = JSON.stringify(comments);
-                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
-                attachCommentListeners(modal, postId);
-            } catch(err) { console.error(err); }
-        };
-    });
-
-    // 4. Edit Komentar (Top-Level & Nested)
-    modal.querySelectorAll('.comment-action-btn[data-action="edit-comment"]').forEach(btn => {
-        btn.onclick = async function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (!currentAuthUser) return;
-            const commentId = this.dataset.commentId;
-            const post = posts.find(p => p.id === postId);
-            if (!post) return;
-            
-            let comments = JSON.parse(post.comments || '[]');
-            let c = comments.find(x => x.id === commentId);
-            
-            // Jika tidak ketemu, cari di dalam balasan
-            let isNested = false;
-            let parentComment = null;
-            if (!c) {
-                for (let pc of comments) {
-                    if (pc.replies) {
-                        let found = pc.replies.find(r => r.id === commentId);
-                        if (found) { c = found; isNested = true; parentComment = pc; break; }
-                    }
-                }
-            }
-            if (!c) return;
-
-            const newText = prompt('Edit komentar:', c.text);
-            if (!newText || newText.trim() === c.text) return;
-
-            try {
-                await window.salinkSupabase.from('comments').update({ content: newText.trim() }).eq('id', commentId);
-                c.text = newText.trim(); 
-                c.content = newText.trim();
-                post.comments = JSON.stringify(comments);
-                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
-                attachCommentListeners(modal, postId);
-                showToast('✅', 'Komentar diedit', 'fa-check-circle');
-            } catch(err) { showToast('❌ Gagal', 'Gagal edit', 'fa-times-circle'); }
-        };
-    });
-
-    // 5. Hapus Komentar (Top-Level & Nested)
-    modal.querySelectorAll('.comment-action-btn[data-action="delete-comment"]').forEach(btn => {
-        btn.onclick = async function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (!currentAuthUser) return;
-            if (!confirm('Hapus komentar ini permanen?')) return;
-            const commentId = this.dataset.commentId;
-            const post = posts.find(p => p.id === postId);
-            if (!post) return;
-            
-            try {
-                // Eksekusi Hapus Permanen di Database
-                const { error } = await window.salinkSupabase.from('comments').delete().eq('id', commentId);
-                if (error) throw error;
-
-                // Hapus dari UI
-                let comments = JSON.parse(post.comments || '[]');
-                // Filter Top-Level
-                comments = comments.filter(x => x.id !== commentId);
-                // Filter Nested
-                comments.forEach(pc => {
-                    if (pc.replies) pc.replies = pc.replies.filter(r => r.id !== commentId);
-                });
-
-                post.comments = JSON.stringify(comments);
-                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
-                attachCommentListeners(modal, postId);
-                showToast('✅', 'Komentar dihapus', 'fa-check-circle');
-            } catch(err) { 
-                showToast('❌ Gagal', 'Gagal hapus: ' + err.message, 'fa-times-circle'); 
-            }
-        };
-    });
-}
         
 async function sendPostinganComment(postId, modal) {
     if (!currentUser || !currentAuthUser) { showToast('🔒 Login', 'Silakan login', 'fa-lock', 'error'); return; }
@@ -6020,7 +6048,7 @@ async function sendPostinganComment(postId, modal) {
         if (updatedPost) {
             let comments = JSON.parse(updatedPost.comments || '[]');
             modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
-            modal.querySelector('.modal-title .badge-count').textContent = comments.length;
+            modal.querySelector('.modal-title .badge-count').textContent = countPostComments(updatedPost);
             attachCommentListeners(modal, postId);
         }
         playRegularSound();
@@ -6102,33 +6130,34 @@ window.editCommentProfile = async function(commentId, postId) {
 };
 
 // Fungsi untuk hapus komentar di profil
+
 window.deleteCommentProfile = async function(commentId, postId) {
     if (!currentAuthUser) return;
-    if (!confirm('Hapus komentar ini secara permanen?')) return;
 
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
+    if (!confirm('Hapus komentar secara permanen?')) return;
 
     try {
-        await window.salinkSupabase.from('comments').update({ deleted_at: new Date().toISOString() }).eq('id', commentId);
-        let comments = JSON.parse(post.comments || '[]');
-        comments = comments.filter(x => x.id !== commentId && x.parent_id !== commentId); // Hapus komentar & balasannya
-        post.comments = JSON.stringify(comments);
-        
-        const modal = document.getElementById('postinganCommentsModal');
-        if (modal) {
-            modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
-        }
-        showToast('✅', 'Komentar dihapus', 'fa-check-circle');
-    } catch(e) { console.error(e); }
-};
-        
-    function openProfileUser(username) {
-    if (!username) return;
-    if (username === (currentUser ? currentUser.username : '')) {
-        window.location.href = PROFILE_URL;
-        return;
+        await deleteCommentPermanently(commentId, postId);
+
+        showToast(
+            '✅ Terhapus',
+            'Komentar berhasil dihapus permanen.',
+            'fa-check-circle',
+            'success'
+        );
+
+    } catch (err) {
+        console.error('[SALINK DELETE COMMENT]', err);
+
+        showToast(
+            '❌ Gagal',
+            err.message || 'Komentar gagal dihapus.',
+            'fa-times-circle',
+            'error'
+        );
     }
+};
+
     window.open(PROFILE_USER_URL + '?username=' + encodeURIComponent(username), '_blank');
 }
 
@@ -8130,6 +8159,137 @@ function setupPWA() {
     });
 }
 
+
+/* ============================================================
+ * SALINK PATCH 3 — POST / LIKE / COMMENT REALTIME
+ * ============================================================ */
+
+window.salinkRealtimeChannel =
+    window.salinkRealtimeChannel || null;
+
+function initSalinkPostRealtime() {
+    const client = window.salinkSupabase;
+
+    if (!client || !window.SALINK_SB_READY) {
+        console.warn('[SALINK] Realtime menunggu Supabase.');
+        return;
+    }
+
+    // Hindari subscription ganda.
+    if (window.salinkRealtimeChannel) {
+        client.removeChannel(window.salinkRealtimeChannel);
+        window.salinkRealtimeChannel = null;
+    }
+
+    let refreshTimer = null;
+
+    const refreshSocialData = () => {
+        clearTimeout(refreshTimer);
+
+        refreshTimer = setTimeout(async () => {
+            try {
+                await loadData();
+                updateStats();
+
+                // Jika modal komentar terbuka,
+                // tampilkan data terbaru.
+                const modal = document.getElementById(
+                    'postinganCommentsModal'
+                );
+
+                if (modal) {
+                    const postId = modal.dataset.postId;
+                    const post = posts.find(
+                        p => String(p.id) === String(postId)
+                    );
+
+                    if (post) {
+                        const comments = parsePostComments(post);
+                        const list = modal.querySelector(
+                            '#commentsListDynamic'
+                        );
+
+                        if (list) {
+                            list.innerHTML =
+                                renderCommentsListDynamic(
+                                    comments,
+                                    postId
+                                );
+
+                            attachCommentListeners(modal, postId);
+                        }
+
+                        const badge = modal.querySelector('.badge-count');
+
+                        if (badge) {
+                            badge.textContent =
+                                countPostComments(post);
+                        }
+                    }
+                }
+
+            } catch (err) {
+                console.error(
+                    '[SALINK REALTIME REFRESH]',
+                    err
+                );
+            }
+        }, 250);
+    };
+
+    const channel = client
+        .channel('salink-profile-social-realtime')
+
+        .on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'posts'
+            },
+            refreshSocialData
+        )
+
+        .on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'likes'
+            },
+            refreshSocialData
+        )
+
+        .on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'comments'
+            },
+            refreshSocialData
+        )
+
+        .on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'comment_likes'
+            },
+            refreshSocialData
+        )
+
+        .subscribe(status => {
+            console.log(
+                '[SALINK REALTIME]',
+                status
+            );
+        });
+
+    window.salinkRealtimeChannel = channel;
+}
+
 /* ================================================================
  * INIT — DOMContentLoaded
  * ================================================================ */
@@ -8249,8 +8409,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Load data
     await loadData();
+
     renderProfile();
     updateNotifBadge();
+
+// Aktifkan sinkronisasi sosial Supabase.
+    initSalinkPostRealtime();
 
     // Load Marketplace + Stats 3x2
     setTimeout(() => {
