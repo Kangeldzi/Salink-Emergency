@@ -9025,128 +9025,153 @@ window.handleLogout = handleLogout;
         }
     };
 
+    
     // ---------------------------------------------------------
     // 3. Kirim komentar utama dan balasan
     // ---------------------------------------------------------
-    
-async function insertComment(postId, content, parentId = null) {
-    // 1. Pastikan pengguna sudah login.
-    requireLogin();
 
-    // 2. Validasi ID postingan.
-    const UUID_PATTERN =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    async function insertComment(postId, content, parentId = null) {
+        // 1. Validasi login.
+        requireLogin();
 
-    if (!postId || !UUID_PATTERN.test(String(postId))) {
-        throw new Error('ID postingan tidak valid.');
-    }
+        // 2. Validasi UUID.
+        const UUID_PATTERN =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-    // 3. Validasi isi komentar.
-    const cleanContent = String(content || '').trim();
-
-    if (!cleanContent) {
-        throw new Error('Komentar tidak boleh kosong.');
-    }
-
-    if (cleanContent.length > 5000) {
-        throw new Error('Komentar terlalu panjang (maksimal 5.000 karakter).');
-    }
-
-    // 4. Siapkan parent_id.
-    let validParentId = null;
-
-    if (parentId !== null && parentId !== undefined && parentId !== '') {
-        if (!UUID_PATTERN.test(String(parentId))) {
-            throw new Error('ID komentar induk tidak valid. Silakan muat ulang komentar.');
+        if (!postId || !UUID_PATTERN.test(String(postId))) {
+            throw new Error('ID postingan tidak valid.');
         }
 
-        validParentId = String(parentId);
+        // 3. Validasi isi komentar.
+        const cleanContent = String(content || '').trim();
 
-        // 5. Pastikan komentar induk benar-benar ada
-        //    dan berasal dari postingan yang sama.
-        const { data: parent, error: parentError } = await SB
+        if (!cleanContent) {
+            throw new Error('Komentar tidak boleh kosong.');
+        }
+
+        if (cleanContent.length > 5000) {
+            throw new Error('Komentar terlalu panjang (maksimal 5.000 karakter).');
+        }
+
+        // 4. Validasi komentar induk jika ini adalah balasan.
+        let validParentId = null;
+
+        if (parentId !== null && parentId !== undefined && parentId !== '') {
+            if (!UUID_PATTERN.test(String(parentId))) {
+                throw new Error('ID komentar induk tidak valid. Muat ulang komentar.');
+            }
+
+            validParentId = String(parentId);
+
+            const { data: parent, error: parentError } = await SB
+                .from('comments')
+                .select('id, post_id, parent_id, deleted_at')
+                .eq('id', validParentId)
+                .maybeSingle();
+
+            if (parentError) {
+                console.error('[SALINK] Validasi komentar induk gagal:', parentError);
+                throw new Error('Gagal memeriksa komentar induk. Silakan coba lagi.');
+            }
+
+            if (!parent) {
+                throw new Error('Komentar yang ingin dibalas sudah tidak tersedia.');
+            }
+
+            if (parent.post_id !== postId) {
+                throw new Error('Komentar induk tidak sesuai dengan postingan ini.');
+            }
+
+            if (parent.deleted_at !== null) {
+                throw new Error('Komentar induk sudah dihapus dan tidak dapat dibalas.');
+            }
+        }
+
+        // 5. Simpan ke Supabase.
+        const { data, error } = await SB
             .from('comments')
-            .select('id, post_id, parent_id, deleted_at')
-            .eq('id', validParentId)
-            .maybeSingle();
+            .insert({
+                post_id: postId,
+                user_id: currentAuthUser.id,
+                content: cleanContent,
+                parent_id: validParentId
+            })
+            .select('id, post_id, user_id, content, parent_id, created_at')
+            .single();
 
-        if (parentError) {
-            console.error('[SALINK] Validasi komentar induk gagal:', parentError);
-            throw new Error('Gagal memeriksa komentar induk. Silakan coba lagi.');
+        if (error) {
+            console.error('[SALINK] Insert komentar gagal:', error);
+            throw error;
         }
 
-        if (!parent) {
-            throw new Error('Komentar yang ingin dibalas sudah tidak tersedia.');
+        if (!data || !data.id) {
+            throw new Error('Komentar belum dapat dikonfirmasi tersimpan.');
         }
 
-        if (parent.post_id !== postId) {
-            throw new Error('Komentar induk tidak sesuai dengan postingan ini.');
-        }
+        console.log('[SALINK] Komentar berhasil disimpan:', data.id);
 
-        if (parent.deleted_at !== null) {
-            throw new Error('Komentar induk sudah dihapus dan tidak dapat dibalas.');
-        }
+        return data;
     }
 
-    // 6. Masukkan komentar atau balasan ke Supabase.
-    const { data, error } = await SB
-        .from('comments')
-        .insert({
-            post_id: postId,
-            user_id: currentAuthUser.id,
-            content: cleanContent,
-            parent_id: validParentId
-        })
-        .select('id, post_id, user_id, content, parent_id, created_at')
-        .single();
-
-    if (error) {
-        console.error('[SALINK] Insert komentar gagal:', error);
-        throw error;
-    }
-
-    if (!data || !data.id) {
-        throw new Error('Komentar belum dapat dikonfirmasi tersimpan.');
-    }
-
-    console.log('[SALINK] Komentar berhasil disimpan:', data.id);
-
-    return data;
-  }
-};
+    // ---------------------------------------------------------
+    // 4. Kirim komentar utama dari modal
+    // ---------------------------------------------------------
 
     sendPostinganComment = async function (postId, modal) {
         const input = modal?.querySelector('#newCommentInput');
+        const button = modal?.querySelector('.send-comment');
         const content = input?.value?.trim();
 
-        if (!content) return;
-        if (!requireLogin()) return;
+        if (!input || !content) {
+            showToast(
+                'Komentar kosong',
+                'Silakan tulis komentar terlebih dahulu.',
+                'fa-info-circle',
+                'warning'
+            );
+            return;
+        }
+
+        if (button?.disabled) return;
 
         try {
-            const button = modal.querySelector('.send-comment');
             if (button) button.disabled = true;
 
+            // insertComment sudah melakukan pemeriksaan login.
             await insertComment(postId, content, null);
 
             if (input) input.value = '';
 
+            // Muat ulang data dan render ulang daftar komentar.
+            try {
+                await reloadComments(postId);
+            } catch (refreshError) {
+                console.warn(
+                    '[SALINK] Komentar tersimpan, tetapi tampilan gagal diperbarui:',
+                    refreshError
+                );
+            }
+
             playRegularSound();
+
             showToast(
                 '💬 Terkirim',
                 'Komentar berhasil disimpan.',
                 'fa-check-circle',
                 'success'
             );
+
         } catch (error) {
             showCommentError('Mengirim komentar', error);
+
         } finally {
-            const button = modal?.querySelector('.send-comment');
             if (button) button.disabled = false;
         }
     };
+
         
     // ---------------------------------------------------------
-    // 4. Edit komentar utama maupun balasan
+    // 5. Edit komentar utama maupun balasan
     // ---------------------------------------------------------
     async function editComment(commentId, postId) {
         if (!requireLogin()) return;
@@ -9211,7 +9236,7 @@ async function insertComment(postId, content, parentId = null) {
     window.editCommentProfile = editComment;
 
     // ---------------------------------------------------------
-    // 5. Hapus komentar + balasan secara atomik melalui RPC
+    // 6. Hapus komentar + balasan secara atomik melalui RPC
     // ---------------------------------------------------------
     async function deleteComment(commentId, postId) {
         if (!requireLogin()) return;
@@ -9248,7 +9273,7 @@ async function insertComment(postId, content, parentId = null) {
     window.deleteCommentProfile = deleteComment;
 
     // ---------------------------------------------------------
-    // 6. Event listener tunggal untuk modal komentar
+    // 7. Event listener tunggal untuk modal komentar
     // ---------------------------------------------------------
     attachCommentListeners = function (modal, postId) {
         if (!modal) return;
@@ -9392,7 +9417,7 @@ async function insertComment(postId, content, parentId = null) {
     };
 
     // ---------------------------------------------------------
-    // 7. Sinkronisasi otomatis komentar dari perangkat lain
+    // 8. Sinkronisasi otomatis komentar dari perangkat lain
     // ---------------------------------------------------------
     if (window.__salinkCommentsChannel) {
         SB.removeChannel(window.__salinkCommentsChannel);
