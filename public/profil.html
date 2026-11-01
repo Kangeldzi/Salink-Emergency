@@ -9115,6 +9115,36 @@ async function insertComment(postId, content, parentId = null) {
   }
 };
 
+    sendPostinganComment = async function (postId, modal) {
+        const input = modal?.querySelector('#newCommentInput');
+        const content = input?.value?.trim();
+
+        if (!content) return;
+        if (!requireLogin()) return;
+
+        try {
+            const button = modal.querySelector('.send-comment');
+            if (button) button.disabled = true;
+
+            await insertComment(postId, content, null);
+
+            if (input) input.value = '';
+
+            playRegularSound();
+            showToast(
+                '💬 Terkirim',
+                'Komentar berhasil disimpan.',
+                'fa-check-circle',
+                'success'
+            );
+        } catch (error) {
+            showCommentError('Mengirim komentar', error);
+        } finally {
+            const button = modal?.querySelector('.send-comment');
+            if (button) button.disabled = false;
+        }
+    };
+        
     // ---------------------------------------------------------
     // 4. Edit komentar utama maupun balasan
     // ---------------------------------------------------------
