@@ -5375,20 +5375,48 @@ window.toggleProfilePostMenu = function(event, postId) {
     if (menu) menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
 };
 
-window.editPostProfile = function(postId) {
+window.editPostProfile = async function(postId) {
+    if (!currentUser || !currentAuthUser) {
+        showToast('🔒 Login', 'Silakan login terlebih dahulu', 'fa-lock', 'error');
+        return;
+    }
+
     const p = posts.find(x => x.id === postId);
     if (!p) return;
+
     const nt = prompt('Edit postingan:', p.text || '');
-    if (nt !== null && nt.trim() !== '') {
+    if (nt === null || nt.trim() === '' || nt.trim() === p.text) return;
+
+    // Tembak ke Supabase
+    try {
+        const { error } = await window.salinkSupabase
+            .from('posts')
+            .update({ 
+                text: nt.trim(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', postId)
+            .eq('user_id', currentAuthUser.id); // Pastikan hanya pemilik yang bisa edit
+
+        if (error) throw error;
+
+        // Update UI Lokal
         p.text = nt.trim();
         safeSavePosts(posts);
         renderPostinganCarousel();
-        showToast('✅', 'Postingan diedit', 'fa-edit');
+        
+        showToast('✅ Berhasil', 'Postingan berhasil diedit di database', 'fa-edit', 'success');
+        playRegularSound();
+
+    } catch (err) {
+        console.error('[Edit Post] Gagal:', err);
+        showToast('❌ Gagal', 'Tidak dapat mengedit postingan: ' + err.message, 'fa-times-circle', 'error');
     }
 };
 
 window.deletePostProfile = function(postId) {
-    requestDelete('post', postId, 'Postingan');
+    // Panggil fungsi modal konfirmasi yang sudah ada
+    requestDelete('post', postId, 'Postingan ini');
 };
 
 document.addEventListener('click', function(e) {
