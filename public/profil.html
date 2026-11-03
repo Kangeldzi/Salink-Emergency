@@ -2967,52 +2967,35 @@ function closeCommentsModal() {
 function attachCommentListeners(modal, postId) {
     if (!modal) return;
 
-    // 1. TOMBOL KIRIM KOMENTAR UTAMA (Perbaikan Tombol Macet)
+    // 1. KIRIM KOMENTAR UTAMA
     const btnSendMain = modal.querySelector('.send-comment');
     if (btnSendMain) {
-        // Hapus event lama jika ada, lalu pasang yang baru
         btnSendMain.onclick = async function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            
+            e.preventDefault(); e.stopPropagation();
             const input = modal.querySelector('#newCommentInput');
             const content = input ? input.value.trim() : '';
-            
-            if (!content) {
-                showToast('⚠️ Kosong', 'Tulis komentar terlebih dahulu', 'fa-exclamation-triangle', 'error');
-                return;
-            }
+            if (!content) return;
 
-            // Ubah tombol jadi loading
             this.disabled = true;
             this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
             try {
                 const { error } = await window.salinkSupabase.from('comments').insert({
-                    user_id: currentAuthUser.id,
-                    post_id: postId,
-                    content: content,
-                    parent_id: null // Komentar utama
+                    user_id: currentAuthUser.id, post_id: postId, content: content, parent_id: null
                 });
-                
                 if (error) throw error;
 
-                input.value = ''; // Kosongkan input
-                await loadData(); // Refresh data dari DB
+                input.value = '';
+                await loadData(); // Refresh data dari Supabase
                 
-                // Render ulang list
                 const post = posts.find(p => p.id === postId);
-                const comments = parsePostComments(post);
-                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
-                
-                // Pasang ulang event listener
+                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(parsePostComments(post), postId);
                 attachCommentListeners(modal, postId);
                 updatePostCommentCounter(postId);
                 
+                playRegularSound(); // Suara indikator
                 showToast('✅', 'Komentar terkirim', 'fa-check-circle', 'success');
-
             } catch(err) {
-                console.error(err);
                 showToast('❌ Gagal', err.message, 'fa-times-circle', 'error');
             } finally {
                 this.disabled = false;
@@ -3021,7 +3004,7 @@ function attachCommentListeners(modal, postId) {
         };
     }
 
-    // 2. TOMBOL TOGGLE BALASAN
+    // 2. TOGGLE FORM BALASAN
     modal.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(btn => {
         btn.onclick = function(e) {
             e.preventDefault(); e.stopPropagation();
@@ -3029,72 +3012,90 @@ function attachCommentListeners(modal, postId) {
             const box = document.getElementById('replyBox-' + commentId);
             if (!box) return;
             
-            // Sembunyikan box balasan lain
             modal.querySelectorAll('.comment-reply-box').forEach(b => {
                 if (b.id !== 'replyBox-' + commentId) b.style.display = 'none';
             });
-            
-            // Toggle box yang diklik
-            const isHidden = box.style.display === 'none' || box.style.display === '';
-            box.style.display = isHidden ? 'flex' : 'none';
-            if (isHidden) {
-                setTimeout(() => box.querySelector('input')?.focus(), 100);
-            }
+            box.style.display = (box.style.display === 'none' || box.style.display === '') ? 'flex' : 'none';
+            if (box.style.display === 'flex') setTimeout(() => box.querySelector('input')?.focus(), 100);
         };
     });
 
-    // 3. TOMBOL KIRIM BALASAN (Perbaikan Tombol Balasan)
+    // 3. KIRIM BALASAN (Dengan Suara Nada Dering)
     modal.querySelectorAll('.reply-send-btn').forEach(btn => {
         btn.onclick = async function(e) {
             e.preventDefault(); e.stopPropagation();
             const parentId = this.dataset.parentId;
             const input = this.parentElement.querySelector('input');
             const content = input.value.trim();
-            
             if (!content) return;
 
             this.disabled = true;
             const icon = this.querySelector('i');
-            const origClass = icon.className;
             icon.className = 'fas fa-spinner fa-spin';
 
             try {
                 const { error } = await window.salinkSupabase.from('comments').insert({
-                    user_id: currentAuthUser.id,
-                    post_id: postId,
-                    content: content,
-                    parent_id: parentId // Ini balasan
+                    user_id: currentAuthUser.id, post_id: postId, content: content, parent_id: parentId
                 });
                 if (error) throw error;
-                
+
                 input.value = '';
                 this.parentElement.style.display = 'none';
                 await loadData();
                 
-                const updatedPost = posts.find(p => p.id === postId);
-                const comments = parsePostComments(updatedPost);
-                
-                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+                const post = posts.find(p => p.id === postId);
+                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(parsePostComments(post), postId);
                 attachCommentListeners(modal, postId);
                 updatePostCommentCounter(postId);
                 
+                playRegularSound(); // 💡 SUARA NADA DERING SAAT SUKSES BALAS
                 showToast('✅', 'Balasan terkirim', 'fa-check-circle', 'success');
             } catch(err) {
                 showToast('❌ Gagal', err.message, 'fa-times-circle', 'error');
             } finally {
                 this.disabled = false;
-                icon.className = origClass;
+                icon.className = 'fas fa-paper-plane';
             }
         };
     });
 
-    // 4. LIKE / EDIT / HAPUS (Tetap sama)
-    ['like-comment','edit-comment','delete-comment'].forEach(action => {
+    // 4. LIKE KOMENTAR (Hit Supabase Langsung)
+    modal.querySelectorAll('.comment-action-btn[data-action="like-comment"]').forEach(btn => {
+        btn.onclick = async function(e) {
+            e.preventDefault(); e.stopPropagation();
+            const commentId = this.dataset.commentId;
+            
+            try {
+                // Cek apakah sudah like dari UI
+                const isLiked = this.style.color === 'var(--accent-red)';
+                
+                if (isLiked) {
+                    await window.salinkSupabase.from('comment_likes').delete().eq('comment_id', commentId).eq('user_id', currentAuthUser.id);
+                } else {
+                    await window.salinkSupabase.from('comment_likes').insert({ comment_id: commentId, user_id: currentAuthUser.id });
+                }
+                
+                playRegularSound(); // 💡 Suara saat Like
+                await loadData(); // Tarik data terbaru dari DB
+                
+                // Render ulang UI
+                const post = posts.find(p => p.id === postId);
+                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(parsePostComments(post), postId);
+                attachCommentListeners(modal, postId);
+                
+            } catch(err) {
+                console.error(err);
+                showToast('❌ Gagal Like', err.message, 'fa-times-circle', 'error');
+            }
+        };
+    });
+
+    // 5. HAPUS & EDIT
+    ['edit-comment','delete-comment'].forEach(action => {
         modal.querySelectorAll(`.comment-action-btn[data-action="${action}"]`).forEach(btn => {
             btn.onclick = function(e) {
                 e.preventDefault(); e.stopPropagation();
                 const commentId = this.dataset.commentId;
-                if (action === 'like-comment') window.toggleCommentLikeProfile?.(commentId, postId);
                 if (action === 'edit-comment') window.editCommentProfile?.(commentId, postId);
                 if (action === 'delete-comment') window.deleteCommentProfile?.(commentId, postId);
             };
@@ -3107,40 +3108,39 @@ function renderCommentsListDynamic(comments, postId) {
         return '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.75rem;">Belum ada komentar</div>';
     }
     
-    // Ratakan komentar induk dan balasan
+    // Ratakan komentar induk dan balasan menjadi satu list
     const flatComments = [];
-    
     comments.forEach(c => {
-        // Pastikan teks komentar ada
         c.text = c.text || c.content || '';
+        c.is_reply = false;
         flatComments.push(c);
         
-        // Jika ada balasan, masukkan ke list
         if (c.replies && Array.isArray(c.replies)) {
             c.replies.forEach(r => {
                 r.text = r.text || r.content || '';
-                r._isReply = true;
-                r._parentName = c.userFullName || c.userId; // Nama yang dibalas
+                r.is_reply = true;
+                r.parent_name = c.userFullName || c.userId;
                 flatComments.push(r);
             });
         }
     });
 
     return flatComments.map(c => {
+        // Avatar
         const cp = c.userProfilePic
             ? `<img src="${escapeAttr(c.userProfilePic)}" alt="" style="width:100%;height:100%;object-fit:cover;">`
             : (c.userGender === 'female' ? '<i class="fas fa-female" style="color:#fff;font-size:0.7rem;"></i>' : '<i class="fas fa-male" style="color:#fff;font-size:0.7rem;"></i>');
 
+        // Cek kepemilikan & status like
         const isOwn = currentAuthUser && (c.user_id === currentAuthUser.id || c.userId === currentUser?.username);
         const isLiked = !!c.is_liked;
         const likeCount = c.likes_count || 0;
         
-        // Jika ini balasan, geser tampilannya sedikit ke kanan & beri label
-        const marginLeft = c._isReply ? 'margin-left: 20px; border-left: 2px solid var(--primary); padding-left: 8px;' : '';
-        let replyToHTML = '';
-        if (c._isReply && c._parentName) {
-            replyToHTML = `<div style="font-size:0.6rem;color:var(--text-muted);margin-bottom:4px;display:flex;align-items:center;gap:4px;"><i class="fas fa-reply fa-flip-horizontal"></i> Membalas <strong style="color:var(--primary);">@${escapeHTML(c._parentName)}</strong></div>`;
-        }
+        // Indentasi jika ini balasan
+        const marginLeft = c.is_reply ? 'margin-left: 20px; border-left: 2px solid var(--primary); padding-left: 8px;' : '';
+        const replyToHTML = (c.is_reply && c.parent_name) 
+            ? `<div style="font-size:0.6rem;color:var(--text-muted);margin-bottom:4px;"><i class="fas fa-reply fa-flip-horizontal"></i> Membalas <strong style="color:var(--primary);">@${escapeHTML(c.parent_name)}</strong></div>` 
+            : '';
 
         return `
             <div style="margin-bottom:12px; padding-bottom:12px; border-bottom:1px dashed rgba(255,255,255,0.1); ${marginLeft}">
@@ -3148,9 +3148,7 @@ function renderCommentsListDynamic(comments, postId) {
                     <div style="width:28px;height:28px;border-radius:50%;overflow:hidden;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1.5px solid var(--primary);cursor:pointer;" onclick="goToCommentProfile('${escapeAttr(c.userId)}')">${cp}</div>
                     <div style="flex:1;min-width:0;">
                         <div style="font-size:0.68rem;font-weight:700;color:var(--primary);cursor:pointer;" onclick="goToCommentProfile('${escapeAttr(c.userId)}')">${escapeHTML(c.userFullName)}</div>
-                        
                         ${replyToHTML}
-                        
                         <div style="font-size:0.75rem;color:var(--text-primary);margin:3px 0;line-height:1.5;">${escapeHTML(c.text)}</div>
                         
                         <div style="display:flex;gap:10px;font-size:0.6rem;color:var(--text-muted);margin-top:6px;flex-wrap:wrap;align-items:center;">
@@ -3171,7 +3169,7 @@ function renderCommentsListDynamic(comments, postId) {
                             <span style="margin-left:auto;">${getTimeAgo(c.timestamp)}</span>
                         </div>
                         
-                        <div id="replyBox-${c.id}" class="comment-reply-box">
+                        <div id="replyBox-${c.id}" class="comment-reply-box" style="display:none;">
                             <input type="text" id="replyInput-${c.id}" placeholder="Balas @${escapeAttr(c.userId)}...">
                             <button class="reply-send-btn" data-parent-id="${c.id}" data-post-id="${postId}" type="button"><i class="fas fa-paper-plane"></i></button>
                         </div>
@@ -3275,44 +3273,38 @@ window.editCommentProfile = async function(commentId, postId) {
  * ============================================================ */
 window.deleteCommentProfile = async function(commentId, postId) {
     if (!currentAuthUser) return;
-    if (!confirm('Hapus komentar secara permanen?')) return;
+    if (!confirm('Hapus komentar ini secara permanen?')) return;
 
     try {
-        await deleteCommentPermanently(commentId, postId);
-        showToast('✅ Terhapus', 'Komentar berhasil dihapus permanen.', 'fa-check-circle', 'success');
+        // Hapus komentar
+        const { error } = await window.salinkSupabase.from('comments').delete().eq('id', commentId);
+        if (error) throw error;
+
+        // PENTING: Ambil ulang data dari Supabase agar memori lokal terupdate
+        await loadData(); 
+        
+        // Render ulang list komentar di modal
+        const modal = document.getElementById('postinganCommentsModal');
+        if (modal) {
+            const updatedPost = posts.find(p => String(p.id) === String(postId));
+            if (updatedPost) {
+                const comments = parsePostComments(updatedPost);
+                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+                attachCommentListeners(modal, postId);
+                const badge = modal.querySelector('.badge-count');
+                if (badge) badge.textContent = countPostComments(updatedPost);
+            }
+        }
+        
+        updatePostCommentCounter(postId);
+        playRegularSound(); // Suara saat hapus sukses
+        showToast('✅ Terhapus', 'Komentar berhasil dihapus.', 'fa-check-circle', 'success');
+        
     } catch (err) {
         console.error('[SALINK DELETE COMMENT]', err);
         showToast('❌ Gagal', err.message || 'Komentar gagal dihapus.', 'fa-times-circle', 'error');
     }
 };
-
-async function deleteCommentPermanently(commentId, postId) {
-    const client = window.salinkSupabase;
-    if (!client || !currentAuthUser) throw new Error('Sesi Supabase tidak tersedia.');
-
-    // Hapus komentar (RLS akan membatasi hanya pemilik)
-    const { error } = await client.from('comments').delete().eq('id', commentId);
-    if (error) throw error;
-
-    await loadData();
-
-    const modal = document.getElementById('postinganCommentsModal');
-    if (modal) {
-        const updatedPost = posts.find(p => String(p.id) === String(postId));
-        if (updatedPost) {
-            const comments = parsePostComments(updatedPost);
-            const list = modal.querySelector('#commentsListDynamic');
-            if (list) {
-                list.innerHTML = renderCommentsListDynamic(comments, postId);
-                attachCommentListeners(modal, postId);
-            }
-            const badge = modal.querySelector('.badge-count');
-            if (badge) badge.textContent = countPostComments(updatedPost);
-        }
-    }
-    updatePostCommentCounter(postId);
-    return true;
-}
 
 /* ================================================================
  * GPS
