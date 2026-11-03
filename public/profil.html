@@ -2815,7 +2815,7 @@ function buildScrollPostCard(post) {
         if (c.replies && Array.isArray(c.replies)) totalComments += c.replies.length;
     });
 
-    // Paksa cek menggunakan String agar tidak gagal cocok ID
+    // Paksa konversi ke String agar UUID bisa dicocokkan dengan String dari Supabase
     const isLiked = currentAuthUser && likes.map(String).includes(String(currentAuthUser.id));
     const viewerCount = parseInt(post.viewerCount || 0, 10) || 0;
 
@@ -2955,14 +2955,30 @@ async function handlePostinganLike(postId) {
             result = await client.from('likes').insert({ user_id: userId, post_id: postId });
         }
         if (result.error) throw result.error;
-        
-        // Tarik data terbaru
-        await loadData(); 
+
+        // ✅ PERBAIKAN: Ubah data di memori LOKAL terlebih dahulu agar UI langsung berubah 0 detik
+        if (isUnlike) {
+            post.likes = JSON.stringify(likes.filter(id => String(id) !== String(userId)));
+        } else {
+            post.likes = JSON.stringify([...likes, userId]);
+        }
+
+        // Gambar ulang kartu postingan secara instan (Tanpa nunggu Supabase)
+        renderPostinganCarousel();
         updateStats();
         playRegularSound();
+
+        // Tarik data dari Supabase di belakang layar untuk memastikan sinkron
+        loadData().then(() => {
+            renderPostinganCarousel();
+            updateStats();
+        });
+
     } catch (err) {
         console.error('[SALINK LIKE]', err);
         showToast('❌ Gagal', err.message || 'Like gagal diperbarui.', 'fa-times-circle', 'error');
+        // Jika error, kembalikan data ke aslinya
+        loadData(); 
     }
 }
 
