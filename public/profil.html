@@ -2047,12 +2047,62 @@ async function apiGetFriends() {
     return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
 }
 async function apiGetProducts() {
-    const r = await apiCall('get_products');
-    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
+    try {
+        if (window.SALINK_SB_READY && window.salinkSupabase) {
+            // Ambil dari tabel products di Supabase
+            const { data, error } = await window.salinkSupabase
+                .from('products')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(10);
+            
+            if (error) throw error;
+            
+            // Format ulang ke camelCase sesuai kebutuhan UI
+            return (data || []).map(p => ({
+                id: p.id,
+                name: p.name,
+                price: p.price,
+                stock: p.stock,
+                imageUrl: p.image_url,
+                sellerId: p.seller_id,
+                sellerName: p.seller_name || 'Seller',
+                createdAt: p.created_at
+            }));
+        }
+    } catch (err) {
+        console.warn('[SALINK Products] Error:', err.message);
+    }
+    return [];
 }
 async function apiGetTransactions() {
-    const r = await apiCall('get_transactions');
-    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
+    try {
+        if (window.SALINK_SB_READY && window.salinkSupabase && currentAuthUser) {
+            // Ambil transaksi milik user yang sedang login
+            const { data, error } = await window.salinkSupabase
+                .from('transactions')
+                .select('*')
+                .eq('buyer_id', currentAuthUser.id) // Filter berdasarkan UUID pembeli
+                .order('created_at', { ascending: false });
+            
+            if (error) throw error;
+            
+            return (data || []).map(t => ({
+                id: t.id,
+                buyerId: t.buyer_id,
+                buyerName: t.buyer_name || 'Pembeli',
+                sellerName: t.seller_name || 'Seller',
+                productName: t.product_name || 'Produk',
+                quantity: t.quantity || 1,
+                totalPrice: t.total_price || 0,
+                status: t.status || 'pending',
+                createdAt: t.created_at
+            }));
+        }
+    } catch (err) {
+        console.warn('[SALINK Trans] Error:', err.message);
+    }
+    return [];
 }
 async function apiSavePost(postData) {
     const payload = {
@@ -2810,24 +2860,32 @@ async function handlePostinganLike(postId) {
         likes = typeof post.likes === 'string' ? JSON.parse(post.likes || '[]') : (post.likes || []);
     } catch (e) { likes = []; }
 
-    const userId = currentAuthUser.id;
+    const userId = currentAuthUser.id; // UUID dari Supabase Auth
     const isUnlike = likes.includes(userId);
     const client = window.salinkSupabase;
 
     try {
+        // 1. Tembak ke Supabase langsung
         let result;
         if (isUnlike) {
+            // Hapus like jika sudah ada
             result = await client.from('likes').delete().eq('user_id', userId).eq('post_id', postId);
         } else {
+            // Tambah like baru
             result = await client.from('likes').insert({ user_id: userId, post_id: postId });
         }
+
+        // 2. Cek Error
         if (result.error) throw result.error;
-        await loadData();
+
+        // 3. Tarik data terbaru dari Supabase agar sinkron
+        await loadData(); 
         updateStats();
-        playRegularSound();
+        playRegularSound(); // Suara indikator sukses
+
     } catch (err) {
-        console.error('[SALINK LIKE]', err);
-        showToast('❌ Gagal', err.message || 'Like gagal diperbarui.', 'fa-times-circle', 'error');
+        console.error('[SALINK LIKE ERROR]', err);
+        showToast('❌ Gagal Like', err.message || 'Like gagal diperbarui.', 'fa-times-circle', 'error');
     }
 }
 
@@ -3766,21 +3824,48 @@ async function refreshMiniMarketplace() {
 /* ================================================================
  * STATISTIK 3x2
  * ================================================================ */
-function loadStats3x2() {
+async function loadStats3x2() {
+    // Tampilkan angka awal 0 sambil menunggu data
     statsData = { favorit: 0, pesanan: 0, keranjang: 0, buyer: 0, toko: 0, seller: 0 };
+    
+    try {
+        if (window.SALINK_SB_READY && window.salinkSupabase && currentAuthUser) {
+            // 1. Hitung Keranjang dari LocalStorage
+            try {
+                const cart = JSON.parse(localStorage.getItem('salink_cart') || '[]');
+                statsData.keranjang = Array.isArray(cart) ? cart.length : 0;
+            } catch(e) {}
 
-    try {
-        const favs = JSON.parse(localStorage.getItem('salink_favorites') || '[]');
-        statsData.favorit = Array.isArray(favs) ? favs.length : 0;
-    } catch(e) {}
-    try {
-        const cart = JSON.parse(localStorage.getItem('salink_cart') || '[]');
-        statsData.keranjang = Array.isArray(cart) ? cart.length : 0;
-    } catch(e) {}
-    try {
-        const orders = JSON.parse(localStorage.getItem('salink_mini_orders_cache') || '[]');
-        statsData.pesanan = Array.isArray(orders) ? orders.length : 0;
-    } catch(e) {}
+            // 2. Hitung Favorit dari LocalStorage
+            try {
+                const favs = JSON.parse(localStorage.getItem('salink_favorites') || '[]');
+                statsData.favorit = Array.isArray(favs) ? favs.length : 0;
+            } catch(e) {}
+
+            // 3. Hitung Pesanan Saya dari Supabase
+            const { count: orderCount, error: orderErr } = await window.salinkSupabase
+                .from('transactions')
+                .select('*', { count: 'exact', head: true })
+                .eq('buyer_id', currentAuthUser.id);
+            
+            if (!orderErr && orderCount !== null) {
+                statsData.pesanan = orderCount;
+            }
+
+            // 4. Hitung Total Pembeli (Jika Anda punya toko/jualan)
+            // Menghitung berapa banyak transaksi yang buyer-nya membeli produk Anda
+            const { count: buyerCount, error: buyerErr } = await window.salinkSupabase
+                .from('transactions')
+                .select('*', { count: 'exact', head: true })
+                .eq('seller_id', currentAuthUser.id);
+
+            if (!buyerErr && buyerCount !== null) {
+                statsData.buyer = buyerCount;
+            }
+        }
+    } catch (err) {
+        console.warn('[SALINK Stats] Gagal memuat statistik:', err);
+    }
 
     renderStats3x2();
 }
