@@ -1974,6 +1974,9 @@ function closeModal(id) {
 /* ================================================================
  * API CALL
  * ================================================================ */
+/* ================================================================
+ * ✅ PATCH: API GETTERS DARI SUPABASE
+ * ================================================================ */
 async function apiCall(action, data = {}) {
     try {
         if (action.startsWith('get_')) {
@@ -1999,13 +2002,53 @@ async function apiCall(action, data = {}) {
     }
 }
 async function apiGetPosts() {
-    const r = await apiCall('get_posts');
-    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
+    try {
+        if (window.SALINK_SB_READY && window.salinkSupabase) {
+            const { data, error } = await window.salinkSupabase
+                .from('posts')
+                .select('*')
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            
+            // Format disesuaikan dengan struktur UI lama
+            return (data || []).map(p => ({
+                id: p.id,
+                userId: p.user_id,
+                text: p.text,
+                timestamp: new Date(p.created_at).getTime(),
+                likes: p.likes || '[]',
+                comments: p.comments || '[]',
+                mediaType: p.media_type,
+                gdriveImageUrl: p.media_url,
+                gdriveVideoEmbed: p.media_url
+            }));
+        }
+    } catch (err) { console.warn('[SALINK Posts]', err.message); }
+    return [];
 }
+    
 async function apiGetEmergencies() {
-    const r = await apiCall('get_emergencies');
-    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
+    try {
+        if (window.SALINK_SB_READY && window.salinkSupabase) {
+            const { data, error } = await window.salinkSupabase
+                .from('emergencies')
+                .select('*')
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+
+            return (data || []).map(e => ({
+                id: e.id,
+                type: e.type,
+                description: e.description,
+                location: e.location,
+                sender: e.sender_name || 'User',
+                timestamp: new Date(e.created_at).getTime()
+            }));
+        }
+    } catch (err) { console.warn('[SALINK Emergencies]', err.message); }
+    return [];
 }
+    
 async function apiGetNotifications() {
     try {
         if (window.SALINK_SB_READY && window.salinkSupabase && currentAuthUser?.id) {
@@ -2042,10 +2085,48 @@ async function apiGetUsers() {
     } catch (err) { console.warn('[Users] Error:', err.message); }
     return [];
 }
+
 async function apiGetFriends() {
-    const r = await apiCall('get_friends');
-    return r.status === 'success' && Array.isArray(r.data) ? r.data : [];
+    try {
+        if (window.SALINK_SB_READY && window.salinkSupabase && currentAuthUser) {
+            // Mengambil data dari tabel friendships berdasarkan UUID user yang login
+            const { data, error } = await window.salinkSupabase
+                .from('friendships')
+                .select(`
+                    id,
+                    user1_id,
+                    user2_id,
+                    user1_profile:profiles!friendships_user1_id_fkey(username, full_name, profile_picture),
+                    user2_profile:profiles!friendships_user2_id_fkey(username, full_name, profile_picture)
+                `)
+                .or(`user1_id.eq.${currentAuthUser.id},user2_id.eq.${currentAuthUser.id}`);
+            
+            if (error) throw error;
+            
+            // Format ulang data agar sesuai dengan tampilan UI profil
+            return (data || []).map(f => {
+                // Tentukan siapa "teman" (bukan diri sendiri)
+                const isUser1 = f.user1_id === currentAuthUser.id;
+                const friendProfile = isUser1 ? f.user2_profile : f.user1_profile;
+                const friendId = isUser1 ? f.user2_id : f.user1_id;
+
+                return {
+                    id: f.id,
+                    name: friendProfile?.full_name || 'Pengguna',
+                    username: friendProfile?.username || 'user',
+                    profilePicture: friendProfile?.profile_picture || '',
+                    // Untuk kompatibilitas dengan fungsi pencarian teman yang lama
+                    user1: isUser1 ? currentUser.username : friendProfile?.username,
+                    user2: isUser1 ? friendProfile?.username : currentUser.username
+                };
+            });
+        }
+    } catch (err) { 
+        console.warn('[SALINK Friends]', err.message); 
+    }
+    return [];
 }
+    
 async function apiGetProducts() {
     try {
         if (window.SALINK_SB_READY && window.salinkSupabase) {
@@ -2734,7 +2815,8 @@ function buildScrollPostCard(post) {
         if (c.replies && Array.isArray(c.replies)) totalComments += c.replies.length;
     });
 
-    const isLiked = currentAuthUser && likes.includes(currentAuthUser.id);
+    // Paksa cek menggunakan String agar tidak gagal cocok ID
+    const isLiked = currentAuthUser && likes.map(String).includes(String(currentAuthUser.id));
     const viewerCount = parseInt(post.viewerCount || 0, 10) || 0;
 
     return `
@@ -2860,32 +2942,27 @@ async function handlePostinganLike(postId) {
         likes = typeof post.likes === 'string' ? JSON.parse(post.likes || '[]') : (post.likes || []);
     } catch (e) { likes = []; }
 
-    const userId = currentAuthUser.id; // UUID dari Supabase Auth
-    const isUnlike = likes.includes(userId);
+    const userId = currentAuthUser.id;
+    // Paksa string untuk pengecekan
+    const isUnlike = likes.map(String).includes(String(userId));
     const client = window.salinkSupabase;
 
     try {
-        // 1. Tembak ke Supabase langsung
         let result;
         if (isUnlike) {
-            // Hapus like jika sudah ada
             result = await client.from('likes').delete().eq('user_id', userId).eq('post_id', postId);
         } else {
-            // Tambah like baru
             result = await client.from('likes').insert({ user_id: userId, post_id: postId });
         }
-
-        // 2. Cek Error
         if (result.error) throw result.error;
-
-        // 3. Tarik data terbaru dari Supabase agar sinkron
+        
+        // Tarik data terbaru
         await loadData(); 
         updateStats();
-        playRegularSound(); // Suara indikator sukses
-
+        playRegularSound();
     } catch (err) {
-        console.error('[SALINK LIKE ERROR]', err);
-        showToast('❌ Gagal Like', err.message || 'Like gagal diperbarui.', 'fa-times-circle', 'error');
+        console.error('[SALINK LIKE]', err);
+        showToast('❌ Gagal', err.message || 'Like gagal diperbarui.', 'fa-times-circle', 'error');
     }
 }
 
