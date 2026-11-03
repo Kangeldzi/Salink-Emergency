@@ -825,6 +825,38 @@
 
         /* ✅ PATCH CSS: Loading spinner untuk tombol */
         .btn-loading { pointer-events: none; opacity: 0.7; }
+
+        /* ✅ PATCH CSS: Perbaikan Tombol Kirim Balasan */
+        .reply-send-btn {
+         background: var(--accent-blue-gradient);
+         border: none;
+         color: #fff;
+         border-radius: 50%;
+         width: 32px;
+         height: 32px;
+         min-width: 32px;
+         display: flex;
+         align-items: center;
+         justify-content: center;
+         cursor: pointer;
+         box-shadow: 0 2px 8px rgba(230,0,18,0.3);
+         transition: all 0.2s;
+         padding: 0;
+      }
+        .reply-send-btn:active {
+         transform: scale(0.9);
+      }
+        .reply-send-btn i {
+         font-size: 0.75rem;
+         margin-left: 2px; /* Agar panah terlihat seimbang */
+      }
+
+/* ✅ PATCH CSS: Memperbaiki Input Balasan */
+.comment-reply-box input {
+    border: 1px solid var(--primary);
+    box-shadow: 0 0 5px rgba(230,0,18,0.2);
+}
+        
 </style>
 </head>
 <body>
@@ -2935,30 +2967,90 @@ function closeCommentsModal() {
 function attachCommentListeners(modal, postId) {
     if (!modal) return;
 
-    // A. Toggle Balas
+    // 1. TOMBOL KIRIM KOMENTAR UTAMA (Perbaikan Tombol Macet)
+    const btnSendMain = modal.querySelector('.send-comment');
+    if (btnSendMain) {
+        // Hapus event lama jika ada, lalu pasang yang baru
+        btnSendMain.onclick = async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const input = modal.querySelector('#newCommentInput');
+            const content = input ? input.value.trim() : '';
+            
+            if (!content) {
+                showToast('⚠️ Kosong', 'Tulis komentar terlebih dahulu', 'fa-exclamation-triangle', 'error');
+                return;
+            }
+
+            // Ubah tombol jadi loading
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            try {
+                const { error } = await window.salinkSupabase.from('comments').insert({
+                    user_id: currentAuthUser.id,
+                    post_id: postId,
+                    content: content,
+                    parent_id: null // Komentar utama
+                });
+                
+                if (error) throw error;
+
+                input.value = ''; // Kosongkan input
+                await loadData(); // Refresh data dari DB
+                
+                // Render ulang list
+                const post = posts.find(p => p.id === postId);
+                const comments = parsePostComments(post);
+                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+                
+                // Pasang ulang event listener
+                attachCommentListeners(modal, postId);
+                updatePostCommentCounter(postId);
+                
+                showToast('✅', 'Komentar terkirim', 'fa-check-circle', 'success');
+
+            } catch(err) {
+                console.error(err);
+                showToast('❌ Gagal', err.message, 'fa-times-circle', 'error');
+            } finally {
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-paper-plane"></i>';
+            }
+        };
+    }
+
+    // 2. TOMBOL TOGGLE BALASAN
     modal.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(btn => {
         btn.onclick = function(e) {
             e.preventDefault(); e.stopPropagation();
             const commentId = this.dataset.commentId;
             const box = document.getElementById('replyBox-' + commentId);
             if (!box) return;
+            
+            // Sembunyikan box balasan lain
             modal.querySelectorAll('.comment-reply-box').forEach(b => {
-                if (b.id !== 'replyBox-' + commentId) b.classList.remove('show');
+                if (b.id !== 'replyBox-' + commentId) b.style.display = 'none';
             });
-            box.classList.toggle('show');
-            if (box.classList.contains('show')) {
+            
+            // Toggle box yang diklik
+            const isHidden = box.style.display === 'none' || box.style.display === '';
+            box.style.display = isHidden ? 'flex' : 'none';
+            if (isHidden) {
                 setTimeout(() => box.querySelector('input')?.focus(), 100);
             }
         };
     });
 
-    // B. Kirim Balasan
+    // 3. TOMBOL KIRIM BALASAN (Perbaikan Tombol Balasan)
     modal.querySelectorAll('.reply-send-btn').forEach(btn => {
         btn.onclick = async function(e) {
             e.preventDefault(); e.stopPropagation();
             const parentId = this.dataset.parentId;
             const input = this.parentElement.querySelector('input');
             const content = input.value.trim();
+            
             if (!content) return;
 
             this.disabled = true;
@@ -2971,24 +3063,24 @@ function attachCommentListeners(modal, postId) {
                     user_id: currentAuthUser.id,
                     post_id: postId,
                     content: content,
-                    parent_id: parentId
+                    parent_id: parentId // Ini balasan
                 });
                 if (error) throw error;
-
+                
                 input.value = '';
-                this.parentElement.classList.remove('show');
+                this.parentElement.style.display = 'none';
                 await loadData();
-
+                
                 const updatedPost = posts.find(p => p.id === postId);
-                if (updatedPost && modal) {
-                    const comments = parsePostComments(updatedPost);
-                    modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
-                    attachCommentListeners(modal, postId);
-                    updatePostCommentCounter(postId);
-                }
-                showToast('✅', 'Balasan terkirim', 'fa-check-circle');
+                const comments = parsePostComments(updatedPost);
+                
+                modal.querySelector('#commentsListDynamic').innerHTML = renderCommentsListDynamic(comments, postId);
+                attachCommentListeners(modal, postId);
+                updatePostCommentCounter(postId);
+                
+                showToast('✅', 'Balasan terkirim', 'fa-check-circle', 'success');
             } catch(err) {
-                showToast('❌ Gagal', err.message, 'fa-times-circle');
+                showToast('❌ Gagal', err.message, 'fa-times-circle', 'error');
             } finally {
                 this.disabled = false;
                 icon.className = origClass;
@@ -2996,7 +3088,7 @@ function attachCommentListeners(modal, postId) {
         };
     });
 
-    // C. Like / Edit / Hapus
+    // 4. LIKE / EDIT / HAPUS (Tetap sama)
     ['like-comment','edit-comment','delete-comment'].forEach(action => {
         modal.querySelectorAll(`.comment-action-btn[data-action="${action}"]`).forEach(btn => {
             btn.onclick = function(e) {
@@ -3012,30 +3104,23 @@ function attachCommentListeners(modal, postId) {
 
 function renderCommentsListDynamic(comments, postId) {
     if (!comments || comments.length === 0) {
-        return '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.72rem;">Belum ada komentar</div>';
+        return '<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:0.75rem;">Belum ada komentar</div>';
     }
-
+    
+    // Ratakan komentar induk dan balasan
     const flatComments = [];
-    const commentUserMap = {};
-
+    
     comments.forEach(c => {
-        commentUserMap[c.id] = c.userFullName || c.userId;
-        if (c.replies && Array.isArray(c.replies)) {
-            c.replies.forEach(r => {
-                commentUserMap[r.id] = r.userFullName || r.userId;
-            });
-        }
-    });
-
-    comments.forEach(c => {
+        // Pastikan teks komentar ada
+        c.text = c.text || c.content || '';
         flatComments.push(c);
+        
+        // Jika ada balasan, masukkan ke list
         if (c.replies && Array.isArray(c.replies)) {
             c.replies.forEach(r => {
-                let parentName = '';
-                if (r.parent_id && commentUserMap[r.parent_id]) {
-                    parentName = commentUserMap[r.parent_id];
-                }
-                r._replyToName = parentName;
+                r.text = r.text || r.content || '';
+                r._isReply = true;
+                r._parentName = c.userFullName || c.userId; // Nama yang dibalas
                 flatComments.push(r);
             });
         }
@@ -3046,23 +3131,28 @@ function renderCommentsListDynamic(comments, postId) {
             ? `<img src="${escapeAttr(c.userProfilePic)}" alt="" style="width:100%;height:100%;object-fit:cover;">`
             : (c.userGender === 'female' ? '<i class="fas fa-female" style="color:#fff;font-size:0.7rem;"></i>' : '<i class="fas fa-male" style="color:#fff;font-size:0.7rem;"></i>');
 
-        const isOwn = currentAuthUser && (c.user_id === currentAuthUser.id || c.userId === currentUser?.username || c.userAuthId === currentAuthUser.id);
+        const isOwn = currentAuthUser && (c.user_id === currentAuthUser.id || c.userId === currentUser?.username);
         const isLiked = !!c.is_liked;
         const likeCount = c.likes_count || 0;
-
+        
+        // Jika ini balasan, geser tampilannya sedikit ke kanan & beri label
+        const marginLeft = c._isReply ? 'margin-left: 20px; border-left: 2px solid var(--primary); padding-left: 8px;' : '';
         let replyToHTML = '';
-        if (c._replyToName) {
-            replyToHTML = `<div style="font-size:0.6rem;color:var(--text-muted);margin-bottom:4px;display:flex;align-items:center;gap:4px;"><i class="fas fa-reply fa-flip-horizontal"></i> Membalas <strong style="color:var(--primary);">@${escapeHTML(c._replyToName)}</strong></div>`;
+        if (c._isReply && c._parentName) {
+            replyToHTML = `<div style="font-size:0.6rem;color:var(--text-muted);margin-bottom:4px;display:flex;align-items:center;gap:4px;"><i class="fas fa-reply fa-flip-horizontal"></i> Membalas <strong style="color:var(--primary);">@${escapeHTML(c._parentName)}</strong></div>`;
         }
 
         return `
-            <div style="margin-bottom:12px; padding-bottom:12px; border-bottom:1px dashed rgba(0,0,0,0.1);">
+            <div style="margin-bottom:12px; padding-bottom:12px; border-bottom:1px dashed rgba(255,255,255,0.1); ${marginLeft}">
                 <div style="display:flex;gap:8px;">
                     <div style="width:28px;height:28px;border-radius:50%;overflow:hidden;background:var(--accent-blue-gradient);display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1.5px solid var(--primary);cursor:pointer;" onclick="goToCommentProfile('${escapeAttr(c.userId)}')">${cp}</div>
                     <div style="flex:1;min-width:0;">
                         <div style="font-size:0.68rem;font-weight:700;color:var(--primary);cursor:pointer;" onclick="goToCommentProfile('${escapeAttr(c.userId)}')">${escapeHTML(c.userFullName)}</div>
+                        
                         ${replyToHTML}
-                        <div style="font-size:0.7rem;color:var(--text-primary);margin:3px 0;line-height:1.5;">${escapeHTML(c.text || c.content)}</div>
+                        
+                        <div style="font-size:0.75rem;color:var(--text-primary);margin:3px 0;line-height:1.5;">${escapeHTML(c.text)}</div>
+                        
                         <div style="display:flex;gap:10px;font-size:0.6rem;color:var(--text-muted);margin-top:6px;flex-wrap:wrap;align-items:center;">
                             <button class="comment-action-btn" data-action="like-comment" data-comment-id="${c.id}" data-post-id="${postId}" style="color:${isLiked ? 'var(--accent-red)' : 'inherit'};">
                                 <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> <span>${likeCount}</span>
@@ -3080,9 +3170,10 @@ function renderCommentsListDynamic(comments, postId) {
                             ` : ''}
                             <span style="margin-left:auto;">${getTimeAgo(c.timestamp)}</span>
                         </div>
+                        
                         <div id="replyBox-${c.id}" class="comment-reply-box">
                             <input type="text" id="replyInput-${c.id}" placeholder="Balas @${escapeAttr(c.userId)}...">
-                            <button class="reply-send-btn" data-parent-id="${c.id}" data-post-id="${postId}" type="button"><i class="fas fa-paper-plane" style="font-size:0.6rem;"></i></button>
+                            <button class="reply-send-btn" data-parent-id="${c.id}" data-post-id="${postId}" type="button"><i class="fas fa-paper-plane"></i></button>
                         </div>
                     </div>
                 </div>
