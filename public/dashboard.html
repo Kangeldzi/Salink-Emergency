@@ -3583,60 +3583,49 @@ async function apiCall(action, data) {
  * - Comments + profiles komentator di-query dengan JOIN
  * - Tidak ada duplikasi, tidak ada kode rusak
  * ================================================================ */
-  async function apiGetPosts() {
+ async function apiGetPosts() {
     try {
         if (window.SALINK_SB_READY && window.salinkSupabase) {
             const client = window.salinkSupabase;
-            const authUserId = currentAuthUser?.id || null; // Guard currentAuthUser
+            const authUserId = currentAuthUser?.id || null;
 
-            console.log('[apiGetPosts] Mulai query Supabase...');
-
-            // 1. Ambil Posts
+            // 1. Ambil Posts (Batas 50 agar ringan)
             const { data: rawPosts, error: postsError } = await client
                 .from('posts')
                 .select('*')
                 .order('created_at', { ascending: false })
-                .limit(100);
+                .limit(50);
 
             if (postsError) throw postsError;
-            if (!rawPosts || rawPosts.length === 0) {
-                console.warn('[apiGetPosts] Tabel posts kosong.');
-                return []; // Kembalikan array kosong, jangan throw error
-            }
+            if (!rawPosts || rawPosts.length === 0) return [];
 
-            // 2. Ambil Profil (dengan fallback jika RLS gagal)
+            // 2. Ambil Profil
             let profileMap = {};
             try {
                 const userIds = [...new Set(rawPosts.map(p => p.user_id).filter(Boolean))];
                 if (userIds.length > 0) {
-                    const { data: profilesData, error: profErr } = await client
+                    const { data: profilesData } = await client
                         .from('profiles')
                         .select('id, username, full_name, profile_picture, gender')
                         .in('id', userIds);
-                    
-                    if (profErr) console.warn('[apiGetPosts] Gagal ambil profiles:', profErr.message);
-                    if (profilesData) {
-                        profilesData.forEach(p => { profileMap[p.id] = p; });
-                    }
+                    if (profilesData) profilesData.forEach(p => { profileMap[p.id] = p; });
                 }
-            } catch (e) { 
-                console.warn('[apiGetPosts] Profiles error (abaikan):', e.message); 
-            }
+            } catch (e) {}
 
             // 3. Ambil Relasi
             const [mediaRes, likesRes, commentsRes, commentLikesRes] = await Promise.allSettled([
-                client.from('media').select('*').not('post_id', 'is', null).limit(1000),
-                client.from('likes').select('*').limit(2000),
-                client.from('comments').select('*').is('deleted_at', null).limit(1000),
-                client.from('comment_likes').select('*').limit(5000)
+                client.from('media').select('*').not('post_id', 'is', null),
+                client.from('likes').select('*'),
+                client.from('comments').select('*').is('deleted_at', null),
+                client.from('comment_likes').select('*')
             ]);
 
-            const rawMedia = mediaRes.status === 'fulfilled' && mediaRes.value.data ? mediaRes.value.data : [];
-            const rawLikes = likesRes.status === 'fulfilled' && likesRes.value.data ? likesRes.value.data : [];
-            const rawComments = commentsRes.status === 'fulfilled' && commentsRes.value.data ? commentsRes.value.data : [];
-            const rawCommentLikes = commentLikesRes.status === 'fulfilled' && commentLikesRes.value.data ? commentLikesRes.value.data : [];
+            const rawMedia = mediaRes.value?.data || [];
+            const rawLikes = likesRes.value?.data || [];
+            const rawComments = commentsRes.value?.data || [];
+            const rawCommentLikes = commentLikesRes.value?.data || [];
 
-            // 4. Ambil Profil Komentator
+            // 4. Profil Komentator
             let commentProfileMap = {};
             try {
                 const commentUserIds = [...new Set(rawComments.map(c => c.user_id).filter(Boolean))];
@@ -3645,10 +3634,7 @@ async function apiCall(action, data) {
                         .from('profiles')
                         .select('id, username, full_name, profile_picture, gender')
                         .in('id', commentUserIds);
-                    
-                    if (cProfiles) {
-                        cProfiles.forEach(p => { commentProfileMap[p.id] = p; });
-                    }
+                    if (cProfiles) cProfiles.forEach(p => { commentProfileMap[p.id] = p; });
                 }
             } catch(e) {}
 
@@ -3660,7 +3646,7 @@ async function apiCall(action, data) {
             rawLikes.forEach(l => {
                 if (!l.post_id) return;
                 if (!likesByPost[l.post_id]) likesByPost[l.post_id] = [];
-                likesByPost[l.post_id].push(l.user_id);
+                likesByPost[l.post_id].push(String(l.user_id)); // Paksa String
             });
 
             const commentsByPost = {};
@@ -3668,7 +3654,6 @@ async function apiCall(action, data) {
                 if (!c.post_id) return;
                 if (!commentsByPost[c.post_id]) commentsByPost[c.post_id] = [];
                 const profile = commentProfileMap[c.user_id] || {};
-                
                 commentsByPost[c.post_id].push({
                     id: c.id, user_id: c.user_id,
                     userId: profile.username || c.user_id || 'user',
@@ -3684,15 +3669,12 @@ async function apiCall(action, data) {
                 });
             });
 
-            // 6. GABUNGKAN & ADAPTASI
+            // 6. Gabungkan & Adaptasi
             const adapted = rawPosts.map(row => {
-                // Suntikkan profil ke row
                 row.profiles = profileMap[row.user_id] || {};
                 row.comments = commentsByPost[row.id] || [];
                 row.media = mediaByPost[row.id] ? [mediaByPost[row.id]] : [];
                 row.likes = likesByPost[row.id] || [];
-
-                // Konversi ke format dashboard
                 return adaptPostFromSupabase(row);
             }).filter(p => p !== null);
 
@@ -3700,18 +3682,13 @@ async function apiCall(action, data) {
             return adapted;
         }
     } catch (err) {
-        console.warn('[SALINK] Supabase error, fallback GAS:', err.message);
+        console.warn('[SALINK] Supabase error:', err.message);
     }
 
-    // Fallback GAS
-    try {
-        const r = await apiCall('get_posts');
-        return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptPost) : [];
-    } catch (err) {
-        return [];
-    }
-}             
-
+    // Fallback jika Supabase tidak siap
+    return [];
+} 
+                    
 async function apiGetEmergencies() {
     const r = await apiCall('get_emergencies');
     return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptEmergency) : [];
@@ -5575,125 +5552,41 @@ console.log('✅ [TAHAP 3] Hologram + Render Posts + Posts Stats loaded');
  * - `user_id` WAJIB di-set = currentAuthUser.id (RLS policy)
  * ================================================================ */
 async function toggleLike(postId) {
-    if (!currentUser) { redirectToLogin(); return; }
-
+    if (!currentUser || !currentAuthUser) { showToast('🔒 Login', 'Silakan login', 'fa-lock'); return; }
     const post = posts.find(p => p.id === postId);
-    if (!post) {
-        console.warn('[Like] Post tidak ditemukan:', postId);
-        return;
-    }
+    if (!post) return;
 
-    // Cek apakah postId UUID Supabase
-    const isUUID = isSupabaseUUID(postId);
+    let likes = [];
+    try { likes = typeof post.likes === 'string' ? JSON.parse(post.likes) : (post.likes || []); } catch (e) {}
+    
+    const userId = currentAuthUser.id;
+    const isUnlike = likes.map(String).includes(String(userId));
+    const client = window.salinkSupabase;
 
-    // Ambil likes array dari global state / LS
-    let likes = getPostLikes(postId) || [];
-    if (!Array.isArray(likes)) likes = [];
-    if (likes.length === 0) {
-        try {
-            likes = typeof post.likes === 'string' ? JSON.parse(post.likes) : (post.likes || []);
-        } catch (e) { likes = []; }
-    }
-
-    // Cek status like user (dari array lokal)
-    const idx = likes.indexOf(currentUser.username);
-    const isUnlike = idx > -1;
-
-    // ============================================================
-    // 1) SUPABASE (PRIMARY)
-    // ============================================================
-    let supabaseOk = false;
-    if (isUUID && window.SALINK_SB_READY && window.salinkSupabase && currentAuthUser?.id) {
-        try {
-            const client = window.salinkSupabase;
-
-            if (isUnlike) {
-                // DELETE dari likes
-                console.log('📤 [Like] Delete dari Supabase:', postId);
-                const { error: delError } = await client
-                    .from('likes')
-                    .delete()
-                    .eq('user_id', currentAuthUser.id)
-                    .eq('post_id', postId);
-
-                if (delError) {
-                    console.warn('⚠️ [Like] Supabase delete error:', delError.message);
-                } else {
-                    supabaseOk = true;
-                    console.log('✅ [Like] Supabase delete OK');
-                }
-            } else {
-                // INSERT ke likes
-                console.log('📤 [Like] Insert ke Supabase:', postId);
-                const { error: insError } = await client
-                    .from('likes')
-                    .insert({
-                        user_id: currentAuthUser.id,
-                        post_id: postId
-                    });
-
-                if (insError) {
-                    // Handle duplicate (kalau sudah ada di DB tapi tidak di LS)
-                    if (insError.code === '23505') {
-                        console.log('ℹ️ [Like] Sudah ada di Supabase (duplicate)');
-                        supabaseOk = true;
-                    } else {
-                        console.warn('⚠️ [Like] Supabase insert error:', insError.message);
-                    }
-                } else {
-                    supabaseOk = true;
-                    console.log('✅ [Like] Supabase insert OK');
-                }
-            }
-        } catch (sbErr) {
-            console.warn('⚠️ [Like] Supabase catch:', sbErr.message);
-        }
-    } else {
-        console.log('ℹ️ [Like] Skip Supabase (bukan UUID atau tidak ready)');
-    }
-
-    // ============================================================
-    // 2) UPDATE UI + GLOBAL STATE
-    // ============================================================
-    if (isUnlike) {
-        likes.splice(idx, 1);
-    } else {
-        likes.push(currentUser.username);
-    }
-
-    setPostLikes(postId, likes);
-    post.likes = JSON.stringify(likes);
-
-    // Simpan ke LS
-    safeSavePosts(posts);
-
-    // ============================================================
-    // 3) DUAL-WRITE KE GAS (BACKUP)
-    // ============================================================
-    const action = isUnlike ? 'unlike_post' : 'like_post';
     try {
-        const r = await apiCall(action, {
-            postId: postId,
-            userId: currentUser.username,
-            userName: currentUser.fullName
-        });
-        console.log('📤 [Like] GAS backup:', r.status);
-    } catch (e) {
-        console.warn('⚠️ [Like] GAS error:', e.message);
+        let result;
+        if (isUnlike) {
+            result = await client.from('likes').delete().eq('user_id', userId).eq('post_id', postId);
+        } else {
+            result = await client.from('likes').insert({ user_id: userId, post_id: postId });
+        }
+        if (result.error) throw result.error;
+
+        // UI Optimistic (Ubah tampilan langsung)
+        if (isUnlike) {
+            post.likes = JSON.stringify(likes.filter(id => String(id) !== String(userId)));
+        } else {
+            post.likes = JSON.stringify([...likes, userId]);
+        }
+        
+        safeSavePosts(posts);
+        renderPosts();
+        updateStatsCards();
+        playRegularSound();
+    } catch (err) {
+        console.error('[LIKE] Gagal:', err);
+        showToast('❌ Gagal Like', err.message, 'fa-times-circle');
     }
-
-    // ============================================================
-    // 4) RENDER + SYNC
-    // ============================================================
-    renderPosts();
-    broadcastSync('stats_update', { postId: postId });
-    playRegularSound();
-
-    console.log('📊 [Like] Result:', {
-        action: isUnlike ? 'unlike' : 'like',
-        supabaseOk: supabaseOk,
-        totalLikes: likes.length
-    });
 }
 
 
@@ -5710,19 +5603,13 @@ async function toggleLike(postId) {
  * 4) Dual-write ke GAS
  * ================================================================ */
 async function addComment(postId, text, parentId = null) {
-    if (!currentUser) { redirectToLogin(); return; }
+    if (!currentUser || !currentAuthUser) { showToast('🔒 Login', 'Silakan login', 'fa-lock'); return; }
 
-    let trimmedText = (text || '').trim();
-    if (!trimmedText) {
-        showToast('⚠️', 'Komentar tidak boleh kosong', 'fa-exclamation-triangle');
-        return;
-    }
+    let trimmedText = text.trim();
+    if (!trimmedText) return;
 
     const post = posts.find(p => p.id === postId);
-    if (!post) {
-        console.warn('[Comment] Post tidak ditemukan:', postId);
-        return;
-    }
+    if (!post) return;
 
     // Cek apakah postId UUID Supabase
     const isUUID = isSupabaseUUID(postId);
@@ -7149,69 +7036,59 @@ function setupLoginGuard() {
 // 41. LOAD DATA — API + Local Merge
 // ====================================================================
 async function loadData() {
-    // PATCH 12A: Kunci Auto-refresh jika sedang posting/hapus
+    // Kunci Auto-refresh jika sedang posting/hapus
     if (window._salinkPostingInProgress || window._salinkDeleteInProgress) {
         console.log('[loadData] Ditunda karena ada proses simpan/hapus.');
         return;
     }
 
-    let localPosts = [];
-    try { localPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]'); } catch(e) {}
-    
-    // PATCH 16: Filter super ketat agar data sampah (NaN/undefined) tidak muncul
-    posts = localPosts
-        .filter(p => {
-            if (!p || !p.id || isDeleted(p.id)) return false;
-            if (!p.userFullName || p.userFullName === 'undefined') return false;
-            if (!p.timestamp || isNaN(new Date(p.timestamp).getTime())) return false;
-            return true;
-        })
-        .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    renderPosts();
-    renderPostsStats();
-
-    // 2. AMBIL DATA DARI SUPABASE
+    // 1. AMBIL DATA DARI SUPABASE (SECARA PARALEL)
     try {
         const results = await Promise.allSettled([
-            apiGetPosts(),
-            apiGetEmergencies(),
-            apiGetNotifications(),
-            apiGetStatistics(),
-            apiGetUsers()
+            apiGetPosts(),         // Ambil Posts dari Supabase
+            apiGetEmergencies(),   // Ambil Emergency
+            apiGetNotifications(), // Ambil Notifikasi
+            apiGetStatistics(),    // Ambil Statistik
+            apiGetUsers()          // Ambil Users
         ]);
 
         // ==============================
-        // 2A. PROSES POSTS
+        // A. PROSES POSTS (SUMBER UTAMA: SUPABASE)
         // ==============================
         let apiPosts = (results[0].status === 'fulfilled' && Array.isArray(results[0].value)) ? results[0].value : [];
-        const supabasePosts = apiPosts.filter(p => p && p._source === 'supabase');
-
-        if (supabasePosts.length > 0) {
-            // Jika Supabase mengembalikan data, GABUNGKAN dengan data lokal (jangan timpa total)
+        
+        // Karena apiGetPosts() sudah kita perbaiki untuk Supabase, 
+        // apiPosts sekarang berisi data terbaru dari database.
+        if (apiPosts.length > 0) {
             const postMap = new Map();
             
-            // Masukkan data Supabase (prioritas utama)
-            supabasePosts.forEach(p => { if (p && p.id && !isDeleted(p.id)) postMap.set(p.id, p); });
+            // Masukkan data dari Supabase
+            apiPosts.forEach(p => { if (p && p.id && !isDeleted(p.id)) postMap.set(p.id, p); });
             
-            // Masukkan data lokal yang mungkin belum ter-sync ke Supabase (umur < 5 menit)
-            posts.forEach(p => { 
+            // Gabungkan dengan data lokal yang BELUM tersync ke Supabase (umur < 5 menit)
+            let localPosts = [];
+            try { localPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]'); } catch(e) {}
+            localPosts.forEach(p => { 
                 if (p && p.id && !postMap.has(p.id)) {
                     const ts = p.timestamp || Date.now();
-                    if (Date.now() - ts < 300000) postMap.set(p.id, p);
+                    if (Date.now() - ts < 300000) postMap.set(p.id, p); // 5 menit
                 }
             });
 
+            // Timpa array global 'posts' dengan data gabungan
             posts = Array.from(postMap.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
             safeSavePosts(posts);
             console.log('✅ [loadData] Sinkronisasi Sukses:', posts.length, 'posts');
         } else {
-            // JIKA SUPABASE KOSONG ATAU ERROR: JANGAN HAPUS DATA LOKAL!
-            console.log('⚠️ [loadData] Supabase kosong/gagal. Mempertahankan data lokal:', posts.length, 'posts');
-            // Jangan ada kode `posts = []` di sini!
+            // Jika Supabase kosong (misal belum ada postingan), pakai data lokal
+            let localPosts = [];
+            try { localPosts = JSON.parse(localStorage.getItem('salink_posts') || '[]'); } catch(e) {}
+            posts = localPosts.filter(p => p && p.id && !isDeleted(p.id));
+            console.log('⚠️ [loadData] Supabase kosong. Menggunakan data lokal:', posts.length, 'posts');
         }
 
         // ==============================
-        // 2B. PROSES EMERGENCIES
+        // B. PROSES EMERGENCIES
         // ==============================
         let apiEms = (results[1].status === 'fulfilled' && Array.isArray(results[1].value)) ? results[1].value : [];
         if (apiEms.length > 0) {
@@ -7231,7 +7108,7 @@ async function loadData() {
         }
 
         // ==============================
-        // 2C. PROSES NOTIFICATIONS
+        // C. PROSES NOTIFICATIONS
         // ==============================
         let apiNotifs = (results[2].status === 'fulfilled' && Array.isArray(results[2].value)) ? results[2].value : [];
         if (apiNotifs.length > 0) {
@@ -7240,18 +7117,18 @@ async function loadData() {
                 .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
             localStorage.setItem('salink_notifications', JSON.stringify(notifications));
 
-            // PATCH 8B — Pemicu Suara Notifikasi Reguler
+            // Pemicu Suara Notifikasi Reguler
             const unreadNotifs = notifications.filter(n => !n.read);
             const lastUnreadCount = parseInt(localStorage.getItem('salink_last_unread_count') || '0');
             if (unreadNotifs.length > lastUnreadCount) {
-                console.log('🔊 [8B] Notifikasi baru masuk, membunyikan suara...');
+                console.log('🔊 Notifikasi baru masuk, membunyikan suara...');
                 playRegularSound();
             }
             localStorage.setItem('salink_last_unread_count', unreadNotifs.length.toString());
         }
 
         // ==============================
-        // 2D. PROSES STATISTICS & USERS
+        // D. PROSES STATISTICS & USERS
         // ==============================
         if (results[3].status === 'fulfilled' && results[3].value) {
             statistics = results[3].value;
@@ -7264,14 +7141,14 @@ async function loadData() {
         }
 
         // ==============================
-        // 2E. PATCH 8C — Deteksi Emergency Baru (Alarm)
+        // E. DETEKSI EMERGENCY BARU (ALARM)
         // ==============================
-        if (supabasePosts.length > 0) {
-            const latestEmergency = supabasePosts.find(p => p.isSpecial && p.specialType);
+        if (apiPosts.length > 0) {
+            const latestEmergency = apiPosts.find(p => p.isSpecial && p.specialType);
             if (latestEmergency) {
                 const lastEmergencyId = localStorage.getItem('salink_last_emergency_id');
                 if (latestEmergency.id !== lastEmergencyId) {
-                    console.log('🚨 [8C] Emergency Baru dari Supabase:', latestEmergency.specialType);
+                    console.log('🚨 Emergency Baru dari Supabase:', latestEmergency.specialType);
                     localStorage.setItem('salink_last_emergency_id', latestEmergency.id);
                     
                     if (typeof triggerLocalEmergencyVisual === 'function') {
@@ -7290,7 +7167,7 @@ async function loadData() {
         }
 
         // ==============================
-        // 3. RENDER ULANG SEMUA UI
+        // F. RENDER ULANG SEMUA UI
         // ==============================
         renderPosts();
         renderPostsStats();
@@ -7302,7 +7179,15 @@ async function loadData() {
         updateAllCharts();
 
     } catch (err) {
-        console.warn('⚠️ [loadData 12A] API error, menggunakan data lokal:', err.message);
+        console.warn('⚠️ [loadData] API error, menggunakan data lokal:', err.message);
+        
+        // Fallback darurat: tampilkan data dari LocalStorage jika jaringan putus
+        try {
+            posts = JSON.parse(localStorage.getItem('salink_posts') || '[]')
+                .filter(p => p && p.id && !isDeleted(p.id));
+            renderPosts();
+            renderPostsStats();
+        } catch(e) {}
     }
 }
 
@@ -8409,26 +8294,34 @@ function initEcommerce() {
 
 async function loadProducts() {
     try {
-        const r = await apiCall('get_products');
-        allProducts = (r.status === 'success' && Array.isArray(r.data)) ? r.data : [];
-        console.log('📦 [Ecom] Loaded', allProducts.length, 'products');
-    } catch (e) {
-        console.error('❌ [Ecom] Load products error:', e);
-        allProducts = [];
-    }
+        if (window.SALINK_SB_READY && window.salinkSupabase) {
+            const { data, error } = await window.salinkSupabase
+                .from('products').select('*').order('created_at', { ascending: false }).limit(10);
+            if (error) throw error;
+            allProducts = (data || []).map(p => ({
+                id: p.id, name: p.name, price: p.price, stock: p.stock,
+                imageUrl: p.image_url, sellerId: p.seller_id, sellerName: p.seller_name,
+                createdAt: p.created_at
+            }));
+        }
+    } catch (e) { console.warn('[Products] Gagal:', e); }
 }
 
 async function loadMyOrders() {
-    if (!currentUser) return;
+    if (!currentUser || !currentAuthUser) return;
     try {
-        const r = await apiCall('get_transactions');
-        const all = (r.status === 'success' && Array.isArray(r.data)) ? r.data : [];
-        allTransactions = all;
-        try { localStorage.setItem('salink_transactions_cache', JSON.stringify(all)); } catch(e) {}
-        console.log('📋 [Ecom] Loaded', allTransactions.length, 'transactions');
-    } catch (e) {
-        try { allTransactions = JSON.parse(localStorage.getItem('salink_transactions_cache') || '[]'); } catch(e2) { allTransactions = []; }
-    }
+        if (window.SALINK_SB_READY && window.salinkSupabase) {
+            const { data, error } = await window.salinkSupabase
+                .from('transactions').select('*').eq('buyer_id', currentAuthUser.id).order('created_at', { ascending: false });
+            if (error) throw error;
+            allTransactions = (data || []).map(t => ({
+                id: t.id, buyerId: t.buyer_id, buyerName: t.buyer_name,
+                sellerName: t.seller_name, productName: t.product_name,
+                quantity: t.quantity, totalPrice: t.total_price,
+                status: t.status, createdAt: t.created_at
+            }));
+        }
+    } catch (e) { console.warn('[Orders] Gagal:', e); }
 }
 
 async function loadMiniProducts() {
@@ -8437,29 +8330,21 @@ async function loadMiniProducts() {
 
     grid.innerHTML = '<div class="mini-loader"><span class="spinner-mini"></span><div>Memuat produk...</div></div>';
 
-    const timeoutId = setTimeout(() => {
-        if (grid.querySelector('.mini-loader')) {
-            console.warn('⚠️ [MiniMarket] Timeout 8s');
-            grid.innerHTML = '<div class="mini-empty"><i class="fas fa-box-open"></i><div>Belum ada produk dari pengguna lain</div></div>';
-        }
-    }, 8000);
-
     try {
-        const r = await apiCall('get_products');
-        clearTimeout(timeoutId);
-        let products = (r.status === 'success' && Array.isArray(r.data)) ? r.data : [];
-        console.log('🛍️ [MiniMarket] Loaded', products.length, 'products');
+        // Tarik data dari fungsi loadProducts (Supabase)
+        await loadProducts();
+        
+        let products = allProducts || [];
 
-        if (currentUser && currentUser.username) {
-            const myUsername = currentUser.username.toLowerCase();
+        // Filter: Jangan tampilkan produk milik sendiri (berdasarkan UUID Supabase)
+        if (currentAuthUser && currentAuthUser.id) {
             products = products.filter(p => {
                 if (!p) return false;
-                const sellerId = String(p.sellerId || '').trim().toLowerCase();
-                const sellerName = String(p.sellerName || '').trim().toLowerCase();
-                return sellerId !== myUsername && sellerName !== myUsername;
+                return String(p.sellerId) !== String(currentAuthUser.id);
             });
         }
 
+        // Filter: Pastikan datanya valid
         products = products.filter(p => p && p.id && (p.name || p.productName));
 
         if (products.length === 0) {
@@ -8467,30 +8352,26 @@ async function loadMiniProducts() {
             return;
         }
 
+        // Urutkan dari yang terbaru
         products.sort((a, b) => {
             const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
             const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
             return dateB - dateA;
         });
 
-        const newest = products.slice(0, 3);
-        const remaining = products.slice(3);
-        const shuffled = remaining.slice().sort(() => Math.random() - 0.5);
-        const randomPicks = shuffled.slice(0, MINI_PRODUCT_COUNT - newest.length);
-
-        let finalProducts = [...newest, ...randomPicks];
-        finalProducts = finalProducts.sort(() => Math.random() - 0.5);
-        finalProducts = finalProducts.slice(0, MINI_PRODUCT_COUNT);
+        // Ambil maksimal 6 produk
+        const finalProducts = products.slice(0, MINI_PRODUCT_COUNT);
 
         miniAllProducts = products;
         renderMiniProducts(finalProducts);
 
+        // Simpan ke cache lokal
         try {
             localStorage.setItem('salink_mini_products_cache', JSON.stringify(finalProducts));
         } catch(e) {}
     } catch (e) {
-        clearTimeout(timeoutId);
         console.error('❌ [MiniMarket] Load error:', e);
+        // Fallback: Baca dari cache jika internet bermasalah
         try {
             const cached = JSON.parse(localStorage.getItem('salink_mini_products_cache') || '[]');
             if (cached.length > 0) { renderMiniProducts(cached); return; }
@@ -8549,46 +8430,25 @@ async function loadMiniOrders() {
     const sectionEl = document.getElementById('miniOrdersSection');
     if (!listEl || !sectionEl) return;
 
-    if (!currentUser || !currentUser.username) {
-        sectionEl.style.display = 'none';
-        return;
+    if (!currentUser || !currentAuthUser) { 
+        sectionEl.style.display = 'none'; 
+        return; 
     }
 
-    const timeoutId = setTimeout(() => {
-        sectionEl.style.display = 'block';
-        listEl.innerHTML = '<div class="mini-empty-text"><i class="fas fa-receipt"></i><div>Belum ada pesanan</div></div>';
-    }, 8000);
-
     try {
-        const r = await apiCall('get_transactions');
-        clearTimeout(timeoutId);
-        let transactions = (r.status === 'success' && Array.isArray(r.data)) ? r.data : [];
-
-        const myUsername = currentUser.username.toLowerCase();
-        const myFullName = (currentUser.fullName || '').toLowerCase();
-
-        transactions = transactions.filter(t => {
-            if (!t) return false;
-            const buyerId = String(t.buyerId || '').trim().toLowerCase();
-            const buyerName = String(t.buyerName || '').trim().toLowerCase();
-            return buyerId === myUsername || buyerName === myFullName;
-        });
-
-        transactions.sort((a, b) => {
-            const dateA = new Date(a.createdAt || a.updatedAt || 0).getTime();
-            const dateB = new Date(b.createdAt || b.updatedAt || 0).getTime();
-            return dateB - dateA;
-        });
-
+        // 1. Ambil data dari Supabase (via fungsi loadMyOrders yang baru)
+        await loadMyOrders();
+        
+        // 2. Format data agar sesuai dengan UI
+        let transactions = allTransactions || [];
         const recent = transactions.slice(0, MINI_ORDER_COUNT);
+        
+        // 3. Render ke tampilan
         miniAllTransactions = transactions;
         renderMiniOrders(recent);
+        
     } catch (e) {
-        clearTimeout(timeoutId);
-        try {
-            const cached = JSON.parse(localStorage.getItem('salink_mini_orders_cache') || '[]');
-            if (cached.length > 0) { renderMiniOrders(cached); return; }
-        } catch(e2) {}
+        console.warn('[MiniOrders] Gagal:', e.message);
         sectionEl.style.display = 'block';
         listEl.innerHTML = '<div class="mini-empty-text"><i class="fas fa-exclamation-triangle"></i><div>Gagal memuat pesanan</div></div>';
     }
