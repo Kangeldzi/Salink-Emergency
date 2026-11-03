@@ -2508,11 +2508,10 @@ async function loadData() {
                 .limit(50);
 
             if (!postsErr && rawPosts) {
-                // Ambil data relasi
                 const [mediaRes, likesRes, commentsRes, cLikesRes] = await Promise.allSettled([
                     client.from('media').select('*').not('post_id', 'is', null),
                     client.from('likes').select('*'),
-                    client.from('comments').select('*').is('deleted_at', null), // Pastikan soft-delete tidak masuk
+                    client.from('comments').select('*').is('deleted_at', null),
                     client.from('comment_likes').select('*')
                 ]);
 
@@ -2528,10 +2527,10 @@ async function loadData() {
                 rawLikes.forEach(l => {
                     if (!l.post_id) return;
                     if (!likesByPost[l.post_id]) likesByPost[l.post_id] = [];
-                    likesByPost[l.post_id].push(l.user_id);
+                    // Paksa simpan sebagai String agar konsisten
+                    likesByPost[l.post_id].push(String(l.user_id)); 
                 });
 
-                // Ambil profil pemilik komentar
                 const userIds = [...new Set(rawComments.map(c => c.user_id).filter(Boolean))];
                 let profileMap = {};
                 if (userIds.length > 0) {
@@ -2539,46 +2538,31 @@ async function loadData() {
                     if (profiles) profiles.forEach(p => { profileMap[p.id] = p; });
                 }
 
-                // --- MULAI PEMETAAN KOMENTAR YANG LEBIH KETAT ---
                 const commentsByPost = {};
                 rawComments.forEach(c => {
                     if (!c.post_id) return;
                     if (!commentsByPost[c.post_id]) commentsByPost[c.post_id] = [];
-                    
                     const p = profileMap[c.user_id] || {};
-                    
-                    // Format komentar standar
                     commentsByPost[c.post_id].push({
-                        id: c.id, 
-                        user_id: c.user_id, 
-                        userId: p.username || 'user',
+                        id: c.id, user_id: c.user_id, userId: p.username || 'user',
                         userFullName: p.full_name || 'Pengguna',
                         userGender: (p.gender || '').toLowerCase().includes('perempuan') ? 'female' : 'male',
                         userProfilePic: p.profile_picture || '',
-                        text: c.content, 
-                        content: c.content, 
-                        parent_id: c.parent_id || null,
+                        text: c.content, content: c.content, parent_id: c.parent_id,
                         timestamp: new Date(c.created_at).getTime(),
                         likes_count: rawCLikes.filter(cl => cl.comment_id === c.id).length,
-                        is_liked: currentAuthUser ? rawCLikes.some(cl => cl.comment_id === c.id && cl.user_id === currentAuthUser.id) : false,
-                        replies: [] // Siapkan array kosong
+                        is_liked: currentAuthUser ? rawCLikes.some(cl => cl.comment_id === c.id && String(cl.user_id) === String(currentAuthUser.id)) : false
                     });
                 });
 
-                // Susun Nested Replies (Balasan)
                 Object.keys(commentsByPost).forEach(postId => {
                     const allComments = commentsByPost[postId];
-                    const topLevel = allComments.filter(c => !c.parent_id);
-                    const replies = allComments.filter(c => c.parent_id);
-
-                    // Masukkan balasan ke induknya masing-masing
-                    topLevel.forEach(parent => {
-                        parent.replies = replies.filter(r => r.parent_id === parent.id);
+                    const top = allComments.filter(c => !c.parent_id);
+                    top.forEach(t => {
+                        t.replies = allComments.filter(c => c.parent_id === t.id);
                     });
-
-                    commentsByPost[postId] = topLevel;
+                    commentsByPost[postId] = top;
                 });
-                // --- SELESAI PEMETAAN KOMENTAR ---
 
                 posts = rawPosts.map(row => {
                     const p = row.profiles || {};
@@ -2598,8 +2582,9 @@ async function loadData() {
                         mediaType: mType, gdriveImageUrl: mType === 'image' ? mediaUrl : '',
                         gdriveVideoEmbed: mType === 'video' ? mediaUrl : '', mediaData: row.media_data || '',
                         timestamp: new Date(row.created_at).getTime(),
+                        // Simpan likes sebagai string JSON yang sudah berisi ID string
                         likes: JSON.stringify(likesByPost[row.id] || []),
-                        comments: JSON.stringify(commentsByPost[row.id] || []), // Simpan sebagai string JSON
+                        comments: JSON.stringify(commentsByPost[row.id] || []),
                         viewerCount: row.viewer_count || 0, isSpecial: row.is_special || false,
                         specialType: row.special_type || '', specialLocation: row.special_location || '',
                         specialAddress: row.special_address || ''
@@ -2815,8 +2800,12 @@ function buildScrollPostCard(post) {
         if (c.replies && Array.isArray(c.replies)) totalComments += c.replies.length;
     });
 
-    // Paksa konversi ke String agar UUID bisa dicocokkan dengan String dari Supabase
-    const isLiked = currentAuthUser && likes.map(String).includes(String(currentAuthUser.id));
+    // ✅ PERBAIKAN MUTLAK: Cek kecocokan ID dengan format String
+    let isLiked = false;
+    if (currentAuthUser && currentAuthUser.id) {
+        isLiked = likes.some(id => String(id) === String(currentAuthUser.id));
+    }
+    
     const viewerCount = parseInt(post.viewerCount || 0, 10) || 0;
 
     return `
@@ -2838,8 +2827,8 @@ function buildScrollPostCard(post) {
             <div class="scroll-post-text">${escapeHTML(post.text)}</div>
             ${mediaHTML}
             <div class="scroll-post-actions">
-                <button class="scroll-post-btn ${isLiked ? 'liked' : ''}" onclick="handlePostinganLike('${escapeAttr(post.id)}')" type="button">
-                    <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> <span class="like-count">${likes.length}</span>
+                <button class="scroll-post-btn ${isLiked ? 'liked' : ''}" onclick="handlePostinganLike('${escapeAttr(post.id)}')" type="button" id="like-btn-${post.id}">
+                    <i class="${isLiked ? 'fas' : 'far'} fa-heart"></i> <span class="like-count" id="like-count-${post.id}">${likes.length}</span>
                 </button>
                 <button class="scroll-post-btn" onclick="openPostinganCommentsModal('${escapeAttr(post.id)}')" type="button">
                     <i class="far fa-comment"></i> Komentar (${totalComments})
@@ -2934,6 +2923,7 @@ async function handlePostinganLike(postId) {
         showToast('🔒 Login', 'Silakan masuk untuk menyukai', 'fa-lock');
         return;
     }
+
     const post = posts.find(p => String(p.id) === String(postId));
     if (!post) return;
 
@@ -2943,9 +2933,24 @@ async function handlePostinganLike(postId) {
     } catch (e) { likes = []; }
 
     const userId = currentAuthUser.id;
-    // Paksa string untuk pengecekan
     const isUnlike = likes.map(String).includes(String(userId));
     const client = window.salinkSupabase;
+
+    // ✅ TRIK UI: Ubah tampilan tombol secara instan sebelum nunggu database
+    const btn = document.getElementById('like-btn-' + postId);
+    const countSpan = document.getElementById('like-count-' + postId);
+    
+    if (btn && countSpan) {
+        if (isUnlike) {
+            btn.classList.remove('liked');
+            btn.querySelector('i').className = 'far fa-heart';
+            countSpan.textContent = Math.max(0, parseInt(countSpan.textContent) - 1);
+        } else {
+            btn.classList.add('liked');
+            btn.querySelector('i').className = 'fas fa-heart';
+            countSpan.textContent = parseInt(countSpan.textContent) + 1;
+        }
+    }
 
     try {
         let result;
@@ -2954,31 +2959,34 @@ async function handlePostinganLike(postId) {
         } else {
             result = await client.from('likes').insert({ user_id: userId, post_id: postId });
         }
+
         if (result.error) throw result.error;
 
-        // ✅ PERBAIKAN: Ubah data di memori LOKAL terlebih dahulu agar UI langsung berubah 0 detik
+        playRegularSound();
+        
+        // Update memori lokal agar saat di-scroll tidak balik lagi
         if (isUnlike) {
             post.likes = JSON.stringify(likes.filter(id => String(id) !== String(userId)));
         } else {
             post.likes = JSON.stringify([...likes, userId]);
         }
 
-        // Gambar ulang kartu postingan secara instan (Tanpa nunggu Supabase)
-        renderPostinganCarousel();
-        updateStats();
-        playRegularSound();
-
-        // Tarik data dari Supabase di belakang layar untuk memastikan sinkron
-        loadData().then(() => {
-            renderPostinganCarousel();
-            updateStats();
-        });
-
     } catch (err) {
-        console.error('[SALINK LIKE]', err);
-        showToast('❌ Gagal', err.message || 'Like gagal diperbarui.', 'fa-times-circle', 'error');
-        // Jika error, kembalikan data ke aslinya
-        loadData(); 
+        console.error('[SALINK LIKE ERROR]', err);
+        showToast('❌ Gagal Like', err.message || 'Like gagal diperbarui.', 'fa-times-circle', 'error');
+        
+        // Jika gagal simpan ke DB, balikkan tampilan UI seperti semula
+        if (btn && countSpan) {
+            if (isUnlike) {
+                btn.classList.add('liked');
+                btn.querySelector('i').className = 'fas fa-heart';
+                countSpan.textContent = parseInt(countSpan.textContent) + 1;
+            } else {
+                btn.classList.remove('liked');
+                btn.querySelector('i').className = 'far fa-heart';
+                countSpan.textContent = Math.max(0, parseInt(countSpan.textContent) - 1);
+            }
+        }
     }
 }
 
