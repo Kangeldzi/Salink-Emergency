@@ -5310,30 +5310,21 @@ function attachPostListeners() {
     // 4. TOMBOL TITIK TIGA (Buka/Tutup Menu)
     document.querySelectorAll('.post-menu-toggle').forEach(el => {
         el.onclick = function(e) {
-            e.stopPropagation(); // Cegah bubbling agar menu tidak langsung tertutup
+            e.stopPropagation();
             e.preventDefault();
-            
             const menuId = 'postMenu-' + this.dataset.postId;
             const menu = document.getElementById(menuId);
             const isOpen = menu.classList.contains('active');
-            
-            // Tutup semua menu lain yang terbuka
             document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
-            
-            // Buka menu yang diklik
-            if (!isOpen) {
-                menu.classList.add('active');
-            }
+            if (!isOpen) { menu.classList.add('active'); }
         };
     });
 
     // 5. TOMBOL EDIT (Di dalam menu)
     document.querySelectorAll('.edit-post').forEach(el => {
         el.onclick = function(e) {
-            e.preventDefault(); 
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
-            
             const p = posts.find(x => x.id === this.dataset.postId);
             if (!p) return;
             const nt = prompt('Edit postingan:', p.text || '');
@@ -5350,10 +5341,8 @@ function attachPostListeners() {
     // 6. TOMBOL HAPUS (Di dalam menu)
     document.querySelectorAll('.delete-post').forEach(el => {
         el.onclick = function(e) {
-            e.preventDefault(); 
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
-            
             if (typeof deletePostPermanent === 'function') {
                 deletePostPermanent(this.dataset.postId);
             }
@@ -5364,7 +5353,6 @@ function attachPostListeners() {
     if (window._salinkClickOutsideListener) {
         document.removeEventListener('click', window._salinkClickOutsideListener);
     }
-    
     window._salinkClickOutsideListener = function(e) {
         if (!e.target.closest('.post-menu-toggle') && !e.target.closest('.post-menu-dropdown')) {
             document.querySelectorAll('.post-menu-dropdown').forEach(m => m.classList.remove('active'));
@@ -5372,79 +5360,7 @@ function attachPostListeners() {
     };
     document.addEventListener('click', window._salinkClickOutsideListener);
 
-    // 8. EVENT LISTENER UNTUK BALASAN KOMENTAR (Sesuai Patch 3B)
-    document.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(el => {
-        el.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (isPreviewMode) { showPreviewOverlay(); return; }
-            toggleReplyBox(this.dataset.commentId);
-        };
-    });
-
-    document.querySelectorAll('.comment-reply-box .reply-send-btn').forEach(el => {
-        el.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (isPreviewMode) { showPreviewOverlay(); return; }
-            const parentId = this.dataset.parentId;
-            const postId = this.dataset.postId;
-            const input = this.parentElement.querySelector('input');
-            const text = input.value.trim();
-            if (text) {
-                addComment(postId, text, parentId);
-                input.value = '';
-                this.parentElement.classList.remove('active');
-            }
-        };
-    });
-
-    document.querySelectorAll('.comment-reply-box input').forEach(el => {
-        el.onkeypress = function(e) {
-            if (e.key === 'Enter') {
-                const btn = this.parentElement.querySelector('.reply-send-btn');
-                if (btn) btn.click();
-            }
-        };
-    });
-
-    document.querySelectorAll('.comment-action-btn[data-action="like-comment"]').forEach(el => {
-        el.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (isPreviewMode) { showPreviewOverlay(); return; }
-            toggleCommentLike(this.dataset.commentId, this.dataset.postId);
-        };
-    });
-
-    document.querySelectorAll('.comment-action-btn[data-action="edit-comment"]').forEach(el => {
-        el.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (isPreviewMode) { showPreviewOverlay(); return; }
-            handleEditComment(this.dataset.commentId, this.dataset.postId);
-        };
-    });
-
-    document.querySelectorAll('.comment-action-btn[data-action="delete-comment"]').forEach(el => {
-        el.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (isPreviewMode) { showPreviewOverlay(); return; }
-            handleDeleteComment(this.dataset.commentId, this.dataset.postId);
-        };
-    });
-
-    document.querySelectorAll('.comment-show-replies-btn[data-action="show-replies"]').forEach(el => {
-        el.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
-            showAllReplies(this.dataset.commentId, this.dataset.postId);
-        };
-    });
-
-    document.querySelectorAll('.comment-show-replies-btn[data-action="hide-replies"]').forEach(el => {
-        el.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
-            hideReplies(this.dataset.commentId, this.dataset.postId);
-        };
-    });
-
-    // 16. EVENT LISTENER UNTUK BALASAN KOMENTAR (NESTED)
+    // 8. EVENT LISTENER UNTUK BALASAN KOMENTAR
     document.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(el => {
         el.onclick = function(e) {
             e.preventDefault(); e.stopPropagation();
@@ -5479,33 +5395,24 @@ function attachPostListeners() {
         };
     });
 
-    document.querySelectorAll('.comment-action-btn[data-action="like-comment"]').forEach(el => {
+    // 9. SHOW/HIDE REPLIES
+    document.querySelectorAll('.comment-show-replies-btn[data-action="show-replies"]').forEach(el => {
         el.onclick = function(e) {
             e.preventDefault(); e.stopPropagation();
-            if (isPreviewMode) { showPreviewOverlay(); return; }
-            toggleCommentLike(this.dataset.commentId, this.dataset.postId);
+            showAllReplies(this.dataset.commentId, this.dataset.postId);
         };
     });
 
-    document.querySelectorAll('.comment-action-btn[data-action="edit-comment"]').forEach(el => {
+    document.querySelectorAll('.comment-show-replies-btn[data-action="hide-replies"]').forEach(el => {
         el.onclick = function(e) {
             e.preventDefault(); e.stopPropagation();
-            if (isPreviewMode) { showPreviewOverlay(); return; }
-            handleEditComment(this.dataset.commentId, this.dataset.postId);
+            hideReplies(this.dataset.commentId, this.dataset.postId);
         };
     });
 
-    document.querySelectorAll('.comment-action-btn[data-action="delete-comment"]').forEach(el => {
-        el.onclick = function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (isPreviewMode) { showPreviewOverlay(); return; }
-            handleDeleteComment(this.dataset.commentId, this.dataset.postId);
-        };
-    });
-
-}
-
-    // ✅ PATCH KOMENTAR NESTED — LIKE
+    // ============================================================
+    // ✅ PATCH KOMENTAR NESTED — LIKE (Sudah di dalam fungsi)
+    // ============================================================
     document.querySelectorAll('.comment-action-btn[data-action="like-comment"]').forEach(el => {
         el.onclick = async function(e) {
             e.preventDefault(); e.stopPropagation();
@@ -5516,7 +5423,6 @@ function attachPostListeners() {
             if (!commentId || !currentAuthUser) return;
 
             try {
-                // Cek apakah sudah like dari UI
                 const isLiked = this.classList.contains('liked');
                 
                 if (isLiked) {
@@ -5534,7 +5440,9 @@ function attachPostListeners() {
         };
     });
 
-    // ✅ PATCH KOMENTAR NESTED — EDIT
+    // ============================================================
+    // ✅ PATCH KOMENTAR NESTED — EDIT (Sudah di dalam fungsi)
+    // ============================================================
     document.querySelectorAll('.comment-action-btn[data-action="edit-comment"]').forEach(el => {
         el.onclick = function(e) {
             e.preventDefault(); e.stopPropagation();
@@ -5543,7 +5451,6 @@ function attachPostListeners() {
             const postId = this.dataset.postId;
             if (!commentId) return;
 
-            // Cari text komentar saat ini
             const post = posts.find(p => p.id === postId);
             let oldText = '';
             if (post) {
@@ -5573,7 +5480,9 @@ function attachPostListeners() {
         };
     });
 
-    // ✅ PATCH KOMENTAR NESTED — HAPUS
+    // ============================================================
+    // ✅ PATCH KOMENTAR NESTED — HAPUS (Sudah di dalam fungsi)
+    // ============================================================
     document.querySelectorAll('.comment-action-btn[data-action="delete-comment"]').forEach(el => {
         el.onclick = function(e) {
             e.preventDefault(); e.stopPropagation();
@@ -5591,6 +5500,7 @@ function attachPostListeners() {
                 }).catch(err => showToast('❌ Gagal', err.message, 'fa-times-circle'));
         };
     });
+}
         
 // ====================================================================
 // 29. POST CLICK HANDLERS
