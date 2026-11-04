@@ -941,8 +941,23 @@
             border-color: rgba(0,0,0,0.15) !important;
         }
         .post { background: #ffffff !important; color: #0a0e1a !important; }
-        .post .post-text, .post .post-header h4, .post .post-user-info h4 { color: #0a0e1a !important; }
-        .post .post-user-info small { color: #6b7688 !important; }
+        /* ✅ PATCH WARNA TEKS PROFIL */
+        .post-header .post-user-info h4 { 
+         color: var(--text-primary) !important; 
+         font-weight: 700;
+        }
+        .post-header .post-user-info small { 
+         color: var(--text-secondary) !important; 
+        }
+        .post-menu-toggle {
+         background: rgba(255,255,255,0.1) !important;
+         color: var(--text-primary) !important;
+         border: 1px solid var(--border-color) !important;
+        }
+        [data-theme="light"] .post-menu-toggle {
+         background: #f5f7fa !important;
+         color: #0a0e1a !important;
+        }
         .post .post-actions { border-color: rgba(0,0,0,0.08) !important; }
         .post .post-action { color: #6b7688 !important; }
         .post .post-action.liked, .post .post-action.liked i { color: #f85149 !important; }
@@ -4507,39 +4522,28 @@ function calculateRealStatistics() {
 // 24. UPDATE STATS CARDS (FIX BUG 1)
 // ====================================================================
 function updateStatsCards() {
-    const allEms = JSON.parse(localStorage.getItem('salink_emergencies') || '[]');
-    const now = Date.now();
-    let activeCount = 0, resolvedCount = 0;
+    // Sinkronisasi dari array `posts` (yang sudah terisi data dari Supabase)
+    let activeCount = 0;
+    let resolvedCount = 0;
 
-    console.log('📊 [updateStatsCards] Total ems:', allEms.length);
-
-    allEms.forEach(e => {
-        if (!e) return;
-        if (isDeleted(e.id)) return;
-
-        let ts;
-        if (typeof e.timestamp === 'number') ts = e.timestamp;
-        else if (e.timestamp) ts = new Date(e.timestamp).getTime();
-        else ts = now;
-        if (isNaN(ts)) ts = now;
-
-        const exp = e.expiresAt || (ts + EMERGENCY_DURATION);
-        const status = String(e.status || 'active').toLowerCase();
-        const isManuallyResolved = ['resolved', 'selesai', 'ditangani', 'completed', 'closed'].indexOf(status) !== -1;
-        const isExpired = exp <= now;
-
-        if (isManuallyResolved) resolvedCount++;
-        else if (isExpired) resolvedCount++;
-        else activeCount++;
+    posts.forEach(p => {
+        if (!p || isDeleted(p.id)) return;
+        
+        // Hanya hitung postingan khusus emergency
+        if (p.isSpecial && p.specialType) {
+            const status = String(p.status || 'active').toLowerCase();
+            if (['resolved', 'selesai', 'ditangani', 'completed', 'closed'].includes(status)) {
+                resolvedCount++;
+            } else {
+                activeCount++;
+            }
+        }
     });
-
-    console.log('📊 [updateStatsCards] Active:', activeCount, '| Resolved:', resolvedCount);
 
     let teamsDisplay = 0;
     if (allUsers && allUsers.length > 0) {
         const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
         const teamsOnline = allUsers.filter(u => {
-            if (!u) return false;
             if (u.isOnline === true) return true;
             if (u.lastActive) {
                 const t = new Date(u.lastActive).getTime();
@@ -4561,6 +4565,10 @@ function updateStatsCards() {
     if (st) st.textContent = teamsDisplay;
     const sr = document.getElementById('statResponse');
     if (sr) sr.textContent = responseRate + '%';
+
+    // Render Charts secara otomatis
+    updateAllCharts();
+}
 
     console.log('✅ [updateStatsCards] UI updated:', activeCount, resolvedCount, teamsDisplay, responseRate + '%');
 }
@@ -5496,6 +5504,93 @@ function attachPostListeners() {
     });
 
 }
+
+    // ✅ PATCH KOMENTAR NESTED — LIKE
+    document.querySelectorAll('.comment-action-btn[data-action="like-comment"]').forEach(el => {
+        el.onclick = async function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (isPreviewMode) { showPreviewOverlay(); return; }
+            
+            const commentId = this.dataset.commentId;
+            const postId = this.dataset.postId;
+            if (!commentId || !currentAuthUser) return;
+
+            try {
+                // Cek apakah sudah like dari UI
+                const isLiked = this.classList.contains('liked');
+                
+                if (isLiked) {
+                    await window.salinkSupabase.from('comment_likes').delete().eq('comment_id', commentId).eq('user_id', currentAuthUser.id);
+                } else {
+                    await window.salinkSupabase.from('comment_likes').insert({ comment_id: commentId, user_id: currentAuthUser.id });
+                }
+                
+                playRegularSound();
+                await loadData(); // Tarik data terbaru dari Supabase
+            } catch(err) {
+                console.error(err);
+                showToast('❌ Gagal Like', err.message, 'fa-times-circle');
+            }
+        };
+    });
+
+    // ✅ PATCH KOMENTAR NESTED — EDIT
+    document.querySelectorAll('.comment-action-btn[data-action="edit-comment"]').forEach(el => {
+        el.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (isPreviewMode) { showPreviewOverlay(); return; }
+            const commentId = this.dataset.commentId;
+            const postId = this.dataset.postId;
+            if (!commentId) return;
+
+            // Cari text komentar saat ini
+            const post = posts.find(p => p.id === postId);
+            let oldText = '';
+            if (post) {
+                const parseComments = (arr) => {
+                    for (let c of arr) {
+                        if (c.id === commentId) return c.content || c.text;
+                        if (c.replies) {
+                            for (let r of c.replies) {
+                                if (r.id === commentId) return r.content || r.text;
+                            }
+                        }
+                    }
+                    return '';
+                };
+                oldText = parseComments(JSON.parse(post.comments || '[]'));
+            }
+
+            const newText = prompt('Edit komentar:', oldText);
+            if (newText === null || newText.trim() === '' || newText.trim() === oldText) return;
+
+            window.salinkSupabase.from('comments').update({ content: newText.trim() }).eq('id', commentId)
+                .then(({error}) => {
+                    if (error) throw error;
+                    showToast('✅', 'Komentar diedit', 'fa-check-circle');
+                    loadData();
+                }).catch(err => showToast('❌ Gagal', err.message, 'fa-times-circle'));
+        };
+    });
+
+    // ✅ PATCH KOMENTAR NESTED — HAPUS
+    document.querySelectorAll('.comment-action-btn[data-action="delete-comment"]').forEach(el => {
+        el.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (isPreviewMode) { showPreviewOverlay(); return; }
+            const commentId = this.dataset.commentId;
+            if (!commentId) return;
+
+            if (!confirm('Hapus komentar ini secara permanen?')) return;
+
+            window.salinkSupabase.from('comments').delete().eq('id', commentId)
+                .then(({error}) => {
+                    if (error) throw error;
+                    showToast('✅', 'Komentar dihapus', 'fa-check-circle');
+                    loadData();
+                }).catch(err => showToast('❌ Gagal', err.message, 'fa-times-circle'));
+        };
+    });
         
 // ====================================================================
 // 29. POST CLICK HANDLERS
@@ -6277,40 +6372,71 @@ function goToLocation(location) {
 // ====================================================================
 // 37. INVITE MODAL
 // ====================================================================
-function openInviteModal() {
-    if (isPreviewMode) { showPreviewOverlay(); return; }
-    openModal('inviteModal');
-    loadInviteUsers();
-    setupInviteFilters();
-}
-
-function loadInviteUsers() {
+async function loadInviteUsers() {
     const listEl = document.getElementById('inviteUserList');
     if (!listEl) return;
+    
+    listEl.innerHTML = '<div style="text-align:center;padding:20px;color:#6b7688;"><i class="fas fa-spinner fa-spin"></i> Memuat pengguna...</div>';
+
+    try {
+        // Ambil data real-time dari tabel profiles Supabase
+        if (window.SALINK_SB_READY && window.salinkSupabase) {
+            const { data, error } = await window.salinkSupabase
+                .from('profiles')
+                .select('id, username, full_name, profile_picture, city, province')
+                .neq('id', currentAuthUser?.id); // Jangan tampilkan diri sendiri
+            
+            if (error) throw error;
+            
+            // Simpan ke state global agar pencarian lokal berjalan
+            allUsers = (data || []).map(u => ({
+                id: u.id,
+                username: u.username,
+                fullName: u.full_name,
+                profilePicture: u.profile_picture,
+                city: u.city || '',
+                province: u.province || '',
+                isOnline: true
+            }));
+        }
+    } catch (err) {
+        console.warn('[Invite] Gagal ambil data Supabase:', err);
+    }
+
+    // Render HTML
     if (!allUsers || allUsers.length === 0) {
         listEl.innerHTML = '<div style="text-align:center;padding:30px;color:#6b7688;"><i class="fas fa-users-slash" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada pengguna untuk diundang</p></div>';
         return;
     }
-    let filtered = allUsers.filter(u => !currentUser || u.username !== currentUser.username);
+
+    let filtered = allUsers;
     const inputEl = document.getElementById('inviteSearchInput');
     const q = (inputEl ? inputEl.value : '').toLowerCase().trim();
-    if (q) filtered = filtered.filter(u => (u.fullName || '').toLowerCase().indexOf(q) !== -1 || (u.username || '').toLowerCase().indexOf(q) !== -1);
+    if (q) {
+        filtered = filtered.filter(u => 
+            (u.fullName || '').toLowerCase().indexOf(q) !== -1 || 
+            (u.username || '').toLowerCase().indexOf(q) !== -1
+        );
+    }
+
     const countEl = document.getElementById('inviteModalCount');
     if (countEl) countEl.textContent = filtered.length;
+
     if (filtered.length === 0) {
         listEl.innerHTML = '<div style="text-align:center;padding:30px;color:#6b7688;"><i class="fas fa-search" style="font-size:2rem;opacity:0.3;display:block;margin-bottom:8px;"></i><p style="font-size:0.75rem;">Tidak ada pengguna yang cocok</p></div>';
         return;
     }
+
     listEl.innerHTML = filtered.map(u => {
         const initial = (u.fullName || u.username || 'U').charAt(0).toUpperCase();
         const avatar = u.profilePicture ? '<img src="' + escapeAttr(u.profilePicture) + '" alt="">' : initial;
         const isSent = sentInvites[u.username] === true;
-        const location = [u.city, u.province].filter(Boolean).join(', ') || u.country || 'Lokasi tidak diketahui';
-        const statusDot = u.isOnline ? '🟢' : '⚪';
+        const location = [u.city, u.province].filter(Boolean).join(', ') || 'Lokasi tidak diketahui';
+        
         return '<div class="invite-user-item">' +
             '<div class="invite-user-avatar">' + avatar + '</div>' +
             '<div class="invite-user-info">' +
-                '<div class="invite-user-name">' + statusDot + ' ' + escapeHTML(u.fullName || u.username) + '</div>' +
+                '<div class="invite-user-name">' + escapeHTML(u.fullName || u.username) + '</div>' +
                 '<div class="invite-user-sub"><i class="fas fa-map-marker-alt" style="font-size:0.5rem;"></i> ' + escapeHTML(location) + '</div>' +
             '</div>' +
             '<button class="invite-user-btn ' + (isSent ? 'sent' : '') + '" onclick="sendInvite(\'' + escapeAttr(u.username) + '\', this)" ' + (isSent ? 'disabled' : '') + '>' +
@@ -6342,32 +6468,44 @@ function setupInviteFilters() {
 }
 
 async function sendInvite(username, btnEl) {
-    if (!currentUser) { redirectToLogin(); return; }
+    if (!currentUser || !currentAuthUser) { redirectToLogin(); return; }
     if (!username) return;
+    
     btnEl.disabled = true;
     btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    
     try {
+        // ✅ SIMPAN KE SUPABASE
+        if (window.SALINK_SB_READY && window.salinkSupabase) {
+            // Cari ID target
+            const targetUser = allUsers.find(u => u.username === username);
+            if (targetUser) {
+                const { error } = await window.salinkSupabase
+                    .from('friendships')
+                    .insert({
+                        user1_id: currentAuthUser.id,
+                        user2_id: targetUser.id
+                    });
+                
+                if (error && error.code !== '23505') { // 23505 = duplicate
+                    throw error;
+                }
+            }
+        }
+        
         sentInvites[username] = true;
         localStorage.setItem('salink_sent_invites', JSON.stringify(sentInvites));
-        const invitePayload = {
-            id: 'invite-' + Date.now(),
-            user1: currentUser.username,
-            user2: username,
-            status: 'pending',
-            requestedBy: currentUser.username,
-            timestamp: new Date().toISOString(),
-            acceptedAt: ''
-        };
-        await apiCall('save_invite', invitePayload);
+        
         btnEl.classList.add('sent');
         btnEl.innerHTML = '<i class="fas fa-check"></i> Terkirim';
         playRegularSound();
         updateInviteBadge();
         showToast('📨 Terkirim', 'Undangan dikirim ke ' + username, 'fa-paper-plane');
+        
     } catch(e) {
         btnEl.disabled = false;
         btnEl.innerHTML = '<i class="fas fa-paper-plane"></i> Undang';
-        showToast('⚠️ Gagal', 'Tidak dapat mengirim undangan', 'fa-exclamation-triangle');
+        showToast('⚠️ Gagal', e.message || 'Tidak dapat mengirim undangan', 'fa-exclamation-triangle');
     }
 }
 
