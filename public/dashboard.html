@@ -5169,7 +5169,8 @@ function renderCommentTree(comment, repliesByParent, postId, depth) {
 /* Render satu komentar item */
 function buildCommentItemHTML(c, postId, isReply, depth) {
     depth = depth || 0;
-    const isOwn = currentUser && (c.userId === currentUser.username || c.userAuthId === currentAuthUser?.id);
+    // Paksa cek ID berdasarkan UUID Auth Supabase
+const isOwn = currentAuthUser && String(c.user_id) === String(currentAuthUser.id);
     const isDeleted = !!c.deleted_at;
     
     // Avatar
@@ -5464,66 +5465,82 @@ function attachPostListeners() {
     });
 
     // ============================================================
-    // ✅ PATCH KOMENTAR NESTED — EDIT (Sudah di dalam fungsi)
+    // ✅ PATCH FINAL: TOMBOL EDIT KOMENTAR (Force Sync)
     // ============================================================
     document.querySelectorAll('.comment-action-btn[data-action="edit-comment"]').forEach(el => {
-        el.onclick = function(e) {
+        el.onclick = async function(e) {
             e.preventDefault(); e.stopPropagation();
             if (isPreviewMode) { showPreviewOverlay(); return; }
+            
             const commentId = this.dataset.commentId;
             const postId = this.dataset.postId;
             if (!commentId) return;
 
+            // Cari text lama
             const post = posts.find(p => p.id === postId);
             let oldText = '';
-            if (post) {
-                const parseComments = (arr) => {
-                    for (let c of arr) {
-                        if (c.id === commentId) return c.content || c.text;
-                        if (c.replies) {
-                            for (let r of c.replies) {
-                                if (r.id === commentId) return r.content || r.text;
-                            }
+            try {
+                const arr = JSON.parse(post.comments || '[]');
+                for (let c of arr) {
+                    if (c.id === commentId) { oldText = c.content || c.text; break; }
+                    if (c.replies) {
+                        for (let r of c.replies) {
+                            if (r.id === commentId) { oldText = r.content || r.text; break; }
                         }
                     }
-                    return '';
-                };
-                oldText = parseComments(JSON.parse(post.comments || '[]'));
-            }
+                }
+            } catch(e) {}
 
             const newText = prompt('Edit komentar:', oldText);
             if (newText === null || newText.trim() === '' || newText.trim() === oldText) return;
 
-            window.salinkSupabase.from('comments').update({ content: newText.trim() }).eq('id', commentId)
-                .then(({error}) => {
-                    if (error) throw error;
-                    showToast('✅', 'Komentar diedit', 'fa-check-circle');
-                    loadData();
-                }).catch(err => showToast('❌ Gagal', err.message, 'fa-times-circle'));
+            try {
+                // Tembak ke Supabase
+                const { error } = await window.salinkSupabase
+                    .from('comments')
+                    .update({ content: newText.trim(), updated_at: new Date().toISOString() })
+                    .eq('id', commentId);
+
+                if (error) throw error;
+                
+                showToast('✅', 'Komentar diedit', 'fa-check-circle');
+                await loadData(); // Paksa UI tarik data baru SETELAH database selesai update
+            } catch (err) {
+                showToast('❌ Gagal', err.message, 'fa-times-circle');
+            }
         };
     });
 
     // ============================================================
-    // ✅ PATCH KOMENTAR NESTED — HAPUS (Sudah di dalam fungsi)
+    // ✅ PATCH FINAL: TOMBOL HAPUS KOMENTAR (Force Sync)
     // ============================================================
     document.querySelectorAll('.comment-action-btn[data-action="delete-comment"]').forEach(el => {
-        el.onclick = function(e) {
+        el.onclick = async function(e) {
             e.preventDefault(); e.stopPropagation();
             if (isPreviewMode) { showPreviewOverlay(); return; }
+            
             const commentId = this.dataset.commentId;
             if (!commentId) return;
 
             if (!confirm('Hapus komentar ini secara permanen?')) return;
 
-            window.salinkSupabase.from('comments').delete().eq('id', commentId)
-                .then(({error}) => {
-                    if (error) throw error;
-                    showToast('✅', 'Komentar dihapus', 'fa-check-circle');
-                    loadData();
-                }).catch(err => showToast('❌ Gagal', err.message, 'fa-times-circle'));
+            try {
+                // Tembak ke Supabase
+                const { error } = await window.salinkSupabase
+                    .from('comments')
+                    .delete()
+                    .eq('id', commentId);
+
+                if (error) throw error;
+                
+                showToast('✅', 'Komentar dihapus', 'fa-check-circle');
+                await loadData(); // Paksa UI tarik data baru SETELAH database selesai hapus
+            } catch (err) {
+                showToast('❌ Gagal', err.message, 'fa-times-circle');
+            }
         };
     });
-}
+} 
         
 // ====================================================================
 // 29. POST CLICK HANDLERS
@@ -5862,6 +5879,110 @@ async function addComment(postId, text, parentId = null) {
     return newComment;
 }
 
+/* ================================================================
+ * PATCH KOMENTAR: EDIT (Force Sync ke Supabase)
+ * ================================================================ */
+async function handleEditComment(commentId, postId) {
+    if (!currentAuthUser) { showToast('🔒 Login', 'Silakan login', 'fa-lock'); return; }
+    
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+
+    // 1. Cari teks lama untuk ditampilkan di prompt
+    let oldText = '';
+    const parseComments = (arr) => {
+        for (let c of arr) {
+            if (c.id === commentId) return c.content || c.text;
+            if (c.replies) {
+                for (let r of c.replies) {
+                    if (r.id === commentId) return r.content || r.text;
+                }
+            }
+        }
+        return '';
+    };
+    
+    try {
+        oldText = parseComments(JSON.parse(post.comments || '[]'));
+    } catch(e) {}
+
+    const newText = prompt('Edit komentar:', oldText);
+    if (newText === null || newText.trim() === '' || newText.trim() === oldText) return;
+
+    try {
+        // 2. Update ke Supabase
+        const { error } = await window.salinkSupabase
+            .from('comments')
+            .update({ 
+                content: newText.trim(),
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', commentId);
+
+        if (error) throw error;
+        
+        // 3. Tarik data terbaru dari database (Paksa UI berubah)
+        await loadData(); 
+        showToast('✅', 'Komentar berhasil diedit', 'fa-check-circle');
+        
+    } catch (err) {
+        console.error('[EDIT COMMENT]', err);
+        showToast('❌ Gagal Edit', err.message, 'fa-times-circle');
+    }
+}
+
+/* ================================================================
+ * PATCH KOMENTAR: HAPUS (Force Sync ke Supabase)
+ * ================================================================ */
+async function handleDeleteComment(commentId, postId) {
+    if (!currentAuthUser) { showToast('🔒 Login', 'Silakan login', 'fa-lock'); return; }
+    if (!confirm('Hapus komentar ini secara permanen?')) return;
+
+    try {
+        // 1. Hapus dari Supabase
+        const { error } = await window.salinkSupabase
+            .from('comments')
+            .delete()
+            .eq('id', commentId);
+
+        if (error) throw error;
+        
+        // 2. Tarik data terbaru dari database (Paksa UI berubah)
+        await loadData(); 
+        showToast('✅', 'Komentar berhasil dihapus', 'fa-check-circle');
+        
+    } catch (err) {
+        console.error('[DELETE COMMENT]', err);
+        showToast('❌ Gagal Hapus', err.message, 'fa-times-circle');
+    }
+}
+
+/* ================================================================
+ * PATCH KOMENTAR: HAPUS (Force Sync ke Supabase)
+ * ================================================================ */
+async function handleDeleteComment(commentId, postId) {
+    if (!currentAuthUser) { showToast('🔒 Login', 'Silakan login', 'fa-lock'); return; }
+    if (!confirm('Hapus komentar ini secara permanen?')) return;
+
+    try {
+        // 1. Hapus dari Supabase
+        const { error } = await window.salinkSupabase
+            .from('comments')
+            .delete()
+            .eq('id', commentId);
+
+        if (error) throw error;
+        
+        // 2. Tarik data terbaru (Paksa UI berubah)
+        await loadData(); 
+        showToast('✅', 'Komentar berhasil dihapus', 'fa-check-circle');
+        
+    } catch (err) {
+        console.error('[DELETE COMMENT]', err);
+        showToast('❌ Gagal Hapus', err.message, 'fa-times-circle');
+    }
+}
+        
 // ====================================================================
 // 32. TRIGGER LOCAL EMERGENCY VISUAL (FIX BUG 2)
 // ====================================================================
