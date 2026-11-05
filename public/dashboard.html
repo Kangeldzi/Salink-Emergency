@@ -5344,7 +5344,7 @@ function attachPostListeners() {
         };
     });
 
-    // 5. TOMBOL EDIT (Di dalam menu)
+    // 5. TOMBOL EDIT POSTINGAN (Di dalam menu)
     document.querySelectorAll('.edit-post').forEach(el => {
         el.onclick = function(e) {
             e.preventDefault(); e.stopPropagation();
@@ -5362,7 +5362,7 @@ function attachPostListeners() {
         };
     });
 
-    // 6. TOMBOL HAPUS (Di dalam menu)
+    // 6. TOMBOL HAPUS POSTINGAN (Di dalam menu)
     document.querySelectorAll('.delete-post').forEach(el => {
         el.onclick = function(e) {
             e.preventDefault(); e.stopPropagation();
@@ -5384,7 +5384,7 @@ function attachPostListeners() {
     };
     document.addEventListener('click', window._salinkClickOutsideListener);
 
-    // 8. EVENT LISTENER UNTUK BALASAN KOMENTAR
+    // 8. EVENT LISTENER UNTUK BALASAN KOMENTAR (Buka Box)
     document.querySelectorAll('.comment-action-btn[data-action="reply-comment"]').forEach(el => {
         el.onclick = function(e) {
             e.preventDefault(); e.stopPropagation();
@@ -5394,18 +5394,39 @@ function attachPostListeners() {
         };
     });
 
+    // 9. KIRIM BALASAN (Force Sync ke Supabase)
     document.querySelectorAll('.comment-reply-box .reply-send-btn').forEach(el => {
-        el.onclick = function(e) {
+        el.onclick = async function(e) {
             e.preventDefault(); e.stopPropagation();
             if (isPreviewMode) { showPreviewOverlay(); return; }
+            
             const parentId = this.dataset.parentId;
             const postId = this.dataset.postId;
             const input = this.parentElement.querySelector('input');
             const text = input.value.trim();
-            if (text) {
-                addComment(postId, text, parentId);
+            if (!text) return;
+
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+            try {
+                const { error } = await window.salinkSupabase.from('comments').insert({
+                    user_id: currentAuthUser.id, 
+                    post_id: postId, 
+                    content: text, 
+                    parent_id: parentId
+                });
+                if (error) throw error;
+                
                 input.value = '';
                 this.parentElement.classList.remove('active');
+                showToast('✅', 'Balasan terkirim', 'fa-check-circle');
+                await loadData(); // Force Sync
+            } catch(err) {
+                showToast('❌ Gagal', err.message, 'fa-times-circle');
+            } finally {
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-paper-plane"></i>';
             }
         };
     });
@@ -5419,7 +5440,7 @@ function attachPostListeners() {
         };
     });
 
-    // 9. SHOW/HIDE REPLIES
+    // 10. SHOW/HIDE REPLIES
     document.querySelectorAll('.comment-show-replies-btn[data-action="show-replies"]').forEach(el => {
         el.onclick = function(e) {
             e.preventDefault(); e.stopPropagation();
@@ -5434,39 +5455,31 @@ function attachPostListeners() {
         };
     });
 
-    // ============================================================
-    // ✅ PATCH KOMENTAR NESTED — LIKE (Sudah di dalam fungsi)
-    // ============================================================
+    // 11. LIKE KOMENTAR
     document.querySelectorAll('.comment-action-btn[data-action="like-comment"]').forEach(el => {
         el.onclick = async function(e) {
             e.preventDefault(); e.stopPropagation();
             if (isPreviewMode) { showPreviewOverlay(); return; }
             
             const commentId = this.dataset.commentId;
-            const postId = this.dataset.postId;
             if (!commentId || !currentAuthUser) return;
 
             try {
                 const isLiked = this.classList.contains('liked');
-                
                 if (isLiked) {
                     await window.salinkSupabase.from('comment_likes').delete().eq('comment_id', commentId).eq('user_id', currentAuthUser.id);
                 } else {
                     await window.salinkSupabase.from('comment_likes').insert({ comment_id: commentId, user_id: currentAuthUser.id });
                 }
-                
                 playRegularSound();
-                await loadData(); // Tarik data terbaru dari Supabase
+                await loadData(); // Force Sync
             } catch(err) {
-                console.error(err);
                 showToast('❌ Gagal Like', err.message, 'fa-times-circle');
             }
         };
     });
 
-    // ============================================================
-    // ✅ PATCH FINAL: TOMBOL EDIT KOMENTAR (Force Sync)
-    // ============================================================
+    // 12. EDIT KOMENTAR (Force Sync ke Supabase)
     document.querySelectorAll('.comment-action-btn[data-action="edit-comment"]').forEach(el => {
         el.onclick = async function(e) {
             e.preventDefault(); e.stopPropagation();
@@ -5476,7 +5489,6 @@ function attachPostListeners() {
             const postId = this.dataset.postId;
             if (!commentId) return;
 
-            // Cari text lama
             const post = posts.find(p => p.id === postId);
             let oldText = '';
             try {
@@ -5495,7 +5507,6 @@ function attachPostListeners() {
             if (newText === null || newText.trim() === '' || newText.trim() === oldText) return;
 
             try {
-                // Tembak ke Supabase
                 const { error } = await window.salinkSupabase
                     .from('comments')
                     .update({ content: newText.trim(), updated_at: new Date().toISOString() })
@@ -5504,16 +5515,14 @@ function attachPostListeners() {
                 if (error) throw error;
                 
                 showToast('✅', 'Komentar diedit', 'fa-check-circle');
-                await loadData(); // Paksa UI tarik data baru SETELAH database selesai update
+                await loadData(); // Force Sync
             } catch (err) {
                 showToast('❌ Gagal', err.message, 'fa-times-circle');
             }
         };
     });
 
-    // ============================================================
-    // ✅ PATCH FINAL: TOMBOL HAPUS KOMENTAR (Force Sync)
-    // ============================================================
+    // 13. HAPUS KOMENTAR (Force Sync ke Supabase)
     document.querySelectorAll('.comment-action-btn[data-action="delete-comment"]').forEach(el => {
         el.onclick = async function(e) {
             e.preventDefault(); e.stopPropagation();
@@ -5525,7 +5534,6 @@ function attachPostListeners() {
             if (!confirm('Hapus komentar ini secara permanen?')) return;
 
             try {
-                // Tembak ke Supabase
                 const { error } = await window.salinkSupabase
                     .from('comments')
                     .delete()
@@ -5534,13 +5542,13 @@ function attachPostListeners() {
                 if (error) throw error;
                 
                 showToast('✅', 'Komentar dihapus', 'fa-check-circle');
-                await loadData(); // Paksa UI tarik data baru SETELAH database selesai hapus
+                await loadData(); // Force Sync
             } catch (err) {
                 showToast('❌ Gagal', err.message, 'fa-times-circle');
             }
         };
     });
-} 
+}
         
 // ====================================================================
 // 29. POST CLICK HANDLERS
@@ -5948,32 +5956,6 @@ async function handleDeleteComment(commentId, postId) {
         if (error) throw error;
         
         // 2. Tarik data terbaru dari database (Paksa UI berubah)
-        await loadData(); 
-        showToast('✅', 'Komentar berhasil dihapus', 'fa-check-circle');
-        
-    } catch (err) {
-        console.error('[DELETE COMMENT]', err);
-        showToast('❌ Gagal Hapus', err.message, 'fa-times-circle');
-    }
-}
-
-/* ================================================================
- * PATCH KOMENTAR: HAPUS (Force Sync ke Supabase)
- * ================================================================ */
-async function handleDeleteComment(commentId, postId) {
-    if (!currentAuthUser) { showToast('🔒 Login', 'Silakan login', 'fa-lock'); return; }
-    if (!confirm('Hapus komentar ini secara permanen?')) return;
-
-    try {
-        // 1. Hapus dari Supabase
-        const { error } = await window.salinkSupabase
-            .from('comments')
-            .delete()
-            .eq('id', commentId);
-
-        if (error) throw error;
-        
-        // 2. Tarik data terbaru (Paksa UI berubah)
         await loadData(); 
         showToast('✅', 'Komentar berhasil dihapus', 'fa-check-circle');
         
