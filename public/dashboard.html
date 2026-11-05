@@ -5479,76 +5479,6 @@ function attachPostListeners() {
         };
     });
 
-    // 12. EDIT KOMENTAR (Force Sync ke Supabase)
-    document.querySelectorAll('.comment-action-btn[data-action="edit-comment"]').forEach(el => {
-        el.onclick = async function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (isPreviewMode) { showPreviewOverlay(); return; }
-            
-            const commentId = this.dataset.commentId;
-            const postId = this.dataset.postId;
-            if (!commentId) return;
-
-            const post = posts.find(p => p.id === postId);
-            let oldText = '';
-            try {
-                const arr = JSON.parse(post.comments || '[]');
-                for (let c of arr) {
-                    if (c.id === commentId) { oldText = c.content || c.text; break; }
-                    if (c.replies) {
-                        for (let r of c.replies) {
-                            if (r.id === commentId) { oldText = r.content || r.text; break; }
-                        }
-                    }
-                }
-            } catch(e) {}
-
-            const newText = prompt('Edit komentar:', oldText);
-            if (newText === null || newText.trim() === '' || newText.trim() === oldText) return;
-
-            try {
-                const { error } = await window.salinkSupabase
-                    .from('comments')
-                    .update({ content: newText.trim(), updated_at: new Date().toISOString() })
-                    .eq('id', commentId);
-
-                if (error) throw error;
-                
-                showToast('✅', 'Komentar diedit', 'fa-check-circle');
-                await loadData(); // Force Sync
-            } catch (err) {
-                showToast('❌ Gagal', err.message, 'fa-times-circle');
-            }
-        };
-    });
-
-    // 13. HAPUS KOMENTAR (Force Sync ke Supabase)
-    document.querySelectorAll('.comment-action-btn[data-action="delete-comment"]').forEach(el => {
-        el.onclick = async function(e) {
-            e.preventDefault(); e.stopPropagation();
-            if (isPreviewMode) { showPreviewOverlay(); return; }
-            
-            const commentId = this.dataset.commentId;
-            if (!commentId) return;
-
-            if (!confirm('Hapus komentar ini secara permanen?')) return;
-
-            try {
-                const { error } = await window.salinkSupabase
-                    .from('comments')
-                    .delete()
-                    .eq('id', commentId);
-
-                if (error) throw error;
-                
-                showToast('✅', 'Komentar dihapus', 'fa-check-circle');
-                await loadData(); // Force Sync
-            } catch (err) {
-                showToast('❌ Gagal', err.message, 'fa-times-circle');
-            }
-        };
-    });
-}
         
 // ====================================================================
 // 29. POST CLICK HANDLERS
@@ -5647,53 +5577,115 @@ async function toggleLike(postId) {
 // 31. ADD COMMENT (FCM TRIGGER)
 // ====================================================================
 /* ================================================================
- * PATCH 2 — addComment() dengan dukungan parent_id (reply)
- *
- * Alur:
- * 1) Kalau parentId ada → reply, auto-prepend @username
- * 2) INSERT ke `comments` dengan parent_id
- * 3) Update UI + global state
- * 4) Dual-write ke GAS
+ * PATCH KOMENTAR FINAL — SINKRONISASI TOTAL SUPABASE
  * ================================================================ */
+
+// 1. KIRIM KOMENTAR / BALASAN
 async function addComment(postId, text, parentId = null) {
     if (!currentUser || !currentAuthUser) { showToast('🔒 Login', 'Silakan login', 'fa-lock'); return; }
-
-    let trimmedText = text.trim();
+    const trimmedText = text.trim();
     if (!trimmedText) return;
 
+    try {
+        // Tembak ke Supabase
+        const { error } = await window.salinkSupabase
+            .from('comments')
+            .insert({
+                user_id: currentAuthUser.id,
+                post_id: postId,
+                content: trimmedText,
+                parent_id: parentId || null
+            });
+
+        if (error) throw error;
+
+        playRegularSound();
+        showToast('✅', 'Komentar terkirim', 'fa-check-circle');
+        
+        // Paksa tarik data terbaru (SINKRONISASI UI)
+        await loadData(); 
+
+    } catch (err) {
+        console.error('[COMMENT]', err);
+        showToast('❌ Gagal', err.message, 'fa-times-circle');
+    }
+}
+
+// 2. EDIT KOMENTAR
+async function handleEditComment(commentId, postId) {
+    if (!currentAuthUser) { showToast('🔒 Login', 'Silakan login', 'fa-lock'); return; }
+    
     const post = posts.find(p => p.id === postId);
     if (!post) return;
 
-    // Cek apakah postId UUID Supabase
-    const isUUID = isSupabaseUUID(postId);
-
-    // ============================================================
-    // PREPARE — Kalau reply, siapkan parent info
-    // ============================================================
-    let parentComment = null;
-    let parentUsername = null;
-    let parentCommentId = null;
-
-    if (parentId) {
-        // Cari parent di comments post
-        const postComments = JSON.parse(post.comments || '[]');
-        parentComment = postComments.find(c => c.id === parentId);
-        
-        if (parentComment) {
-            // Cari username parent (userId di comment = username atau UUID)
-            parentUsername = parentComment.userId || '';
-            parentCommentId = parentComment.id;
-            
-            // Auto-prepend @username kalau belum ada di text
-            if (parentUsername && !trimmedText.startsWith('@' + parentUsername)) {
-                trimmedText = '@' + parentUsername + ' ' + trimmedText;
+    // Cari text lama untuk dimasukkan ke prompt
+    let oldText = '';
+    const parseComments = (arr) => {
+        for (let c of arr) {
+            if (c.id === commentId) return c.content || c.text;
+            if (c.replies) {
+                for (let r of c.replies) {
+                    if (r.id === commentId) return r.content || r.text;
+                }
             }
-        } else {
-            console.warn('[Comment] Parent comment tidak ditemukan:', parentId);
-            // Lanjut sebagai komentar biasa
-            parentId = null;
         }
+        return '';
+    };
+    
+    try {
+        oldText = parseComments(JSON.parse(post.comments || '[]'));
+    } catch(e) {}
+
+    const newText = prompt('Edit komentar:', oldText);
+    if (newText === null || newText.trim() === '' || newText.trim() === oldText) return;
+
+    try {
+        // Update ke Supabase
+        const { error } = await window.salinkSupabase
+            .from('comments')
+            .update({ 
+                content: newText.trim(),
+                updated_at: new Date().toISOString() 
+            })
+            .eq('id', commentId);
+
+        if (error) throw error;
+        
+        showToast('✅', 'Komentar diedit', 'fa-check-circle');
+        
+        // Paksa tarik data terbaru (SINKRONISASI UI)
+        await loadData(); 
+
+    } catch (err) {
+        console.error('[EDIT COMMENT]', err);
+        showToast('❌ Gagal Edit', err.message, 'fa-times-circle');
     }
+}
+
+// 3. HAPUS KOMENTAR
+async function handleDeleteComment(commentId, postId) {
+    if (!currentAuthUser) { showToast('🔒 Login', 'Silakan login', 'fa-lock'); return; }
+    if (!confirm('Hapus komentar ini secara permanen?')) return;
+
+    try {
+        // Hapus dari Supabase
+        const { error } = await window.salinkSupabase
+            .from('comments')
+            .delete()
+            .eq('id', commentId);
+
+        if (error) throw error;
+        
+        showToast('✅', 'Komentar dihapus', 'fa-check-circle');
+        
+        // Paksa tarik data terbaru (SINKRONISASI UI)
+        await loadData(); 
+
+    } catch (err) {
+        console.error('[DELETE COMMENT]', err);
+        showToast('❌ Gagal Hapus', err.message, 'fa-times-circle');
+    }
+}
 
     // ============================================================
     // 1) INSERT KE SUPABASE (PRIMARY)
@@ -5772,198 +5764,6 @@ async function addComment(postId, text, parentId = null) {
     setPostComments(postId, comments);
     safeSavePosts(posts);
 
-    // ============================================================
-    // 3) DUAL-WRITE KE GAS (BACKUP)
-    // ============================================================
-    try {
-        const r = await apiCall('comment_post', {
-            postId: postId,
-            commenterId: currentUser.username,
-            commenterName: currentUser.fullName,
-            text: trimmedText,
-            parentId: parentId || ''
-        });
-        console.log('📤 [Comment] GAS backup:', r.status);
-    } catch (e) {
-        console.warn('⚠️ [Comment] GAS error:', e.message);
-    }
-
-    // ============================================================
-    // 4) RENDER + SYNC
-    // ============================================================
-    renderPosts();
-    broadcastSync('new_post', { id: postId });
-    playRegularSound();
-
-    // ============================================================
-    // PATCH 6D — Kirim NOTIFIKASI ke pemilik post / parent comment
-    // ============================================================
-    try {
-        const notifTargetUserId = parentComment 
-            ? parentComment.userAuthId
-            : post.userAuthId;
-        
-        const notifTargetUsername = parentComment
-            ? parentComment.userId
-            : post.userId;
-        
-        // Jangan kirim notif ke diri sendiri
-        const isSelfAction = currentAuthUser?.id === notifTargetUserId;
-        
-        if (notifTargetUserId && !isSelfAction) {
-            const isEmergency = post.isSpecial && post.specialType;
-            const notifType = isEmergency 
-                ? 'emergency_' + post.specialType
-                : (parentComment ? 'social_reply' : 'social_comment');
-            
-            const notifTitle = isEmergency
-                ? EMERGENCY_ICONS[post.specialType] + ' ' + EMERGENCY_LABELS[post.specialType]
-                : (parentComment ? '💬 Balasan Komentar' : '💬 Komentar Baru');
-            
-            const notifMessage = currentUser.fullName + ' ' + 
-                (parentComment ? 'membalas komentar Anda' : 'mengomentari postingan Anda') +
-                ': "' + trimmedText.substring(0, 80) + '"';
-            
-            const notifPayload = {
-                id: 'notif-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
-                user_id: notifTargetUserId,
-                sender_id: currentAuthUser.id,
-                type: notifType,
-                title: notifTitle,
-                message: notifMessage,
-                link: 'detail-emergency.html?id=' + postId,
-                post_id: postId,
-                emergency_id: isEmergency ? postId : null,
-                sound_key: isEmergency ? post.specialType : 'social_comment',
-                read: false,
-                created_at: new Date().toISOString()
-            };
-            
-            console.log('📤 [Notif 6D] Kirim ke', notifTargetUsername, '| type:', notifType);
-            
-            // Insert ke Supabase
-            if (window.SALINK_SB_READY && window.salinkSupabase) {
-                const { error: notifError } = await window.salinkSupabase
-                    .from('notifications')
-                    .insert(notifPayload);
-                
-                if (notifError) {
-                    console.warn('⚠️ [Notif 6D] Supabase error:', notifError.message);
-                } else {
-                    console.log('✅ [Notif 6D] Tersimpan di Supabase');
-                }
-            }
-            
-            // Trigger FCM (via GAS)
-            try {
-                await apiCall('send_notification', {
-                    userId: notifTargetUserId,
-                    username: notifTargetUsername,
-                    type: notifType,
-                    title: notifTitle,
-                    message: notifMessage,
-                    link: notifPayload.link,
-                    soundKey: notifPayload.sound_key
-                });
-                console.log('📤 [Notif 6D] FCM trigger terkirim');
-            } catch (fcmErr) {
-                console.warn('⚠️ [Notif 6D] FCM error:', fcmErr.message);
-            }
-        } else {
-            console.log('ℹ️ [Notif 6D] Skip (self action atau tidak ada target)');
-        }
-    } catch (notifCatch) {
-        console.warn('⚠️ [Notif 6D] Catch:', notifCatch.message);
-    }
-
-    console.log('📊 [Comment] Result:', {
-        supabaseOk: supabaseOk,
-        isReply: !!parentId,
-        parentId: parentId,
-        totalComments: comments.length,
-        supabaseCommentId: supabaseCommentId
-    });
-
-    return newComment;
-}
-
-/* ================================================================
- * PATCH KOMENTAR: EDIT (Force Sync ke Supabase)
- * ================================================================ */
-async function handleEditComment(commentId, postId) {
-    if (!currentAuthUser) { showToast('🔒 Login', 'Silakan login', 'fa-lock'); return; }
-    
-    const post = posts.find(p => p.id === postId);
-    if (!post) return;
-
-    // 1. Cari teks lama untuk ditampilkan di prompt
-    let oldText = '';
-    const parseComments = (arr) => {
-        for (let c of arr) {
-            if (c.id === commentId) return c.content || c.text;
-            if (c.replies) {
-                for (let r of c.replies) {
-                    if (r.id === commentId) return r.content || r.text;
-                }
-            }
-        }
-        return '';
-    };
-    
-    try {
-        oldText = parseComments(JSON.parse(post.comments || '[]'));
-    } catch(e) {}
-
-    const newText = prompt('Edit komentar:', oldText);
-    if (newText === null || newText.trim() === '' || newText.trim() === oldText) return;
-
-    try {
-        // 2. Update ke Supabase
-        const { error } = await window.salinkSupabase
-            .from('comments')
-            .update({ 
-                content: newText.trim(),
-                updated_at: new Date().toISOString()
-            })
-            .eq('id', commentId);
-
-        if (error) throw error;
-        
-        // 3. Tarik data terbaru dari database (Paksa UI berubah)
-        await loadData(); 
-        showToast('✅', 'Komentar berhasil diedit', 'fa-check-circle');
-        
-    } catch (err) {
-        console.error('[EDIT COMMENT]', err);
-        showToast('❌ Gagal Edit', err.message, 'fa-times-circle');
-    }
-}
-
-/* ================================================================
- * PATCH KOMENTAR: HAPUS (Force Sync ke Supabase)
- * ================================================================ */
-async function handleDeleteComment(commentId, postId) {
-    if (!currentAuthUser) { showToast('🔒 Login', 'Silakan login', 'fa-lock'); return; }
-    if (!confirm('Hapus komentar ini secara permanen?')) return;
-
-    try {
-        // 1. Hapus dari Supabase
-        const { error } = await window.salinkSupabase
-            .from('comments')
-            .delete()
-            .eq('id', commentId);
-
-        if (error) throw error;
-        
-        // 2. Tarik data terbaru dari database (Paksa UI berubah)
-        await loadData(); 
-        showToast('✅', 'Komentar berhasil dihapus', 'fa-check-circle');
-        
-    } catch (err) {
-        console.error('[DELETE COMMENT]', err);
-        showToast('❌ Gagal Hapus', err.message, 'fa-times-circle');
-    }
-}
         
 // ====================================================================
 // 32. TRIGGER LOCAL EMERGENCY VISUAL (FIX BUG 2)
