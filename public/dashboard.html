@@ -5491,7 +5491,7 @@ async function attachPostListeners() {
 }
 
 // ====================================================================
-// 28c. FUNGSI EDIT & HAPUS KOMENTAR (FORCE SYNC UI)
+// 28c. FUNGSI EDIT & HAPUS KOMENTAR (YANG HILANG)
 // ====================================================================
 async function handleEditComment(commentId, postId) {
     if (!currentAuthUser) return;
@@ -5517,7 +5517,6 @@ async function handleEditComment(commentId, postId) {
     if (newText === null || newText.trim() === '' || newText.trim() === oldText) return;
 
     try {
-        // 1. Update ke Supabase
         const { error } = await window.salinkSupabase
             .from('comments')
             .update({ content: newText.trim(), updated_at: new Date().toISOString() })
@@ -5525,14 +5524,8 @@ async function handleEditComment(commentId, postId) {
 
         if (error) throw error;
         
-        // 2. TUNGGU sampai data terbaru masuk ke array `posts`
-        await loadData(); 
-
-        // 3. Paksa render ulang UI setelah data masuk
-        renderPosts(); 
-        renderPostsStats();
-
         showToast('✅', 'Komentar diedit', 'fa-check-circle');
+        await loadData(); // Force Sync
     } catch (err) {
         console.error('[EDIT COMMENT]', err);
         showToast('❌ Gagal Edit', err.message, 'fa-times-circle');
@@ -5544,7 +5537,6 @@ async function handleDeleteComment(commentId, postId) {
     if (!confirm('Hapus komentar ini secara permanen?')) return;
 
     try {
-        // 1. Hapus dari Supabase
         const { error } = await window.salinkSupabase
             .from('comments')
             .delete()
@@ -5552,14 +5544,8 @@ async function handleDeleteComment(commentId, postId) {
 
         if (error) throw error;
         
-        // 2. TUNGGU sampai data terbaru masuk ke array `posts`
-        await loadData(); 
-
-        // 3. Paksa render ulang UI setelah data masuk
-        renderPosts();
-        renderPostsStats();
-
         showToast('✅', 'Komentar dihapus', 'fa-check-circle');
+        await loadData(); // Force Sync
     } catch (err) {
         console.error('[DELETE COMMENT]', err);
         showToast('❌ Gagal Hapus', err.message, 'fa-times-circle');
@@ -5652,17 +5638,12 @@ async function toggleLike(postId) {
         renderPosts();
         updateStatsCards();
         playRegularSound();
-
-        // TARIK DATA DARI SUPABASE (agar sinkron)
-        await loadData();
-        renderPosts(); // Paksa render ulang setelah data masuk
-
     } catch (err) {
         console.error('[LIKE] Gagal:', err);
         showToast('❌ Gagal Like', err.message, 'fa-times-circle');
     }
 }
-        
+
 // ====================================================================
 // 32. TRIGGER LOCAL EMERGENCY VISUAL (FIX BUG 2)
 // ====================================================================
