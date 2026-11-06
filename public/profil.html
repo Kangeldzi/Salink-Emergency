@@ -5491,6 +5491,44 @@ async function attachPostListeners() {
 }
 
 // ====================================================================
+// FUNGSI KIRIM KOMENTAR UTAMA (ADD COMMENT)
+// ====================================================================
+async function addComment(postId, text, parentId = null) {
+    if (!currentUser || !currentAuthUser) {
+        showToast('🔒 Login', 'Silakan login', 'fa-lock');
+        return;
+    }
+
+    const trimmedText = text.trim();
+    if (!trimmedText) return;
+
+    try {
+        // 1. Kirim ke Supabase
+        const { error } = await window.salinkSupabase
+            .from('comments')
+            .insert({
+                user_id: currentAuthUser.id,
+                post_id: postId,
+                content: trimmedText,
+                parent_id: parentId || null
+            });
+
+        if (error) throw error;
+
+        // 2. Bunyikan suara & Notifikasi
+        playRegularSound();
+        showToast('✅', 'Komentar terkirim', 'fa-check-circle');
+
+        // 3. Tarik ulang data dari Supabase
+        await loadData(); 
+
+    } catch (err) {
+        console.error('[COMMENT]', err);
+        showToast('❌ Gagal', err.message, 'fa-times-circle');
+    }
+}
+        
+// ====================================================================
 // 28c. FUNGSI EDIT & HAPUS KOMENTAR (YANG HILANG)
 // ====================================================================
 async function handleEditComment(commentId, postId) {
