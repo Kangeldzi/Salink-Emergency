@@ -5291,7 +5291,7 @@ function renderRepliesBlock(parent, replies, repliesByParent, postId, parentDept
 }
 
 // ====================================================================
-// 28b. ATTACH POST LISTENERS (FIX TOTAL - BERSIH TANPA TUMPANG TINDIH)
+// 28b. ATTACH POST LISTENERS (FIX TOTAL - BERSIH)
 // ====================================================================
 function attachPostListeners() {
     // 1. Tombol Komentar (Buka/Tutup)
@@ -5447,7 +5447,7 @@ function attachPostListeners() {
         };
     });
 
-    // 11. LIKE KOMENTAR
+    // 11. LIKE KOMENTAR (Force Sync ke Supabase)
     document.querySelectorAll('.comment-action-btn[data-action="like-comment"]').forEach(el => {
         el.onclick = async function(e) {
             e.preventDefault(); e.stopPropagation();
@@ -5467,9 +5467,90 @@ function attachPostListeners() {
                 await loadData(); // Force Sync
             } catch(err) {
                 showToast('❌ Gagal Like', err.message, 'fa-times-circle');
+            }
         };
     });
- }     
+
+    // 12. EDIT KOMENTAR
+    document.querySelectorAll('.comment-action-btn[data-action="edit-comment"]').forEach(el => {
+        el.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (isPreviewMode) { showPreviewOverlay(); return; }
+            handleEditComment(this.dataset.commentId, this.dataset.postId);
+        };
+    });
+
+    // 13. HAPUS KOMENTAR
+    document.querySelectorAll('.comment-action-btn[data-action="delete-comment"]').forEach(el => {
+        el.onclick = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            if (isPreviewMode) { showPreviewOverlay(); return; }
+            handleDeleteComment(this.dataset.commentId, this.dataset.postId);
+        };
+    });
+}
+
+// ====================================================================
+// 28c. FUNGSI EDIT & HAPUS KOMENTAR (YANG HILANG)
+// ====================================================================
+async function handleEditComment(commentId, postId) {
+    if (!currentAuthUser) return;
+    const post = posts.find(p => p.id === postId);
+    if (!post) return;
+
+    let oldText = '';
+    const parseComments = (arr) => {
+        for (let c of arr) {
+            if (c.id === commentId) return c.content || c.text;
+            if (c.replies) {
+                for (let r of c.replies) {
+                    if (r.id === commentId) return r.content || r.text;
+                }
+            }
+        }
+        return '';
+    };
+    
+    try { oldText = parseComments(JSON.parse(post.comments || '[]')); } catch(e) {}
+
+    const newText = prompt('Edit komentar:', oldText);
+    if (newText === null || newText.trim() === '' || newText.trim() === oldText) return;
+
+    try {
+        const { error } = await window.salinkSupabase
+            .from('comments')
+            .update({ content: newText.trim(), updated_at: new Date().toISOString() })
+            .eq('id', commentId);
+
+        if (error) throw error;
+        
+        showToast('✅', 'Komentar diedit', 'fa-check-circle');
+        await loadData(); // Force Sync
+    } catch (err) {
+        console.error('[EDIT COMMENT]', err);
+        showToast('❌ Gagal Edit', err.message, 'fa-times-circle');
+    }
+}
+
+async function handleDeleteComment(commentId, postId) {
+    if (!currentAuthUser) return;
+    if (!confirm('Hapus komentar ini secara permanen?')) return;
+
+    try {
+        const { error } = await window.salinkSupabase
+            .from('comments')
+            .delete()
+            .eq('id', commentId);
+
+        if (error) throw error;
+        
+        showToast('✅', 'Komentar dihapus', 'fa-check-circle');
+        await loadData(); // Force Sync
+    } catch (err) {
+        console.error('[DELETE COMMENT]', err);
+        showToast('❌ Gagal Hapus', err.message, 'fa-times-circle');
+    }
+}
         
 // ====================================================================
 // 29. POST CLICK HANDLERS
