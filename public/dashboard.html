@@ -3626,91 +3626,197 @@ async function apiCall(action, data) {
  * - Comments + profiles komentator di-query dengan JOIN
  * - Tidak ada duplikasi, tidak ada kode rusak
  * ================================================================ */
+ 
 async function apiGetPosts() {
-    try {
-        if (window.SALINK_SB_READY && window.salinkSupabase) {
-            const client = window.salinkSupabase;
-            
-            // 1. Ambil Posts
-            const { data: rawPosts, error: postsError } = await client
-                .from('posts').select('*').order('created_at', { ascending: false }).limit(50);
-            if (postsError) throw postsError;
-            if (!rawPosts || rawPosts.length === 0) return [];
+    const client = window.salinkSupabase;
 
-            // 2. Ambil Profil
-            let profileMap = {};
-            const userIds = [...new Set(rawPosts.map(p => p.user_id).filter(Boolean))];
-            if (userIds.length > 0) {
-                const { data: profilesData } = await client.from('profiles').select('id, username, full_name, profile_picture, gender').in('id', userIds);
-                if (profilesData) profilesData.forEach(p => { profileMap[p.id] = p; });
-            }
-
-            // 3. Ambil Relasi
-            const [mediaRes, likesRes, commentsRes, commentLikesRes] = await Promise.allSettled([
-                client.from('media').select('*').not('post_id', 'is', null),
-                client.from('likes').select('*'),
-                client.from('comments').select('*').is('deleted_at', null),
-                client.from('comment_likes').select('*')
-            ]);
-
-            const rawMedia = mediaRes.value?.data || [];
-            const rawLikes = likesRes.value?.data || [];
-            const rawComments = commentsRes.value?.data || [];
-            const rawCommentLikes = commentLikesRes.value?.data || [];
-
-            // 4. Profil Komentator
-            let commentProfileMap = {};
-            const commentUserIds = [...new Set(rawComments.map(c => c.user_id).filter(Boolean))];
-            if (commentUserIds.length > 0) {
-                const { data: cProfiles } = await client.from('profiles').select('id, username, full_name, profile_picture, gender').in('id', commentUserIds);
-                if (cProfiles) cProfiles.forEach(p => { commentProfileMap[p.id] = p; });
-            }
-
-            // 5. Bangun Map Data
-            const mediaByPost = {}; rawMedia.forEach(m => { if (m.post_id) mediaByPost[m.post_id] = m; });
-            const likesByPost = {}; rawLikes.forEach(l => {
-                if (!l.post_id) return;
-                if (!likesByPost[l.post_id]) likesByPost[l.post_id] = [];
-                likesByPost[l.post_id].push(String(l.user_id)); // Paksa String
-            });
-
-            const commentsByPost = {};
-            rawComments.forEach(c => {
-                if (!c.post_id) return;
-                if (!commentsByPost[c.post_id]) commentsByPost[c.post_id] = [];
-                const profile = commentProfileMap[c.user_id] || {};
-                commentsByPost[c.post_id].push({
-                    id: c.id, user_id: c.user_id, userId: profile.username || c.user_id || 'user',
-                    userFullName: profile.full_name || 'Pengguna',
-                    userGender: normalizeGenderProfile(profile.gender || 'Laki-laki'),
-                    userProfilePic: profile.profile_picture || '',
-                    content: c.content || '', text: c.content || '',
-                    parent_id: c.parent_id || null, parentId: c.parent_id || null,
-                    created_at: c.created_at,
-                    timestamp: c.created_at ? new Date(c.created_at).getTime() : Date.now(),
-                    likes_count: rawCommentLikes.filter(cl => cl.comment_id === c.id).length,
-                    is_liked: currentAuthUser ? rawCommentLikes.some(cl => cl.comment_id === c.id && cl.user_id === currentAuthUser.id) : false
-                });
-            });
-
-            // 6. Gabungkan & Adaptasi
-            const adapted = rawPosts.map(row => {
-                row.profiles = profileMap[row.user_id] || {};
-                row.comments = commentsByPost[row.id] || [];
-                row.media = mediaByPost[row.id] ? [mediaByPost[row.id]] : [];
-                row.likes = likesByPost[row.id] || [];
-                return adaptPostFromSupabase(row);
-            }).filter(p => p !== null);
-
-            console.log('✅ [SALINK] Posts berhasil dimuat dari Supabase:', adapted.length);
-            return adapted;
-        }
-    } catch (err) {
-        console.warn('[SALINK] Supabase error:', err.message);
+    // Supabase belum tersedia = kegagalan, bukan feed kosong.
+    if (!window.SALINK_SB_READY || !client) {
+        throw new Error('Koneksi Supabase belum siap.');
     }
-    return []; // Jika gagal, kembalikan array kosong. JANGAN pakai LocalStorage.
-}
-                    
+
+    // 1. Ambil postingan.
+    const { data: rawPosts, error: postsError } = await client
+        .from('posts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+    if (postsError) throw postsError;
+
+    // Hasil kosong hanya sah jika query berhasil.
+    if (!Array.isArray(rawPosts) || rawPosts.length === 0) {
+        return [];
+    }
+
+    // 2. Ambil profil pemilik postingan.
+    const userIds = [
+        ...new Set(rawPosts.map(p => p.user_id).filter(Boolean))
+    ];
+
+    const profileMap = {};
+
+    if (userIds.length > 0) {
+        const { data, error } = await client
+            .from('profiles')
+            .select('id, username, full_name, profile_picture, gender')
+            .in('id', userIds);
+
+        if (error) throw error;
+
+        (data || []).forEach(p => {
+            profileMap[p.id] = p;
+        });
+    }
+
+    // 3. Ambil data relasi.
+    const results = await Promise.all([
+        client.from('media')
+            .select('*')
+            .not('post_id', 'is', null),
+
+        client.from('likes')
+            .select('*'),
+
+        client.from('comments')
+            .select('*')
+            .is('deleted_at', null),
+
+        client.from('comment_likes')
+            .select('*')
+    ]);
+
+    const [mediaRes, likesRes, commentsRes, commentLikesRes] = results;
+
+    // Penting: Supabase dapat mengembalikan error di properti
+    // error meskipun Promise-nya berhasil diselesaikan.
+    for (const result of results) {
+        if (result.error) throw result.error;
+    }
+
+    const rawMedia = mediaRes.data || [];
+    const rawLikes = likesRes.data || [];
+    const rawComments = commentsRes.data || [];
+    const rawCommentLikes = commentLikesRes.data || [];
+
+    // 4. Ambil profil para komentator.
+    const commentUserIds = [
+        ...new Set(rawComments.map(c => c.user_id).filter(Boolean))
+    ];
+
+    const commentProfileMap = {};
+
+    if (commentUserIds.length > 0) {
+        const { data, error } = await client
+            .from('profiles')
+            .select('id, username, full_name, profile_picture, gender')
+            .in('id', commentUserIds);
+
+        if (error) throw error;
+
+        (data || []).forEach(p => {
+            commentProfileMap[p.id] = p;
+        });
+    }
+
+    // 5. Kelompokkan media berdasarkan postingan.
+    const mediaByPost = {};
+
+    rawMedia.forEach(m => {
+        if (m.post_id) {
+            if (!mediaByPost[m.post_id]) {
+                mediaByPost[m.post_id] = [];
+            }
+            mediaByPost[m.post_id].push(m);
+        }
+    });
+
+    // 6. Kelompokkan Like postingan.
+    const likesByPost = {};
+
+    rawLikes.forEach(l => {
+        if (!l.post_id) return;
+
+        if (!likesByPost[l.post_id]) {
+            likesByPost[l.post_id] = [];
+        }
+
+        likesByPost[l.post_id].push(String(l.user_id));
+    });
+
+    // 7. Kelompokkan komentar.
+    const commentsByPost = {};
+
+    rawComments.forEach(c => {
+        if (!c.post_id) return;
+
+        if (!commentsByPost[c.post_id]) {
+            commentsByPost[c.post_id] = [];
+        }
+
+        const profile = commentProfileMap[c.user_id] || {};
+
+        const commentLikes = rawCommentLikes.filter(
+            cl => cl.comment_id === c.id
+        );
+
+        commentsByPost[c.post_id].push({
+            id: c.id,
+            user_id: c.user_id,
+            userId: profile.username || c.user_id || 'user',
+            userFullName: profile.full_name || 'Pengguna',
+            userGender: normalizeGenderProfile(
+                profile.gender || 'Laki-laki'
+            ),
+            userProfilePic: profile.profile_picture || '',
+
+            content: c.content || '',
+            text: c.content || '',
+
+            parent_id: c.parent_id || null,
+            parentId: c.parent_id || null,
+
+            created_at: c.created_at,
+            updated_at: c.updated_at || null,
+            deleted_at: c.deleted_at || null,
+
+            timestamp: c.created_at
+                ? new Date(c.created_at).getTime()
+                : Date.now(),
+
+            likes_count: commentLikes.length,
+
+            is_liked: !!(
+                currentAuthUser &&
+                commentLikes.some(
+                    cl => cl.user_id === currentAuthUser.id
+                )
+            )
+        });
+    });
+
+    // 8. Gabungkan dan sesuaikan format postingan.
+    const adapted = rawPosts.map(row => {
+        const normalizedRow = {
+            ...row,
+            profiles: profileMap[row.user_id] || {},
+            comments: commentsByPost[row.id] || [],
+            media: mediaByPost[row.id] || [],
+            likes: likesByPost[row.id] || []
+        };
+
+        return adaptPostFromSupabase(normalizedRow);
+    }).filter(Boolean);
+
+    console.log(
+        '✅ [SALINK] Data Supabase berhasil dimuat:',
+        adapted.length,
+        'postingan'
+    );
+
+    return adapted;
+}      
+            
 async function apiGetEmergencies() {
     const r = await apiCall('get_emergencies');
     return r.status === 'success' && Array.isArray(r.data) ? r.data.map(adaptEmergency) : [];
@@ -6914,33 +7020,51 @@ function setupLoginGuard() {
 async function loadData() {
     if (window._salinkPostingInProgress) return;
 
-    console.log("🔄 [Sync] Memulai sinkronisasi paksa dari Supabase...");
+    console.log('🔄 [Sync] Memulai sinkronisasi Supabase...');
 
     try {
-        // 1. Ambil data murni dari Supabase
+        // Jika apiGetPosts gagal, fungsi akan masuk ke catch.
+        // Data lama tidak akan dikosongkan.
         const freshPosts = await apiGetPosts();
-        
-        // 2. Timpa array global `posts` secara total
-        if (freshPosts && freshPosts.length > 0) {
-            posts = freshPosts;
-            // Opsional: simpan ke cache, tapi jangan biarkan cache menimpa UI
-            safeSavePosts(posts); 
-        } else if (freshPosts.length === 0) {
-            posts = []; // Kosongkan jika memang tidak ada data
+
+        if (!Array.isArray(freshPosts)) {
+            throw new Error('Format data postingan tidak valid.');
         }
 
-        // 3. Render Ulang Semua Tampilan
-        renderPosts();          // Gambar ulang feed
-        renderPostsStats();     // Gambar ulang statistik postingan
-        renderHologram();       // Gambar ulang hologram
+        // Hanya hasil query yang benar-benar berhasil
+        // yang boleh menggantikan data feed sebelumnya.
+        posts = freshPosts;
+
+        safeSavePosts(posts);
+
+        renderPosts();
+        renderPostsStats();
+        renderHologram();
         updateEmergencyBadges();
         updateNotifBadge();
         updateStatsCards();
         updateAllCharts();
 
-        console.log("✅ [Sync] UI berhasil disinkronkan!");
+        console.log(
+            '✅ [Sync] Feed berhasil diperbarui:',
+            posts.length,
+            'postingan'
+        );
+
+        return true;
+
     } catch (err) {
-        console.warn('[loadData] Gagal:', err.message);
+        console.error('[loadData] Sinkronisasi gagal:', err);
+
+        // Pertahankan posts yang sebelumnya sudah ada.
+        // Jangan menggantinya dengan array kosong.
+        showToast(
+            '⚠️ Sinkronisasi',
+            'Gagal mengambil data terbaru. Tampilan sebelumnya dipertahankan.',
+            'fa-exclamation-triangle'
+        );
+
+        return false;
     }
 }
 
